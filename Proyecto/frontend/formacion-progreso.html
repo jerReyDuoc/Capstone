@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi progreso — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container" id="app">
+    <p class="loading">Cargando progreso…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
+    return Therion.store.api.mapaFormativo();
+  }).then(function (mapa) {
+    var app = document.getElementById("app");
+    var todos = [];
+    Object.keys(mapa).forEach(function (d) { todos = todos.concat(mapa[d]); });
+    var completados = todos.filter(function (m) { return m.estado === "completado"; }).length;
+    var enCurso = todos.filter(function (m) { return m.estado === "en_curso"; }).length;
+
+    var secciones = Object.keys(mapa).map(function (dimension) {
+      var filas = mapa[dimension].map(function (m) {
+        return '<li class="list-row"><span>' + Therion.ui.escapeHtml(m.nivel) + ' — ' + Therion.ui.escapeHtml(m.titulo) +
+          '</span><span class="text-muted">' + Therion.ui.escapeHtml(m.estado.replace("_", " ")) + '</span></li>';
+      }).join("");
+      return '<div class="mb-6"><h2 class="font-editorial mb-2" style="font-size:1rem;">' + Therion.ui.escapeHtml(dimension) +
+        '</h2><ul class="list-plain text-sm">' + filas + '</ul></div>';
+    }).join("");
+
+    app.innerHTML =
+      '<h1 class="font-editorial mb-6" style="font-size:1.6rem;">Mi progreso formativo</h1>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center;" class="mb-8">' +
+      '<div class="card"><p class="font-editorial" style="font-size:1.4rem;font-weight:600;">' + todos.length + '</p><p class="text-xs text-muted">Módulos totales</p></div>' +
+      '<div class="card"><p class="font-editorial" style="font-size:1.4rem;font-weight:600;">' + enCurso + '</p><p class="text-xs text-muted">En curso</p></div>' +
+      '<div class="card"><p class="font-editorial" style="font-size:1.4rem;font-weight:600;">' + completados + '</p><p class="text-xs text-muted">Completados</p></div>' +
+      '</div>' + secciones;
+  }).catch(function () {});
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa formativo — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container-lg" id="app">
+    <p class="loading">Cargando mapa formativo…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  var ESTADO_COLOR = { bloqueado: "var(--na)", en_curso: "var(--partial)", completado: "var(--verify)" };
+
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
+    return Therion.store.api.mapaFormativo();
+  }).then(function (mapa) {
+    var app = document.getElementById("app");
+    var secciones = Object.keys(mapa).map(function (dimension) {
+      var tarjetas = mapa[dimension].map(function (m) {
+        return (
+          '<a href="formacion-modulo.html?dimension=' + encodeURIComponent(dimension) + '&nivel=' + encodeURIComponent(m.nivel) + '" class="card card-link" style="display:block;">' +
+          '<p class="text-xs text-faint mb-1">' + Therion.ui.escapeHtml(m.nivel) + '</p>' +
+          '<p class="text-sm mb-3" style="font-weight:500;">' + Therion.ui.escapeHtml(m.titulo) + '</p>' +
+          Therion.ui.statusTag(m.estado.replace("_", " "), ESTADO_COLOR[m.estado]) +
+          '</a>'
+        );
+      }).join("");
+      return (
+        '<div class="mb-8">' +
+        '<h2 class="font-editorial mb-3" style="font-size:1.1rem;">' + Therion.ui.escapeHtml(dimension) + '</h2>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">' + tarjetas + '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    app.innerHTML =
+      '<div class="flex justify-between items-center mb-8">' +
+      '<h1 class="font-editorial" style="font-size:1.6rem;">Mapa formativo</h1>' +
+      '<a href="formacion-progreso.html" class="text-sm" style="color:var(--accent);">Ver mi progreso &rarr;</a>' +
+      '</div>' + secciones;
+  }).catch(function () {});
+</script>
+</body>
+</html>

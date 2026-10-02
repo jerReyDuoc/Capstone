@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cuestionario — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container" id="app">
+    <p class="loading">Cargando…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  var ESTADOS = [
+    { value: "cumplido", label: "Cumplido" },
+    { value: "parcial", label: "Parcial" },
+    { value: "no", label: "No cumplido" },
+    { value: "revision", label: "Requiere revisión" },
+    { value: "na", label: "No aplica" },
+  ];
+  var EXIGEN_EVIDENCIA = { cumplido: true, parcial: true };
+
+  var app = document.getElementById("app");
+  var diagnosticoId = null;
+  var reglas = [];
+  var gateIndex = 0;
+  var controles = [];
+  var controlIndex = 0;
+  var aplicablesTotales = [];
+  var estadoSeleccionado = "cumplido";
+  var archivoSeleccionado = null;
+
+  function asegurarDiagnostico() {
+    var id = window.localStorage.getItem("therion_diagnostico_id");
+    if (id) return Promise.resolve(id);
+    return Therion.store.api.crearDiagnostico().then(function (diag) {
+      window.localStorage.setItem("therion_diagnostico_id", diag.id);
+      return diag.id;
+    });
+  }
+
+  function renderCerradoPorRaizNo() {
+    app.innerHTML =
+      '<div style="max-width:480px;margin:0 auto;text-align:center;padding-top:48px;">' +
+      '<h1 class="font-editorial mb-4" style="font-size:1.6rem;">Diagnóstico cerrado</h1>' +
+      '<p class="text-muted">Como tu organización no utiliza, desarrolla ni integra sistemas de IA, ningún ' +
+      'control de la matriz aplica todavía. El diagnóstico quedó cerrado con 0 controles aplicables.</p></div>';
+  }
+
+  function renderGate() {
+    var regla = reglas[gateIndex];
+    app.innerHTML =
+      '<div style="max-width:480px;margin:0 auto;padding-top:48px;">' +
+      '<p class="text-xs text-faint font-technical mb-2">Puerta ' + (gateIndex + 1) + " de " + reglas.length + '</p>' +
+      '<h1 class="font-editorial mb-8" style="font-size:1.3rem;">' + Therion.ui.escapeHtml(regla.pregunta) + '</h1>' +
+      '<p id="error" class="error-text hidden mb-4"></p>' +
+      '<div class="flex gap-3">' +
+      '<button class="btn btn-success" style="flex:1;" id="btn-si">Sí</button>' +
+      '<button class="btn btn-danger" style="flex:1;" id="btn-no">No</button>' +
+      "</div></div>";
+
+    document.getElementById("btn-si").addEventListener("click", function () { responder(true); });
+    document.getElementById("btn-no").addEventListener("click", function () { responder(false); });
+  }
+
+  function responder(respuesta) {
+    var regla = reglas[gateIndex];
+    Therion.store.api.responderGate(diagnosticoId, regla.orden, respuesta).then(function (resultado) {
+      if (resultado.cerrado_por_raiz_no) {
+        renderCerradoPorRaizNo();
+        return;
+      }
+      if (gateIndex + 1 < reglas.length) {
+        gateIndex++;
+        renderGate();
+      } else {
+        pasarAEvaluacion();
+      }
+    }).catch(function (err) {
+      Therion.ui.mostrarError("error", err.message || "Error al responder");
+    });
+  }
+
+  function pasarAEvaluacion() {
+    Therion.store.api.controlesAplicables(diagnosticoId).then(function (res) {
+      aplicablesTotales = res.aplicables;
+      return Promise.all(res.aplicables.map(function (cid) { return Therion.store.api.obtenerControl(cid); }));
+    }).then(function (detalles) {
+      detalles.sort(function (a, b) { return a.control_id.localeCompare(b.control_id); });
+      controles = detalles;
+      controlIndex = 0;
+      renderControl();
+    });
+  }
+
+  function abrirInfoNormativa(control) {
+    var fuente = control.framework_fuente + (control.articulo_referencia ? " — " + control.articulo_referencia : "");
+    var html =
+      '<div class="text-sm">' +
+      '<div class="mb-3"><p class="text-xs text-faint" style="text-transform:uppercase;">Marco / fuente</p><p class="mt-1">' + Therion.ui.escapeHtml(fuente) + '</p></div>' +
+      '<div class="mb-3"><p class="text-xs text-faint" style="text-transform:uppercase;">Tipo de fuente</p><p class="mt-1">' + Therion.ui.escapeHtml(control.tipo_fuente) + '</p></div>' +
+      '<div><p class="text-xs text-faint" style="text-transform:uppercase;">Obligación</p><p class="mt-1">' + Therion.ui.escapeHtml(control.obligacion) + '</p></div>' +
+      "</div>";
+    Therion.ui.mostrarModal("Base normativa de esta pregunta", html);
+  }
+
+  function renderControl() {
+    var control = controles[controlIndex];
+    estadoSeleccionado = "cumplido";
+    archivoSeleccionado = null;
+
+    var botonesEstado = ESTADOS.map(function (e) {
+      var sel = e.value === estadoSeleccionado ? " selected" : "";
+      return '<button type="button" class="btn-outline' + sel + '" data-estado="' + e.value + '">' + e.label + "</button>";
+    }).join(" ");
+
+    app.innerHTML =
+      '<div style="max-width:620px;margin:0 auto;">' +
+      '<p class="text-xs text-faint font-technical mb-2">Control ' + (controlIndex + 1) + " de " + controles.length +
+      " &middot; " + aplicablesTotales.length + ' aplicables en total</p>' +
+      '<div class="card mb-6">' +
+      '<div class="flex justify-between items-center mb-3">' +
+      '<div><span class="text-xs text-muted">' + Therion.ui.escapeHtml(control.dominio) + '</span>' +
+      '<span class="text-xs text-muted"> &middot; Criticidad ' + Therion.ui.escapeHtml(control.criticidad) + '</span></div>' +
+      '<button id="btn-info" title="¿En qué norma se basa esta pregunta?" style="width:24px;height:24px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:none;font-size:0.75rem;font-weight:600;">i</button>' +
+      '</div>' +
+      '<h2 class="font-editorial mb-2" style="font-size:1.15rem;">' + Therion.ui.escapeHtml(control.pregunta) + '</h2>' +
+      '<p class="text-sm text-muted mb-1"><strong>Obligación:</strong> ' + Therion.ui.escapeHtml(control.obligacion) + '</p>' +
+      '<p class="text-sm text-muted"><strong>Evidencia esperada:</strong> ' + Therion.ui.escapeHtml(control.evidencia_esperada) + '</p>' +
+      '</div>' +
+      '<div class="card">' +
+      '<label class="mb-2">Estado</label>' +
+      '<div class="flex gap-2 mb-4" id="botones-estado" style="flex-wrap:wrap;">' + botonesEstado + '</div>' +
+      '<label id="label-evidencia">Evidencia en PDF <span id="evidencia-obligatoria" class="error-text">(obligatoria para este estado)</span></label>' +
+      '<input type="file" accept="application/pdf" id="input-archivo">' +
+      '<p id="archivo-info" class="text-xs mb-2 hidden" style="color:var(--verify);"></p>' +
+      '<p id="evidencia-opcional-msg" class="text-xs text-faint mb-2 hidden">Opcional para este estado (no cumplido / no aplica / requiere revisión).</p>' +
+      '<p id="error" class="error-text hidden mb-3"></p>' +
+      '<button class="btn btn-block" id="btn-guardar">' +
+      (controlIndex + 1 < controles.length ? "Guardar y continuar" : "Guardar y cerrar diagnóstico") +
+      '</button>' +
+      '</div></div>';
+
+    document.getElementById("btn-info").addEventListener("click", function () { abrirInfoNormativa(control); });
+
+    document.querySelectorAll("#botones-estado button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        estadoSeleccionado = btn.getAttribute("data-estado");
+        document.querySelectorAll("#botones-estado button").forEach(function (b) { b.classList.remove("selected"); });
+        btn.classList.add("selected");
+        actualizarRequisitoEvidencia();
+        Therion.ui.mostrarError("error", "");
+      });
+    });
+
+    document.getElementById("input-archivo").addEventListener("change", function (e) {
+      var file = e.target.files[0] || null;
+      if (file && file.type !== "application/pdf") {
+        Therion.ui.mostrarError("error", "La evidencia debe subirse en formato PDF.");
+        archivoSeleccionado = null;
+        document.getElementById("archivo-info").classList.add("hidden");
+        return;
+      }
+      archivoSeleccionado = file;
+      Therion.ui.mostrarError("error", "");
+      var info = document.getElementById("archivo-info");
+      if (file) {
+        info.textContent = "Archivo listo: " + file.name;
+        info.classList.remove("hidden");
+      } else {
+        info.classList.add("hidden");
+      }
+    });
+
+    document.getElementById("btn-guardar").addEventListener("click", guardarEvaluacion);
+
+    // Preselecciona "Cumplido" visualmente
+    document.querySelector('#botones-estado button[data-estado="cumplido"]').classList.add("selected");
+    actualizarRequisitoEvidencia();
+  }
+
+  function actualizarRequisitoEvidencia() {
+    var requiere = !!EXIGEN_EVIDENCIA[estadoSeleccionado];
+    document.getElementById("evidencia-obligatoria").classList.toggle("hidden", !requiere);
+    document.getElementById("evidencia-opcional-msg").classList.toggle("hidden", requiere);
+  }
+
+  function guardarEvaluacion() {
+    var requiere = !!EXIGEN_EVIDENCIA[estadoSeleccionado];
+    if (requiere && !archivoSeleccionado) {
+      Therion.ui.mostrarError("error", "Este estado requiere adjuntar evidencia en PDF antes de continuar.");
+      return;
+    }
+    var btn = document.getElementById("btn-guardar");
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    var control = controles[controlIndex];
+
+    Therion.store.api.registrarEvaluacion(diagnosticoId, control.control_id, estadoSeleccionado, archivoSeleccionado)
+      .then(function () {
+        if (controlIndex + 1 < controles.length) {
+          controlIndex++;
+          renderControl();
+        } else {
+          return Therion.store.api.cerrarDiagnostico(diagnosticoId).then(function () {
+            window.location.href = "resumen.html";
+          });
+        }
+      })
+      .catch(function (err) {
+        Therion.ui.mostrarError("error", err.message || "Error al guardar la evaluación");
+        btn.disabled = false;
+        btn.textContent = controlIndex + 1 < controles.length ? "Guardar y continuar" : "Guardar y cerrar diagnóstico";
+      });
+  }
+
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true }).then(function () {
+    return asegurarDiagnostico();
+  }).then(function (id) {
+    diagnosticoId = id;
+    return Therion.store.api.reglasAplicabilidad();
+  }).then(function (r) {
+    reglas = r.sort(function (a, b) { return a.orden - b.orden; });
+    renderGate();
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel sectorial — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container-lg" id="app">
+    <p class="loading">Cargando…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  var RUBROS = [
+    { id: "", nombre: "Todos" },
+    { id: "manufactura", nombre: "Manufactura" },
+    { id: "retail", nombre: "Retail" },
+    { id: "servicios_financieros", nombre: "Servicios financieros" },
+    { id: "salud", nombre: "Salud" },
+    { id: "tecnologia", nombre: "Tecnología" },
+  ];
+  var rubroActual = "";
+
+  function esqueleto() {
+    var dims = ["Gobernanza de IA", "Gestión de Riesgos", "Protección de Datos", "Uso Responsable"];
+    return '<div class="card-grid">' + dims.map(function (d) {
+      return (
+        '<div class="card" style="opacity:0.55;">' +
+        '<p class="text-xs text-faint mb-1">— rubro —</p>' +
+        '<p class="text-sm mb-2 text-muted">' + Therion.ui.escapeHtml(d) + '</p>' +
+        '<p class="font-editorial" style="font-size:1.4rem;font-weight:600;color:rgba(16,24,40,0.3);">—%</p>' +
+        '<p class="text-xs text-faint">Aún sin datos suficientes</p></div>'
+      );
+    }).join("") + '</div>';
+  }
+
+  function render(items) {
+    var app = document.getElementById("app");
+    var botones = RUBROS.map(function (r) {
+      var sel = r.id === rubroActual ? " selected" : "";
+      return '<button type="button" class="btn-outline' + sel + '" data-rubro="' + r.id + '">' + r.nombre + '</button>';
+    }).join(" ");
+
+    var cuerpo;
+    if (items === null) {
+      cuerpo = esqueleto();
+    } else if (items.length === 0) {
+      cuerpo =
+        '<p class="text-sm text-muted mb-4">Todavía no hay celdas con al menos 5 organizaciones distintas para este filtro. ' +
+        'En cuanto se alcance ese umbral, aquí se mostrarán los promedios reales.</p>' + esqueleto();
+    } else {
+      cuerpo = '<div class="card-grid">' + items.map(function (item) {
+        return (
+          '<div class="card">' +
+          '<p class="text-xs text-faint mb-1">' + Therion.ui.escapeHtml(item.rubro_id) + '</p>' +
+          '<p class="text-sm mb-2" style="font-weight:500;">' + Therion.ui.escapeHtml(item.dimension) + '</p>' +
+          '<p class="font-editorial" style="font-size:1.4rem;font-weight:600;">' + item.promedio + '%</p>' +
+          '<p class="text-xs text-faint">' + item.n_organizaciones + ' organizaciones</p></div>'
+        );
+      }).join("") + '</div>';
+    }
+
+    app.innerHTML =
+      '<div class="flex justify-between items-center mb-2">' +
+      '<h1 class="font-editorial" style="font-size:1.6rem;">Panel sectorial</h1>' +
+      '<a href="panel-metodologia.html" class="text-sm" style="color:var(--accent);">Metodología &rarr;</a>' +
+      '</div>' +
+      '<p class="text-sm text-muted mb-6">Promedios agregados y anonimizados. Solo se muestran celdas con 5 o más organizaciones distintas.</p>' +
+      '<div class="flex gap-2 mb-8" style="flex-wrap:wrap;" id="filtros">' + botones + '</div>' +
+      '<div id="resultados">' + cuerpo + '</div>';
+
+    document.querySelectorAll("#filtros button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        rubroActual = btn.getAttribute("data-rubro");
+        cargar();
+      });
+    });
+  }
+
+  function cargar() {
+    render(null);
+    Therion.store.api.panelSectorial(rubroActual || undefined).then(function (items) {
+      render(items);
+    });
+  }
+
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
+    cargar();
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

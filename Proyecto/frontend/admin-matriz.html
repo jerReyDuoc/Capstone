@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backoffice: matriz — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container-lg" id="app">
+    <p class="loading">Cargando…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  var controles = [];
+  var seleccionadoId = null;
+
+  function cargar() {
+    return Therion.store.api.listarControles().then(function (lista) {
+      controles = lista;
+      renderLista();
+    });
+  }
+
+  function renderLista() {
+    var app = document.getElementById("app");
+    var filas = controles.map(function (c) {
+      return (
+        '<button type="button" class="control-row" data-id="' + c.control_id + '" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--line);padding:12px 16px;">' +
+        '<div class="flex items-center gap-2 mb-1">' + Therion.ui.controlBadge(c.control_id) +
+        '<span class="text-xs text-faint">v' + c.version + '</span></div>' +
+        '<p class="text-sm">' + Therion.ui.escapeHtml(c.pregunta) + '</p></button>'
+      );
+    }).join("");
+
+    app.innerHTML =
+      '<h1 class="font-editorial mb-1" style="font-size:1.6rem;">Backoffice — Matriz de controles</h1>' +
+      '<p class="text-sm text-muted mb-6">Editar un control crea una nueva versión (append-only). Requiere rol <span class="font-technical">admin_therion</span>.</p>' +
+      '<div class="card-grid">' +
+      '<div class="card" style="max-height:70vh;overflow-y:auto;padding:0;">' + filas + '</div>' +
+      '<div class="card" id="panel-edicion"><p class="text-sm text-muted">Selecciona un control para editar.</p></div>' +
+      '</div>';
+
+    document.querySelectorAll(".control-row").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        seleccionadoId = btn.getAttribute("data-id");
+        renderEdicion();
+      });
+    });
+  }
+
+  function renderEdicion() {
+    var control = controles.filter(function (c) { return c.control_id === seleccionadoId; })[0];
+    var panel = document.getElementById("panel-edicion");
+    panel.innerHTML =
+      '<div class="flex items-center gap-2 mb-2">' + Therion.ui.controlBadge(control.control_id) +
+      '<span class="text-xs text-faint">versión vigente: v' + control.version + '</span></div>' +
+      '<p class="text-sm text-muted mb-3">' + Therion.ui.escapeHtml(control.pregunta) + '</p>' +
+      '<label>Recomendación</label>' +
+      '<textarea id="input-recomendacion" rows="5">' + Therion.ui.escapeHtml(control.recomendacion) + '</textarea>' +
+      '<p id="mensaje" class="text-sm mb-3 mt-2 hidden"></p>' +
+      '<button class="btn" id="btn-guardar" style="margin-top:8px;">Guardar como nueva versión</button>';
+
+    document.getElementById("btn-guardar").addEventListener("click", function () {
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = "Guardando…";
+      var recomendacion = document.getElementById("input-recomendacion").value;
+      Therion.store.api.actualizarControl(control.control_id, { recomendacion: recomendacion }).then(function (actualizado) {
+        var msg = document.getElementById("mensaje");
+        msg.textContent = "Se creó la versión " + actualizado.version + " (la anterior quedó cerrada, nunca se sobrescribió).";
+        msg.style.color = "var(--accent)";
+        msg.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Guardar como nueva versión";
+        return cargar();
+      }).catch(function (err) {
+        var msg = document.getElementById("mensaje");
+        msg.textContent = err.message || "Error al guardar";
+        msg.style.color = "var(--gap)";
+        msg.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Guardar como nueva versión";
+      });
+    });
+  }
+
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false, rolesPermitidos: ["admin_therion"] }).then(function () {
+    return cargar();
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

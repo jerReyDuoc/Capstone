@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ComplainceIA</title>
+</head>
+<body>
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script>
+  var token = Therion.store.getToken();
+  if (!token) {
+    window.location.href = "login.html";
+  } else {
+    Therion.store.api.me().then(function (me) {
+      window.location.href = me.tiene_diagnostico_cerrado ? "dashboard.html" : "cuestionario.html";
+    }).catch(function () {
+      Therion.store.clearToken();
+      window.location.href = "login.html";
+    });
+  }
+</script>
+</body>
+</html>

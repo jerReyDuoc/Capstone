@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backoffice: árbol de aplicabilidad — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container" id="app">
+    <p class="loading">Cargando…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false, rolesPermitidos: ["admin_therion"] }).then(function () {
+    return Therion.store.api.reglasAplicabilidad();
+  }).then(function (reglas) {
+    reglas.sort(function (a, b) { return a.orden - b.orden; });
+    var app = document.getElementById("app");
+    var bloques = reglas.map(function (regla) {
+      var badges = regla.controles_si.map(Therion.ui.controlBadge).join(" ");
+      var tagRaiz = regla.es_raiz ? Therion.ui.statusTag("Raíz", "var(--accent)") : "";
+      return (
+        '<div class="card mb-4">' +
+        '<div class="flex items-center gap-2 mb-2">' +
+        '<span class="text-xs text-faint font-technical">orden ' + regla.orden + '</span>' + tagRaiz + '</div>' +
+        '<p class="text-sm mb-3" style="font-weight:500;">' + Therion.ui.escapeHtml(regla.pregunta) + '</p>' +
+        '<p class="text-xs text-faint mb-2">Si es &ldquo;Sí&rdquo;, activa ' + regla.controles_si.length + ' control(es):</p>' +
+        '<div class="flex gap-2" style="flex-wrap:wrap;">' + badges + '</div></div>'
+      );
+    }).join("");
+
+    app.innerHTML =
+      '<h1 class="font-editorial mb-1" style="font-size:1.6rem;">Backoffice — Árbol de aplicabilidad</h1>' +
+      '<p class="text-sm text-muted mb-8">7 puertas de aplicabilidad. La puerta raíz determina si el diagnóstico continúa o se cierra de inmediato.</p>' +
+      bloques;
+  }).catch(function () {});
+</script>
+</body>
+</html>

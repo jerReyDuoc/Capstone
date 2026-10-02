@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel — ComplainceIA</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page">
+<div id="sidebar-mount"></div>
+<div id="content-wrapper">
+  <div id="demo-banner-mount"></div>
+  <div class="container-lg" id="app">
+    <p class="loading">Cargando…</p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/logica.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function (me) {
+    var app = document.getElementById("app");
+    var backofficeCard = "";
+    if (me.rol === "admin_therion") {
+      backofficeCard =
+        '<a href="admin-matriz.html" class="card card-link" style="display:block;">' +
+        '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Backoffice</h2>' +
+        '<p class="text-sm text-muted">Edita la matriz de controles y el árbol de aplicabilidad.</p></a>';
+    }
+    app.innerHTML =
+      '<h1 class="font-editorial mb-2" style="font-size:1.6rem;">Panel</h1>' +
+      '<p class="text-sm text-muted mb-6">Hola, ' + Therion.ui.escapeHtml(me.nombre) +
+      ' &middot; rol <span class="font-technical">' + Therion.ui.escapeHtml(me.rol) + '</span></p>' +
+      '<div class="card-grid">' +
+      '<a href="diagnostico.html" class="card card-link" style="display:block;">' +
+      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Autodiagnóstico</h2>' +
+      '<p class="text-sm text-muted">Inicia o continúa el cuestionario de aplicabilidad y evaluación de controles.</p></a>' +
+      '<a href="formacion-mapa.html" class="card card-link" style="display:block;">' +
+      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Formación</h2>' +
+      '<p class="text-sm text-muted">Recorre los módulos formativos generados a partir de tus brechas.</p></a>' +
+      '<a href="panel-sectorial.html" class="card card-link" style="display:block;">' +
+      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Panel sectorial</h2>' +
+      '<p class="text-sm text-muted">Compara tu madurez promedio contra tu rubro (anonimizado, k&ge;5).</p></a>' +
+      backofficeCard +
+      "</div>";
+  }).catch(function () {});
+</script>
+</body>
+</html>
