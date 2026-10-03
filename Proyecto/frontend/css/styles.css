@@ -1,21 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --ink: #101828;
-  --paper: #EEF2F8;
-  --paper-alt: #DCE6F2;
-  --line: #B7C6DA;
-  --accent: #2054C7;
-  --verify: #0F766E;
-  --partial: #B45309;
-  --gap: #B91C1C;
-  --na: #64748B;
-  --review: #4C51BF;
+  /* Tema oscuro inspirado en el dashboard de referencia (fondo casi negro,
+     verde como color principal, rojo/ámbar/gris para los estados de riesgo). */
+  --ink: #E8EAED;
+  --paper: #0B0E13;
+  --paper-alt: #141920;
+  --line: #262D37;
+  --accent: #27AE60;
+  --verify: #22C55E;
+  --partial: #F5A524;
+  --gap: #E5484D;
+  --na: #6B7785;
+  --review: #8B8FF0;
 
-  --dom-gob: #1E3A8A;
-  --dom-rie: #2563EB;
-  --dom-dat: #0EA5E9;
-  --dom-seg: #6366F1;
+  --dom-gob: #2DD4BF;
+  --dom-rie: #818CF8;
+  --dom-dat: #38BDF8;
+  --dom-seg: #E879F9;
 }
 
 * { box-sizing: border-box; }
@@ -60,7 +62,7 @@ button {
 }
 .sidebar-header { padding: 20px; border-bottom: 1px solid var(--line); }
 .sidebar-header .brand { font-family: 'Source Serif 4', serif; font-size: 1.15rem; font-weight: 600; }
-.sidebar-header .user { font-size: 0.75rem; color: rgba(16,24,40,0.5); margin-top: 2px; }
+.sidebar-header .user { font-size: 0.75rem; color: rgba(232, 234, 237, 0.5); margin-top: 2px; }
 .sidebar-nav { flex: 1; padding: 16px 12px; }
 .sidebar-nav a, .sidebar-nav .hint {
   display: block;
@@ -71,7 +73,7 @@ button {
 }
 .sidebar-nav a:hover { background: var(--paper); }
 .sidebar-nav a.active { background: var(--paper); color: var(--accent); font-weight: 600; }
-.sidebar-nav .hint { color: rgba(16,24,40,0.5); font-size: 0.75rem; padding-bottom: 10px; }
+.sidebar-nav .hint { color: rgba(232, 234, 237, 0.5); font-size: 0.75rem; padding-bottom: 10px; }
 .sidebar-footer { padding: 14px 12px; border-top: 1px solid var(--line); }
 .sidebar-footer button {
   width: 100%; text-align: left; background: none; border: none;
@@ -80,7 +82,7 @@ button {
 .sidebar-footer button:hover { background: var(--paper); }
 .demo-tag {
   font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;
-  color: rgba(16,24,40,0.45); padding: 0 12px 8px;
+  color: rgba(232, 234, 237, 0.45); padding: 0 12px 8px;
 }
 
 /* ---------- Demo banner ---------- */
@@ -142,7 +144,7 @@ label { display: block; font-size: 0.875rem; margin-bottom: 4px; }
 input[type="text"], input[type="email"], input[type="password"], input[type="file"], textarea, select {
   width: 100%;
   border: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--paper-alt);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 0.875rem;
@@ -180,7 +182,7 @@ textarea { resize: vertical; }
   text-align: center;
 }
 .ring-inner .big { font-family: 'Source Serif 4', serif; font-weight: 600; line-height: 1; }
-.ring-inner .small { font-size: 0.6rem; color: rgba(16,24,40,0.5); margin-top: 3px; }
+.ring-inner .small { font-size: 0.6rem; color: rgba(232, 234, 237, 0.5); margin-top: 3px; }
 
 /* ---------- Modal ---------- */
 .modal-backdrop {
@@ -195,16 +197,16 @@ textarea { resize: vertical; }
   padding: 24px;
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 10px 30px rgba(16,24,40,0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 .modal-box .modal-title { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-.modal-box .modal-close { background: none; border: none; font-size: 1.1rem; color: rgba(16,24,40,0.5); }
+.modal-box .modal-close { background: none; border: none; font-size: 1.1rem; color: rgba(232, 234, 237, 0.5); }
 
 /* ---------- Utility ---------- */
 .text-xs { font-size: 0.75rem; }
 .text-sm { font-size: 0.875rem; }
-.text-muted { color: rgba(16,24,40,0.6); }
-.text-faint { color: rgba(16,24,40,0.45); }
+.text-muted { color: rgba(232, 234, 237, 0.6); }
+.text-faint { color: rgba(232, 234, 237, 0.45); }
 .mb-1 { margin-bottom: 4px; } .mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; }
 .mb-4 { margin-bottom: 16px; } .mb-6 { margin-bottom: 24px; } .mb-8 { margin-bottom: 32px; }
 .mt-1 { margin-top: 4px; } .mt-2 { margin-top: 8px; }
@@ -219,4 +221,4 @@ textarea { resize: vertical; }
 .list-plain { list-style: none; margin: 0; padding: 0; }
 .list-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.875rem; }
 .list-row:last-child { border-bottom: none; }
-.loading { text-align: center; padding: 64px 16px; color: rgba(16,24,40,0.6); }
+.loading { text-align: center; padding: 64px 16px; color: rgba(232, 234, 237, 0.6); }
