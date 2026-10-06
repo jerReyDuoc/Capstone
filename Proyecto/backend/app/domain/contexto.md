@@ -1,0 +1,1 @@
+Entidades y puertos (interfaces)

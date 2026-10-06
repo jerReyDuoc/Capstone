@@ -1,0 +1,13 @@
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+pydantic==2.10.0
+pydantic-settings==2.6.0
+python-multipart==0.0.12
+langchain-openai==0.2.10
+langchain-core==0.3.20
+arq==0.26.1
+redis==5.2.0
+aiofiles==24.1.0
