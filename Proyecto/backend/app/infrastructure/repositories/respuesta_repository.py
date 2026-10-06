@@ -3,6 +3,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.matriz_control import MatrizControl
+from app.domain.models.catalogo_brechas import CatalogoBrechas
 
 class RespuestaRepository:
     def __init__(self, session: AsyncSession):
@@ -30,5 +31,11 @@ class RespuestaRepository:
     async def get_control(self, control_id: int) -> MatrizControl | None:
         result = await self.session.execute(
             select(MatrizControl).where(MatrizControl.id_control == control_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_brecha(self, brecha_id: int) -> CatalogoBrechas | None:
+        result = await self.session.execute(
+            select(CatalogoBrechas).where(CatalogoBrechas.id_brecha == brecha_id)
         )
         return result.scalar_one_or_none()

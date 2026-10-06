@@ -5,16 +5,11 @@ from alembic import context
 # --- Importar la app y los modelos ---
 from app.core.config import settings
 from app.core.database import Base
-from app.domain.models import evaluacion, respuesta, matriz_control, evidencia
+from app.domain.models import *
 
 # Importar TODOS los modelos para que Alembic los detecte al autogenerar.
 # El noqa evita que linters se quejen de imports "no usados".
-from app.domain.models import (  # noqa: F401
-    evaluacion,
-    respuesta,
-    matriz_control,
-    evidencia,
-)
+from app.domain.models import *
 
 # Objeto de configuración de Alembic
 config = context.config

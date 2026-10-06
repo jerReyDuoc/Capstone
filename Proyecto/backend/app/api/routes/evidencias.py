@@ -30,7 +30,7 @@ async def upload_evidencia(
     try:
         evidencia = await use_case.execute(respuesta_id, file)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Encolar tarea en ARQ
     await request.app.state.arq.enqueue_job("process_evidence_task", evidencia.id_evidencia)
