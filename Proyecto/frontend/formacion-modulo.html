@@ -25,38 +25,73 @@
   var dimension = params.get("dimension") || "";
   var nivel = params.get("nivel") || "";
   var moduloActual = null;
+  var estadoProgreso = "bloqueado";
 
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
-    return Therion.store.api.obtenerModulo(dimension, nivel);
-  }).then(function (modulo) {
-    moduloActual = modulo;
-    render("bloqueado");
-    // Lee el estado actual real desde el mapa formativo para mostrar el botón correcto
-    return Therion.store.api.mapaFormativo();
-  }).then(function (mapa) {
-    var lista = mapa[dimension] || [];
-    var actual = lista.filter(function (m) { return m.id === moduloActual.id; })[0];
-    render(actual ? actual.estado : "bloqueado");
-  }).catch(function () {
-    document.getElementById("app").innerHTML = '<p class="error-text" style="text-align:center;padding-top:48px;">Módulo no encontrado.</p>';
-  });
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false })
+    .then(function () {
+      return Promise.all([
+        Therion.store.api.obtenerModulo(dimension, nivel),
+        Therion.store.api.mapaFormativo(),
+      ]);
+    })
+    .then(function (out) {
+      moduloActual = out[0];
+      var lista = out[1][dimension] || [];
+      var actual = lista.filter(function (m) { return m.id === moduloActual.id; })[0];
+      estadoProgreso = actual ? actual.estado : "bloqueado";
+      render();
+    })
+    .catch(function () {
+      document.getElementById("app").innerHTML =
+        Therion.ui.emptyState({
+          title: "Módulo no encontrado",
+          description: "El módulo solicitado no existe.",
+          actionHtml: '<a class="btn" href="formacion-mapa.html">Volver al mapa</a>',
+        });
+    });
 
-  function render(estadoProgreso) {
+  function render() {
     var app = document.getElementById("app");
-    var labelBoton = estadoProgreso === "completado" ? "Módulo completado ✓" : "Marcar avance";
+    var completado = estadoProgreso === "completado";
+    var labelBoton = completado ? "Módulo completado" : "Marcar avance";
+
+    var controles = (moduloActual.controles || []).map(function (cid) {
+      return Therion.ui.controlBadge(cid);
+    }).join(" ");
+
     app.innerHTML =
-      '<a href="formacion-mapa.html" class="text-xs mb-4" style="color:var(--accent);display:inline-block;">&larr; Volver al mapa</a>' +
-      '<p class="text-xs text-faint mb-1">' + Therion.ui.escapeHtml(moduloActual.dimension) + ' &middot; Nivel ' + Therion.ui.escapeHtml(moduloActual.nivel) + '</p>' +
-      '<h1 class="font-editorial mb-4" style="font-size:1.6rem;">' + Therion.ui.escapeHtml(moduloActual.titulo) + '</h1>' +
-      '<div class="card mb-6"><p class="text-sm">' + Therion.ui.escapeHtml(moduloActual.contenido) + '</p></div>' +
-      '<p class="text-xs text-faint mb-8">Este módulo cubre ' + moduloActual.controles.length + ' control(es) de la matriz relacionados con esta dimensión y nivel.</p>' +
-      '<button class="btn" id="btn-avanzar"' + (estadoProgreso === "completado" ? " disabled" : "") + '>' + labelBoton + '</button>';
+      Therion.ui.breadcrumb([
+        { label: "Formación", href: "formacion-mapa.html" },
+        { label: moduloActual.titulo },
+      ]) +
+      Therion.ui.pageHeader({
+        eyebrow: moduloActual.dimension + " · Nivel " + moduloActual.nivel,
+        title: moduloActual.titulo,
+        actions: completado
+          ? ''
+          : '<button class="btn" id="btn-avanzar">' + labelBoton + '</button>',
+      }) +
+
+      '<div class="card mb-4">' +
+        '<p class="text-sm">' + Therion.ui.escapeHtml(moduloActual.contenido) + '</p>' +
+      '</div>' +
+
+      '<div class="card mb-6">' +
+        '<p class="text-caption u-upper mb-2">Controles cubiertos por este módulo (' + (moduloActual.controles || []).length + ')</p>' +
+        '<div class="flex gap-2 wrap">' + (controles || '<span class="text-faint">—</span>') + '</div>' +
+      '</div>';
 
     var btn = document.getElementById("btn-avanzar");
-    if (btn && estadoProgreso !== "completado") {
+    if (btn) {
       btn.addEventListener("click", function () {
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
         Therion.store.api.actualizarProgreso(moduloActual.id).then(function (res) {
-          render(res.estado);
+          estadoProgreso = res.estado;
+          render();
+        }).catch(function () {
+          btn.disabled = false;
+          btn.textContent = labelBoton;
         });
       });
     }

@@ -21,35 +21,46 @@
 <script src="js/ui.js"></script>
 <script>
   var ESTADO_COLOR = { bloqueado: "var(--na)", en_curso: "var(--partial)", completado: "var(--verify)" };
+  var ESTADO_LABEL = { bloqueado: "Bloqueado", en_curso: "En curso", completado: "Completado" };
 
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
-    return Therion.store.api.mapaFormativo();
-  }).then(function (mapa) {
-    var app = document.getElementById("app");
-    var secciones = Object.keys(mapa).map(function (dimension) {
-      var tarjetas = mapa[dimension].map(function (m) {
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false })
+    .then(function () { return Therion.store.api.mapaFormativo(); })
+    .then(function (mapa) {
+      var app = document.getElementById("app");
+      var dimensiones = Object.keys(mapa);
+
+      var secciones = dimensiones.map(function (dimension) {
+        var modulos = mapa[dimension];
+        var tarjetas = modulos.map(function (m) {
+          return (
+            '<a href="formacion-modulo.html?dimension=' + encodeURIComponent(dimension) +
+              '&nivel=' + encodeURIComponent(m.nivel) + '" class="card card--action">' +
+              '<p class="text-caption u-upper mb-2">' + Therion.ui.escapeHtml(m.nivel) + '</p>' +
+              '<p class="text-sm mb-3" style="font-weight:500;">' + Therion.ui.escapeHtml(m.titulo) + '</p>' +
+              Therion.ui.statusTag(ESTADO_LABEL[m.estado] || m.estado, ESTADO_COLOR[m.estado] || "var(--na)") +
+            '</a>'
+          );
+        }).join("");
+
         return (
-          '<a href="formacion-modulo.html?dimension=' + encodeURIComponent(dimension) + '&nivel=' + encodeURIComponent(m.nivel) + '" class="card card-link" style="display:block;">' +
-          '<p class="text-xs text-faint mb-1">' + Therion.ui.escapeHtml(m.nivel) + '</p>' +
-          '<p class="text-sm mb-3" style="font-weight:500;">' + Therion.ui.escapeHtml(m.titulo) + '</p>' +
-          Therion.ui.statusTag(m.estado.replace("_", " "), ESTADO_COLOR[m.estado]) +
-          '</a>'
+          '<section class="mb-8">' +
+            '<h2 class="text-h2 mb-3">' + Therion.ui.escapeHtml(dimension) + '</h2>' +
+            '<div class="card-grid card-grid--auto">' + tarjetas + '</div>' +
+          '</section>'
         );
       }).join("");
-      return (
-        '<div class="mb-8">' +
-        '<h2 class="font-editorial mb-3" style="font-size:1.1rem;">' + Therion.ui.escapeHtml(dimension) + '</h2>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">' + tarjetas + '</div>' +
-        '</div>'
-      );
-    }).join("");
 
-    app.innerHTML =
-      '<div class="flex justify-between items-center mb-8">' +
-      '<h1 class="font-editorial" style="font-size:1.6rem;">Mapa formativo</h1>' +
-      '<a href="formacion-progreso.html" class="text-sm" style="color:var(--accent);">Ver mi progreso &rarr;</a>' +
-      '</div>' + secciones;
-  }).catch(function () {});
+      app.innerHTML =
+        Therion.ui.pageHeader({
+          title: "Mapa formativo",
+          subtitle: "Módulos organizados por dimensión y nivel. Cada módulo cubre los controles relacionados con tus brechas.",
+          actions: '<a class="btn btn--secondary" href="formacion-progreso.html">Ver mi progreso</a>',
+        }) +
+        (dimensiones.length === 0
+          ? Therion.ui.emptyState({ title: "Sin módulos disponibles", description: "Aún no hay módulos formativos." })
+          : secciones);
+    })
+    .catch(function () {});
 </script>
 </body>
 </html>

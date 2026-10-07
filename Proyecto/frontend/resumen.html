@@ -10,7 +10,7 @@
 <div id="sidebar-mount"></div>
 <div id="content-wrapper">
   <div id="demo-banner-mount"></div>
-  <div class="container" style="text-align:center;" id="app">
+  <div class="container" id="app">
     <p class="loading">Cargando resumen…</p>
   </div>
 </div>
@@ -20,23 +20,35 @@
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
 <script>
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true }).then(function () {
-    return Therion.store.api.ultimoDiagnosticoCerrado();
-  }).then(function (diag) {
-    return Therion.store.api.informe(diag.id);
-  }).then(function (informe) {
-    var color = Therion.ui.COLOR_RIESGO[informe.riesgo_general] || "var(--na)";
-    var app = document.getElementById("app");
-    app.innerHTML =
-      '<h1 class="font-editorial mb-4" style="font-size:1.6rem;">Diagnóstico cerrado</h1>' +
-      '<p class="text-muted mb-2">Evaluaste ' + informe.n_evaluados + ' de ' + informe.n_aplicables + ' controles aplicables.</p>' +
-      '<p class="font-editorial" style="font-size:3rem; font-weight:600; margin:24px 0;">' +
-      (informe.puntaje_general !== null ? informe.puntaje_general + "%" : "—") + '</p>' +
-      '<p class="mb-8" style="font-weight:600; color:' + color + '">' + Therion.ui.escapeHtml(informe.riesgo_general) + '</p>' +
-      '<a href="informe.html" class="btn">Ver informe completo</a>';
-  }).catch(function () {
-    window.location.href = "diagnostico.html";
-  });
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true })
+    .then(function () { return Therion.store.api.ultimoDiagnosticoCerrado(); })
+    .then(function (diag) { return Therion.store.api.informe(diag.id); })
+    .then(function (informe) {
+      var color = Therion.ui.COLOR_RIESGO[informe.riesgo_general] || "var(--na)";
+      var app = document.getElementById("app");
+      app.innerHTML =
+        '<div style="text-align:center;max-width:520px;margin:0 auto;">' +
+          '<p class="text-caption u-upper mb-2">Diagnóstico cerrado</p>' +
+          '<h1 class="text-h1 mb-4">Resumen de tu madurez</h1>' +
+          '<div class="card mb-6" style="padding:32px 24px;">' +
+            '<p class="text-sm text-muted mb-3">Puntaje general</p>' +
+            '<p class="font-editorial" style="font-size:3.5rem;font-weight:600;line-height:1;color:' + color + ';margin:0;">' +
+              (informe.puntaje_general !== null ? informe.puntaje_general + "%" : "—") +
+            '</p>' +
+            '<p class="mb-3 mt-3" style="font-weight:600;color:' + color + '">' +
+              Therion.ui.escapeHtml(informe.riesgo_general) +
+            '</p>' +
+            '<p class="text-sm text-muted">' +
+              'Evaluaste ' + informe.n_evaluados + ' de ' + informe.n_aplicables + ' controles aplicables.' +
+            '</p>' +
+          '</div>' +
+          '<p class="text-xs text-faint mb-6">' +
+            'Un puntaje de 75% o más se considera riesgo bajo; entre 40% y 74%, riesgo moderado; menos de 40%, riesgo alto.' +
+          '</p>' +
+          '<a href="informe.html" class="btn">Ver informe completo</a>' +
+        '</div>';
+    })
+    .catch(function () { window.location.href = "diagnostico.html"; });
 </script>
 </body>
 </html>

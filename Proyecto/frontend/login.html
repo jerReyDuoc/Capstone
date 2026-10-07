@@ -3,34 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ComplainceIA — Ingresar</title>
+<title>Ingresar — ComplainceIA</title>
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 <div class="center-screen">
-  <div class="card" style="max-width:380px; width:100%;">
-    <h1 class="font-editorial" style="font-size:1.5rem; font-weight:600; margin-bottom:4px;">Therion Labs</h1>
-    <p class="text-sm text-muted mb-6">Autodiagnóstico de gobernanza de IA — versión demo (sin backend)</p>
+  <div class="card" style="max-width:400px; width:100%;">
+    <h1 class="font-editorial" style="font-size:1.5rem; font-weight:600; margin-bottom:4px;">ComplainceIA</h1>
+    <p class="text-sm text-muted mb-6">Autodiagnóstico de gobernanza de IA</p>
 
-    <form id="form-login">
-      <div class="mb-3">
-        <label>Correo</label>
-        <input type="email" id="email" required value="completo@demo.cl">
+    <form id="form-login" novalidate>
+      <div class="mb-4">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" required value="completo@therionlabs.cl" autocomplete="username">
       </div>
-      <div class="mb-3">
-        <label>Contraseña</label>
-        <input type="password" id="password" required placeholder="cualquier valor sirve">
+      <div class="mb-4">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" required placeholder="cualquier valor sirve" autocomplete="current-password">
       </div>
-      <p id="error" class="error-text hidden mb-3"></p>
-      <button type="submit" class="btn btn-block" id="btn-submit">Ingresar</button>
+      <p id="error" class="hidden mb-3"></p>
+      <button type="submit" class="btn btn--block" id="btn-submit">Ingresar</button>
     </form>
 
-    <hr class="divider">
-    <p class="text-xs text-faint mb-1"><strong>Cuentas de demo</strong> (cualquier contraseña funciona):</p>
+    <hr class="divider divider--spaced">
+    <p class="text-caption u-upper mb-2">Cuentas de acceso</p>
     <ul class="list-plain text-xs text-muted">
-      <li class="mb-1"><span class="font-technical">nuevo@demo.cl</span> — usuario nuevo, sin diagnóstico, va directo al cuestionario.</li>
-      <li class="mb-1"><span class="font-technical">completo@demo.cl</span> — ya tiene un diagnóstico cerrado, ve todo el menú.</li>
-      <li><span class="font-technical">admin@demo.cl</span> — además ve el backoffice.</li>
+      <li class="mb-2"><span class="font-technical">nuevo@therionlabs.cl</span> — sin diagnóstico previo.</li>
+      <li class="mb-2"><span class="font-technical">completo@therionlabs.cl</span> — con diagnóstico cerrado.</li>
+      <li><span class="font-technical">admin@therionlabs.cl</span> — con acceso al backoffice.</li>
     </ul>
   </div>
 </div>
@@ -38,21 +38,22 @@
 <script src="js/data.js"></script>
 <script src="js/logica.js"></script>
 <script src="js/store.js"></script>
+<script src="js/ui.js"></script>
 <script>
   document.getElementById("form-login").addEventListener("submit", function (e) {
     e.preventDefault();
-    var email = document.getElementById("email").value;
+    var email = document.getElementById("email").value.trim();
     var btn = document.getElementById("btn-submit");
     btn.disabled = true;
     btn.textContent = "Ingresando…";
+    Therion.ui.mostrarError("error", "");
     Therion.store.api.login(email).then(function (res) {
       Therion.store.setToken(res.access_token);
       return Therion.store.api.me();
     }).then(function (me) {
       window.location.href = me.tiene_diagnostico_cerrado ? "dashboard.html" : "cuestionario.html";
     }).catch(function (err) {
-      document.getElementById("error").textContent = err.message || "Error de autenticación";
-      document.getElementById("error").classList.remove("hidden");
+      Therion.ui.mostrarError("error", err.message || "Error de autenticación");
       btn.disabled = false;
       btn.textContent = "Ingresar";
     });

@@ -23,10 +23,10 @@
 (function () {
   var ESTADOS = [
     { value: "cumplido", label: "Cumplido" },
-    { value: "parcial", label: "Parcial" },
-    { value: "no", label: "No cumplido" },
+    { value: "parcial",  label: "Parcial" },
+    { value: "no",       label: "No cumplido" },
     { value: "revision", label: "Requiere revisión" },
-    { value: "na", label: "No aplica" },
+    { value: "na",       label: "No aplica" },
   ];
   var EXIGEN_EVIDENCIA = { cumplido: true, parcial: true };
 
@@ -51,23 +51,27 @@
 
   function renderCerradoPorRaizNo() {
     app.innerHTML =
-      '<div style="max-width:480px;margin:0 auto;text-align:center;padding-top:48px;">' +
-      '<h1 class="font-editorial mb-4" style="font-size:1.6rem;">Diagnóstico cerrado</h1>' +
-      '<p class="text-muted">Como tu organización no utiliza, desarrolla ni integra sistemas de IA, ningún ' +
-      'control de la matriz aplica todavía. El diagnóstico quedó cerrado con 0 controles aplicables.</p></div>';
+      '<div style="max-width:520px;margin:0 auto;text-align:center;padding-top:48px;">' +
+        '<h1 class="text-h1 mb-3">Diagnóstico cerrado</h1>' +
+        '<p class="text-muted mb-6">Como tu organización no utiliza, desarrolla ni integra sistemas de IA, ' +
+        'ningún control de la matriz aplica todavía. El diagnóstico quedó cerrado con 0 controles aplicables.</p>' +
+        '<a class="btn" href="dashboard.html">Ir al panel</a>' +
+      '</div>';
   }
 
   function renderGate() {
     var regla = reglas[gateIndex];
     app.innerHTML =
-      '<div style="max-width:480px;margin:0 auto;padding-top:48px;">' +
-      '<p class="text-xs text-faint font-technical mb-2">Puerta ' + (gateIndex + 1) + " de " + reglas.length + '</p>' +
-      '<h1 class="font-editorial mb-8" style="font-size:1.3rem;">' + Therion.ui.escapeHtml(regla.pregunta) + '</h1>' +
-      '<p id="error" class="error-text hidden mb-4"></p>' +
-      '<div class="flex gap-3">' +
-      '<button class="btn btn-success" style="flex:1;" id="btn-si">Sí</button>' +
-      '<button class="btn btn-danger" style="flex:1;" id="btn-no">No</button>' +
-      "</div></div>";
+      '<div style="max-width:560px;margin:0 auto;padding-top:32px;">' +
+        '<p class="text-caption u-upper font-technical mb-2">Puerta ' + (gateIndex + 1) + ' de ' + reglas.length + '</p>' +
+        '<div class="progress mb-6"><span style="width:' + Math.round((gateIndex / reglas.length) * 100) + '%"></span></div>' +
+        '<h1 class="text-h1 mb-6">' + Therion.ui.escapeHtml(regla.pregunta) + '</h1>' +
+        '<p id="error" class="hidden mb-4"></p>' +
+        '<div class="flex gap-3 wrap">' +
+          '<button class="btn" style="flex:1;min-width:140px;" id="btn-si">Sí</button>' +
+          '<button class="btn btn--secondary" style="flex:1;min-width:140px;" id="btn-no">No</button>' +
+        '</div>' +
+      '</div>';
 
     document.getElementById("btn-si").addEventListener("click", function () { responder(true); });
     document.getElementById("btn-no").addEventListener("click", function () { responder(false); });
@@ -76,16 +80,9 @@
   function responder(respuesta) {
     var regla = reglas[gateIndex];
     Therion.store.api.responderGate(diagnosticoId, regla.orden, respuesta).then(function (resultado) {
-      if (resultado.cerrado_por_raiz_no) {
-        renderCerradoPorRaizNo();
-        return;
-      }
-      if (gateIndex + 1 < reglas.length) {
-        gateIndex++;
-        renderGate();
-      } else {
-        pasarAEvaluacion();
-      }
+      if (resultado.cerrado_por_raiz_no) { renderCerradoPorRaizNo(); return; }
+      if (gateIndex + 1 < reglas.length) { gateIndex++; renderGate(); }
+      else { pasarAEvaluacion(); }
     }).catch(function (err) {
       Therion.ui.mostrarError("error", err.message || "Error al responder");
     });
@@ -107,10 +104,10 @@
     var fuente = control.framework_fuente + (control.articulo_referencia ? " — " + control.articulo_referencia : "");
     var html =
       '<div class="text-sm">' +
-      '<div class="mb-3"><p class="text-xs text-faint" style="text-transform:uppercase;">Marco / fuente</p><p class="mt-1">' + Therion.ui.escapeHtml(fuente) + '</p></div>' +
-      '<div class="mb-3"><p class="text-xs text-faint" style="text-transform:uppercase;">Tipo de fuente</p><p class="mt-1">' + Therion.ui.escapeHtml(control.tipo_fuente) + '</p></div>' +
-      '<div><p class="text-xs text-faint" style="text-transform:uppercase;">Obligación</p><p class="mt-1">' + Therion.ui.escapeHtml(control.obligacion) + '</p></div>' +
-      "</div>";
+        Therion.ui.campo("Marco / fuente", fuente) +
+        Therion.ui.campo("Tipo de fuente", control.tipo_fuente) +
+        Therion.ui.campo("Obligación", control.obligacion) +
+      '</div>';
     Therion.ui.mostrarModal("Base normativa de esta pregunta", html);
   }
 
@@ -119,45 +116,76 @@
     estadoSeleccionado = "cumplido";
     archivoSeleccionado = null;
 
-    var botonesEstado = ESTADOS.map(function (e) {
-      var sel = e.value === estadoSeleccionado ? " selected" : "";
-      return '<button type="button" class="btn-outline' + sel + '" data-estado="' + e.value + '">' + e.label + "</button>";
-    }).join(" ");
+    var chips = ESTADOS.map(function (e) {
+      return (
+        '<button type="button" class="option-chip" role="radio" aria-checked="' +
+        (e.value === estadoSeleccionado) + '" data-estado="' + e.value + '">' +
+          '<span class="dot" aria-hidden="true"></span>' + e.label +
+        '</button>'
+      );
+    }).join("");
+
+    var progreso = Math.round((controlIndex / controles.length) * 100);
 
     app.innerHTML =
-      '<div style="max-width:620px;margin:0 auto;">' +
-      '<p class="text-xs text-faint font-technical mb-2">Control ' + (controlIndex + 1) + " de " + controles.length +
-      " &middot; " + aplicablesTotales.length + ' aplicables en total</p>' +
-      '<div class="card mb-6">' +
-      '<div class="flex justify-between items-center mb-3">' +
-      '<div><span class="text-xs text-muted">' + Therion.ui.escapeHtml(control.dominio) + '</span>' +
-      '<span class="text-xs text-muted"> &middot; Criticidad ' + Therion.ui.escapeHtml(control.criticidad) + '</span></div>' +
-      '<button id="btn-info" title="¿En qué norma se basa esta pregunta?" style="width:24px;height:24px;border-radius:999px;border:1px solid var(--accent);color:var(--accent);background:none;font-size:0.75rem;font-weight:600;">i</button>' +
-      '</div>' +
-      '<h2 class="font-editorial mb-2" style="font-size:1.15rem;">' + Therion.ui.escapeHtml(control.pregunta) + '</h2>' +
-      '<p class="text-sm text-muted mb-1"><strong>Obligación:</strong> ' + Therion.ui.escapeHtml(control.obligacion) + '</p>' +
-      '<p class="text-sm text-muted"><strong>Evidencia esperada:</strong> ' + Therion.ui.escapeHtml(control.evidencia_esperada) + '</p>' +
-      '</div>' +
-      '<div class="card">' +
-      '<label class="mb-2">Estado</label>' +
-      '<div class="flex gap-2 mb-4" id="botones-estado" style="flex-wrap:wrap;">' + botonesEstado + '</div>' +
-      '<label id="label-evidencia">Evidencia en PDF <span id="evidencia-obligatoria" class="error-text">(obligatoria para este estado)</span></label>' +
-      '<input type="file" accept="application/pdf" id="input-archivo">' +
-      '<p id="archivo-info" class="text-xs mb-2 hidden" style="color:var(--verify);"></p>' +
-      '<p id="evidencia-opcional-msg" class="text-xs text-faint mb-2 hidden">Opcional para este estado (no cumplido / no aplica / requiere revisión).</p>' +
-      '<p id="error" class="error-text hidden mb-3"></p>' +
-      '<button class="btn btn-block" id="btn-guardar">' +
-      (controlIndex + 1 < controles.length ? "Guardar y continuar" : "Guardar y cerrar diagnóstico") +
-      '</button>' +
-      '</div></div>';
+      '<div style="max-width:680px;margin:0 auto;">' +
+        '<p class="text-caption u-upper font-technical mb-2">' +
+          'Control ' + (controlIndex + 1) + ' de ' + controles.length +
+          ' · ' + aplicablesTotales.length + ' aplicables' +
+        '</p>' +
+        '<div class="progress mb-6"><span style="width:' + progreso + '%"></span></div>' +
+
+        '<div class="card mb-4">' +
+          '<div class="flex justify-between items-start gap-3 mb-3 wrap">' +
+            '<div class="flex items-center gap-2 wrap">' +
+              Therion.ui.controlBadge(control.control_id) +
+              '<span class="text-xs text-faint">' + Therion.ui.escapeHtml(control.dominio) + ' · Criticidad ' + Therion.ui.escapeHtml(control.criticidad) + '</span>' +
+            '</div>' +
+            '<button type="button" id="btn-info" class="btn btn--ghost btn--sm" aria-label="Ver base normativa">' +
+              'ⓘ Base normativa' +
+            '</button>' +
+          '</div>' +
+          '<h2 class="text-h2 mb-3">' + Therion.ui.escapeHtml(control.pregunta) + '</h2>' +
+          Therion.ui.campo("Obligación", control.obligacion) +
+          Therion.ui.campo("Evidencia esperada", control.evidencia_esperada) +
+        '</div>' +
+
+        '<div class="card">' +
+          '<fieldset style="border:none;padding:0;margin:0;">' +
+            '<legend class="text-sm text-muted mb-3">Selecciona el estado de cumplimiento</legend>' +
+            '<div class="option-group mb-4" id="botones-estado" role="radiogroup" aria-label="Estado de cumplimiento">' +
+              chips +
+            '</div>' +
+          '</fieldset>' +
+
+          '<div class="mb-4">' +
+            '<label for="input-archivo">Evidencia en PDF ' +
+              '<span id="evidencia-obligatoria" class="req">(obligatoria)</span>' +
+              '<span id="evidencia-opcional" class="opt hidden">(opcional)</span>' +
+            '</label>' +
+            '<label class="file-input" for="input-archivo">' +
+              '<span class="file-btn">Seleccionar archivo</span>' +
+              '<span class="file-name" id="archivo-nombre">Ningún archivo seleccionado</span>' +
+              '<input type="file" accept="application/pdf" id="input-archivo">' +
+            '</label>' +
+            '<p id="evidencia-hint" class="field-help">Formato aceptado: PDF.</p>' +
+          '</div>' +
+
+          '<p id="error" class="hidden mb-3"></p>' +
+          '<button class="btn btn--block" id="btn-guardar">' +
+            (controlIndex + 1 < controles.length ? "Guardar y continuar" : "Guardar y cerrar diagnóstico") +
+          '</button>' +
+        '</div>' +
+      '</div>';
 
     document.getElementById("btn-info").addEventListener("click", function () { abrirInfoNormativa(control); });
 
-    document.querySelectorAll("#botones-estado button").forEach(function (btn) {
+    document.querySelectorAll('#botones-estado button').forEach(function (btn) {
       btn.addEventListener("click", function () {
         estadoSeleccionado = btn.getAttribute("data-estado");
-        document.querySelectorAll("#botones-estado button").forEach(function (b) { b.classList.remove("selected"); });
-        btn.classList.add("selected");
+        document.querySelectorAll("#botones-estado button").forEach(function (b) {
+          b.setAttribute("aria-checked", b === btn ? "true" : "false");
+        });
         actualizarRequisitoEvidencia();
         Therion.ui.mostrarError("error", "");
       });
@@ -165,34 +193,34 @@
 
     document.getElementById("input-archivo").addEventListener("change", function (e) {
       var file = e.target.files[0] || null;
+      var nombre = document.getElementById("archivo-nombre");
       if (file && file.type !== "application/pdf") {
         Therion.ui.mostrarError("error", "La evidencia debe subirse en formato PDF.");
         archivoSeleccionado = null;
-        document.getElementById("archivo-info").classList.add("hidden");
+        nombre.textContent = "Ningún archivo seleccionado";
         return;
       }
       archivoSeleccionado = file;
       Therion.ui.mostrarError("error", "");
-      var info = document.getElementById("archivo-info");
-      if (file) {
-        info.textContent = "Archivo listo: " + file.name;
-        info.classList.remove("hidden");
-      } else {
-        info.classList.add("hidden");
-      }
+      nombre.textContent = file ? file.name : "Ningún archivo seleccionado";
     });
 
     document.getElementById("btn-guardar").addEventListener("click", guardarEvaluacion);
-
-    // Preselecciona "Cumplido" visualmente
-    document.querySelector('#botones-estado button[data-estado="cumplido"]').classList.add("selected");
     actualizarRequisitoEvidencia();
   }
 
   function actualizarRequisitoEvidencia() {
     var requiere = !!EXIGEN_EVIDENCIA[estadoSeleccionado];
     document.getElementById("evidencia-obligatoria").classList.toggle("hidden", !requiere);
-    document.getElementById("evidencia-opcional-msg").classList.toggle("hidden", requiere);
+    document.getElementById("evidencia-opcional").classList.toggle("hidden", requiere);
+    var hint = document.getElementById("evidencia-hint");
+    if (requiere) {
+      hint.textContent = "Obligatoria para los estados Cumplido y Parcial.";
+      hint.style.color = "var(--partial)";
+    } else {
+      hint.textContent = "Opcional para este estado.";
+      hint.style.color = "var(--ink-subtle)";
+    }
   }
 
   function guardarEvaluacion() {
@@ -224,15 +252,17 @@
       });
   }
 
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true }).then(function () {
-    return asegurarDiagnostico();
-  }).then(function (id) {
-    diagnosticoId = id;
-    return Therion.store.api.reglasAplicabilidad();
-  }).then(function (r) {
-    reglas = r.sort(function (a, b) { return a.orden - b.orden; });
-    renderGate();
-  }).catch(function () {});
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true })
+    .then(function () { return asegurarDiagnostico(); })
+    .then(function (id) {
+      diagnosticoId = id;
+      return Therion.store.api.reglasAplicabilidad();
+    })
+    .then(function (r) {
+      reglas = r.sort(function (a, b) { return a.orden - b.orden; });
+      renderGate();
+    })
+    .catch(function () {});
 })();
 </script>
 </body>

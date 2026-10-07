@@ -1268,11 +1268,18 @@ Therion.data = {
     "promedio": 74.0,
     "n_organizaciones": 11
   },
-  {
+ {
     "dimension": "Uso Responsable",
     "rubro_id": "tecnologia",
     "promedio": 60.5,
     "n_organizaciones": 11
   }
-]
+],
+  RUBROS: [
+    { id: "manufactura",           nombre: "Manufactura" },
+    { id: "retail",                nombre: "Retail" },
+    { id: "servicios_financieros", nombre: "Servicios financieros" },
+    { id: "salud",                 nombre: "Salud" },
+    { id: "tecnologia",            nombre: "Tecnología" }
+  ]
 };

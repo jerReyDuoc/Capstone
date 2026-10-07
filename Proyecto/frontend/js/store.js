@@ -13,16 +13,18 @@ Therion.store = (function () {
   var ESTADO_KEY = "therion_demo_state";
   var RETRASO_MS = 200;
 
-  var PERSONAS = {
-    nuevo: { nombre: "Usuario Nuevo", email: "nuevo@demo.cl", rol: "referente", organizacionId: "demo-org-nuevo" },
-    completo: { nombre: "Camila Rojas", email: "completo@demo.cl", rol: "referente", organizacionId: "demo-org-completo" },
-    admin: { nombre: "Admin Demo", email: "admin@demo.cl", rol: "admin_therion", organizacionId: null },
+  // Cuentas de acceso genéricas: sin nombres propios, sin datos personales.
+  // El identificador (nuevo / completo / admin) es solo una clave interna.
+  var CUENTAS = {
+    nuevo:    { email: "nuevo@therionlabs.cl",    rol: "referente",     organizacionId: "org-nuevo" },
+    completo: { email: "completo@therionlabs.cl", rol: "referente",     organizacionId: "org-completo" },
+    admin:    { email: "admin@therionlabs.cl",    rol: "admin_therion", organizacionId: null },
   };
 
   var ESTADOS_VALIDOS = ["cumplido", "parcial", "no", "na", "revision"];
   var ESTADOS_QUE_EXIGEN_EVIDENCIA = ["cumplido", "parcial"];
 
-  function personaDesdeEmail(email) {
+  function cuentaDesdeEmail(email) {
     var e = (email || "").toLowerCase();
     if (e.indexOf("nuevo") !== -1) return "nuevo";
     if (e.indexOf("admin") !== -1) return "admin";
@@ -38,23 +40,23 @@ Therion.store = (function () {
   function clearToken() {
     window.localStorage.removeItem(TOKEN_KEY);
   }
-  function resetDemo() {
+  function reiniciarDemo() {
     window.localStorage.removeItem(ESTADO_KEY);
     window.localStorage.removeItem(TOKEN_KEY);
     window.location.href = "login.html";
   }
 
-  function personaActual() {
+  function cuentaActual() {
     var token = getToken();
     if (!token || token.indexOf("demo:") !== 0) return null;
-    var persona = token.slice(5);
-    return PERSONAS.hasOwnProperty(persona) ? persona : null;
+    var cuenta = token.slice(5);
+    return CUENTAS.hasOwnProperty(cuenta) ? cuenta : null;
   }
 
-  function requerirPersona() {
-    var persona = personaActual();
-    if (!persona) throw new Error("No autenticado. Vuelve a iniciar sesión.");
-    return persona;
+  function requerirCuenta() {
+    var cuenta = cuentaActual();
+    if (!cuenta) throw new Error("No autenticado. Vuelve a iniciar sesión.");
+    return cuenta;
   }
 
   function delay(ms) {
@@ -62,10 +64,10 @@ Therion.store = (function () {
   }
 
   function generarId() {
-    return "demo-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    return "diag-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
   }
 
-  function diagnosticoPrecargado(persona) {
+  function diagnosticoPrecargado(cuenta) {
     var ahora = new Date();
     var cerrado = new Date(ahora.getTime() - 9 * 24 * 3600 * 1000);
     var respuestas = {};
@@ -75,12 +77,12 @@ Therion.store = (function () {
       evaluaciones[e.control_id] = {
         estado: e.estado,
         evidencia_texto: e.evidencia_texto,
-        evidencia_archivo_nombre: e.evidencia_texto ? "evidencia-demo.pdf" : null,
+        evidencia_archivo_nombre: e.evidencia_texto ? "evidencia.pdf" : null,
       };
     });
     return {
-      id: "demo-diag-" + persona,
-      organizacion_id: PERSONAS[persona].organizacionId,
+      id: "diag-" + cuenta,
+      organizacion_id: CUENTAS[cuenta].organizacionId,
       estado: "cerrado",
       iniciado_en: new Date(cerrado.getTime() - 24 * 3600 * 1000).toISOString(),
       cerrado_en: cerrado.toISOString(),
@@ -125,8 +127,8 @@ Therion.store = (function () {
     return estado.controles.map(function (c) { return c.control_id; });
   }
 
-  function buscarDiagnostico(estado, persona, diagnosticoId) {
-    var lista = estado.diagnosticos[persona] || [];
+  function buscarDiagnostico(estado, cuenta, diagnosticoId) {
+    var lista = estado.diagnosticos[cuenta] || [];
     for (var i = 0; i < lista.length; i++) {
       if (lista[i].id === diagnosticoId) return lista[i];
     }
@@ -201,20 +203,20 @@ Therion.store = (function () {
   var api = {
     login: function (email) {
       return delay().then(function () {
-        var persona = personaDesdeEmail(email);
-        return { access_token: "demo:" + persona, token_type: "bearer" };
+        var cuenta = cuentaDesdeEmail(email);
+        return { access_token: "demo:" + cuenta, token_type: "bearer" };
       });
     },
 
     me: function () {
       return delay().then(function () {
-        var persona = requerirPersona();
-        var cfg = PERSONAS[persona];
+        var cuenta = requerirCuenta();
+        var cfg = CUENTAS[cuenta];
         var estado = cargarEstado();
-        var tieneCerrado = (estado.diagnosticos[persona] || []).some(function (d) { return d.estado === "cerrado"; });
+        var tieneCerrado = (estado.diagnosticos[cuenta] || [])
+          .some(function (d) { return d.estado === "cerrado"; });
         return {
-          id: "demo-user-" + persona,
-          nombre: cfg.nombre,
+          id: "user-" + cuenta,
           email: cfg.email,
           rol: cfg.rol,
           organizacion_id: cfg.organizacionId,
@@ -246,8 +248,8 @@ Therion.store = (function () {
 
     actualizarControl: function (controlId, payload) {
       return delay().then(function () {
-        var persona = requerirPersona();
-        if (PERSONAS[persona].rol !== "admin_therion") {
+        var cuenta = requerirCuenta();
+        if (CUENTAS[cuenta].rol !== "admin_therion") {
           throw new Error("No autorizado para esta acción (requiere rol admin_therion)");
         }
         var estado = cargarEstado();
@@ -272,20 +274,21 @@ Therion.store = (function () {
 
     crearDiagnostico: function () {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var enCurso = (estado.diagnosticos[persona] || []).filter(function (d) { return d.estado === "en_curso"; })[0];
+        var enCurso = (estado.diagnosticos[cuenta] || [])
+          .filter(function (d) { return d.estado === "en_curso"; })[0];
         if (!enCurso) {
           enCurso = {
             id: generarId(),
-            organizacion_id: PERSONAS[persona].organizacionId,
+            organizacion_id: CUENTAS[cuenta].organizacionId,
             estado: "en_curso",
             iniciado_en: new Date().toISOString(),
             cerrado_en: null,
             respuestas: {},
             evaluaciones: {},
           };
-          estado.diagnosticos[persona].push(enCurso);
+          estado.diagnosticos[cuenta].push(enCurso);
           guardarEstado(estado);
         }
         return {
@@ -299,9 +302,9 @@ Therion.store = (function () {
 
     ultimoDiagnosticoCerrado: function () {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var cerrados = (estado.diagnosticos[persona] || [])
+        var cerrados = (estado.diagnosticos[cuenta] || [])
           .filter(function (d) { return d.estado === "cerrado"; })
           .sort(function (a, b) { return (b.cerrado_en || "").localeCompare(a.cerrado_en || ""); });
         if (cerrados.length === 0) throw new Error("La organización todavía no tiene diagnósticos cerrados");
@@ -311,15 +314,16 @@ Therion.store = (function () {
           organizacion_id: diag.organizacion_id || "",
           estado: diag.estado,
           iniciado_en: diag.iniciado_en,
+          cerrado_en: diag.cerrado_en,
         };
       });
     },
 
     responderGate: function (diagnosticoId, orden, respuesta) {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var diag = buscarDiagnostico(estado, persona, diagnosticoId);
+        var diag = buscarDiagnostico(estado, cuenta, diagnosticoId);
         if (diag.estado !== "en_curso") throw new Error("El diagnóstico ya está cerrado");
 
         diag.respuestas[orden] = respuesta;
@@ -347,9 +351,9 @@ Therion.store = (function () {
 
     controlesAplicables: function (diagnosticoId) {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var diag = buscarDiagnostico(estado, persona, diagnosticoId);
+        var diag = buscarDiagnostico(estado, cuenta, diagnosticoId);
         var universo = universoControles(estado);
         var resultado = Therion.logica.calcularAplicabilidad(Therion.data.GATES, diag.respuestas, universo);
         return {
@@ -364,9 +368,9 @@ Therion.store = (function () {
     registrarEvaluacion: function (diagnosticoId, controlId, estadoControl, archivo) {
       return delay().then(function () {
         if (ESTADOS_VALIDOS.indexOf(estadoControl) === -1) throw new Error("Estado inválido");
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var diag = buscarDiagnostico(estado, persona, diagnosticoId);
+        var diag = buscarDiagnostico(estado, cuenta, diagnosticoId);
         if (diag.estado !== "en_curso") throw new Error("El diagnóstico ya está cerrado");
 
         var previa = diag.evaluaciones[controlId];
@@ -394,7 +398,7 @@ Therion.store = (function () {
         guardarEstado(estado);
 
         return {
-          id: "demo-eval-" + controlId,
+          id: "eval-" + controlId,
           control_id: controlId,
           estado: estadoControl,
           evidencia_texto: evidenciaTexto,
@@ -406,35 +410,45 @@ Therion.store = (function () {
 
     cerrarDiagnostico: function (diagnosticoId) {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var diag = buscarDiagnostico(estado, persona, diagnosticoId);
+        var diag = buscarDiagnostico(estado, cuenta, diagnosticoId);
         diag.estado = "cerrado";
         diag.cerrado_en = new Date().toISOString();
         guardarEstado(estado);
-        return { id: diag.id, organizacion_id: diag.organizacion_id || "", estado: diag.estado, iniciado_en: diag.iniciado_en };
+        return {
+          id: diag.id,
+          organizacion_id: diag.organizacion_id || "",
+          estado: diag.estado,
+          iniciado_en: diag.iniciado_en,
+        };
       });
     },
 
     informe: function (diagnosticoId) {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var diag = buscarDiagnostico(estado, persona, diagnosticoId);
+        var diag = buscarDiagnostico(estado, cuenta, diagnosticoId);
         return construirInforme(estado, diag);
       });
     },
 
     mapaFormativo: function () {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
         var mapa = {};
         Therion.data.MODULOS.forEach(function (modulo) {
-          var key = persona + ":" + modulo.id;
+          var key = cuenta + ":" + modulo.id;
           var estadoModulo = estado.progreso[key] || "bloqueado";
           if (!mapa[modulo.dimension]) mapa[modulo.dimension] = [];
-          mapa[modulo.dimension].push({ id: modulo.id, nivel: modulo.nivel, titulo: modulo.titulo, estado: estadoModulo });
+          mapa[modulo.dimension].push({
+            id: modulo.id,
+            nivel: modulo.nivel,
+            titulo: modulo.titulo,
+            estado: estadoModulo,
+          });
         });
         return mapa;
       });
@@ -442,7 +456,8 @@ Therion.store = (function () {
 
     obtenerModulo: function (dimension, nivel) {
       return delay().then(function () {
-        var modulo = Therion.data.MODULOS.filter(function (m) { return m.dimension === dimension && m.nivel === nivel; })[0];
+        var modulo = Therion.data.MODULOS
+          .filter(function (m) { return m.dimension === dimension && m.nivel === nivel; })[0];
         if (!modulo) throw new Error("Módulo no encontrado");
         return modulo;
       });
@@ -450,9 +465,9 @@ Therion.store = (function () {
 
     actualizarProgreso: function (moduloId) {
       return delay().then(function () {
-        var persona = requerirPersona();
+        var cuenta = requerirCuenta();
         var estado = cargarEstado();
-        var key = persona + ":" + moduloId;
+        var key = cuenta + ":" + moduloId;
         var actual = estado.progreso[key] || "bloqueado";
         var siguiente = actual === "bloqueado" ? "en_curso" : "completado";
         estado.progreso[key] = siguiente;
@@ -471,8 +486,10 @@ Therion.store = (function () {
       return delay().then(function () {
         var estado = cargarEstado();
         var total = 0;
-        Object.keys(estado.diagnosticos).forEach(function (persona) {
-          estado.diagnosticos[persona].forEach(function (d) { total += Object.keys(d.evaluaciones).length; });
+        Object.keys(estado.diagnosticos).forEach(function (cuenta) {
+          estado.diagnosticos[cuenta].forEach(function (d) {
+            total += Object.keys(d.evaluaciones).length;
+          });
         });
         return { tipo: "anonimizacion", estado: "exitoso", filas_procesadas: total };
       });
@@ -483,8 +500,8 @@ Therion.store = (function () {
     getToken: getToken,
     setToken: setToken,
     clearToken: clearToken,
-    resetDemo: resetDemo,
-    personaActual: personaActual,
+    reiniciarDemo: reiniciarDemo,
+    cuentaActual: cuentaActual,
     api: api,
   };
 })();

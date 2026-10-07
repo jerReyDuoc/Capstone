@@ -11,23 +11,7 @@
 <div id="content-wrapper">
   <div id="demo-banner-mount"></div>
   <div class="container" id="app">
-    <h1 class="font-editorial mb-4" style="font-size:1.6rem;">Metodología del panel sectorial</h1>
-    <p class="text-sm mb-3">
-      El panel sectorial se calcula mediante un job de anonimización que corre diariamente (y puede
-      dispararse manualmente desde el backoffice). Este job:
-    </p>
-    <ol class="text-sm" style="padding-left:20px;">
-      <li class="mb-2">Lee las evaluaciones de diagnósticos ya <strong>cerrados</strong> desde la última corrida.</li>
-      <li class="mb-2">Extrae el texto de cada PDF de evidencia y lo enmascara con Microsoft Presidio (RUT, nombres, direcciones, etc.) antes de que ese dato participe en cualquier agregación.</li>
-      <li class="mb-2">Reemplaza el identificador de la organización por un hash estable (SHA-256 con una sal secreta), de forma que el resultado agregado nunca guarda el ID real de ninguna organización.</li>
-      <li class="mb-2">Agrupa las evaluaciones por dimensión y rubro, y calcula el promedio del puntaje.</li>
-      <li class="mb-2">Solo si hay <strong>5 organizaciones distintas o más</strong> en esa celda, el resultado se guarda o actualiza en el panel. Si no se alcanza ese umbral, la celda simplemente no se muestra.</li>
-    </ol>
-    <p class="text-sm">
-      Además, la tabla donde se guardan estos resultados agregados no tiene ninguna relación (clave foránea)
-      hacia las tablas de organizaciones o diagnósticos, precisamente para garantizar de forma estructural
-      que el panel sectorial no pueda usarse para identificar a una organización en particular.
-    </p>
+    <p class="loading">Cargando…</p>
   </div>
 </div>
 
@@ -36,7 +20,37 @@
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
 <script>
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).catch(function () {});
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function () {
+    document.getElementById("app").innerHTML =
+      Therion.ui.breadcrumb([
+        { label: "Panel sectorial", href: "panel-sectorial.html" },
+        { label: "Metodología" },
+      ]) +
+      Therion.ui.pageHeader({
+        title: "Metodología del panel sectorial",
+        subtitle: "Cómo se calculan, anonimizan y publican los promedios por rubro.",
+      }) +
+      '<div class="card mb-4">' +
+        '<p class="text-sm mb-3">' +
+          'El panel sectorial se calcula mediante un job de anonimización que corre diariamente ' +
+          'y puede dispararse manualmente desde el backoffice. El job:' +
+        '</p>' +
+        '<ol class="text-sm" style="padding-left:20px;margin:0;">' +
+          '<li class="mb-2">Lee las evaluaciones de diagnósticos ya <strong>cerrados</strong> desde la última corrida.</li>' +
+          '<li class="mb-2">Extrae el texto de cada PDF de evidencia y lo enmascara con Microsoft Presidio (RUT, nombres, direcciones, etc.) antes de que ese dato participe en cualquier agregación.</li>' +
+          '<li class="mb-2">Reemplaza el identificador de la organización por un hash estable (SHA-256 con sal secreta), de modo que el resultado agregado nunca guarda el ID real de ninguna organización.</li>' +
+          '<li class="mb-2">Agrupa las evaluaciones por dimensión y rubro, y calcula el promedio del puntaje.</li>' +
+          '<li>Solo si hay <strong>5 organizaciones distintas o más</strong> en esa celda, el resultado se guarda o actualiza. Si no se alcanza ese umbral, la celda no se muestra.</li>' +
+        '</ol>' +
+      '</div>' +
+      '<div class="card">' +
+        '<p class="text-sm">' +
+          'Además, la tabla donde se guardan estos resultados agregados no tiene ninguna relación (clave foránea) ' +
+          'hacia las tablas de organizaciones o diagnósticos, precisamente para garantizar de forma estructural ' +
+          'que el panel sectorial no pueda usarse para identificar a una organización en particular.' +
+        '</p>' +
+      '</div>';
+  }).catch(function () {});
 </script>
 </body>
 </html>

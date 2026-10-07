@@ -11,7 +11,7 @@
 <div id="content-wrapper">
   <div id="demo-banner-mount"></div>
   <div class="container-lg" id="app">
-    <p class="loading">Cargando…</p>
+    <p class="loading">Cargando panel…</p>
   </div>
 </div>
 
@@ -20,32 +20,127 @@
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
 <script>
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false }).then(function (me) {
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true }).then(function (me) {
     var app = document.getElementById("app");
+
+    if (!me.tiene_diagnostico_cerrado) {
+      app.innerHTML =
+        Therion.ui.pageHeader({
+          title: "Panel",
+          subtitle: "Tu organización aún no tiene un diagnóstico cerrado.",
+        }) +
+        Therion.ui.emptyState({
+          title: "Comienza tu autodiagnóstico",
+          description: "Responde las puertas de aplicabilidad y evalúa los controles que apliquen a tu organización.",
+          actionHtml: '<a class="btn" href="diagnostico.html">Ir al autodiagnóstico</a>',
+        });
+      return;
+    }
+
+    return Promise.all([
+      Therion.store.api.ultimoDiagnosticoCerrado(),
+      Therion.store.api.reglasAplicabilidad(),
+    ]).then(function (out) {
+      var diag = out[0];
+      return Therion.store.api.informe(diag.id).then(function (informe) {
+        render(app, me, diag, informe);
+      });
+    });
+  }).catch(function () {});
+
+  function render(app, me, diag, informe) {
+    var colorRiesgo = Therion.ui.COLOR_RIESGO[informe.riesgo_general] || "var(--na)";
+    var top3 = informe.brechas.slice(0, 3);
+
+    var brechasHtml = top3.length === 0
+      ? '<p class="text-sm text-muted">Sin brechas críticas detectadas.</p>'
+      : top3.map(function (b) {
+          var c = Therion.ui.COLOR_CRITICIDAD[b.criticidad] || "var(--na)";
+          return (
+            '<div class="flex justify-between items-start gap-3 mb-3 wrap">' +
+              '<div style="min-width:0;">' +
+                '<div class="flex items-center gap-2 mb-1 wrap">' +
+                  Therion.ui.controlBadge(b.control_id) +
+                  Therion.ui.statusTag(b.criticidad, c) +
+                '</div>' +
+                '<p class="text-sm">' + Therion.ui.escapeHtml(b.brecha_asociada) + '</p>' +
+                '<p class="text-xs text-faint mt-1">' + Therion.ui.escapeHtml(b.dominio) + '</p>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('<hr class="divider">');
+
     var backofficeCard = "";
     if (me.rol === "admin_therion") {
       backofficeCard =
-        '<a href="admin-matriz.html" class="card card-link" style="display:block;">' +
-        '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Backoffice</h2>' +
-        '<p class="text-sm text-muted">Edita la matriz de controles y el árbol de aplicabilidad.</p></a>';
+        '<a href="admin-matriz.html" class="card card--action">' +
+          '<div class="flex justify-between items-center mb-1">' +
+            '<h3 class="text-h3">Administración</h3>' +
+            '<span class="arrow" aria-hidden="true">→</span>' +
+          '</div>' +
+          '<p class="text-sm text-muted">Edita la matriz de controles y el árbol de aplicabilidad.</p>' +
+        '</a>';
     }
+
     app.innerHTML =
-      '<h1 class="font-editorial mb-2" style="font-size:1.6rem;">Panel</h1>' +
-      '<p class="text-sm text-muted mb-6">Hola, ' + Therion.ui.escapeHtml(me.nombre) +
-      ' &middot; rol <span class="font-technical">' + Therion.ui.escapeHtml(me.rol) + '</span></p>' +
-      '<div class="card-grid">' +
-      '<a href="diagnostico.html" class="card card-link" style="display:block;">' +
-      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Autodiagnóstico</h2>' +
-      '<p class="text-sm text-muted">Inicia o continúa el cuestionario de aplicabilidad y evaluación de controles.</p></a>' +
-      '<a href="formacion-mapa.html" class="card card-link" style="display:block;">' +
-      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Formación</h2>' +
-      '<p class="text-sm text-muted">Recorre los módulos formativos generados a partir de tus brechas.</p></a>' +
-      '<a href="panel-sectorial.html" class="card card-link" style="display:block;">' +
-      '<h2 class="font-editorial" style="font-size:1.1rem; margin-bottom:4px;">Panel sectorial</h2>' +
-      '<p class="text-sm text-muted">Compara tu madurez promedio contra tu rubro (anonimizado, k&ge;5).</p></a>' +
-      backofficeCard +
-      "</div>";
-  }).catch(function () {});
+      Therion.ui.pageHeader({
+        eyebrow: "Panel",
+        title: "Resumen de tu organización",
+        subtitle: "Diagnóstico cerrado el " + Therion.ui.formatFecha(diag.cerrado_en) +
+                  (me.organizacion_id ? " · " + me.organizacion_id : ""),
+        actions: '<a class="btn btn--secondary" href="informe.html">Ver informe completo</a>',
+      }) +
+
+      // Fila de métricas
+      '<div class="card-grid mb-6">' +
+        '<div class="card card--metric">' +
+          '<p class="text-caption u-upper mb-2">Puntaje general</p>' +
+          '<p class="metric-value" style="color:' + colorRiesgo + '">' +
+            (informe.puntaje_general !== null ? informe.puntaje_general + "%" : "—") +
+          '</p>' +
+          '<p class="metric-label">' + Therion.ui.escapeHtml(informe.riesgo_general) + '</p>' +
+        '</div>' +
+        '<div class="card card--metric">' +
+          '<p class="text-caption u-upper mb-2">Controles evaluados</p>' +
+          '<p class="metric-value">' + informe.n_evaluados + '<span class="text-sm text-muted"> / ' + informe.n_aplicables + '</span></p>' +
+          '<p class="metric-label">aplicables en tu organización</p>' +
+        '</div>' +
+        '<div class="card card--metric">' +
+          '<p class="text-caption u-upper mb-2">Brechas detectadas</p>' +
+          '<p class="metric-value">' + informe.brechas.length + '</p>' +
+          '<p class="metric-label">controles con oportunidades de mejora</p>' +
+        '</div>' +
+      '</div>' +
+
+      // Brechas prioritarias
+      '<div class="card mb-6">' +
+        '<div class="flex justify-between items-center mb-4 wrap gap-2">' +
+          '<h2 class="text-h2">Brechas prioritarias</h2>' +
+          '<a class="text-sm" style="color:var(--accent)" href="informe.html">Ver todas →</a>' +
+        '</div>' +
+        brechasHtml +
+      '</div>' +
+
+      // Accesos
+      '<h2 class="text-h2 mb-3">Continúa</h2>' +
+      '<div class="card-grid card-grid--3">' +
+        '<a href="formacion-mapa.html" class="card card--action">' +
+          '<div class="flex justify-between items-center mb-1">' +
+            '<h3 class="text-h3">Formación</h3>' +
+            '<span class="arrow" aria-hidden="true">→</span>' +
+          '</div>' +
+          '<p class="text-sm text-muted">Módulos formativos según tus brechas.</p>' +
+        '</a>' +
+        '<a href="panel-sectorial.html" class="card card--action">' +
+          '<div class="flex justify-between items-center mb-1">' +
+            '<h3 class="text-h3">Panel sectorial</h3>' +
+            '<span class="arrow" aria-hidden="true">→</span>' +
+          '</div>' +
+          '<p class="text-sm text-muted">Compara tu madurez con tu rubro.</p>' +
+        '</a>' +
+        backofficeCard +
+      '</div>';
+  }
 </script>
 </body>
 </html>

@@ -25,21 +25,31 @@
 (function () {
   var meActual = null;
   var informeActual = null;
+  var diagActual = null;
 
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true }).then(function (me) {
-    meActual = me;
-    return Therion.store.api.ultimoDiagnosticoCerrado();
-  }).then(function (diag) {
-    return Therion.store.api.informe(diag.id);
-  }).then(function (informe) {
-    informeActual = informe;
-    render(informe);
-  }).catch(function () {
-    document.getElementById("app").innerHTML =
-      '<p class="error-text" style="text-align:center;padding-top:48px;">Todavía no tienes un diagnóstico cerrado para mostrar.</p>';
-  });
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: true })
+    .then(function (me) {
+      meActual = me;
+      return Therion.store.api.ultimoDiagnosticoCerrado();
+    })
+    .then(function (diag) {
+      diagActual = diag;
+      return Therion.store.api.informe(diag.id);
+    })
+    .then(function (informe) {
+      informeActual = informe;
+      render(informe, diagActual);
+    })
+    .catch(function () {
+      document.getElementById("app").innerHTML =
+        Therion.ui.emptyState({
+          title: "Aún no hay un informe disponible",
+          description: "Necesitas cerrar un diagnóstico para generar el informe de madurez.",
+          actionHtml: '<a class="btn" href="diagnostico.html">Ir al autodiagnóstico</a>',
+        });
+    });
 
-  function render(informe) {
+  function render(informe, diag) {
     var colorGeneral = Therion.ui.COLOR_RIESGO[informe.riesgo_general] || "var(--na)";
     var app = document.getElementById("app");
 
@@ -47,64 +57,78 @@
       var color = Therion.ui.COLOR_DIMENSION[d.clasificacion] || "var(--na)";
       return (
         '<div class="card flex items-center gap-4">' +
-        Therion.ui.ring(d.puntaje, color, { size: 84, thickness: 9, centerLabel: d.puntaje !== null ? d.puntaje + "%" : "—" }) +
-        '<div><p class="text-sm text-muted mb-1">' + Therion.ui.escapeHtml(d.dimension) + '</p>' +
-        Therion.ui.statusTag(d.clasificacion, color) +
-        '<p class="text-xs text-faint mt-1">' + d.n_evaluados + ' controles evaluados</p></div></div>'
+          Therion.ui.ring(d.puntaje, color, {
+            size: 84, thickness: 9,
+            centerLabel: d.puntaje !== null ? d.puntaje + "%" : "—",
+          }) +
+          '<div style="min-width:0;">' +
+            '<p class="text-sm mb-1">' + Therion.ui.escapeHtml(d.dimension) + '</p>' +
+            Therion.ui.statusTag(d.clasificacion, color) +
+            '<p class="text-xs text-faint mt-2">' + d.n_evaluados + ' controles evaluados</p>' +
+          '</div>' +
+        '</div>'
       );
     }).join("");
 
     var brechasHtml = informe.brechas.length === 0
       ? '<p class="text-sm text-muted">No hay brechas: todos los controles evaluados están cumplidos.</p>'
       : informe.brechas.map(function (b) {
-        var colorCrit = Therion.ui.COLOR_CRITICIDAD[b.criticidad] || "var(--na)";
-        return (
-          '<div class="card mb-4">' +
-          '<div class="flex justify-between items-center mb-2">' +
-          '<h3 class="font-editorial" style="font-size:1.05rem;">' + Therion.ui.escapeHtml(b.brecha_asociada) + '</h3>' +
-          Therion.ui.statusTag(b.criticidad, colorCrit) +
-          '</div>' +
-          campo("Fuente", b.fuente) +
-          campo("Dimensión", b.dominio) +
-          campo("Evidencia entregada", b.evidencia_entregada || "No se entregó evidencia.") +
-          campo("Evidencia esperada", b.evidencia_esperada) +
-          campo("Recomendación", b.recomendacion) +
-          campo("Ruta formativa vinculada", b.ruta_formativa) +
-          '</div>'
-        );
-      }).join("");
+          var colorCrit = Therion.ui.COLOR_CRITICIDAD[b.criticidad] || "var(--na)";
+          return (
+            '<div class="card mb-4">' +
+              '<div class="flex justify-between items-center gap-2 mb-3 wrap">' +
+                '<div class="flex items-center gap-2 wrap">' +
+                  Therion.ui.controlBadge(b.control_id) +
+                  '<h3 class="text-h3">' + Therion.ui.escapeHtml(b.brecha_asociada) + '</h3>' +
+                '</div>' +
+                Therion.ui.statusTag(b.criticidad, colorCrit) +
+              '</div>' +
+              Therion.ui.campo("Fuente normativa", b.fuente) +
+              Therion.ui.campo("Dimensión", b.dominio) +
+              Therion.ui.campo("Evidencia entregada", b.evidencia_entregada || "No se entregó evidencia.") +
+              Therion.ui.campo("Evidencia esperada", b.evidencia_esperada) +
+              Therion.ui.campo("Recomendación", b.recomendacion) +
+              Therion.ui.campo("Ruta formativa vinculada", b.ruta_formativa) +
+            '</div>'
+          );
+        }).join("");
 
     app.innerHTML =
-      '<div class="flex justify-between items-start mb-1" style="gap:16px;">' +
-      '<div><h1 class="font-editorial" style="font-size:1.6rem;">Informe de madurez</h1>' +
-      '<p class="text-xs text-faint font-technical">Diagnóstico ' + Therion.ui.escapeHtml(informe.diagnostico_id) + '</p></div>' +
-      '<button class="btn" id="btn-pdf">Descargar PDF</button>' +
+      Therion.ui.pageHeader({
+        eyebrow: "Informe",
+        title: "Informe de madurez",
+        subtitle: "Diagnóstico cerrado el " + Therion.ui.formatFecha(diag.cerrado_en) +
+                  " · " + informe.n_evaluados + " de " + informe.n_aplicables + " controles evaluados",
+        actions: '<button class="btn" id="btn-pdf">Descargar PDF</button>',
+      }) +
+
+      '<div class="card mb-6 flex items-center gap-6 wrap">' +
+        Therion.ui.ring(informe.puntaje_general, colorGeneral, {
+          centerLabel: informe.puntaje_general !== null ? informe.puntaje_general + "%" : "—",
+          centerSubLabel: "madurez general",
+          size: 140, thickness: 16,
+        }) +
+        '<div style="min-width:0;">' +
+          '<p class="text-caption u-upper mb-2">Nivel de riesgo</p>' +
+          '<p class="font-editorial mb-2" style="font-size:1.6rem;font-weight:600;color:' + colorGeneral + ';margin:0;">' +
+            Therion.ui.escapeHtml(informe.riesgo_general) +
+          '</p>' +
+          '<p class="text-sm text-muted">Escala: ≥75% riesgo bajo · 40–74% moderado · &lt;40% alto.</p>' +
+        '</div>' +
       '</div>' +
 
-      '<div class="card flex items-center gap-4" style="margin:32px 0;">' +
-      Therion.ui.ring(informe.puntaje_general, colorGeneral, { centerLabel: informe.puntaje_general !== null ? informe.puntaje_general + "%" : "—", centerSubLabel: "madurez" }) +
-      '<div><p class="text-sm text-muted mb-1">Nivel de riesgo general</p>' +
-      '<p class="font-editorial mb-2" style="font-size:1.5rem;font-weight:600;color:' + colorGeneral + '">' + Therion.ui.escapeHtml(informe.riesgo_general) + '</p>' +
-      '<p class="text-sm text-muted">' + informe.n_evaluados + ' / ' + informe.n_aplicables + ' controles evaluados</p></div>' +
-      '</div>' +
-
-      '<h2 class="font-editorial mb-3" style="font-size:1.15rem;">Puntaje por dimensión</h2>' +
+      '<h2 class="text-h2 mb-3">Puntaje por dimensión</h2>' +
       '<div class="card-grid mb-8">' + dimensionesHtml + '</div>' +
 
-      '<h2 class="font-editorial mb-3" style="font-size:1.15rem;">Brechas priorizadas (' + informe.brechas.length + ')</h2>' +
+      '<h2 class="text-h2 mb-2">Brechas priorizadas (' + informe.brechas.length + ')</h2>' +
+      '<p class="text-sm text-muted mb-4">' +
+        'Ordenadas por criticidad y severidad del estado de cumplimiento (Alta → Baja · No cumplido → Parcial → Requiere revisión).' +
+      '</p>' +
       brechasHtml;
 
     document.getElementById("btn-pdf").addEventListener("click", function () {
-      Therion.pdf.generarInformePdf(informeActual, meActual ? meActual.nombre : undefined);
+      Therion.pdf.generarInformePdf(informeActual);
     });
-  }
-
-  function campo(etiqueta, valor) {
-    return (
-      '<div class="mb-2">' +
-      '<p class="text-xs text-faint" style="text-transform:uppercase;letter-spacing:.02em;">' + Therion.ui.escapeHtml(etiqueta) + '</p>' +
-      '<p class="text-sm mt-1">' + Therion.ui.escapeHtml(valor) + "</p></div>"
-    );
   }
 })();
 </script>

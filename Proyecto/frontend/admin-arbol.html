@@ -20,29 +20,60 @@
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
 <script>
-  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false, rolesPermitidos: ["admin_therion"] }).then(function () {
-    return Therion.store.api.reglasAplicabilidad();
-  }).then(function (reglas) {
-    reglas.sort(function (a, b) { return a.orden - b.orden; });
-    var app = document.getElementById("app");
-    var bloques = reglas.map(function (regla) {
-      var badges = regla.controles_si.map(Therion.ui.controlBadge).join(" ");
-      var tagRaiz = regla.es_raiz ? Therion.ui.statusTag("Raíz", "var(--accent)") : "";
-      return (
-        '<div class="card mb-4">' +
-        '<div class="flex items-center gap-2 mb-2">' +
-        '<span class="text-xs text-faint font-technical">orden ' + regla.orden + '</span>' + tagRaiz + '</div>' +
-        '<p class="text-sm mb-3" style="font-weight:500;">' + Therion.ui.escapeHtml(regla.pregunta) + '</p>' +
-        '<p class="text-xs text-faint mb-2">Si es &ldquo;Sí&rdquo;, activa ' + regla.controles_si.length + ' control(es):</p>' +
-        '<div class="flex gap-2" style="flex-wrap:wrap;">' + badges + '</div></div>'
-      );
-    }).join("");
+  Therion.ui.protegerPagina({ permitidoSinDiagnostico: false, rolesPermitidos: ["admin_therion"] })
+    .then(function () { return Therion.store.api.reglasAplicabilidad(); })
+    .then(function (reglas) {
+      reglas.sort(function (a, b) { return a.orden - b.orden; });
 
-    app.innerHTML =
-      '<h1 class="font-editorial mb-1" style="font-size:1.6rem;">Backoffice — Árbol de aplicabilidad</h1>' +
-      '<p class="text-sm text-muted mb-8">7 puertas de aplicabilidad. La puerta raíz determina si el diagnóstico continúa o se cierra de inmediato.</p>' +
-      bloques;
-  }).catch(function () {});
+      var totalControles = reglas.reduce(function (acc, r) { return acc + r.controles_si.length; }, 0);
+
+      var bloques = reglas.map(function (regla, i) {
+        // Agrupar controles por prefijo de dominio
+        var porDominio = {};
+        regla.controles_si.forEach(function (cid) {
+          var pref = cid.split("-")[0];
+          (porDominio[pref] = porDominio[pref] || []).push(cid);
+        });
+
+        var grupos = Object.keys(porDominio).map(function (pref) {
+          var badges = porDominio[pref].map(Therion.ui.controlBadge).join(" ");
+          return (
+            '<div class="mb-2">' +
+              '<p class="text-caption u-upper mb-1">' + Therion.ui.escapeHtml(pref) + '</p>' +
+              '<div class="flex gap-2 wrap">' + badges + '</div>' +
+            '</div>'
+          );
+        }).join("");
+
+        return (
+          '<div class="card mb-4">' +
+            '<div class="flex justify-between items-start gap-3 mb-3 wrap">' +
+              '<div>' +
+                '<p class="text-caption u-upper font-technical mb-1">Puerta ' + (i + 1) + '</p>' +
+                '<p class="text-sm" style="font-weight:500;">' + Therion.ui.escapeHtml(regla.pregunta) + '</p>' +
+              '</div>' +
+              '<div class="flex gap-2 wrap">' +
+                (regla.es_raiz ? Therion.ui.statusTag("Raíz", "var(--accent)") : "") +
+                Therion.ui.statusTag(regla.controles_si.length + " controles", "var(--na)") +
+              '</div>' +
+            '</div>' +
+            '<hr class="divider">' +
+            '<p class="text-xs text-faint mb-3">Si la respuesta es <strong>Sí</strong>, se activan los siguientes controles:</p>' +
+            grupos +
+          '</div>'
+        );
+      }).join("");
+
+      document.getElementById("app").innerHTML =
+        Therion.ui.pageHeader({
+          eyebrow: "Administración",
+          title: "Árbol de aplicabilidad",
+          subtitle: reglas.length + " puertas · " + totalControles + " activaciones de control en total. " +
+                    "La puerta raíz determina si el diagnóstico continúa o se cierra de inmediato.",
+        }) +
+        bloques;
+    })
+    .catch(function () {});
 </script>
 </body>
 </html>
