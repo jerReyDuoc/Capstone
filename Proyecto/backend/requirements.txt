@@ -11,3 +11,11 @@ arq==0.26.1
 redis==5.2.0
 aiofiles==24.1.0
 langchain-groq==0.2.0
+
+# Capa anti prompt-injection (app/infrastructure/security)
+# NER de nombres (opcional pero recomendado). Tras instalar:
+#   python -m spacy download es_core_news_md
+spacy
+
+# Tests
+pytest

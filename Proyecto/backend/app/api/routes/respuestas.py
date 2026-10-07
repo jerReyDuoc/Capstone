@@ -3,9 +3,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase
+from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
+from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.application.schemas.api_schemas import RespuestaDetalleResponse, EvidenciaDetalleResponse
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
+from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
 
@@ -21,13 +24,26 @@ async def create_respuesta(
     db: AsyncSession = Depends(get_db),
 ):
     repo = RespuestaRepository(db)
-    use_case = CreateRespuestaUseCase(repo)
-    respuesta = await use_case.execute(
-        evaluacion_id=payload.evaluacion_id,
-        matriz_control_id=payload.matriz_control_id,
-        estado_clasificacion=payload.estado_clasificacion,
-        justificacion=payload.justificacion,
+    guard = ReglasPromptGuard()
+    use_case = CreateRespuestaUseCase(
+        repo,
+        guard=guard,
+        registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(db), guard),
     )
+    try:
+        respuesta = await use_case.execute(
+            evaluacion_id=payload.evaluacion_id,
+            matriz_control_id=payload.matriz_control_id,
+            estado_clasificacion=payload.estado_clasificacion,
+            justificacion=payload.justificacion,
+        )
+    except InyeccionDetectadaError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"codigo": "PROMPT_INJECTION", "mensaje": str(e)},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"id_respuesta": respuesta.id}
 
 @router.get("/{respuesta_id}", response_model=RespuestaDetalleResponse)

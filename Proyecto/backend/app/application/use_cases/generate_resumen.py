@@ -15,6 +15,9 @@ from app.application.filters.control_tree import get_controles_aplicables
 PUNTAJE_CUMPLIDO = 1.0
 PUNTAJE_PARCIAL = 0.5
 PUNTAJE_NO_CUMPLIDO = 0.0
+# Bloqueada por seguridad (posible prompt injection): cuenta como 0 y NO se excluye
+# del denominador, para que inyectar texto nunca pueda subir el puntaje.
+PUNTAJE_REQUIERE_REVISION = 0.0
 
 
 def nivel_madurez(puntaje: float) -> str:
@@ -76,6 +79,8 @@ class GenerateResumenUseCase:
                 puntaje = PUNTAJE_PARCIAL
             elif clasif == EstadoClasificacion.NO_CUMPLIDO.value:
                 puntaje = PUNTAJE_NO_CUMPLIDO
+            elif clasif == EstadoClasificacion.REQUIERE_REVISION.value:
+                puntaje = PUNTAJE_REQUIERE_REVISION
             else:
                 continue
 
@@ -107,6 +112,7 @@ class GenerateResumenUseCase:
             cumplidos = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.CUMPLIDO.value)
             parciales = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value)
             no_cumplidos = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.NO_CUMPLIDO.value)
+            en_revision = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.REQUIERE_REVISION.value)
 
             resumen = Resumen(
                 evaluacion_id=evaluacion_id,
@@ -124,6 +130,7 @@ class GenerateResumenUseCase:
                 "cumplidos": cumplidos,
                 "parciales": parciales,
                 "no_cumplidos": no_cumplidos,
+                "en_revision": en_revision,
             })
 
             total_general_controles += total_evaluados

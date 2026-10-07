@@ -9,14 +9,28 @@ class EstadoClasificacion(str, Enum):
     PARCIALMENTE_CUMPLIDO = "parcialmente_cumplido"
     NO_CUMPLIDO = "no_cumplido"
     NO_APLICA = "no_aplica"
+    # Solo la asigna el BACKEND cuando la capa de seguridad bloquea una evidencia
+    # (posible prompt injection). El usuario NO puede declararla.
+    REQUIERE_REVISION = "requiere_revision"
 
     @classmethod
     def requiere_evidencia(cls, valor: str) -> bool:
         return valor in (cls.CUMPLIDO.value, cls.PARCIALMENTE_CUMPLIDO.value)
 
+    @classmethod
+    def declarables(cls) -> list[str]:
+        """Las 4 opciones que el usuario puede elegir al responder."""
+        return [
+            cls.CUMPLIDO.value,
+            cls.PARCIALMENTE_CUMPLIDO.value,
+            cls.NO_CUMPLIDO.value,
+            cls.NO_APLICA.value,
+        ]
+
 class FuenteClasificacion(str, Enum):
     USUARIO = "usuario"
     LLM = "llm"
+    SEGURIDAD = "seguridad"  # decisión tomada por la capa anti prompt-injection
 
 class Respuesta(Base):
     __tablename__ = "respuestas"

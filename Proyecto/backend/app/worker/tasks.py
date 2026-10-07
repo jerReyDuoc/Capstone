@@ -8,6 +8,9 @@ from app.infrastructure.storage.local_storage import LocalFileStorage
 from app.infrastructure.llm.groq_validator import GroqEvidenceValidator
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
+from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
+from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 
 async def process_evidence_task(ctx, evidencia_id: int):
     async with AsyncSessionLocal() as session:
@@ -15,9 +18,12 @@ async def process_evidence_task(ctx, evidencia_id: int):
         respuesta_repo = RespuestaRepository(session)
         storage = LocalFileStorage()
         validator = GroqEvidenceValidator()
+        guard = ReglasPromptGuard()
 
         use_case = ProcessEvidenceUseCase(
-            evidencia_repo, respuesta_repo, storage, validator
+            evidencia_repo, respuesta_repo, storage, validator,
+            guard=guard,
+            registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(session), guard),
         )
         await use_case.execute(evidencia_id)
 

@@ -13,9 +13,13 @@ class EvidenceValidatorPort(ABC):
         control: MatrizControl,
         respuesta: Respuesta,
         brecha: CatalogoBrechas | None = None,
+        justificacion: str | None = None,
     ) -> EvidenceValidation:
         """
         Valida una evidencia contra el control y la clasificación declarada.
         El LLM NO tiene acceso a la BD: solo recibe este prompt y devuelve JSON.
+
+        `contenido` y `justificacion` llegan YA anonimizados y revisados por la
+        capa de seguridad. Si `justificacion` es None se usa la de `respuesta`.
         """
         ...
