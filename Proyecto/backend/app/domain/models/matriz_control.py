@@ -1,5 +1,7 @@
+from app.domain.models.catalogo_brechas import CatalogoBrechas
+from app.domain.models.dominio import Dominio
 from sqlalchemy import Integer, String, Text, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 class MatrizControl(Base):
@@ -23,4 +25,9 @@ class MatrizControl(Base):
     catalogo_brechas_id_brecha: Mapped[int | None] = mapped_column(
         "catalogo_brechas_id_brecha", Integer,
         ForeignKey("catalogo_brechas.id_brecha"), nullable=True
+    )
+
+    dominio: Mapped["Dominio | None"] = relationship("Dominio", lazy="selectin")
+    brecha: Mapped["CatalogoBrechas | None"] = relationship(
+        "CatalogoBrechas", lazy="selectin"
     )

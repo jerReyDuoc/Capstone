@@ -11,3 +11,8 @@ class EvaluacionRepository:
             select(Evaluacion).where(Evaluacion.id == evaluacion_id)
         )
         return result.scalar_one_or_none()
+
+    async def update(self, evaluacion) -> "Evaluacion":
+        await self.session.commit()
+        await self.session.refresh(evaluacion)
+        return evaluacion

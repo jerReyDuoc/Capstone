@@ -9,6 +9,8 @@ from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteCl
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.resumen import Resumen
+from app.domain.models.pregunta_filtro import PreguntaFiltro
+from app.domain.models.respuesta_filtro import RespuestaFiltro
 
 __all__ = [
     "Dominio",
@@ -25,4 +27,6 @@ __all__ = [
     "EstadoValidacion",
     "Benchmark",
     "Resumen",
+    "PreguntaFiltro",
+    "RespuestaFiltro",
 ]
