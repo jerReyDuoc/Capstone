@@ -22,3 +22,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar _api_h
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "latencia: pruebas de tiempo de respuesta de la API REST")
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def bd_live():
+    """
+    Solo en modo live con LATENCIA_PREPARAR_BD=1: crea las evaluaciones de prueba
+    y limpia sus datos al inicio y al final de la sesión. En otro caso no hace nada.
+    """
+    import asyncio
+    import _api_harness as h
+
+    if not h.PREPARAR_BD:
+        yield
+        return
+    asyncio.run(h.preparar_bd())
+    yield
+    if not h.CONSERVAR_DATOS:
+        asyncio.run(h.limpiar_bd())
