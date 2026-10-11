@@ -3,11 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
 from app.domain.models.resumen import Resumen
 from app.domain.models.dominio import Dominio
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.rubro import Rubro
+from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.usuario_temporal import UsuarioTemporal
 
 router = APIRouter(prefix="/api/evaluaciones", tags=["reportes"])
 
@@ -54,8 +56,6 @@ async def get_resumen(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
         suma_ponderada += (resumen.puntaje_obtenido or 0) * (resumen.total_controles_evaluados or 0)
 
     puntaje_general = round(suma_ponderada / total_controles, 2) if total_controles > 0 else 0.0
-
-    from app.application.use_cases.generate_resumen import nivel_madurez
 
     return {
         "evaluacion_id": evaluacion_id,

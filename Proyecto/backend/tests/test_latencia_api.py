@@ -129,13 +129,8 @@ OPERACIONES += [
        lambda i, c: f"/api/evaluaciones/{EVAL_NA_ID}/resumen", 404),
 ]
 
-DEFECTOS_CONOCIDOS = {
-    "GET respuestas de evaluación (paginado)": (
-        "DEFECTO: RespuestaResumenResponse pide 'id_respuesta' pero el modelo Respuesta "
-        "expone el atributo 'id' (columna id_respuesta). model_validate falla y el "
-        "endpoint responde 500 en cuanto la evaluación tiene al menos una respuesta."
-    ),
-}
+# Vacío: el defecto del listado paginado (id_respuesta) ya fue corregido.
+DEFECTOS_CONOCIDOS: dict[str, str] = {}
 
 
 async def _preparar_evaluacion_na(c):

@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel, ConfigDict
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 class EvidenciaUploadResponse(BaseModel):
     id_evidencia: int
@@ -109,7 +109,8 @@ class EvaluacionResumenResponse(BaseModel):
 
 class RespuestaResumenResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id_respuesta: int
+    # El modelo Respuesta expone el atributo `id` (columna id_respuesta)
+    id_respuesta: int = Field(validation_alias=AliasChoices("id_respuesta", "id"))
     estado_clasificacion: str | None
     estado_clasificacion_final: str | None
     fuente_clasificacion: str | None

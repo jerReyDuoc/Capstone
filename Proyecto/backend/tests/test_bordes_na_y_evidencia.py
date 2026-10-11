@@ -376,11 +376,6 @@ class TestNivelMadurez:
     def test_limites(self, puntaje, nivel):
         assert nivel_madurez(puntaje) == nivel
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "DEFECTO: Resumen.nivel_madurez es String(10) (modelo y migración 20674abc0fc2) "
-        "pero 'en_desarrollo' tiene 13 caracteres. En PostgreSQL, POST /cerrar responde 500 "
-        "(StringDataRightTruncation) para cualquier dominio con puntaje entre 25 y 50."
-    ))
     def test_todo_nivel_cabe_en_la_columna(self):
         largo = Resumen.__table__.c.nivel_madurez.type.length
         for puntaje in (0, 30, 60, 90):

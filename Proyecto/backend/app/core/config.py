@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     #                 si el LLM no está seguro, queda en requiere_revision (sin fallback al usuario)
     MODO_SEGURIDAD_EVIDENCIA: Literal["bloquear", "marcar"] = "bloquear"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()

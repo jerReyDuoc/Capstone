@@ -1,8 +1,9 @@
 """
-QA - Defectos de contrato de la API encontrados durante las pruebas de latencia.
-
-Cada test describe el comportamiento CORRECTO y está marcado xfail(strict=True):
-hoy falla por el defecto; al corregirlo pasará y pytest pedirá quitar la marca.
+QA - Regresión de los defectos de contrato de la API encontrados en las pruebas
+de latencia (ya corregidos). Si alguno vuelve a fallar, el defecto regresó:
+  - /benchmark tapado por /{evaluacion_id}       -> orden de routers en main.py
+  - /comparativa con NameError                     -> imports en reportes.py
+  - listado de respuestas con 500 (id_respuesta)   -> alias en RespuestaResumenResponse
 
     pytest tests/test_defectos_api.py -v -rxX
 """
@@ -25,30 +26,18 @@ def _correr(fn):
     return asyncio.run(_run())
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFECTO: GET /api/evaluaciones/benchmark queda tapado por GET /api/evaluaciones/{evaluacion_id} "
-    "(router 'evaluaciones' se registra antes que 'reportes'); 'benchmark' no es int => 422."
-))
 def test_benchmark_es_alcanzable():
     async def f(c):
         return await c.get("/api/evaluaciones/benchmark")
     assert _correr(f).status_code == 200
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFECTO: reportes.py usa Evaluacion y UsuarioTemporal en get_comparativa sin importarlos "
-    "=> NameError => HTTP 500 en cualquier llamada."
-))
 def test_comparativa_no_falla_con_500():
     async def f(c):
         return await c.get(f"/api/evaluaciones/{EVAL_ID}/comparativa")
     assert _correr(f).status_code != 500
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFECTO: RespuestaResumenResponse.id_respuesta no existe como atributo en Respuesta "
-    "(se llama 'id') => GET /api/evaluaciones/{id}/respuestas responde 500 si hay respuestas."
-))
 def test_listado_de_respuestas_con_datos():
     async def f(c):
         await c.post(f"/api/evaluaciones/{EVAL_ID}/filtro", json=body_filtro(True))
