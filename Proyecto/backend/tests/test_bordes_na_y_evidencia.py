@@ -325,10 +325,11 @@ class TestResumenConNAMasivo:
         r, _ = _resumen(monkeypatch, pares)
         assert r["total_controles_evaluados"] == 0
 
-    def test_todos_los_33_controles_aplicables_en_na(self, monkeypatch):
+    def test_todos_los_40_controles_aplicables_en_na(self, monkeypatch):
+        """Filtro F1..F7 = SI activa la matriz completa: 22 base + 18 por filtro."""
         pares = [_par(c, NA) for c in TODOS_LOS_CONTROLES]
         r, _ = _resumen(monkeypatch, pares, filtro=FILTRO_TODO_SI)
-        assert len(TODOS_LOS_CONTROLES) == 33
+        assert len(TODOS_LOS_CONTROLES) == 40
         assert r["total_controles_evaluados"] == 0
 
     def test_resumenes_previos_se_borran_aunque_el_nuevo_quede_vacio(self, monkeypatch):
@@ -394,12 +395,12 @@ class TestCrearRespuestasNA:
     def _uc(self, repo):
         return CreateRespuestaUseCase(repo, guard=ReglasPromptGuard())
 
-    def test_na_masivo_33_controles_se_acepta_sin_brechas(self):
+    def test_na_masivo_40_controles_se_acepta_sin_brechas(self):
         repo = FakeRespuestaRepo(control=_control())
         uc = self._uc(repo)
-        for control_id in range(1, 34):
+        for control_id in range(1, len(TODOS_LOS_CONTROLES) + 1):
             asyncio.run(uc.execute(1, control_id, NA, ""))
-        assert len(repo.creadas) == 33
+        assert len(repo.creadas) == 40
         assert all(r.estado_clasificacion_final == NA for r in repo.creadas)
         assert all(r.catalogo_brechas_id_brecha is None for r in repo.creadas)
 
