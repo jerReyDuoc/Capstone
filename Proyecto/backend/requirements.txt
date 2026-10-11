@@ -19,3 +19,5 @@ spacy
 
 # Tests
 pytest
+httpx        # pruebas de API (en proceso y live)
+aiosqlite    # BD en memoria para pruebas de latencia en proceso

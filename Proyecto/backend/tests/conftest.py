@@ -12,3 +12,13 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@127.0.0.1:
 os.environ.setdefault("DATABASE_URL_SYNC", "postgresql://test:test@127.0.0.1:5433/test")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379")
 os.environ.setdefault("GROQ_API_KEY", "gsk_test")
+
+# Las pruebas de API en proceso suben archivos: que no ensucien ./storage
+import tempfile  # noqa: E402
+
+os.environ.setdefault("STORAGE_DIR", tempfile.mkdtemp(prefix="qa_storage_"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar _api_harness
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "latencia: pruebas de tiempo de respuesta de la API REST")
