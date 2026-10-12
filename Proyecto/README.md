@@ -61,6 +61,11 @@ Proyecto/
 │   │   │       ├── file_storage_port.py
 │   │   │       └── evidence_validator_port.py
 │   │   ├── application/
+│   │   │   ├── ai/                         # Capa de Políticas e IA
+│   │   │   │   ├── gateway.py              # Orquesta sanitización, prompt, LLM y métricas
+│   │   │   │   ├── politicas.py            # Router: política por tarea
+│   │   │   │   ├── prompts/                # Prompts versionados
+│   │   │   │   └── metricas.py             # Tasa de error, precisión, evaluación NER
 │   │   │   ├── schemas/
 │   │   │   │   ├── evidence_validation.py  # Schema del LLM
 │   │   │   │   └── api_schemas.py          # Schemas de request/response
@@ -69,7 +74,10 @@ Proyecto/
 │   │   │       ├── upload_evidence.py
 │   │   │       └── process_evidence.py     # Caso de uso principal
 │   │   ├── infrastructure/
-│   │   │   ├── llm/groq_validator.py       # Adaptador LLM
+│   │   │   ├── llm/groq_provider.py        # Adaptador Groq (solo transporte)
+│   │   │   ├── llm/factory.py              # Ensambla la capa de IA según LLM_PROVIDER
+│   │   │   ├── security/ner_sanitizer.py   # Motor NER de anonimización
+│   │   │   ├── security/cifrado.py         # Cifrado del mapa de entidades
 │   │   │   ├── storage/local_storage.py
 │   │   │   └── repositories/
 │   │   │       ├── evidencia_repository.py
@@ -401,6 +409,13 @@ El usuario elige **1 de 4 opciones** al responder un control:
 |---|---|---|
 | POST | `/api/respuestas/` | Crear respuesta |
 | GET | `/api/respuestas/{id}` | Consultar respuesta + evidencias |
+| PATCH | `/api/respuestas/{id}/revision` | Revisión humana (Oficial de Cumplimiento) |
+
+### Capa de IA
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/ia/metricas?desde=&hasta=&tarea=&modelo=` | Tasa de error, latencia, tokens, costo, precisión del LLM y sanitización |
 
 ### Evidencias
 
@@ -510,6 +525,50 @@ Debe responder `HTTP 400`.
 | `LLM_MODEL` | Modelo a usar | `openai/gpt-oss-safeguard-20b` |
 | `UMBRAL_CONFIANZA` | Umbral para aceptar LLM | `0.8` |
 | `STORAGE_DIR` | Carpeta de archivos | `./storage` |
+| `APP_ENV` | `development`, `test` o `production` | `development` |
+| `LLM_PROVIDER` | Proveedor del LLM | `groq` |
+| `LLM_TIMEOUT_S` / `LLM_MAX_REINTENTOS` | Tiempo máximo por intento y reintentos (429/5xx) | `60` / `2` |
+| `LLM_MAX_TOKENS_SALIDA` | Tope de tokens de respuesta | `1500` |
+| `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | Caracteres enviados al LLM (tras sanitizar) | `8000` / `4000` |
+| `LLM_PRECIO_ENTRADA_USD_1M` / `LLM_PRECIO_SALIDA_USD_1M` | Precio del modelo para estimar costo | según proveedor |
+| `SANITIZER_ENABLED` | `true` anonimiza antes del LLM; `false` solo debug (prohibido en producción) | `true` |
+| `ENTITY_MAP_KEY` | Clave Fernet para cifrar el mapa de entidades | ver abajo |
+
+---
+
+## Capa de Políticas e IA
+
+Intermediario entre la lógica de negocio y el LLM (`app/application/ai/`). Los casos de uso piden una **tarea** (`TareaIA.VALIDAR_EVIDENCIA`) y la capa se encarga del resto:
+
+```
+caso de uso ─► AIGateway.ejecutar(tarea, textos, datos)
+                 1. Política de la tarea (prompt versionado, schema, límites)
+                 2. Motor NER: anonimiza RUT, nombres, correos, teléfonos, direcciones
+                    └─ falla ⇒ se aborta, no se llama al LLM (fail-closed)
+                 3. Guarda el mapa de entidades CIFRADO en `sanitizaciones`
+                 4. Prompt solo con texto sanitizado ─► LLMProviderPort (Groq)
+                 5. Valida la salida (schema + reglas) ─► métrica en `llamadas_llm`
+```
+
+**Reglas de negocio:** el texto original nunca llega al LLM; el mapa de entidades se guarda en BD y no se envía al proveedor; si la sanitización falla se aborta y se registra; si el LLM falla se registra `exito=False` con el tipo de error; etiquetas fijas (`[RUT_ANON]`, `[NOMBRE_ANON]`, `[CORREO_ANON]`, `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]`).
+
+**Puesta en marcha:**
+
+```bash
+pip install -r requirements.txt
+python -m spacy download es_core_news_md      # obligatorio con SANITIZER_ENABLED=true
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"   # -> ENTITY_MAP_KEY
+alembic upgrade head                          # crea llamadas_llm y sanitizaciones
+```
+
+El worker no arranca si falta el modelo de spaCy (mejor fallar al inicio que en cada evidencia). Guarda `ENTITY_MAP_KEY` fuera del repositorio: sin ella no se pueden descifrar los mapas ya guardados.
+
+**Cambiar de proveedor:** crear un adaptador de `LLMProviderPort` en `app/infrastructure/llm/` y registrarlo en `factory.py`; luego cambiar `LLM_PROVIDER` y `LLM_MODEL`. Los prompts y la lógica de negocio no cambian.
+
+**Métricas** (`GET /api/ia/metricas`):
+- *Operación del modelo*: tasa de error global y por tipo (`sanitizacion`, `auditoria`, `timeout`, `rate_limit`, `salida_invalida`…), latencia p50/p95, tokens y costo estimado.
+- *Precisión del modelo*: compara la clasificación del LLM con la revisión humana (`PATCH /api/respuestas/{id}/revision`): accuracy, precisión/recall/F1 por clase y matriz de confusión.
+- *Precisión del motor NER*: `pytest tests/test_ner_sanitizer.py -s` evalúa el motor contra `tests/data/ner_gold.jsonl` (P/R/F1 por tipo y cobertura de PII). Amplía ese archivo con casos reales anonimizados.
 
 ---
 

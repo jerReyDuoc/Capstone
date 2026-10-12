@@ -10,6 +10,7 @@ import os
 from app.core.config import settings
 from app.domain.ports.prompt_guard_port import PromptGuardPort
 from app.infrastructure.security import seguridad
+from app.application.ai.prompts.base import escapar_para_prompt  # noqa: F401  (re-export)
 
 # seguridad.py lee REQUIERE_NER desde os.environ; pydantic-settings no lo exporta solo.
 if settings.REQUIERE_NER:
@@ -28,7 +29,3 @@ class ReglasPromptGuard(PromptGuardPort):
         return seguridad.anonimizar(texto)
 
 
-def escapar_para_prompt(texto: str) -> str:
-    """Escapa < y > para que el usuario no pueda cerrar los delimitadores
-    <justificacion_usuario> / <evidencia_adjunta> del prompt."""
-    return (texto or "").replace("<", "&lt;").replace(">", "&gt;")

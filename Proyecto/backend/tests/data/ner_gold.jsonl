@@ -1,0 +1,12 @@
+{"texto": "El Encargado de Protección de Datos es Juan Pérez Soto, RUT 12.345.678-5, correo jperez@empresa.cl.", "entidades": [{"tipo": "NOMBRE", "valor": "Juan Pérez Soto"}, {"tipo": "RUT", "valor": "12.345.678-5"}, {"tipo": "CORREO", "valor": "jperez@empresa.cl"}]}
+{"texto": "Para consultas ARCOP escribir a privacidad arroba acme punto cl o llamar al +56 9 8765 4321.", "entidades": [{"tipo": "CORREO", "valor": "privacidad arroba acme punto cl"}, {"tipo": "TEL", "valor": "+56 9 8765 4321"}]}
+{"texto": "La política fue aprobada por MARÍA GONZÁLEZ ROJAS en sesión de directorio del 15 de marzo de 2025.", "entidades": [{"tipo": "NOMBRE", "valor": "MARÍA GONZÁLEZ ROJAS"}]}
+{"texto": "Oficinas centrales: Av. Providencia 1234, oficina 501, Providencia. Bodega en Los Leones 456.", "entidades": [{"tipo": "DIRECCION", "valor": "Av. Providencia 1234, oficina 501, Providencia"}, {"tipo": "DIRECCION", "valor": "Los Leones 456"}]}
+{"texto": "El presupuesto aprobado fue de $15000000 y el folio interno es 20240315.", "entidades": []}
+{"texto": "Responsable del modelo: Pedro Muñoz (pedro.munoz[at]banco[punto]cl), teléfono (02) 2345 6789.", "entidades": [{"tipo": "NOMBRE", "valor": "Pedro Muñoz"}, {"tipo": "CORREO", "valor": "pedro.munoz[at]banco[punto]cl"}, {"tipo": "TEL", "valor": "(02) 2345 6789"}]}
+{"texto": "Datos del titular: RUN 9.876.543-3, domicilio en Pasaje Los Aromos 77, Maipú.", "entidades": [{"tipo": "RUT", "valor": "9.876.543-3"}, {"tipo": "DIRECCION", "valor": "Pasaje Los Aromos 77, Maipú"}]}
+{"texto": "La evaluación de impacto (EIPD) del sistema de scoring fue revisada por el DPO y el CISO.", "entidades": []}
+{"texto": "Contacto alternativo: 987654321 o ana.silva@correo.com. Firmó Ana Silva.", "entidades": [{"tipo": "TEL", "valor": "987654321"}, {"tipo": "CORREO", "valor": "ana.silva@correo.com"}, {"tipo": "NOMBRE", "valor": "Ana Silva"}]}
+{"texto": "Se registran 3 incidentes en la ruta formativa 2 y el control ISO 42001 cláusula 6.1.", "entidades": []}
+{"texto": "El RUT de la empresa es 76.123.456-0 y su representante legal es Carlos Ramírez.", "entidades": [{"tipo": "RUT", "valor": "76.123.456-0"}, {"tipo": "NOMBRE", "valor": "Carlos Ramírez"}]}
+{"texto": "Dirección para notificaciones: Calle Huérfanos 1160, depto 1204, Santiago.", "entidades": [{"tipo": "DIRECCION", "valor": "Calle Huérfanos 1160, depto 1204, Santiago"}]}

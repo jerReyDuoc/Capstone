@@ -12,10 +12,12 @@ redis==5.2.0
 aiofiles==24.1.0
 langchain-groq==0.2.0
 
-# Capa anti prompt-injection (app/infrastructure/security)
-# NER de nombres (opcional pero recomendado). Tras instalar:
+# Capa anti prompt-injection y motor NER (app/infrastructure/security)
+# OBLIGATORIO con SANITIZER_ENABLED=true. Tras instalar:
 #   python -m spacy download es_core_news_md
 spacy
+# Cifrado del mapa de entidades (Fernet)
+cryptography
 
 # Tests
 pytest

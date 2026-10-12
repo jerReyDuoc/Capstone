@@ -189,7 +189,7 @@ class FakeValidator:
         self.clasificacion, self.confianza, self.suficiente = clasificacion, confianza, suficiente
         self.llamadas = []
 
-    async def validate(self, contenido, control, respuesta, brecha=None, justificacion=None):
+    async def validate(self, contenido, control, respuesta, brecha=None, justificacion=None, contexto=None):
         self.llamadas.append({"contenido": contenido, "justificacion": justificacion})
         return EvidenceValidation(
             clasificacion=self.clasificacion,
@@ -544,12 +544,16 @@ class TestProcesamientoSinEvidencia:
         assert resp.fuente_clasificacion == FuenteClasificacion.LLM.value
 
     def test_evidencia_muy_larga_se_trunca_antes_del_llm(self):
+        # El recorte ahora lo hace la capa de IA (sanitiza primero, recorta después).
+        from _capa_ia_fakes import crear_validador
         texto = ("La organizacion mantiene un inventario de modelos actualizado. " * 2000).encode()
-        validator = FakeValidator()
+        validator, gw = crear_validador(max_chars_evidencia=settings.MAX_CHARS_EVIDENCIA_LLM)
         # Sin guard: el texto repetido dispara la heurística anti-inyección y
         # aquí solo se quiere aislar el truncado.
         _procesar(FakeStorage(texto), validator, guard=False)
-        assert len(validator.llamadas[0]["contenido"]) == settings.MAX_CHARS_EVIDENCIA_LLM
+        enviado = gw.provider.requests[0].user
+        bloque = enviado.split("<evidencia_adjunta>\n", 1)[1].split("\n</evidencia_adjunta>", 1)[0]
+        assert len(bloque) == settings.MAX_CHARS_EVIDENCIA_LLM
 
     def test_justificacion_vacia_no_rompe_el_procesamiento(self):
         validator = FakeValidator()

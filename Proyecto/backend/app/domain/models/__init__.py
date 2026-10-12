@@ -12,6 +12,8 @@ from app.domain.models.resumen import Resumen
 from app.domain.models.pregunta_filtro import PreguntaFiltro
 from app.domain.models.respuesta_filtro import RespuestaFiltro
 from app.domain.models.evento_seguridad import EventoSeguridad, OrigenEvento
+from app.domain.models.llamada_llm import LlamadaLLM
+from app.domain.models.sanitizacion import Sanitizacion
 
 __all__ = [
     "Dominio",
@@ -32,4 +34,6 @@ __all__ = [
     "RespuestaFiltro",
     "EventoSeguridad",
     "OrigenEvento",
+    "LlamadaLLM",
+    "Sanitizacion",
 ]

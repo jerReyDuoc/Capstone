@@ -5,6 +5,8 @@ from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteCl
 from app.domain.ports.file_storage_port import FileStoragePort
 from app.domain.ports.evidence_validator_port import EvidenceValidatorPort
 from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.registro_ia_port import ContextoLlamada
+from app.application.ai.gateway import CapaIAError
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
@@ -60,8 +62,10 @@ class ProcessEvidenceUseCase:
                 )
 
             # 2. CAPA DE SEGURIDAD (antes de que nada llegue al LLM)
-            #    Solo se analiza/envía el fragmento que realmente verá el LLM.
-            contenido = contenido[: settings.MAX_CHARS_EVIDENCIA_LLM]
+            #    La detección de inyección mira el fragmento que verá el LLM. La
+            #    anonimización y el recorte los hace la capa de IA (sanitiza primero
+            #    y recorta después, para no dejar PII cortada a medias).
+            fragmento = contenido[: settings.MAX_CHARS_EVIDENCIA_LLM]
             justificacion = respuesta.justificacion_usuario or ""
 
             evidencia_sospechosa = False
@@ -75,26 +79,37 @@ class ProcessEvidenceUseCase:
                     await self.respuesta_repo.update(respuesta)
                     return await self.evidencia_repo.update(evidencia)
 
-                if self.guard.detectar_inyeccion(contenido):
+                if self.guard.detectar_inyeccion(fragmento):
                     if settings.MODO_SEGURIDAD_EVIDENCIA == "bloquear":
                         # Bloqueo preventivo: NO se llama al LLM
                         await self._bloquear_por_seguridad(
-                            respuesta, evidencia, OrigenEvento.EVIDENCIA.value, contenido, control
+                            respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control
                         )
                         await self.respuesta_repo.update(respuesta)
                         return await self.evidencia_repo.update(evidencia)
                     # Modo "marcar": se registra y se sigue, pero sin fallback al usuario
                     evidencia_sospechosa = True
-                    await self._registrar(respuesta, evidencia, OrigenEvento.EVIDENCIA.value, contenido, control)
+                    await self._registrar(respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control)
 
-                # Ley 21.719: el LLM externo nunca recibe datos personales en claro
-                contenido = self.guard.anonimizar(contenido)
-                justificacion = self.guard.anonimizar(justificacion)
-
-            # 3. Validar con LLM (solo texto entra, solo JSON sale)
-            result = await self.validator.validate(
-                contenido, control, respuesta, brecha, justificacion=justificacion
-            )
+            # 3. Validar con LLM a través de la capa de Políticas e IA.
+            #    Ley 21.719: el validador sanitiza (NER) antes de que algo salga al
+            #    proveedor; si no puede sanitizar, aborta (CapaIAError).
+            try:
+                result = await self.validator.validate(
+                    contenido, control, respuesta, brecha, justificacion=justificacion,
+                    contexto=ContextoLlamada(
+                        evaluacion_id=respuesta.evaluacion_id,
+                        respuesta_id=respuesta.id,
+                        evidencia_id=evidencia.id_evidencia,
+                    ),
+                )
+            except CapaIAError as e:
+                # La respuesta conserva su estado; la evidencia queda en error con un
+                # mensaje sin datos personales. La métrica ya la registró la capa de IA.
+                evidencia.estado_validacion = EstadoValidacion.ERROR.value
+                evidencia.errores_validacion = [f"[{e.tipo_error}] {e.mensaje_usuario}"]
+                evidencia.fecha_procesada = date.today()
+                return await self.evidencia_repo.update(evidencia)
 
             # 4. Persistir el resultado crudo del LLM en Evidencias
             evidencia.clasificacion_llm = result.clasificacion

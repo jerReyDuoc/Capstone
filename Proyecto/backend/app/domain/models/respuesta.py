@@ -31,6 +31,7 @@ class FuenteClasificacion(str, Enum):
     USUARIO = "usuario"
     LLM = "llm"
     SEGURIDAD = "seguridad"  # decisión tomada por la capa anti prompt-injection
+    REVISION = "revision"    # decisión del Oficial de Cumplimiento (revisión humana)
 
 class Respuesta(Base):
     __tablename__ = "respuestas"
@@ -72,6 +73,15 @@ class Respuesta(Base):
     )
     fecha_validacion: Mapped[date | None] = mapped_column(
         "fecha_validacion", Date, nullable=True
+    )
+
+    # Revisión humana (Oficial de Cumplimiento). Es la "verdad de referencia" con la
+    # que se mide la precisión del LLM en /api/ia/metricas.
+    clasificacion_revisada: Mapped[str | None] = mapped_column(
+        "clasificacion_revisada", String(25), nullable=True
+    )
+    fecha_revision: Mapped[date | None] = mapped_column(
+        "fecha_revision", Date, nullable=True
     )
 
     evaluacion: Mapped["Evaluacion"] = relationship(back_populates="respuestas")

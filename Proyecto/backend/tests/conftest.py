@@ -12,6 +12,9 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@127.0.0.1:
 os.environ.setdefault("DATABASE_URL_SYNC", "postgresql://test:test@127.0.0.1:5433/test")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379")
 os.environ.setdefault("GROQ_API_KEY", "gsk_test")
+os.environ.setdefault("APP_ENV", "test")
+# Clave Fernet SOLO para pruebas (no usar en ningún .env real)
+os.environ.setdefault("ENTITY_MAP_KEY", "dGVzdC1rZXktc29sby1wYXJhLXB5dGVzdC0xMjM0NTY=")
 
 # Las pruebas de API en proceso suben archivos: que no ensucien ./storage
 import tempfile  # noqa: E402

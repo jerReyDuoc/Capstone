@@ -98,7 +98,7 @@ class FakeValidator:
         self.llamadas = []
         self.confianza = confianza
 
-    async def validate(self, contenido, control, respuesta, brecha=None, justificacion=None):
+    async def validate(self, contenido, control, respuesta, brecha=None, justificacion=None, contexto=None):
         self.llamadas.append({"contenido": contenido, "justificacion": justificacion})
         return EvidenceValidation(
             clasificacion="cumplido", confianza=self.confianza, justificacion="ok",
@@ -128,9 +128,10 @@ def _evidencia():
     )
 
 
-def _process(contenido, respuesta, confianza=0.95):
+def _process(contenido, respuesta, confianza=0.95, validator=None):
     guard = ReglasPromptGuard()
-    eventos, validator, evidencia = FakeEventoRepo(), FakeValidator(confianza), _evidencia()
+    eventos, evidencia = FakeEventoRepo(), _evidencia()
+    validator = validator or FakeValidator(confianza)
     uc = ProcessEvidenceUseCase(
         FakeEvidenciaRepo(evidencia), FakeRespuestaRepo(respuesta, _control()),
         FakeStorage(contenido), validator,
@@ -180,16 +181,19 @@ def test_evidencia_con_inyeccion_no_llega_al_llm():
 
 
 def test_pii_se_anonimiza_antes_del_llm():
+    # La anonimización ocurre en la capa de IA: se prueba con el gateway real y un
+    # proveedor falso que guarda exactamente lo que habría salido hacia el LLM.
+    from _capa_ia_fakes import crear_validador
     contenido = f"Política aprobada. Responsable: RUT {RUT}, contacto {CORREO}."
     respuesta = _respuesta(f"La firmó el encargado, correo {CORREO}.")
-    evidencia, respuesta, validator, _ = _process(contenido, respuesta)
+    validator, gw = crear_validador()
+    evidencia, respuesta, _, _ = _process(contenido, respuesta, validator=validator)
 
-    assert len(validator.llamadas) == 1
-    enviado = validator.llamadas[0]
+    assert len(gw.provider.requests) == 1
+    enviado = gw.provider.todo_lo_enviado()
     for secreto in (RUT, CORREO, "15444333"):
-        assert secreto not in enviado["contenido"]
-        assert secreto not in enviado["justificacion"]
-    assert "[RUT_ANON]" in enviado["contenido"] and "[CORREO_ANON]" in enviado["contenido"]
+        assert secreto not in enviado
+    assert "[RUT_ANON]" in enviado and "[CORREO_ANON]" in enviado
     # Lo guardado en BD no se modifica
     assert CORREO in respuesta.justificacion_usuario
     assert evidencia.estado_validacion == EstadoValidacion.VALIDATED.value
