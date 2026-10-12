@@ -5,4 +5,4 @@ backend/venv/
 backend/storage/
 __pycache__/
 *.pyc
-docker-compose.yml
+backend/.pytest_cache/

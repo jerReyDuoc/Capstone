@@ -3,7 +3,7 @@ uvicorn[standard]==0.32.0
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 alembic==1.14.0
-pydantic==2.10.0
+pydantic==2.14.0
 pydantic-settings==2.6.0
 python-multipart==0.0.12
 langchain-core==0.3.20
@@ -15,7 +15,8 @@ langchain-groq==0.2.0
 # Capa anti prompt-injection y motor NER (app/infrastructure/security)
 # OBLIGATORIO con SANITIZER_ENABLED=true. Tras instalar:
 #   python -m spacy download es_core_news_md
-spacy
+spacy==3.8.16
+es_core_news_md @ https://github.com/explosion/spacy-models/releases/download/es_core_news_md-3.8.0/es_core_news_md-3.8.0-py3-none-any.whl
 # Cifrado del mapa de entidades (Fernet)
 cryptography
 
