@@ -64,6 +64,10 @@ def test_montos_y_folios_no_se_confunden_con_rut(texto):
 def test_cada_tipo_usa_su_etiqueta_fija(texto, etiqueta):
     assert etiqueta in sanitizer_stub().sanitizar(texto).texto
 
+@pytest.mark.parametrize("complemento", ["oficina 501", "of. 501", "depto 56", "departamento 12B"])
+def test_direccion_incluye_el_numero_del_complemento(complemento):
+    r = sanitizer_stub().sanitizar(f"Av. Providencia 1234, {complemento}, Providencia.")
+    assert r.texto == "[DIRECCION_ANON]." and r.entidades[0].valor.endswith("Providencia")
 
 def test_direccion_sin_prefijo_via_ner():
     s = NERSanitizer(lambda: StubNLP(lugares=["Los Leones"]))

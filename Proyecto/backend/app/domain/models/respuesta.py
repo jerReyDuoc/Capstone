@@ -38,7 +38,7 @@ class Respuesta(Base):
 
     id: Mapped[int] = mapped_column("id_respuesta", Integer, primary_key=True)
     estado_clasificacion: Mapped[str | None] = mapped_column(
-        "estado_clasificacion", String(20), nullable=True
+        "estado_clasificacion", String(25), nullable=True
     )
     justificacion_usuario: Mapped[str | None] = mapped_column(
         "justificacion_usuario", Text, nullable=True
@@ -63,7 +63,7 @@ class Respuesta(Base):
     )
 
     estado_clasificacion_final: Mapped[str | None] = mapped_column(
-        "estado_clasificacion_final", String(20), nullable=True
+        "estado_clasificacion_final", String(25), nullable=True
     )
     fuente_clasificacion: Mapped[str | None] = mapped_column(
         "fuente_clasificacion", String(10), nullable=True

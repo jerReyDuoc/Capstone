@@ -22,7 +22,7 @@ class Evidencia(Base):
     estado_validacion: Mapped[str] = mapped_column(
         "estado_validacion", String(20), default=EstadoValidacion.PENDING.value
     )
-    clasificacion_llm: Mapped[str | None] = mapped_column("clasificacion_llm", String(20), nullable=True)
+    clasificacion_llm: Mapped[str | None] = mapped_column("clasificacion_llm", String(25), nullable=True)
     confianza: Mapped[float | None] = mapped_column("confianza", Float, nullable=True)
     justificacion_llm: Mapped[str | None] = mapped_column("justificacion_llm", Text, nullable=True)
     datos_extraidos: Mapped[dict | None] = mapped_column("datos_extraidos", JSON, nullable=True)

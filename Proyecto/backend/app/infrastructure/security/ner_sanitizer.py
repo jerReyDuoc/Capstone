@@ -77,7 +77,7 @@ _PREFIJO_VIA = (
 _PALABRA_VIA = r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'.]+"
 _NUMERO = r"(?:(?i:n[°º.]?|#|n[uú]mero|num\.?)\s*)?\d{1,5}\b"
 _COMPLEMENTO = (
-    r"(?:\s*[,\-]?\s*(?i:depto\.?|departamento|dpto\.?|of\.?|oficina|casa|block|torre|piso)"
+    r"(?:\s*[,\-]?\s*(?i:departamento|depto\.?|dpto\.?|oficina|of\.?|casa|block|torre|piso)\b\.?"
     r"\s*[\w\-]{1,6})*"
 )
 _COMUNA = r"(?:\s*,\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+(?:de\s+|del\s+)?[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})?"
