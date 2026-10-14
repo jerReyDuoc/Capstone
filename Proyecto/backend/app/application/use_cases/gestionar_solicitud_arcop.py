@@ -8,8 +8,13 @@ Reglas de negocio (el backend decide, nunca el cliente):
     revela que el id existe).
   - Toda transición se valida contra TRANSICIONES_ARCOP y deja un evento en el
     historial en la misma transacción.
+  - Una SUPRESIÓN aprobada (resuelta) anonimiza los datos del titular en la misma
+    transacción que la resolución (ver AnonimizacionRepository).
+  - Plazos: fecha_limite_respuesta / fecha_limite_informacion se calculan solo si
+    ARCOP_PLAZO_*_DIAS está configurado (pendiente de definir por el equipo).
 """
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
 from app.core.autenticacion import Actor
 from app.domain.models.solicitud_arcop import (
@@ -20,6 +25,8 @@ from app.domain.models.solicitud_arcop import (
     TipoSolicitudARCOP,
     transicion_permitida,
 )
+
+logger = logging.getLogger("arcop")
 
 MIN_DESCRIPCION, MAX_DESCRIPCION = 10, 5000
 MAX_COMENTARIO = 2000
@@ -67,9 +74,34 @@ def _texto(valor: str | None, campo: str, minimo: int = 0, maximo: int = MAX_COM
     return texto
 
 
+def plazo_vencido(solicitud: SolicitudARCOP, ahora: datetime | None = None) -> bool:
+    """True si la solicitud sigue abierta y pasó alguno de sus plazos."""
+    if solicitud.estado in Estado.finales():
+        return False
+    ahora = ahora or _ahora()
+    if solicitud.fecha_limite_respuesta and solicitud.fecha_limite_respuesta < ahora:
+        return True
+    return bool(
+        solicitud.estado == Estado.PENDIENTE_INFORMACION.value
+        and solicitud.fecha_limite_informacion
+        and solicitud.fecha_limite_informacion < ahora
+    )
+
+
+def _sumar_dias(desde: datetime, dias: int | None) -> datetime | None:
+    # Días CORRIDOS. Si la ley exige días hábiles, este es el único lugar a cambiar.
+    return desde + timedelta(days=dias) if dias else None
+
+
 class GestionarSolicitudARCOPUseCase:
-    def __init__(self, repo):
+    def __init__(self, repo, anonimizacion_repo=None, storage=None,
+                 plazo_respuesta_dias: int | None = None,
+                 plazo_informacion_dias: int | None = None):
         self.repo = repo
+        self.anonimizacion_repo = anonimizacion_repo
+        self.storage = storage
+        self.plazo_respuesta_dias = plazo_respuesta_dias
+        self.plazo_informacion_dias = plazo_informacion_dias
 
     # ------------------------------------------------------------ helpers
     def _evento(self, actor: Actor, tipo: Evento, anterior: str | None, nuevo: str,
@@ -92,7 +124,8 @@ class GestionarSolicitudARCOPUseCase:
         return solicitud
 
     async def _transicionar(self, actor: Actor, solicitud: SolicitudARCOP, nuevo: str,
-                            tipo_evento: Evento, comentario: str | None) -> SolicitudARCOP:
+                            tipo_evento: Evento, comentario: str | None,
+                            eventos_extra: tuple = ()) -> SolicitudARCOP:
         anterior = solicitud.estado
         if not transicion_permitida(anterior, nuevo):
             raise TransicionInvalidaError(anterior, nuevo)
@@ -101,8 +134,13 @@ class GestionarSolicitudARCOPUseCase:
         solicitud.fecha_actualizacion = ahora
         if nuevo in Estado.finales():
             solicitud.fecha_cierre = ahora
+        # El plazo para aportar antecedentes solo existe mientras se esperan
+        if nuevo == Estado.PENDIENTE_INFORMACION.value:
+            solicitud.fecha_limite_informacion = _sumar_dias(ahora, self.plazo_informacion_dias)
+        else:
+            solicitud.fecha_limite_informacion = None
         return await self.repo.guardar(
-            solicitud, self._evento(actor, tipo_evento, anterior, nuevo, comentario)
+            solicitud, self._evento(actor, tipo_evento, anterior, nuevo, comentario), *eventos_extra
         )
 
     # ------------------------------------------------------------ titular
@@ -125,6 +163,7 @@ class GestionarSolicitudARCOPUseCase:
             usuario_temporal_id=actor.id,
             fecha_creacion=ahora,
             fecha_actualizacion=ahora,
+            fecha_limite_respuesta=_sumar_dias(ahora, self.plazo_respuesta_dias),
         )
         evento = self._evento(actor, Evento.CREADA, None, Estado.RECIBIDA.value)
         return await self.repo.create(solicitud, evento)
@@ -155,7 +194,8 @@ class GestionarSolicitudARCOPUseCase:
         return await self._obtener_visible(actor, solicitud_id)
 
     async def listar(self, actor: Actor, estado: str | None, tipo: str | None,
-                     usuario_temporal_id: int | None, page: int, size: int):
+                     usuario_temporal_id: int | None, page: int, size: int,
+                     solo_vencidas: bool = False):
         if estado and estado not in Estado.valores():
             raise ValueError(f"Estado inválido. Debe ser uno de: {', '.join(Estado.valores())}")
         if tipo and tipo not in TipoSolicitudARCOP.valores():
@@ -164,6 +204,7 @@ class GestionarSolicitudARCOPUseCase:
         dueno = usuario_temporal_id if actor.es_admin else actor.id
         return await self.repo.list(
             usuario_temporal_id=dueno, estado=estado, tipo=tipo,
+            solo_vencidas_al=_ahora() if solo_vencidas else None,
             offset=(page - 1) * size, limit=size,
         )
 
@@ -194,4 +235,39 @@ class GestionarSolicitudARCOPUseCase:
         if not transicion_permitida(solicitud.estado, resultado):
             raise TransicionInvalidaError(solicitud.estado, resultado)
         solicitud.respuesta = texto
-        return await self._transicionar(actor, solicitud, resultado, Evento.RESOLUCION, None)
+
+        eventos_extra, rutas = (), []
+        if resultado == Estado.RESUELTA.value and solicitud.tipo == TipoSolicitudARCOP.SUPRESION.value:
+            if self.anonimizacion_repo is None:
+                raise RuntimeError("Falta el repositorio de anonimización para resolver una supresión.")
+            # Mismo commit que la resolución: si algo falla, no queda nada a medias
+            conteo, rutas = await self.anonimizacion_repo.anonimizar_titular(
+                solicitud.usuario_temporal_id, _ahora()
+            )
+            resumen = ", ".join(f"{k}={v}" for k, v in conteo.items())
+            eventos_extra = (self._evento(
+                actor, Evento.ANONIMIZACION, resultado, resultado,
+                f"Datos del titular anonimizados ({resumen}).",
+            ),)
+
+        resuelta = await self._transicionar(
+            actor, solicitud, resultado, Evento.RESOLUCION, None, eventos_extra
+        )
+        await self._borrar_archivos(solicitud_id, rutas)
+        return resuelta
+
+    async def _borrar_archivos(self, solicitud_id: int, rutas: list[str]) -> None:
+        """Tras el commit: si un archivo no se puede borrar se registra para revisarlo a mano."""
+        if not rutas:
+            return
+        fallidos = 0
+        for ruta in rutas:
+            try:
+                await self.storage.delete(ruta)
+            except Exception:  # noqa: BLE001
+                fallidos += 1
+        if fallidos:
+            logger.error(
+                "Supresión ARCOP %s: no se pudieron borrar %s de %s archivos de evidencia",
+                solicitud_id, fallidos, len(rutas),
+            )

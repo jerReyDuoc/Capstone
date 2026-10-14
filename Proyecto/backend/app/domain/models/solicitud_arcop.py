@@ -44,6 +44,7 @@ class EventoSolicitudARCOP(str, Enum):
     INFORMACION_APORTADA = "informacion_aportada"
     RESOLUCION = "resolucion"
     CANCELACION = "cancelacion"
+    ANONIMIZACION = "anonimizacion"
 
 
 _E = EstadoSolicitudARCOP
@@ -92,6 +93,15 @@ class SolicitudARCOP(Base):
     fecha_actualizacion: Mapped[datetime] = mapped_column("fecha_actualizacion", DateTime, nullable=False)
     # Se fija al llegar a un estado final (resuelta, rechazada o cancelada)
     fecha_cierre: Mapped[datetime | None] = mapped_column("fecha_cierre", DateTime, nullable=True)
+
+    # Plazos (ARCOP_PLAZO_*_DIAS en config). Quedan en NULL mientras no se definan.
+    fecha_limite_respuesta: Mapped[datetime | None] = mapped_column(
+        "fecha_limite_respuesta", DateTime, nullable=True
+    )
+    # Solo mientras está en pendiente_informacion: hasta cuándo puede responder el titular
+    fecha_limite_informacion: Mapped[datetime | None] = mapped_column(
+        "fecha_limite_informacion", DateTime, nullable=True
+    )
 
     # Respuesta/resolución comunicada al titular (obligatoria al resolver o rechazar)
     respuesta: Mapped[str | None] = mapped_column("respuesta", Text, nullable=True)

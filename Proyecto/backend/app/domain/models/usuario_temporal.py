@@ -1,5 +1,5 @@
-from datetime import date
-from sqlalchemy import Integer, String, Date, ForeignKey
+from datetime import date, datetime
+from sqlalchemy import Integer, String, Date, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -18,4 +18,9 @@ class UsuarioTemporal(Base):
         Integer,
         ForeignKey("rubro.id"),
         nullable=True,
+    )
+    # Se fija cuando se ejecuta una supresión ARCOP: el email y los textos del
+    # usuario ya fueron borrados y no puede volver a obtener un token.
+    fecha_anonimizacion: Mapped[datetime | None] = mapped_column(
+        "fecha_anonimizacion", DateTime, nullable=True
     )

@@ -4,33 +4,88 @@ Historia de usuario: *como Titular de Datos Personales quiero registrar solicitu
 formales de Acceso, Rectificación, Supresión, Oposición, Portabilidad o Bloqueo para
 garantizar el cumplimiento de los derechos de la Ley N.º 21.719.*
 
-Base: rama `main` en el commit `03d5bdb` ("Docker agregado"). Head de Alembic previo: `a168283ff2b8`.
+- **Versión 1** (migración `e5a1c9d4b2f7`): solicitudes, ciclo de vida, historial, roles.
+- **Versión 2** (migración `f7b2d1a8c3e9`):
+  1. El usuario temporal obtiene su token con los datos de su invitación y el administrador
+     inicia sesión con email y contraseña (tabla `usuarios_admin`).
+  2. Una **supresión aprobada** (`resuelta`) anonimiza los datos del titular.
+  3. Plazos de respuesta y de aporte de información **configurables y vacíos** hasta que el
+     equipo los defina.
 
-## Cómo aplicar
-
-1. Descomprimir el zip sobre la raíz del repo (las rutas empiezan en `Proyecto/`), o aplicar
-   `arcop.patch` con `git apply arcop.patch` desde la raíz.
-2. En `backend/.env` agregar `AUTH_SECRET` (generar con
-   `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
-3. `alembic upgrade head` (o `docker compose up -d --build`, el servicio `migrate` la aplica).
-4. `pytest tests -v -rxX`.
-
-## Archivos
+## Archivos de la versión 2
 
 | Tipo | Archivo | Qué hace |
 |---|---|---|
-| nuevo | `app/domain/models/solicitud_arcop.py` | Modelos `SolicitudARCOP` y `EventoSolicitud`, enums de tipo/estado/evento y la máquina de estados `TRANSICIONES_ARCOP` |
-| nuevo | `app/core/autenticacion.py` | Token bearer firmado (HMAC-SHA256, solo stdlib), `Actor`, `obtener_actor`, `requerir_rol`. Roles `referente` y `admin_therion` (los mismos del frontend) |
-| nuevo | `app/infrastructure/repositories/solicitud_arcop_repository.py` | Persistencia; cambio + evento en la misma transacción; `SELECT … FOR UPDATE` al transicionar |
-| nuevo | `app/application/use_cases/gestionar_solicitud_arcop.py` | Reglas de negocio: permisos por rol, propiedad, transiciones, validaciones |
-| nuevo | `app/application/schemas/arcop_schemas.py` | Peticiones y respuestas |
-| nuevo | `app/api/routes/arcop.py` | Endpoints `/api/arcop/...` |
-| nuevo | `migrations/versions/e5a1c9d4b2f7_solicitudes_arcop.py` | Tablas `solicitudes_arcop` y `eventos_solicitud_arcop` |
-| nuevo | `tests/test_solicitudes_arcop.py` | Pruebas en proceso (arnés `_api_harness.py`, SQLite en memoria) |
-| modificado | `app/main.py` | Registra el router `arcop` |
-| modificado | `app/domain/models/__init__.py` | Exporta los nuevos modelos (Alembic los detecta) |
-| modificado | `app/core/config.py` | `AUTH_SECRET`, `AUTH_TOKEN_TTL_MIN`; en `production` exige `AUTH_SECRET` ≥ 32 caracteres |
-| modificado | `.env.example`, `env.example` | Variables nuevas |
+| nuevo | `app/domain/models/usuario_admin.py` | Administradores con contraseña (hash PBKDF2-SHA256) |
+| nuevo | `app/core/crear_admin.py` | CLI para crear, cambiar contraseña o desactivar un admin |
+| nuevo | `app/application/use_cases/iniciar_sesion.py` | Login del admin y acceso del titular |
+| nuevo | `app/api/routes/auth.py` | `POST /api/auth/login`, `POST /api/auth/titular`, `GET /api/auth/me` |
+| nuevo | `app/infrastructure/repositories/anonimizacion_repository.py` | Anonimiza todos los datos de un titular (sin commit propio) |
+| nuevo | `migrations/versions/f7b2d1a8c3e9_arcop_admin_plazos_anonimizacion.py` | Tabla `usuarios_admin` y columnas nuevas |
+| modificado | `app/core/autenticacion.py` | Hash de contraseñas; en cada petición verifica que el admin siga activo o que el titular no esté anonimizado |
+| modificado | `app/application/use_cases/gestionar_solicitud_arcop.py` | Anonimización al resolver supresión, plazos, filtro de vencidas |
+| modificado | `app/infrastructure/repositories/solicitud_arcop_repository.py` | Varios eventos por transacción, filtro `vencidas` |
+| modificado | `app/api/routes/arcop.py` | Inyecta anonimización/plazos; `?vencidas=true`; plazos en el catálogo |
+| modificado | `app/application/schemas/arcop_schemas.py` | `fecha_limite_respuesta`, `fecha_limite_informacion`, `plazo_vencido` |
+| modificado | `app/domain/models/solicitud_arcop.py` | Columnas de plazos; evento `anonimizacion` |
+| modificado | `app/domain/models/usuario_temporal.py` | Columna `fecha_anonimizacion` |
+| modificado | `app/domain/models/__init__.py` | Exporta `UsuarioAdmin` |
+| modificado | `app/core/config.py` | `ARCOP_PLAZO_RESPUESTA_DIAS`, `ARCOP_PLAZO_INFORMACION_DIAS` |
+| modificado | `app/main.py` | Registra el router `auth` |
+| modificado | `.env.example`, `env.example` | Variables de plazos (comentadas) |
+| modificado | `tests/_api_harness.py` | Siembra un 2.º usuario temporal y un admin de prueba |
+| modificado | `tests/test_solicitudes_arcop.py` | Pruebas de login, anonimización y plazos |
+
+## Acceso (versión 2)
+
+| Quién | Cómo obtiene el token | Body |
+|---|---|---|
+| Usuario temporal (titular) | `POST /api/auth/titular` | `{"usuario_temporal_id": 1, "email": "correo@de.la.invitacion"}` |
+| Administrador | `POST /api/auth/login` | `{"email": "...", "password": "..."}` |
+
+- El titular debe tener la invitación vigente (`fecha_expiracion` hoy o después) y no estar anonimizado.
+- Los errores son genéricos (401 `CREDENCIALES_INVALIDAS`): no revelan si el email o el id existen.
+- En cada petición se verifica en BD que el usuario siga habilitado: desactivar a un admin o anonimizar
+  a un titular corta su acceso de inmediato (401 `USUARIO_DESHABILITADO`).
+- El CLI `python -m app.core.autenticacion --usuario N --rol ...` se mantiene **solo para desarrollo**.
+
+## Anonimización al aprobar una supresión
+
+Se ejecuta cuando un admin resuelve como `resuelta` una solicitud de tipo `supresion`, **en la misma
+transacción** que la resolución (o se aplica todo o nada). Es **irreversible**.
+
+| Tabla | Se borra | Se conserva |
+|---|---|---|
+| `usuario_temporal` | email, validacion_invitacion; se fija `fecha_anonimizacion` | rubro (benchmark) |
+| `respuestas` | justificacion_usuario | clasificaciones, fuente, confianza |
+| `evidencias` + **archivos** | nombre, ruta, hash, datos extraídos, justificación del LLM, errores; el archivo se borra del disco | estado, clasificación del LLM, confianza |
+| `sanitizaciones` | mapa_cifrado, entidades (huellas) | conteos por tipo |
+| `eventos_seguridad` | extracto, hash del texto | fecha, tipo, origen |
+| `solicitudes_arcop` (todas las del titular) | descripción → `[anonimizado]`; comentarios del titular en el historial | tipo, estados, fechas, respuesta del admin |
+| `respuestas_filtro`, `resumen`, `llamadas_llm` | — (no tienen texto personal) | todo |
+
+El historial de la solicitud registra un evento `anonimizacion` con la **cantidad** de filas
+afectadas por tabla (nunca el contenido). Los archivos se borran después del commit; si alguno
+falla, queda en el log `arcop` para revisarlo a mano.
+
+**Importante para los admin:** la `respuesta` de la resolución se conserva, así que no debe
+contener datos personales del titular.
+
+## Plazos (pendientes de definir)
+
+| Variable | Qué fija | Columna |
+|---|---|---|
+| `ARCOP_PLAZO_RESPUESTA_DIAS` | días desde que se recibe la solicitud hasta responderla | `fecha_limite_respuesta` (al crear) |
+| `ARCOP_PLAZO_INFORMACION_DIAS` | días que tiene el titular para aportar antecedentes pedidos | `fecha_limite_informacion` (al pasar a `pendiente_informacion`; se limpia al salir) |
+
+- Mientras estén **comentadas en el `.env`**, las columnas quedan en `NULL` y no hay vencimientos.
+  Ojo: no dejar la variable con `=` vacío (`ARCOP_PLAZO_RESPUESTA_DIAS=`), porque falla al arrancar;
+  hay que comentarla o poner un número.
+- Se cuentan en **días corridos** (función `_sumar_dias` del caso de uso; si la ley exige días hábiles,
+  se cambia solo ahí).
+- Solo se **informa** el vencimiento: `plazo_vencido` en cada solicitud y `GET /api/arcop/solicitudes?vencidas=true`.
+  No hay cierre automático por vencimiento; queda pendiente decidir qué pasa al vencer.
+- Las solicitudes creadas antes de configurar un plazo no lo reciben retroactivamente.
 
 ## Modelo de datos (migración `e5a1c9d4b2f7`, revisa `a168283ff2b8`)
 
@@ -71,7 +126,8 @@ recibida ──► en_revision ──► en_proceso ──► resuelta
 
 ## Endpoints
 
-Todos menos `/catalogo` exigen `Authorization: Bearer <token>`.
+Todos menos `/catalogo` y los de `/api/auth` exigen `Authorization: Bearer <token>`.
+Listado admite además `?vencidas=true`. Errores nuevos: 401 `CREDENCIALES_INVALIDAS`, 401 `USUARIO_DESHABILITADO`.
 
 | Método | Ruta | Rol | Respuesta |
 |---|---|---|---|
@@ -88,52 +144,43 @@ Errores: 400 validación (texto), 401 `NO_AUTENTICADO`/`TOKEN_INVALIDO`, 403 `NO
 404 no encontrada, 409 `TRANSICION_INVALIDA` (incluye `estado_actual` y `permitidas`),
 503 `AUTH_NO_CONFIGURADA` si falta `AUTH_SECRET`.
 
-## Probar a mano (PowerShell, desde `Proyecto/backend` con el venv activo)
+## Probar a mano (Docker, PowerShell desde `Proyecto\`)
 
 ```powershell
-$t = python -m app.core.autenticacion --usuario 1 --rol referente     # usuario_temporal 1 debe existir
-$a = python -m app.core.autenticacion --usuario 1 --rol admin_therion
-$T = @{ Authorization = "Bearer $t" }; $A = @{ Authorization = "Bearer $a" }
-$api = "http://localhost:8000/api/arcop/solicitudes"
+docker compose up -d --build
+docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl   # pide la contraseña (mín. 12)
 
-$s = Invoke-RestMethod -Method Post $api -Headers $T -ContentType "application/json" `
+$api = "http://localhost:8000/api"
+$a = Invoke-RestMethod -Method Post "$api/auth/login" -ContentType "application/json" `
+     -Body '{"email":"admin@therionlabs.cl","password":"<tu contraseña>"}'
+$t = Invoke-RestMethod -Method Post "$api/auth/titular" -ContentType "application/json" `
+     -Body '{"usuario_temporal_id":1,"email":"test@example.com"}'
+$A = @{ Authorization = "Bearer $($a.access_token)" }; $T = @{ Authorization = "Bearer $($t.access_token)" }
+
+$s = Invoke-RestMethod -Method Post "$api/arcop/solicitudes" -Headers $T -ContentType "application/json" `
      -Body '{"tipo":"acceso","descripcion":"Solicito copia de mis datos personales."}'
-Invoke-RestMethod $api -Headers $T
-Invoke-RestMethod "$api/$($s.id_solicitud)" -Headers $T
-Invoke-RestMethod -Method Patch "$api/$($s.id_solicitud)/estado" -Headers $A -ContentType "application/json" -Body '{"estado":"en_revision"}'
-Invoke-RestMethod -Method Patch "$api/$($s.id_solicitud)/estado" -Headers $A -ContentType "application/json" -Body '{"estado":"en_proceso"}'
-Invoke-RestMethod -Method Post "$api/$($s.id_solicitud)/resolucion" -Headers $A -ContentType "application/json" `
+Invoke-RestMethod "$api/arcop/solicitudes" -Headers $A
+Invoke-RestMethod -Method Patch "$api/arcop/solicitudes/$($s.id_solicitud)/estado" -Headers $A -ContentType "application/json" -Body '{"estado":"en_revision"}'
+Invoke-RestMethod -Method Patch "$api/arcop/solicitudes/$($s.id_solicitud)/estado" -Headers $A -ContentType "application/json" -Body '{"estado":"en_proceso"}'
+Invoke-RestMethod -Method Post "$api/arcop/solicitudes/$($s.id_solicitud)/resolucion" -Headers $A -ContentType "application/json" `
      -Body '{"resultado":"resuelta","respuesta":"Se adjunta el detalle de sus datos."}'
 ```
 
-En Swagger (`/docs`) cada endpoint muestra el campo de header `authorization`: pegar
-`Bearer <token>` ahí.
+Con `"tipo":"supresion"` y el mismo recorrido, al resolver se anonimiza el titular: **úsalo con un
+usuario temporal de prueba**, no con uno que necesites conservar.
 
 ## Decisiones que requieren confirmación
 
-1. **Autenticación.** El backend no tenía autenticación: todos los endpoints actuales son
-   abiertos y solo el frontend simula login y roles. Sin identificar al titular no se puede
-   cumplir "un titular no ve solicitudes ajenas", así que se agregó un único punto de
-   identidad (`app/core/autenticacion.py`) que reutiliza los roles del frontend. **No hay
-   endpoint de login**: los tokens se emiten con el CLI de prueba. Falta decidir cómo se
-   emiten en producción (login real, link de invitación de `usuario_temporal`, etc.).
-   Los endpoints existentes no se tocaron.
-2. **Titular = `usuario_temporal`.** Es la única entidad de usuario. Si el titular puede ser
-   alguien sin cuenta (p. ej. un trabajador de la empresa evaluada), hará falta otra entidad
-   o datos de contacto en la solicitud.
-3. **Plazos legales.** No se calcula fecha límite de respuesta ni vencimientos: el plazo y su
-   forma de cómputo (días hábiles/corridos, prórrogas) dependen de la Ley 21.719 y deben
-   confirmarse antes de agregarlos (columna `fecha_limite` + alerta).
-4. **Verificación de identidad del titular, excepciones y causales de rechazo.** No se
-   modelaron requisitos legales específicos; el rechazo solo exige una respuesta en texto.
-5. **Estados `pendiente_informacion` y `cancelada`.** Son decisiones de diseño (pedir
-   antecedentes al titular y permitir desistimiento), no requisitos legales. El titular no
-   puede cancelar una vez `en_proceso`.
-6. **Duplicados.** No se bloquea abrir dos solicitudes del mismo tipo a la vez (podrían ser
-   distintas rectificaciones). Si se quiere impedir, es un cambio de una línea en el caso de uso.
-7. **Expiración del `usuario_temporal`.** No se revisa `fecha_expiracion` al crear o consultar:
-   un usuario con invitación vencida probablemente sigue teniendo derechos sobre sus datos.
-8. **Ejecución de la solicitud.** El flujo registra y resuelve la solicitud; no ejecuta
-   automáticamente la supresión, portabilidad, etc. sobre los datos.
-9. **Integración con auditoría existente.** `eventos_seguridad` es específico de prompt
-   injection, por eso el historial va en su propia tabla (`eventos_solicitud_arcop`).
+1. **Identificación del titular.** Se valida con `usuario_temporal_id` + email de la invitación.
+   Es tan fuerte como lo secreto que sea el id: si el link de invitación es adivinable, conviene
+   agregar un código de invitación aleatorio.
+2. **Sin límite de intentos.** El login no bloquea tras varios intentos fallidos; queda registrado
+   en el log `seguridad`. Si se expone a internet, agregar limitación de intentos.
+3. **Plazos.** Valores en días, días corridos o hábiles, y qué hacer al vencer (Ley 21.719).
+4. **Alcance de la anonimización.** Se conservan clasificaciones y puntajes sin vínculo personal;
+   no se tocan los respaldos de la BD. Confirmar si la ley exige más (o permite menos).
+5. **Solicitudes abiertas del mismo titular** al anonimizarlo: quedan abiertas y anonimizadas,
+   el titular ya no puede entrar; un admin debe cerrarlas.
+6. **Verificación de identidad, excepciones y causales de rechazo** (Ley 21.719): no modeladas.
+7. **Duplicados**: se permiten dos solicitudes iguales abiertas a la vez.
+8. **Frontend**: no se modificó; el login y la bandeja de admin están disponibles por API.

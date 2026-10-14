@@ -2,14 +2,18 @@
 Solicitudes de derechos ARCOP del titular de datos personales
 (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
 
-Roles (app/core/autenticacion.py):
-  referente      -> titular: crea, consulta, cancela y aporta información a SUS solicitudes.
-  admin_therion  -> consulta todas, cambia estados intermedios y registra la resolución.
+Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.py):
+  referente      -> titular (POST /api/auth/titular): crea, consulta, cancela y aporta
+                    información a SUS solicitudes.
+  admin_therion  -> administrador (POST /api/auth/login): consulta todas, cambia estados
+                    intermedios y registra la resolución. Una supresión resuelta
+                    anonimiza los datos del titular.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
+from app.core.config import settings
 from app.core.database import get_db
 from app.application.schemas.arcop_schemas import (
     AportarInformacionARCOPRequest,
@@ -26,6 +30,7 @@ from app.application.use_cases.gestionar_solicitud_arcop import (
     OperacionNoPermitidaError,
     SolicitudNoEncontradaError,
     TransicionInvalidaError,
+    plazo_vencido,
 )
 from app.domain.models.solicitud_arcop import (
     TRANSICIONES_ARCOP,
@@ -33,7 +38,9 @@ from app.domain.models.solicitud_arcop import (
     SolicitudARCOP,
     TipoSolicitudARCOP,
 )
+from app.infrastructure.repositories.anonimizacion_repository import AnonimizacionRepository
 from app.infrastructure.repositories.solicitud_arcop_repository import SolicitudARCOPRepository
+from app.infrastructure.storage.local_storage import LocalFileStorage
 
 router = APIRouter(prefix="/api/arcop", tags=["arcop"])
 
@@ -42,7 +49,13 @@ solo_admin = requerir_rol(Rol.ADMIN_THERION)
 
 
 def _use_case(db: AsyncSession) -> GestionarSolicitudARCOPUseCase:
-    return GestionarSolicitudARCOPUseCase(SolicitudARCOPRepository(db))
+    return GestionarSolicitudARCOPUseCase(
+        SolicitudARCOPRepository(db),
+        anonimizacion_repo=AnonimizacionRepository(db),
+        storage=LocalFileStorage(),
+        plazo_respuesta_dias=settings.ARCOP_PLAZO_RESPUESTA_DIAS,
+        plazo_informacion_dias=settings.ARCOP_PLAZO_INFORMACION_DIAS,
+    )
 
 
 async def _ejecutar(coro):
@@ -76,6 +89,9 @@ def _resumen(s: SolicitudARCOP) -> SolicitudARCOPResumenResponse:
         fecha_creacion=s.fecha_creacion,
         fecha_actualizacion=s.fecha_actualizacion,
         fecha_cierre=s.fecha_cierre,
+        fecha_limite_respuesta=s.fecha_limite_respuesta,
+        fecha_limite_informacion=s.fecha_limite_informacion,
+        plazo_vencido=plazo_vencido(s),
     )
 
 
@@ -109,6 +125,9 @@ async def catalogo_arcop():
         "estados": EstadoSolicitudARCOP.valores(),
         "estados_finales": sorted(EstadoSolicitudARCOP.finales()),
         "transiciones": {k: sorted(v) for k, v in TRANSICIONES_ARCOP.items()},
+        # None = plazo aún no definido por el equipo
+        "plazo_respuesta_dias": settings.ARCOP_PLAZO_RESPUESTA_DIAS,
+        "plazo_informacion_dias": settings.ARCOP_PLAZO_INFORMACION_DIAS,
     }
 
 
@@ -130,6 +149,7 @@ async def listar_solicitudes(
     estado: str | None = Query(None, description="Filtrar por estado"),
     tipo: str | None = Query(None, description="Filtrar por tipo de derecho"),
     usuario_temporal_id: int | None = Query(None, description="Solo admin_therion: filtrar por titular"),
+    vencidas: bool = Query(False, description="Solo solicitudes abiertas con algún plazo vencido"),
     actor: Actor = Depends(obtener_actor),
     db: AsyncSession = Depends(get_db),
 ):
@@ -138,7 +158,7 @@ async def listar_solicitudes(
     admin_therion: todas, con filtros.
     """
     items, total = await _ejecutar(
-        _use_case(db).listar(actor, estado, tipo, usuario_temporal_id, page, size)
+        _use_case(db).listar(actor, estado, tipo, usuario_temporal_id, page, size, solo_vencidas=vencidas)
     )
     return {
         "items": [_resumen(s) for s in items],
@@ -181,7 +201,11 @@ async def resolver_solicitud(
     actor: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """admin_therion registra la respuesta: 'resuelta' (desde en_proceso) o 'rechazada'."""
+    """
+    admin_therion registra la respuesta: 'resuelta' (desde en_proceso) o 'rechazada'.
+    Si es una SUPRESIÓN y queda 'resuelta', se anonimizan los datos del titular
+    (irreversible) y su acceso queda revocado.
+    """
     s = await _ejecutar(
         _use_case(db).resolver(actor, solicitud_id, payload.resultado, payload.respuesta)
     )

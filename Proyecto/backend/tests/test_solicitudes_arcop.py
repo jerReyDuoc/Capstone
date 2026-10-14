@@ -9,18 +9,22 @@ No requiere PostgreSQL, Redis ni Groq. En modo live (LATENCIA_BASE_URL) se omite
 porque los tokens se firman con el AUTH_SECRET del servidor.
 
 Cubre:
-  - firma/expiración de tokens y roles (app/core/autenticacion.py)
+  - login de administrador y acceso del titular (app/api/routes/auth.py)
+  - firma/expiración de tokens, roles y revocación (app/core/autenticacion.py)
+  - anonimización al aprobar una supresión
+  - plazos configurables (ARCOP_PLAZO_*_DIAS)
   - máquina de estados (TRANSICIONES_ARCOP)
   - aislamiento entre titulares, permisos por rol, validaciones y trazabilidad
 """
 import asyncio
+import os
 import time
 
 import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import MODO, cliente_api  # noqa: E402
+from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, cliente_api  # noqa: E402
 
 from app.core import autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
@@ -29,14 +33,17 @@ from app.domain.models.solicitud_arcop import (  # noqa: E402
 )
 
 SECRETO = "secreto-solo-para-pytest-0123456789abcdef"
-TITULAR_ID = 1      # usuario_temporal sembrado por el arnés
-OTRO_TITULAR_ID = 2  # no existe en BD: sirve para probar aislamiento
+TITULAR_ID = 1       # usuarios sembrados por el arnés (_api_harness._sembrar)
+OTRO_TITULAR_ID = 2
+ADMIN_ID = 1
 DESCRIPCION = "Solicito acceso a todos mis datos personales tratados por la plataforma."
 
 
 @pytest.fixture(autouse=True)
 def _auth_secret(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_SECRET", SECRETO)
+    monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", None)
+    monkeypatch.setattr(settings, "ARCOP_PLAZO_INFORMACION_DIAS", None)
 
 
 def _h(usuario_id: int, rol: str) -> dict:
@@ -45,7 +52,7 @@ def _h(usuario_id: int, rol: str) -> dict:
 
 TITULAR = lambda: _h(TITULAR_ID, "referente")  # noqa: E731
 OTRO = lambda: _h(OTRO_TITULAR_ID, "referente")  # noqa: E731
-ADMIN = lambda: _h(99, "admin_therion")  # noqa: E731
+ADMIN = lambda: _h(ADMIN_ID, "admin_therion")  # noqa: E731
 
 
 def _correr(escenario):
@@ -147,11 +154,14 @@ def test_crear_invalida_400(body, fragmento):
     _correr(esc)
 
 
-def test_admin_no_crea_y_usuario_inexistente_no_crea():
+def test_admin_no_crea_y_token_de_usuario_inexistente_401():
     async def esc(c):
         body = {"tipo": "acceso", "descripcion": DESCRIPCION}
         assert (await c.post("/api/arcop/solicitudes", json=body, headers=ADMIN())).status_code == 403
-        assert (await c.post("/api/arcop/solicitudes", json=body, headers=OTRO())).status_code == 403
+        r = await c.post("/api/arcop/solicitudes", json=body, headers=_h(999, "referente"))
+        assert r.status_code == 401 and r.json()["detail"]["codigo"] == "USUARIO_DESHABILITADO"
+        r = await c.get("/api/arcop/solicitudes", headers=_h(999, "admin_therion"))
+        assert r.status_code == 401
     _correr(esc)
 
 
@@ -207,7 +217,7 @@ def test_admin_no_cancela_por_el_titular():
 # ---------------------------------------------------------------- ciclo de vida
 def test_ciclo_completo_con_pedido_de_informacion_y_resolucion():
     async def esc(c):
-        sid = (await _crear(c, "supresion"))["id_solicitud"]
+        sid = (await _crear(c, "rectificacion"))["id_solicitud"]
         base = f"/api/arcop/solicitudes/{sid}"
 
         r = await c.patch(f"{base}/estado", json={"estado": "en_revision"}, headers=ADMIN())
@@ -290,4 +300,151 @@ def test_catalogo():
         r = await c.get("/api/arcop/catalogo")
         assert r.status_code == 200
         assert len(r.json()["tipos"]) == 6
+    _correr(esc)
+
+
+# ---------------------------------------------------------------- login y acceso
+def test_password_hash():
+    h = auth.hash_password("una-clave-larga", iteraciones=1000)
+    assert h.startswith("pbkdf2_sha256$1000$") and "una-clave-larga" not in h
+    assert auth.verificar_password("una-clave-larga", h)
+    assert not auth.verificar_password("otra", h)
+    assert not auth.verificar_password("x", "basura")
+
+
+def test_login_admin_y_gestion():
+    async def esc(c):
+        r = await c.post("/api/auth/login", json={"email": ADMIN_EMAIL.upper(), "password": ADMIN_PASSWORD})
+        assert r.status_code == 200, r.text
+        token = r.json()["access_token"]
+        assert r.json()["rol"] == "admin_therion"
+        r = await c.get("/api/arcop/solicitudes", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        me = await c.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.json() == {"usuario_id": ADMIN_ID, "rol": "admin_therion"}
+        # errores genéricos: no revelan si el email existe
+        r1 = await c.post("/api/auth/login", json={"email": ADMIN_EMAIL, "password": "mala"})
+        r2 = await c.post("/api/auth/login", json={"email": "nadie@example.com", "password": "mala"})
+        assert r1.status_code == r2.status_code == 401
+        assert r1.json() == r2.json()
+    _correr(esc)
+
+
+def test_acceso_titular_con_invitacion():
+    async def esc(c):
+        r = await c.post("/api/auth/titular", json={"usuario_temporal_id": TITULAR_ID, "email": " QA@example.com "})
+        assert r.status_code == 200 and r.json()["rol"] == "referente"
+        h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        r = await c.post("/api/arcop/solicitudes", json={"tipo": "acceso", "descripcion": DESCRIPCION}, headers=h)
+        assert r.status_code == 201
+        # email que no corresponde a ese id
+        r = await c.post("/api/auth/titular", json={"usuario_temporal_id": TITULAR_ID, "email": "qa2@example.com"})
+        assert r.status_code == 401
+        r = await c.post("/api/auth/titular", json={"usuario_temporal_id": 999, "email": "qa@example.com"})
+        assert r.status_code == 401
+    _correr(esc)
+
+
+# ---------------------------------------------------------------- anonimización
+async def _llevar_a_en_proceso(c, sid):
+    for estado in ("en_revision", "en_proceso"):
+        r = await c.patch(f"/api/arcop/solicitudes/{sid}/estado", json={"estado": estado}, headers=ADMIN())
+        assert r.status_code == 200, r.text
+
+
+def test_supresion_resuelta_anonimiza_datos_del_titular():
+    async def esc(c):
+        # Datos personales del titular 1: una respuesta con justificación y una evidencia
+        r = await c.post("/api/respuestas/", json={
+            "evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "cumplido",
+            "justificacion": "Política aprobada por Juan Pérez, gerente de TI.",
+        })
+        assert r.status_code == 201, r.text
+        rid = r.json()["id_respuesta"]
+        nombre = "evidencia_supresion_arcop_qa.txt"
+        r = await c.post(f"/api/respuestas/{rid}/evidencias",
+                         files={"file": (nombre, b"Politica firmada por Juan Perez", "text/plain")})
+        assert r.status_code == 202, r.text
+        assert any(f.endswith(nombre) for f in os.listdir(settings.STORAGE_DIR))
+
+        otra = await _crear(c, "acceso")   # otra solicitud del mismo titular
+        sid = (await _crear(c, "supresion"))["id_solicitud"]
+        await _llevar_a_en_proceso(c, sid)
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/resolucion",
+                         json={"resultado": "resuelta", "respuesta": "Se anonimizaron sus datos personales."},
+                         headers=ADMIN())
+        assert r.status_code == 200, r.text
+        s = r.json()
+        assert s["estado"] == "resuelta" and s["descripcion"] == "[anonimizado]"
+        assert [e["tipo_evento"] for e in s["historial"]][-2:] == ["resolucion", "anonimizacion"]
+        assert "respuestas=1" in s["historial"][-1]["comentario"]
+        assert "evidencias=1" in s["historial"][-1]["comentario"]
+
+        # textos y archivos borrados; clasificaciones conservadas
+        resp = (await c.get(f"/api/respuestas/{rid}")).json()
+        assert resp["justificacion_usuario"] is None
+        assert resp["estado_clasificacion"] == "cumplido"
+        assert resp["evidencias"][0]["nombre_archivo"] == "[anonimizado]"
+        assert not any(f.endswith(nombre) for f in os.listdir(settings.STORAGE_DIR))
+
+        # la otra solicitud del titular también queda anonimizada
+        r = await c.get(f"/api/arcop/solicitudes/{otra['id_solicitud']}", headers=ADMIN())
+        assert r.json()["descripcion"] == "[anonimizado]"
+
+        # el titular pierde el acceso
+        assert (await c.get("/api/arcop/solicitudes", headers=TITULAR())).status_code == 401
+        r = await c.post("/api/auth/titular", json={"usuario_temporal_id": TITULAR_ID, "email": "qa@example.com"})
+        assert r.status_code == 401
+        # otros titulares no se ven afectados
+        assert (await c.get("/api/arcop/solicitudes", headers=OTRO())).status_code == 200
+    _correr(esc)
+
+
+@pytest.mark.parametrize("tipo,resultado", [("supresion", "rechazada"), ("acceso", "resuelta")])
+def test_sin_anonimizacion_si_no_es_supresion_aprobada(tipo, resultado):
+    async def esc(c):
+        sid = (await _crear(c, tipo))["id_solicitud"]
+        await _llevar_a_en_proceso(c, sid)
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/resolucion",
+                         json={"resultado": resultado, "respuesta": "Respuesta al titular de la solicitud."},
+                         headers=ADMIN())
+        assert r.status_code == 200
+        assert r.json()["descripcion"] == DESCRIPCION
+        assert "anonimizacion" not in [e["tipo_evento"] for e in r.json()["historial"]]
+        assert (await c.get("/api/arcop/solicitudes", headers=TITULAR())).status_code == 200
+    _correr(esc)
+
+
+# ---------------------------------------------------------------- plazos
+def test_sin_plazos_configurados_no_hay_fechas_limite():
+    async def esc(c):
+        s = await _crear(c)
+        assert s["fecha_limite_respuesta"] is None and s["plazo_vencido"] is False
+        cat = (await c.get("/api/arcop/catalogo")).json()
+        assert cat["plazo_respuesta_dias"] is None
+    _correr(esc)
+
+
+def test_plazos_configurados_y_vencidas(monkeypatch):
+    async def esc(c):
+        monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", 10)
+        monkeypatch.setattr(settings, "ARCOP_PLAZO_INFORMACION_DIAS", 5)
+        s = await _crear(c)
+        assert s["fecha_limite_respuesta"] is not None and s["plazo_vencido"] is False
+        sid = s["id_solicitud"]
+        await c.patch(f"/api/arcop/solicitudes/{sid}/estado", json={"estado": "en_revision"}, headers=ADMIN())
+        r = await c.patch(f"/api/arcop/solicitudes/{sid}/estado",
+                          json={"estado": "pendiente_informacion", "comentario": "Indique el periodo."},
+                          headers=ADMIN())
+        assert r.json()["fecha_limite_informacion"] is not None
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/informacion",
+                         json={"informacion": "Periodo 2025 completo."}, headers=TITULAR())
+        assert r.json()["fecha_limite_informacion"] is None   # se limpia al salir de pendiente
+
+        # una solicitud con plazo ya vencido aparece en ?vencidas=true
+        monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", -1)
+        vencida = await _crear(c, "bloqueo")
+        assert vencida["plazo_vencido"] is True
+        r = await c.get("/api/arcop/solicitudes?vencidas=true", headers=ADMIN())
+        assert [x["id_solicitud"] for x in r.json()["items"]] == [vencida["id_solicitud"]]
     _correr(esc)

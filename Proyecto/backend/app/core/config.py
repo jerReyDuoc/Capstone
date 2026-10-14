@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # Secreto HMAC para firmar/verificar los tokens bearer (app/core/autenticacion.py).
     AUTH_SECRET: str | None = None
     AUTH_TOKEN_TTL_MIN: int = 480
+    # ------------------------------------------------ Plazos de solicitudes ARCOP
+    # PENDIENTES DE DEFINIR por el equipo (dependen de la Ley 21.719). Vacíos = no
+    # se calcula fecha límite. Se cuentan en días CORRIDOS.
+    ARCOP_PLAZO_RESPUESTA_DIAS: int | None = None
+    ARCOP_PLAZO_INFORMACION_DIAS: int | None = None
 
     model_config = SettingsConfigDict(env_file=".env")
 

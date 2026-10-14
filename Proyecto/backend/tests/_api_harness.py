@@ -24,6 +24,7 @@ Este archivo no contiene tests (no empieza con test_).
 """
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -47,6 +48,10 @@ PREPARAR_BD = MODO == "live" and os.getenv("LATENCIA_PREPARAR_BD", "1") == "1"
 CONSERVAR_DATOS = os.getenv("LATENCIA_CONSERVAR_DATOS") == "1"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
+
+# Credenciales del administrador sembrado en modo en proceso (solo pruebas)
+ADMIN_EMAIL = "admin@example.com"
+ADMIN_PASSWORD = "clave-admin-solo-pruebas"
 
 
 class FakeArq:
@@ -157,8 +162,9 @@ async def verificar_servidor():
 async def _sembrar(Session):
     from app.domain.models import (
         CatalogoBrechas, Dominio, Evaluacion, MatrizControl, PreguntaFiltro,
-        Rubro, RutaFormativa, UsuarioTemporal,
+        Rubro, RutaFormativa, UsuarioAdmin, UsuarioTemporal,
     )
+    from app.core.autenticacion import hash_password
     async with Session() as s:
         s.add_all([Dominio(id=i, nombre_dominio=n) for i, n in DOMINIOS.values()])
         s.add(Rubro(id=1, nombre_rubro="Retail"))
@@ -166,6 +172,10 @@ async def _sembrar(Session):
         s.add(CatalogoBrechas(id_brecha=1, codigo_brecha="BR-001", categoria="General",
                               criticidad="alta", ruta_formativa_id=1))
         s.add(UsuarioTemporal(id=1, email="qa@example.com", rubro_id=1))
+        # Segundo titular y un administrador para las pruebas ARCOP (test_solicitudes_arcop.py)
+        s.add(UsuarioTemporal(id=2, email="qa2@example.com", rubro_id=1))
+        s.add(UsuarioAdmin(id=1, email=ADMIN_EMAIL, password_hash=hash_password(ADMIN_PASSWORD, iteraciones=1000),
+                           activo=True, fecha_creacion=datetime(2026, 1, 1)))
         s.add_all([
             Evaluacion(id=i, estado_progreso="en_progreso", usuario_temporal_id=1, filtro_completado=False)
             for i in (EVAL_ID, EVAL_NA_ID)

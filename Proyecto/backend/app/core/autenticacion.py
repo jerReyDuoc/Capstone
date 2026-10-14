@@ -1,36 +1,39 @@
 """
 Autenticación y roles de la API (punto ÚNICO de identidad del backend).
 
-Hasta ahora el backend no autenticaba a nadie; el frontend ya trabaja con un
-token "bearer" y dos roles (ver frontend/js/store.js):
-  - referente      -> usuario de la plataforma (usuario_temporal). Es el TITULAR
-                      de sus datos personales en las solicitudes ARCOP.
-  - admin_therion  -> equipo Therion; gestiona y resuelve solicitudes.
+Roles (los mismos que usa el frontend, ver frontend/js/store.js):
+  - referente      -> usuario temporal (usuario_temporal). Es el TITULAR de sus
+                      datos personales en las solicitudes ARCOP.
+  - admin_therion  -> administrador (usuarios_admin). Gestiona las solicitudes.
 
-Este módulo reutiliza esos mismos roles. El token es un HMAC-SHA256 firmado con
-AUTH_SECRET (solo librería estándar, sin dependencias nuevas):
+Cómo se obtiene el token (app/api/routes/auth.py):
+  - Titular: POST /api/auth/titular  {usuario_temporal_id, email}
+  - Admin:   POST /api/auth/login    {email, password}
 
+El token es un HMAC-SHA256 firmado con AUTH_SECRET (solo librería estándar):
     base64url(json {"sub": <id>, "rol": <rol>, "exp": <epoch>}) . base64url(firma)
 
-Cuando exista el login real (p. ej. POST /api/auth/login), basta con emitir el
-token con `emitir_token()` o reemplazar `obtener_actor()`: las rutas solo
-dependen de `Actor`, `obtener_actor` y `requerir_rol`.
+En cada petición se comprueba además en BD que el usuario siga habilitado
+(admin activo / titular no anonimizado), así desactivar a alguien corta su acceso
+sin esperar a que expire el token.
 
-Emitir un token de prueba (desarrollo):
+Token de prueba sin pasar por el login (solo desarrollo):
     python -m app.core.autenticacion --usuario 1 --rol referente
-    python -m app.core.autenticacion --usuario 1 --rol admin_therion
 """
 import base64
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from dataclasses import dataclass
 from enum import Enum
 
 from fastapi import Depends, Header, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.database import get_db
 
 
 class Rol(str, Enum):
@@ -44,7 +47,7 @@ class Rol(str, Enum):
 
 @dataclass(frozen=True)
 class Actor:
-    """Quién hace la petición. `id` es usuario_temporal.id para el rol referente."""
+    """Quién hace la petición. `id` es usuario_temporal.id (referente) o usuarios_admin.id (admin)."""
     id: int
     rol: str
 
@@ -57,6 +60,41 @@ class TokenInvalidoError(Exception):
     pass
 
 
+# ---------------------------------------------------------------- contraseñas
+_PBKDF2_ITERACIONES = 600_000
+
+
+def hash_password(password: str, iteraciones: int = _PBKDF2_ITERACIONES) -> str:
+    """Formato: pbkdf2_sha256$<iteraciones>$<sal b64>$<hash b64>"""
+    sal = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), sal, iteraciones)
+    return f"pbkdf2_sha256${iteraciones}${_b64(sal)}${_b64(dk)}"
+
+
+def verificar_password(password: str, almacenado: str) -> bool:
+    try:
+        algoritmo, iteraciones, sal, esperado = almacenado.split("$")
+        if algoritmo != "pbkdf2_sha256":
+            return False
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), _b64_decode(sal), int(iteraciones))
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(_b64(dk), esperado)
+
+
+# Hash señuelo: se verifica contra él cuando el email no existe, para que la
+# respuesta tarde lo mismo y no revele qué correos están registrados.
+_HASH_SENUELO: str | None = None
+
+
+def verificar_password_senuelo(password: str) -> None:
+    global _HASH_SENUELO
+    if _HASH_SENUELO is None:
+        _HASH_SENUELO = hash_password(secrets.token_urlsafe(16))
+    verificar_password(password, _HASH_SENUELO)
+
+
+# ---------------------------------------------------------------- tokens
 def _b64(datos: bytes) -> str:
     return base64.urlsafe_b64encode(datos).rstrip(b"=").decode("ascii")
 
@@ -100,30 +138,44 @@ def verificar_token(token: str, secreto: str) -> Actor:
     return Actor(id=sub, rol=rol)
 
 
+# ---------------------------------------------------------------- dependencias FastAPI
 _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 
 
-async def obtener_actor(authorization: str | None = Header(None)) -> Actor:
-    """Dependencia de FastAPI: exige `Authorization: Bearer <token>`."""
+def _no_autorizado(codigo: str, mensaje: str) -> HTTPException:
+    return HTTPException(status_code=401, detail={"codigo": codigo, "mensaje": mensaje}, headers=_NO_AUTENTICADO)
+
+
+async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
+    # imports locales: evitan ciclos (los modelos importan app.core.database)
+    if actor.es_admin:
+        from app.domain.models.usuario_admin import UsuarioAdmin
+        admin = await db.get(UsuarioAdmin, actor.id)
+        return bool(admin and admin.activo)
+    from app.domain.models.usuario_temporal import UsuarioTemporal
+    usuario = await db.get(UsuarioTemporal, actor.id)
+    return bool(usuario and usuario.fecha_anonimizacion is None)
+
+
+async def obtener_actor(
+    authorization: str | None = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> Actor:
+    """Exige `Authorization: Bearer <token>` válido y un usuario aún habilitado."""
     if not settings.AUTH_SECRET:
         raise HTTPException(
             status_code=503,
             detail={"codigo": "AUTH_NO_CONFIGURADA", "mensaje": "AUTH_SECRET no está configurado en el servidor."},
         )
     if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail={"codigo": "NO_AUTENTICADO", "mensaje": "Falta el token (Authorization: Bearer ...)."},
-            headers=_NO_AUTENTICADO,
-        )
+        raise _no_autorizado("NO_AUTENTICADO", "Falta el token (Authorization: Bearer ...).")
     try:
-        return verificar_token(authorization[7:].strip(), settings.AUTH_SECRET)
+        actor = verificar_token(authorization[7:].strip(), settings.AUTH_SECRET)
     except TokenInvalidoError as e:
-        raise HTTPException(
-            status_code=401,
-            detail={"codigo": "TOKEN_INVALIDO", "mensaje": str(e)},
-            headers=_NO_AUTENTICADO,
-        )
+        raise _no_autorizado("TOKEN_INVALIDO", str(e))
+    if not await _sigue_habilitado(actor, db):
+        raise _no_autorizado("USUARIO_DESHABILITADO", "El usuario del token ya no está habilitado.")
+    return actor
 
 
 def requerir_rol(*roles: Rol):
@@ -147,8 +199,8 @@ def requerir_rol(*roles: Rol):
 if __name__ == "__main__":  # emisión de tokens de prueba
     import argparse
 
-    p = argparse.ArgumentParser(description="Emite un token de acceso de prueba.")
-    p.add_argument("--usuario", type=int, required=True, help="usuario_temporal.id (o id del admin)")
+    p = argparse.ArgumentParser(description="Emite un token de acceso de prueba (solo desarrollo).")
+    p.add_argument("--usuario", type=int, required=True, help="usuario_temporal.id o usuarios_admin.id")
     p.add_argument("--rol", choices=Rol.valores(), required=True)
     p.add_argument("--ttl", type=int, default=None, help="minutos de validez")
     a = p.parse_args()

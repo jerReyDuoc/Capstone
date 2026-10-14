@@ -37,6 +37,9 @@ class SolicitudARCOPResumenResponse(BaseModel):
     fecha_creacion: datetime
     fecha_actualizacion: datetime
     fecha_cierre: datetime | None
+    fecha_limite_respuesta: datetime | None = None
+    fecha_limite_informacion: datetime | None = None
+    plazo_vencido: bool = False
 
 
 class EventoSolicitudARCOPResponse(BaseModel):

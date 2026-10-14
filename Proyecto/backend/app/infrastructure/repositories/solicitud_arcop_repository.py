@@ -1,8 +1,10 @@
-from sqlalchemy import func, select
+from datetime import datetime
+
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.models.solicitud_arcop import SolicitudARCOP, EventoSolicitud
+from app.domain.models.solicitud_arcop import EstadoSolicitudARCOP, SolicitudARCOP, EventoSolicitud
 from app.domain.models.usuario_temporal import UsuarioTemporal
 
 
@@ -41,6 +43,7 @@ class SolicitudARCOPRepository:
         usuario_temporal_id: int | None = None,
         estado: str | None = None,
         tipo: str | None = None,
+        solo_vencidas_al: datetime | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[SolicitudARCOP], int]:
@@ -53,6 +56,15 @@ class SolicitudARCOPRepository:
             filtros.append(SolicitudARCOP.estado == estado)
         if tipo:
             filtros.append(SolicitudARCOP.tipo == tipo)
+        if solo_vencidas_al is not None:
+            filtros.append(SolicitudARCOP.estado.not_in(EstadoSolicitudARCOP.finales()))
+            filtros.append(or_(
+                SolicitudARCOP.fecha_limite_respuesta < solo_vencidas_al,
+                and_(
+                    SolicitudARCOP.estado == EstadoSolicitudARCOP.PENDIENTE_INFORMACION.value,
+                    SolicitudARCOP.fecha_limite_informacion < solo_vencidas_al,
+                ),
+            ))
         for f in filtros:
             q = q.where(f)
             count_q = count_q.where(f)
@@ -61,8 +73,8 @@ class SolicitudARCOPRepository:
         result = await self.session.execute(q.offset(offset).limit(limit))
         return list(result.scalars().all()), total
 
-    async def guardar(self, solicitud: SolicitudARCOP, evento: EventoSolicitud) -> SolicitudARCOP:
-        """Persiste el cambio de la solicitud y su evento en la MISMA transacción."""
-        solicitud.eventos.append(evento)
+    async def guardar(self, solicitud: SolicitudARCOP, *eventos: EventoSolicitud) -> SolicitudARCOP:
+        """Persiste el cambio de la solicitud y sus eventos en la MISMA transacción."""
+        solicitud.eventos.extend(eventos)
         await self.session.commit()
         return await self.get(solicitud.id)
