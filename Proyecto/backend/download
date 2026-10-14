@@ -1,0 +1,27 @@
+# Entornos virtuales (en Windows pesan cientos de MB)
+venv/
+.venv/
+env/
+
+# Secretos: se inyectan con env_file en docker-compose, nunca dentro de la imagen
+.env
+.env.*
+!.env.example
+
+# Datos locales
+storage/
+*.db
+
+# Cachés
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Otros
+.git/
+.vscode/
+.idea/
+Dockerfile
+.dockerignore

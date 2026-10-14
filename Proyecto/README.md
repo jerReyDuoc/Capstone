@@ -176,6 +176,71 @@ erDiagram
 
 ---
 
+## Inicio rápido con Docker (recomendado)
+
+Todo el sistema (PostgreSQL, Redis, migraciones, API, worker y frontend) se levanta con un solo comando. Solo necesitas **Docker Desktop**; no hace falta Python, venv ni spaCy en tu máquina.
+
+**1. Crea `backend/.env`** a partir de `backend/.env.example` y completa dos valores:
+
+```powershell
+copy backend\.env.example backend\.env
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+- `GROQ_API_KEY`: tu clave de [console.groq.com/keys](https://console.groq.com/keys).
+- `ENTITY_MAP_KEY`: la clave que imprime el segundo comando. Guárdala: sin ella no se pueden descifrar los mapas de entidades ya guardados.
+
+Si no tienes Python, genera la clave con Docker: `docker run --rm python:3.13-slim sh -c "pip install -q cryptography && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"`.
+
+**2. Levanta todo** desde la carpeta `Proyecto/`:
+
+```powershell
+docker compose up -d --build
+```
+
+La primera vez tarda varios minutos (descarga imágenes e instala spaCy con su modelo). Luego:
+
+| Servicio | URL / puerto | Qué hace |
+|---|---|---|
+| `frontend` | http://localhost:8080 | HTML estático (nginx) y proxy de `/api` al backend |
+| `api` | http://localhost:8000/docs | FastAPI |
+| `worker` | — | Procesa evidencias con la capa de Políticas e IA (spaCy + Groq) |
+| `migrate` | — | Ejecuta `alembic upgrade head` y termina |
+| `db` | `localhost:5433` | PostgreSQL 16 (usuario `postgres`, clave `1234`, BD `complaince_db`) |
+| `redis` | `localhost:6379` | Cola de ARQ |
+
+El orden de arranque es automático: `db` sano → `migrate` termina bien → `api` y `worker` → `frontend`. La API y el worker comparten el volumen `storage`, donde se guardan las evidencias. Los puertos solo se publican en `127.0.0.1`.
+
+**Comandos útiles:**
+
+```powershell
+docker compose ps                       # estado de cada servicio
+docker compose logs -f worker           # ver cómo se procesan las evidencias
+docker compose logs migrate             # si la API no arranca, mira aquí primero
+docker compose up -d --build api worker # tras cambiar código del backend
+docker compose down                     # detener (conserva los datos)
+docker compose down -v                  # detener y BORRAR BD y evidencias
+```
+
+**Pruebas:**
+
+```powershell
+# Suite completa (SQLite en memoria, no toca la BD de Docker)
+docker compose run --rm --no-deps api pytest tests -q
+
+# Prueba en vivo contra el sistema levantado (usa la BD real, evaluación 9101)
+docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/test_live_capa_ia.py -v -s'
+```
+
+Sobre el `.env`: en Docker se ignoran `DATABASE_URL`, `DATABASE_URL_SYNC`, `REDIS_URL` y `STORAGE_DIR`, porque el `docker-compose.yml` los reemplaza por los servicios internos (`db`, `redis`, `/data/storage`). El resto de variables (Groq, sanitizador, umbrales, precios) se toman del `.env`. Si cambias el `.env`, aplica con `docker compose up -d`.
+
+**Problemas comunes:**
+- *El puerto 5433, 6379 u 8000 ya está en uso:* detén el uvicorn/worker local o el Redis/PostgreSQL que tengas corriendo fuera de Docker.
+- *`worker` se reinicia una y otra vez:* revisa `docker compose logs worker`. Lo normal es que falte `ENTITY_MAP_KEY` o `GROQ_API_KEY` en `backend/.env`.
+- *`migrate` falla:* mira `docker compose logs migrate`; la API no arranca hasta que las migraciones terminen bien.
+
+> La sección siguiente describe el levantamiento manual (sin Docker para la API y el worker), útil para depurar.
+
 ## Levantamiento paso a paso
 
 ### Paso 1: Clonar/ubicar el proyecto

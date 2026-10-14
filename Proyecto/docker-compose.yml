@@ -1,31 +1,110 @@
-version: '3.8'
+# Sistema completo con un solo comando (desde la carpeta Proyecto/):
+#
+#     docker compose up -d --build
+#
+#   frontend  http://localhost:8080        (nginx: HTML estático + proxy de /api)
+#   api       http://localhost:8000/docs   (FastAPI)
+#   worker    procesa evidencias (capa de Políticas e IA: spaCy + Groq)
+#   migrate   aplica "alembic upgrade head" y termina
+#   db        PostgreSQL 16   -> localhost:5433 (para DBeaver/psql y las pruebas en vivo)
+#   redis     cola de ARQ     -> localhost:6379
+#
+# Requisito: backend/.env con GROQ_API_KEY y ENTITY_MAP_KEY (ver backend/.env.example).
+# Las URLs de BD, Redis y STORAGE_DIR de ese .env se IGNORAN aquí: se reemplazan
+# por los nombres de servicio de Docker (sección "environment" de abajo).
+
+x-backend: &backend
+  build: ./backend
+  image: complianceai-backend:latest
+  env_file:
+    - ./backend/.env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
+    DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
+    REDIS_URL: redis://redis:6379
+    STORAGE_DIR: /data/storage
 
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: complaince_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-1234}
+      POSTGRES_DB: ${POSTGRES_DB:-complaince_db}
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d complaince_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-complaince_db}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  worker:
+    <<: *backend
+    command: ["arq", "app.worker.tasks.WorkerSettings"]
+    restart: unless-stopped
+    volumes:
+      - storage:/data/storage   # el mismo volumen que la API: aquí lee las evidencias
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  frontend:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  postgres_data:   # mismo nombre que antes: se conservan los datos que ya tienes
+  storage:
