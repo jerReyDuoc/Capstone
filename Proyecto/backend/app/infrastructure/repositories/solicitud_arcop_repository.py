@@ -1,0 +1,68 @@
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.domain.models.solicitud_arcop import SolicitudARCOP, EventoSolicitud
+from app.domain.models.usuario_temporal import UsuarioTemporal
+
+
+class SolicitudARCOPRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def existe_usuario(self, usuario_id: int) -> bool:
+        return await self.session.get(UsuarioTemporal, usuario_id) is not None
+
+    async def create(self, solicitud: SolicitudARCOP, evento: EventoSolicitud) -> SolicitudARCOP:
+        """Crea la solicitud y su primer evento en una sola transacción."""
+        solicitud.eventos.append(evento)
+        self.session.add(solicitud)
+        await self.session.commit()
+        return await self.get(solicitud.id)
+
+    async def get(self, solicitud_id: int, para_actualizar: bool = False) -> SolicitudARCOP | None:
+        """
+        Con para_actualizar=True bloquea la fila (SELECT ... FOR UPDATE en PostgreSQL)
+        para que dos cambios de estado simultáneos no se pisen.
+        """
+        q = (
+            select(SolicitudARCOP)
+            .where(SolicitudARCOP.id == solicitud_id)
+            .options(selectinload(SolicitudARCOP.eventos))
+            .execution_options(populate_existing=True)
+        )
+        if para_actualizar:
+            q = q.with_for_update(of=SolicitudARCOP)
+        result = await self.session.execute(q)
+        return result.scalar_one_or_none()
+
+    async def list(
+        self,
+        usuario_temporal_id: int | None = None,
+        estado: str | None = None,
+        tipo: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[SolicitudARCOP], int]:
+        q = select(SolicitudARCOP).order_by(SolicitudARCOP.id.desc())
+        count_q = select(func.count()).select_from(SolicitudARCOP)
+        filtros = []
+        if usuario_temporal_id is not None:
+            filtros.append(SolicitudARCOP.usuario_temporal_id == usuario_temporal_id)
+        if estado:
+            filtros.append(SolicitudARCOP.estado == estado)
+        if tipo:
+            filtros.append(SolicitudARCOP.tipo == tipo)
+        for f in filtros:
+            q = q.where(f)
+            count_q = count_q.where(f)
+
+        total = (await self.session.execute(count_q)).scalar() or 0
+        result = await self.session.execute(q.offset(offset).limit(limit))
+        return list(result.scalars().all()), total
+
+    async def guardar(self, solicitud: SolicitudARCOP, evento: EventoSolicitud) -> SolicitudARCOP:
+        """Persiste el cambio de la solicitud y su evento en la MISMA transacción."""
+        solicitud.eventos.append(evento)
+        await self.session.commit()
+        return await self.get(solicitud.id)

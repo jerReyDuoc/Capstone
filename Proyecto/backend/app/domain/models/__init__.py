@@ -14,6 +14,12 @@ from app.domain.models.respuesta_filtro import RespuestaFiltro
 from app.domain.models.evento_seguridad import EventoSeguridad, OrigenEvento
 from app.domain.models.llamada_llm import LlamadaLLM
 from app.domain.models.sanitizacion import Sanitizacion
+from app.domain.models.solicitud_arcop import (
+    SolicitudARCOP,
+    EventoSolicitud,
+    TipoSolicitudARCOP,
+    EstadoSolicitudARCOP,
+)
 
 __all__ = [
     "Dominio",
@@ -36,4 +42,8 @@ __all__ = [
     "OrigenEvento",
     "LlamadaLLM",
     "Sanitizacion",
+    "SolicitudARCOP",
+    "EventoSolicitud",
+    "TipoSolicitudARCOP",
+    "EstadoSolicitudARCOP",
 ]

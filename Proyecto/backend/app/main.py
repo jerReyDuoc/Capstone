@@ -4,8 +4,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 
 from app.core.config import settings
-from app.api.routes import respuestas, evidencias, catalogos, controles, evaluaciones, filtro, reportes, seguridad, metricas_ia
-
+from app.api.routes import respuestas, evidencias, catalogos, controles, evaluaciones, filtro, reportes, seguridad, metricas_ia, arcop
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.arq = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
@@ -23,6 +22,7 @@ app.include_router(evaluaciones.router)
 app.include_router(filtro.router)
 app.include_router(seguridad.router)
 app.include_router(metricas_ia.router)
+app.include_router(arcop.router)
 
 @app.get("/health")
 async def health():

@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Clave Fernet para cifrar el mapa de entidades guardado en BD. Generar con:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENTITY_MAP_KEY: str | None = None
+    # ------------------------------------------------ Autenticación de la API
+    # Secreto HMAC para firmar/verificar los tokens bearer (app/core/autenticacion.py).
+    AUTH_SECRET: str | None = None
+    AUTH_TOKEN_TTL_MIN: int = 480
 
     model_config = SettingsConfigDict(env_file=".env")
 
@@ -51,6 +55,8 @@ class Settings(BaseSettings):
             )
         if self.APP_ENV == "production" and not self.ENTITY_MAP_KEY:
             raise ValueError("ENTITY_MAP_KEY es obligatoria con APP_ENV=production.")
+        if self.APP_ENV == "production" and (not self.AUTH_SECRET or len(self.AUTH_SECRET) < 32):
+            raise ValueError("AUTH_SECRET (mínimo 32 caracteres) es obligatorio con APP_ENV=production.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),
         # para no bloquear alembic ni la API, que no la necesitan.
         return self
