@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · LangChain + Groq · spaCy · Docker Compose · nginx · HTML/JS estático |
-| **Última actualización** | 14-oct-2026 (commit `467337f`) |
+| **Última actualización** | 15-oct-2026 (T-04: optimización del motor NER) |
 
 ---
 
@@ -81,12 +81,12 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Respuestas y reglas de clasificación | ✅ Hecho | 4 clasificaciones declarables + `requiere_revision` (solo backend) |
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
-| Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed |
+| Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado por cron diario (ver deuda técnica #4) |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
 | Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios |
-| Suite de pruebas (pytest) | ✅ Hecho | 119 funciones de prueba + prueba en vivo y prueba de latencia |
+| Suite de pruebas (pytest) | ✅ Hecho | 133 funciones de prueba (212 casos) + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
 | Frontend | 🟡 Demo estática | 14 páginas HTML funcionando con una API **simulada** en `localStorage`; falta conectarlo al backend |
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
 | Autenticación en todos los endpoints | 🔴 Pendiente | Solo `/api/arcop` y `/api/auth/me` exigen token |
@@ -180,9 +180,11 @@ Capstone/
         ├── env.example             # Variante con valores para Docker local (ver deuda #12)
         ├── alembic.ini
         ├── CAMBIOS_ARCOP.md        # Detalle funcional de la historia de usuario ARCOP
+        ├── CAMBIOS_T04.md          # T-04: optimización del motor NER (resultados y decisiones)
         ├── reporte_latencia_live_c10.md
         ├── evidencia.txt / evidencia_maliciosa.txt   # Archivos de ejemplo para pruebas manuales
         ├── migrations/versions/    # 13 migraciones Alembic
+        ├── scripts/benchmark_ner.py  # Benchmark y profiling del motor NER (T-04)
         ├── tests/                  # Suite pytest (ver sección 14)
         └── app/
             ├── main.py             # App FastAPI, routers y pool ARQ
@@ -612,7 +614,9 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 
 **Modelo por defecto:** `openai/gpt-oss-safeguard-20b` vía Groq (debe soportar *structured outputs*), temperatura 0.
 
-**Motor NER** (`infrastructure/security/ner_sanitizer.py`, versión 1.0.0): híbrido reglas + spaCy `es_core_news_md`. Detecta primero todos los spans, fusiona solapados y reemplaza en una sola pasada, lo que permite devolver el mapa (tipo, valor, inicio, fin) para auditoría. Etiquetas: `[RUT_ANON]` (con validación de dígito verificador), `[NOMBRE_ANON]`, `[CORREO_ANON]` (incluye ofuscaciones tipo "arroba"/"punto"), `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]` (Base64/Hex/Binario/Base32 hasta 3 niveles). El worker no arranca si falta el modelo de spaCy.
+**Motor NER** (`infrastructure/security/ner_sanitizer.py`, versión 1.1.0): híbrido reglas + spaCy `es_core_news_md`. Detecta primero todos los spans, fusiona solapados y reemplaza en una sola pasada, lo que permite devolver el mapa (tipo, valor, inicio, fin) para auditoría. Etiquetas: `[RUT_ANON]` (con validación de dígito verificador), `[NOMBRE_ANON]`, `[CORREO_ANON]` (incluye ofuscaciones tipo "arroba"/"punto"), `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]` (Base64/Hex/Binario/Base32 hasta 3 niveles). El worker no arranca si falta el modelo de spaCy.
+
+**Rendimiento (T-04, < 2,0 s por página):** el motor procesa una página de 3.000 caracteres en **25 ms (p95)** dentro del Docker del proyecto. Para eso: (1) carga solo el componente `ner` del modelo (mismas entidades, ~45 % menos de CPU); (2) la segunda pasada para nombres en MAYÚSCULAS solo revisa ventanas alrededor de nombres de 2 o más palabras, no el documento entero; (3) un único modelo por proceso, compartido con `seguridad.py`; (4) el modelo se precarga al iniciar el worker y la API; (5) la anonimización corre en un hilo (`asyncio.to_thread`) para no bloquear el event loop. En precisión, las referencias normativas ("Ley 21.719", "artículo 14") ya no se toman como direcciones, los cargos ("Presidenta del Directorio") se recortan de los nombres, y se anonimizan correos con tildes, "cargo + nombre" marcados como organización y direcciones tipo "Los Leones 456". Se evaluó ONNX y no se adoptó: el cuello de botella no era la inferencia. Detalle y mediciones en [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md).
 
 **Cifrado:** Fernet con `ENTITY_MAP_KEY`; las entidades además llevan una huella HMAC que permite buscar coincidencias sin descifrar. Guarda la clave fuera del repositorio: sin ella los mapas ya guardados no se pueden descifrar.
 
@@ -834,7 +838,8 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 |---|---:|---|
 | `test_bordes_na_y_evidencia.py` | 39 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje |
 | `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
-| `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (12 casos) |
+| `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
+| `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
 | `test_capa_ia.py` | 17 | AIGateway contra las reglas R1–R6 |
 | `test_seguridad_integracion.py` | 10 | Capa anti prompt-injection en el backend |
 | `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
@@ -843,7 +848,7 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_defectos_api.py` | 1 | Variante anterior de la prueba de latencia (ver deuda #12) |
 | `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
 
-Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba).
+Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba), `_corpus_ner.py` (corpus sintético etiquetado para medir el NER).
 
 ```powershell
 # Suite completa en Docker (no toca la BD real)
@@ -855,13 +860,19 @@ pytest tests -v -rxX
 # Precisión del NER con detalle
 pytest tests/test_ner_sanitizer.py -s
 
+# Rendimiento del NER (T-04): pruebas y benchmark
+docker compose exec worker pytest tests/test_rendimiento_ner.py -v -s
+docker compose exec worker python scripts/benchmark_ner.py --paginas 100 --evidencia 8000
+docker compose exec worker python scripts/benchmark_ner.py --paginas 20 --perfil   # + profiling
+
 # Prueba en vivo contra el sistema levantado (usa la BD real, evaluación 9101)
 docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/test_live_capa_ia.py -v -s'
 ```
 
 **Últimos resultados reportados**
 
-- **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre.
+- **T-04 · Motor NER (15-oct-2026, Docker, 8 núcleos):** página de 3.000 caracteres en 25,1 ms (p95; límite 2.000 ms), evidencia de 8.000 caracteres en 66,6 ms (p95). Precisión 0,988 y cobertura de PII 100 % sobre 40 páginas etiquetadas. Suite completa: 212 aprobadas, 1 omitida (prueba en vivo).
+- **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre (**corregidos en T-04**, motor v1.1.0).
 - **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumple `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
 
 ---
@@ -921,7 +932,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 |---|---|---|
 | 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo nginx, 20 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
 | 7 | `GET /evaluaciones/{id}/controles-aplicables` p95 542 ms (único fuera del requisito) | Cachear códigos aplicables al guardar el filtro o índice por `codigo_control` |
-| 8 | Falsos positivos del NER ("la Ley 21", cargos como "Presidenta del Directorio") | Ampliar términos protegidos y `ner_gold.jsonl` con casos reales anonimizados |
+| 8 | NER: los falsos positivos "la Ley 21" y "Presidenta del Directorio" se corrigieron en T-04. Queda abierto: textos **completamente en mayúsculas** con frases largas, donde spaCy puede no aislar el nombre | Regla adicional para texto 100 % en mayúsculas; ampliar `ner_gold.jsonl` con casos reales anonimizados |
 | 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
 | 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `CAMBIOS_ARCOP.md` |
 | 11 | Sin CRUD de administración de matriz y árbol en el backend (solo en la demo) ni versionado de controles | Endpoints admin + migración de versionado |
@@ -931,7 +942,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | # | Ítem |
 |---|---|
 | 12 | Limpieza: `.env.example` y `env.example` desalineados (el segundo no tiene `AUTH_*`); `test_defectos_api.py` parece una versión anterior de `test_latencia_api.py`; `domain/ports/document_validator_port.py` importa un módulo inexistente (`schemas.validation`) y no se usa; migración vacía `b25cc4eed4b0` |
-| 13 | `seguridad.py` se sincroniza a mano con el repo ComplianceAI-Prompt-Injection: riesgo de divergencia (evaluar paquete compartido o submódulo) |
+| 13 | `seguridad.py` se sincroniza a mano con el repo ComplianceAI-Prompt-Injection: riesgo de divergencia (evaluar paquete compartido o submódulo). Además, su regex de correo no acepta tildes (`matías.díaz@…` queda en parte visible en los extractos de eventos de seguridad): corregirla allá, como se hizo en `ner_sanitizer.py` |
 | 14 | Fechas de respuestas/evidencias en `Date` (sin hora): limita la trazabilidad fina |
 | 15 | Credenciales por defecto de PostgreSQL (`postgres`/`1234`) en el compose: aceptables solo en desarrollo |
 | 16 | Pipeline CI/CD (pytest + build de imagen) y entorno de staging (Sprint 4) |
@@ -944,6 +955,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 |---|---|
 | [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md) | Historia de usuario ARCOP: archivos, acceso, anonimización, plazos, endpoints y decisiones pendientes |
 | [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
+| [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
 | `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
 | `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |
 | `../Documentos/Fase 1/`, `../Documentos/Fase 2/` | Guía del estudiante, evaluaciones formativas, autoevaluaciones y diarios de reflexión por integrante |

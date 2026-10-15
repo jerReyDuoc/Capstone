@@ -26,6 +26,23 @@ class ReglasPromptGuard(PromptGuardPort):
     def anonimizar(self, texto: str) -> str:
         if not texto:
             return texto
+        _compartir_modelo_ner()
         return seguridad.anonimizar(texto)
+
+
+def _compartir_modelo_ner() -> None:
+    """
+    T-04: seguridad.py carga su propia copia de spaCy (pipeline completo) la primera
+    vez que anonimiza. Si el sanitizador está activo, se le entrega el modelo del
+    motor NER (pipeline mínimo, ya precalentado): un solo modelo por proceso.
+    Si spaCy no está, seguridad.py conserva su comportamiento (y REQUIERE_NER).
+    """
+    if not settings.SANITIZER_ENABLED or seguridad._NLP_INTENTADO:
+        return
+    try:
+        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        cargar_spacy()
+    except Exception:  # noqa: BLE001
+        pass
 
 

@@ -23,6 +23,7 @@ Reglas de negocio implementadas aquí:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -219,7 +220,9 @@ class AIGateway:
         inicio = time.perf_counter()
         try:
             for campo, limite in politica.campos_no_confiables.items():
-                res = self.sanitizer.sanitizar(textos[campo] or "", max_chars=limite)
+                # T-04: el NER es CPU puro; en un hilo para no bloquear el event loop
+                # del worker (heartbeat de Redis, otras tareas, consultas a la BD).
+                res = await asyncio.to_thread(self.sanitizer.sanitizar, textos[campo] or "", max_chars=limite)
                 seguros[campo] = res.texto
                 registros.append(RegistroSanitizacion(
                     campo=campo, entidades=res.entidades, motor=res.motor,

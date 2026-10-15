@@ -10,3 +10,8 @@
 {"texto": "Se registran 3 incidentes en la ruta formativa 2 y el control ISO 42001 cláusula 6.1.", "entidades": []}
 {"texto": "El RUT de la empresa es 76.123.456-0 y su representante legal es Carlos Ramírez.", "entidades": [{"tipo": "RUT", "valor": "76.123.456-0"}, {"tipo": "NOMBRE", "valor": "Carlos Ramírez"}]}
 {"texto": "Dirección para notificaciones: Calle Huérfanos 1160, depto 1204, Santiago.", "entidades": [{"tipo": "DIRECCION", "valor": "Calle Huérfanos 1160, depto 1204, Santiago"}]}
+{"texto": "El tratamiento cumple la Ley 21.719 y la Ley 19.628; lo aprobó la Presidenta del Directorio en sesión ordinaria.", "entidades": []}
+{"texto": "LA PRESIDENTA DEL DIRECTORIO APROBÓ LA POLÍTICA DE PRIVACIDAD EL 3 DE MARZO DE 2025.", "entidades": []}
+{"texto": "Lo aprobó el Gerente General Pedro Soto Rojas en la sesión de marzo.", "entidades": [{"tipo": "NOMBRE", "valor": "Pedro Soto Rojas"}]}
+{"texto": "Firmado por la Presidenta Camila Rojas Díaz, según el artículo 14 de la Ley 19.628.", "entidades": [{"tipo": "NOMBRE", "valor": "Camila Rojas Díaz"}]}
+{"texto": "Asistió la Oficial de Cumplimiento, Fernanda Pérez Araya, quien validó el procedimiento.", "entidades": [{"tipo": "NOMBRE", "valor": "Fernanda Pérez Araya"}]}
