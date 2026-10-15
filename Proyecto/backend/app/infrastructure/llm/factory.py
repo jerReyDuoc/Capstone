@@ -21,6 +21,8 @@ def crear_proveedor() -> LLMProviderPort:
             api_key=settings.GROQ_API_KEY,
             modelo_por_defecto=settings.LLM_MODEL,
             max_reintentos=settings.LLM_MAX_REINTENTOS,
+            reasoning_effort=settings.LLM_REASONING_EFFORT,
+            reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
         )
     raise ValueError(f"LLM_PROVIDER no soportado: {settings.LLM_PROVIDER}")
 

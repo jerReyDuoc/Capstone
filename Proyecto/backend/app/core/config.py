@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     DATABASE_URL_SYNC: str
     REDIS_URL: str
     GROQ_API_KEY: str
-    LLM_MODEL: str = "openai/gpt-oss-safeguard-20b"
+    # openai/gpt-oss-20b y gpt-oss-120b admiten salida ESTRICTA en Groq (el JSON siempre
+    # cumple el schema). gpt-oss-safeguard-20b solo "best effort": falla más seguido.
+    LLM_MODEL: str = "openai/gpt-oss-20b"
     UMBRAL_CONFIANZA: float = 0.8
     STORAGE_DIR: str = "./storage"
     # Caracteres de la evidencia que se analizan y se envían al LLM
@@ -27,7 +29,12 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["groq"] = "groq"
     LLM_TIMEOUT_S: float = 60.0
     LLM_MAX_REINTENTOS: int = 2
-    LLM_MAX_TOKENS_SALIDA: int = 1500
+    # Incluye los tokens de razonamiento de gpt-oss: con muy pocos el JSON queda cortado.
+    LLM_MAX_TOKENS_SALIDA: int = 4096
+    # Esfuerzo de razonamiento (solo gpt-oss-20b/120b): low | medium | high
+    LLM_REASONING_EFFORT: Literal["low", "medium", "high"] = "low"
+    # Reintentos cuando el modelo devuelve una salida inválida (JSON cortado / fuera del schema)
+    LLM_REINTENTOS_SALIDA: int = 1
     MAX_CHARS_JUSTIFICACION_LLM: int = 4000
     # Precio del modelo en USD por millón de tokens, para estimar costo en las
     # métricas. Tómalos de la página de precios del proveedor para LLM_MODEL.

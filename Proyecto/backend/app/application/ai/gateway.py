@@ -165,7 +165,9 @@ class AIGateway:
                 latencia_ms=e.latencia_ms or _ms(inicio), sanitizado=self.sanitizer_enabled,
                 entidades=n_entidades,
             )
-            logger.error("LLM falló (tarea=%s, tipo=%s, traza=%s)", tarea.value, e.tipo.value, traza_id)
+            # El detalle viene del adaptador y nunca contiene texto del usuario.
+            logger.error("LLM falló (tarea=%s, tipo=%s, traza=%s): %s",
+                         tarea.value, e.tipo.value, traza_id, str(e)[:300])
             raise LLMNoDisponibleError(
                 f"El servicio de IA no respondió correctamente ({e.tipo.value}).", e.tipo.value
             ) from e
