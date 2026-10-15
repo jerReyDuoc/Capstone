@@ -29,7 +29,8 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -141,6 +142,10 @@ def verificar_token(token: str, secreto: str) -> Actor:
 # ---------------------------------------------------------------- dependencias FastAPI
 _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 
+# Esquema de seguridad: lee el header Authorization y hace que Swagger (/docs)
+# muestre el botón "Authorize". auto_error=False -> los errores los damos nosotros.
+_bearer = HTTPBearer(auto_error=False, description="Token de /api/auth/login o /api/auth/titular (sin la palabra Bearer)")
+
 
 def _no_autorizado(codigo: str, mensaje: str) -> HTTPException:
     return HTTPException(status_code=401, detail={"codigo": codigo, "mensaje": mensaje}, headers=_NO_AUTENTICADO)
@@ -158,7 +163,7 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
 
 
 async def obtener_actor(
-    authorization: str | None = Header(None),
+    credenciales: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> Actor:
     """Exige `Authorization: Bearer <token>` válido y un usuario aún habilitado."""
@@ -167,10 +172,10 @@ async def obtener_actor(
             status_code=503,
             detail={"codigo": "AUTH_NO_CONFIGURADA", "mensaje": "AUTH_SECRET no está configurado en el servidor."},
         )
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if credenciales is None or not credenciales.credentials:
         raise _no_autorizado("NO_AUTENTICADO", "Falta el token (Authorization: Bearer ...).")
     try:
-        actor = verificar_token(authorization[7:].strip(), settings.AUTH_SECRET)
+        actor = verificar_token(credenciales.credentials.strip(), settings.AUTH_SECRET)
     except TokenInvalidoError as e:
         raise _no_autorizado("TOKEN_INVALIDO", str(e))
     if not await _sigue_habilitado(actor, db):
