@@ -1,162 +1,446 @@
-# Sistema de Validación de Evidencias con LLM....
+# ComplianceIA — Plataforma de Evaluación de Gobernanza de IA
 
-Backend con FastAPI que recibe evidencias de archivos, las valida con un LLM y actualiza automáticamente la clasificación de respuestas en un sistema de evaluación de madurez organizacional en IA.
+> Proyecto Capstone para **Therion Labs**. Autodiagnóstico de madurez en gobernanza de Inteligencia Artificial para empresas, con validación de evidencias asistida por LLM, reportes de madurez, rutas formativas y panel de estadísticas comparativas por rubro.
 
-## Descripción
-
-El sistema implementa un flujo **sin validación humana** donde el LLM actúa como autoridad final sobre la clasificación de cada respuesta. El sistema evalúa 40 controles basados en marcos normativos (Ley chilena N.º 21.719, ISO/IEC 42001, NIST AI RMF 100-1, OWASP LLM, NIST 600-1) distribuidos en 4 dominios temáticos.
-
-**Flujo general:**
-
-```
-Usuario responde → (elige 1 de 4 opciones)
-                    ├─ Cumplido / Parcialmente → requiere evidencia → LLM valida
-                    └─ No cumplido / No aplica → sin evidencia, brecha automática
-
-Usuario sube evidencia → Worker ARQ → LLM evalúa → Backend decide → BD actualizada
-```
-
-**Principio arquitectónico clave:** el LLM **nunca** accede a la base de datos. Solo recibe texto (prompt) y devuelve JSON estructurado. El backend es el único que lee y escribe en la BD.
-
-**Stack:** FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, Redis 7, ARQ, LangChain, Groq.
+| | |
+|---|---|
+| **Cliente** | Therion Labs (Seguridad y Gobernanza de IA, miembro de la Comisión de Seguridad IA – CCHIA) |
+| **Marcos normativos** | Ley N.º 21.719 (Chile), ISO/IEC 42001, NIST AI RMF 100-1, NIST AI 600-1, OWASP Top 10 for LLM |
+| **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
+| **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
+| **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · LangChain + Groq · spaCy · Docker Compose · nginx · HTML/JS estático |
+| **Última actualización** | 14-oct-2026 (commit `467337f`) |
 
 ---
 
-## Requisitos previos
+## Tabla de contenidos
 
-| Herramienta | Versión mínima | Notas |
+1. [Contexto del proyecto](#1-contexto-del-proyecto)
+2. [Estado actual](#2-estado-actual)
+3. [Arquitectura](#3-arquitectura)
+4. [Estructura del repositorio](#4-estructura-del-repositorio)
+5. [Flujos funcionales](#5-flujos-funcionales)
+6. [Base de datos](#6-base-de-datos)
+7. [Endpoints de la API](#7-endpoints-de-la-api)
+8. [Capa de Políticas e IA](#8-capa-de-políticas-e-ia)
+9. [Seguridad y privacidad (Ley 21.719)](#9-seguridad-y-privacidad-ley-21719)
+10. [Frontend](#10-frontend)
+11. [Datos maestros](#11-datos-maestros)
+12. [Puesta en marcha](#12-puesta-en-marcha)
+13. [Variables de entorno](#13-variables-de-entorno)
+14. [Pruebas y calidad](#14-pruebas-y-calidad)
+15. [Comandos útiles y solución de problemas](#15-comandos-útiles-y-solución-de-problemas)
+16. [Backlog, deuda técnica y riesgos](#16-backlog-deuda-técnica-y-riesgos)
+17. [Documentación complementaria](#17-documentación-complementaria)
+
+---
+
+## 1. Contexto del proyecto
+
+### Problema
+
+La IA corporativa se está adoptando sin políticas de seguridad, las auditorías se hacen a mano en hojas de cálculo y la entrada en vigencia de la **Ley 21.719** (protección de datos personales) presiona a las organizaciones a demostrar cumplimiento. Como resume el cliente: *la IA no falla por falta de tecnología, sino por falta de capacidad interna para gobernarla.*
+
+### Solución: tres funciones principales
+
+| Función | Qué entrega |
+|---|---|
+| **Autodiagnóstico** | Cuestionario con filtro de aplicabilidad (7 preguntas) y hasta 40 controles; las evidencias se validan con un LLM; produce un reporte de madurez y de brechas. |
+| **Rutas formativas** | Formación en 3 niveles (Inicial, Intermedio, Avanzado) × 4 dominios, asignada según las brechas detectadas. |
+| **Panel de estadísticas** | Benchmark por rubro y dominio (promedio, mediana, máx., mín.) sin exponer datos de ninguna organización. |
+
+### Equipo
+
+| Integrante | Rol |
+|---|---|
+| Jerson Reyes | Product Owner |
+| Jason Sánchez | Scrum Master |
+| Ángel Muñoz | Developer Lead |
+| Rodrigo Álvarez | Docente guía |
+
+### Épicas y sprints
+
+**Épicas:** (1) Motor de Autodiagnóstico y Motor de Reglas · (2) Procesamiento Inteligente y Privacidad de Datos con IA · (3) Rutas formativas e Interfaz Dashboard.
+
+| Sprint | Objetivo |
+|---|---|
+| Sprint 1 | Desarrollo e implementación del backend y reglas de cálculo |
+| Sprint 2 | Desplegar motor NER, gestión de derechos ARCOP y cifrado |
+| Sprint 3 | Implementar IA, controles, detección de brechas y benchmarking |
+| Sprint 4 | Despliegue del frontend, automatización del pipeline y staging para pruebas |
+
+---
+
+## 2. Estado actual
+
+| Área | Estado | Detalle |
 |---|---|---|
-| Python | 3.12+ | Probado en 3.13 |
-| Docker Desktop | Última | Con backend WSL 2 activado |
-| PowerShell | 5.1+ | Viene por defecto en Windows 10/11 |
-| Git | Opcional | Para control de versiones |
+| Backend FastAPI (Clean Architecture) | ✅ Hecho | 11 routers, 35 endpoints |
+| Base de datos y migraciones | ✅ Hecho | 19 tablas, 13 migraciones Alembic, seeds de catálogos, controles y filtro |
+| Filtro de aplicabilidad (F1–F7) | ✅ Hecho | Árbol de decisión aditivo (22 controles base + 18 condicionales) |
+| Respuestas y reglas de clasificación | ✅ Hecho | 4 clasificaciones declarables + `requiere_revision` (solo backend) |
+| Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
+| Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
+| Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed |
+| Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
+| Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado por cron diario (ver deuda técnica #4) |
+| Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
+| Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios |
+| Suite de pruebas (pytest) | ✅ Hecho | 119 funciones de prueba + prueba en vivo y prueba de latencia |
+| Frontend | 🟡 Demo estática | 14 páginas HTML funcionando con una API **simulada** en `localStorage`; falta conectarlo al backend |
+| Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
+| Autenticación en todos los endpoints | 🔴 Pendiente | Solo `/api/arcop` y `/api/auth/me` exigen token |
+| CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
+| Pipeline CI/CD y staging | 🔴 Pendiente | Sprint 4 |
 
-**En Windows:** durante la instalación de Python, marca **"Add Python to PATH"**.
-
----
-
-## Estructura del proyecto
-
-```
-Proyecto/
-├── backend/
-│   ├── app/
-│   │   ├── core/
-│   │   │   ├── config.py              # Settings con pydantic-settings
-│   │   │   └── database.py            # Engine async + Base
-│   │   ├── domain/
-│   │   │   ├── models/                # 12 entidades SQLAlchemy
-│   │   │   │   ├── dominio.py
-│   │   │   │   ├── rubro.py
-│   │   │   │   ├── ruta_formativa.py
-│   │   │   │   ├── usuario_temporal.py
-│   │   │   │   ├── catalogo_brechas.py
-│   │   │   │   ├── evaluacion.py
-│   │   │   │   ├── matriz_control.py
-│   │   │   │   ├── respuesta.py
-│   │   │   │   ├── evidencia.py
-│   │   │   │   ├── benchmark.py
-│   │   │   │   └── resumen.py
-│   │   │   └── ports/                 # Interfaces ABC
-│   │   │       ├── file_storage_port.py
-│   │   │       └── evidence_validator_port.py
-│   │   ├── application/
-│   │   │   ├── ai/                         # Capa de Políticas e IA
-│   │   │   │   ├── gateway.py              # Orquesta sanitización, prompt, LLM y métricas
-│   │   │   │   ├── politicas.py            # Router: política por tarea
-│   │   │   │   ├── prompts/                # Prompts versionados
-│   │   │   │   └── metricas.py             # Tasa de error, precisión, evaluación NER
-│   │   │   ├── schemas/
-│   │   │   │   ├── evidence_validation.py  # Schema del LLM
-│   │   │   │   └── api_schemas.py          # Schemas de request/response
-│   │   │   └── use_cases/
-│   │   │       ├── create_respuesta.py
-│   │   │       ├── upload_evidence.py
-│   │   │       └── process_evidence.py     # Caso de uso principal
-│   │   ├── infrastructure/
-│   │   │   ├── llm/groq_provider.py        # Adaptador Groq (solo transporte)
-│   │   │   ├── llm/factory.py              # Ensambla la capa de IA según LLM_PROVIDER
-│   │   │   ├── security/ner_sanitizer.py   # Motor NER de anonimización
-│   │   │   ├── security/cifrado.py         # Cifrado del mapa de entidades
-│   │   │   ├── storage/local_storage.py
-│   │   │   └── repositories/
-│   │   │       ├── evidencia_repository.py
-│   │   │       ├── respuesta_repository.py
-│   │   │       ├── evaluacion_repository.py
-│   │   │       └── catalogo_repository.py
-│   │   ├── api/
-│   │   │   ├── routes/
-│   │   │   │   ├── respuestas.py
-│   │   │   │   ├── evidencias.py
-│   │   │   │   ├── catalogos.py
-│   │   │   │   ├── controles.py
-│   │   │   │   └── evaluaciones.py
-│   │   │   └── dependencies.py
-│   │   ├── worker/tasks.py            # Tareas ARQ
-│   │   └── main.py
-│   ├── migrations/                    # Alembic
-│   ├── storage/                       # Archivos subidos
-│   ├── requirements.txt
-│   └── .env
-├── docker-compose.yml
-└── README.md
-```
+El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
 
 ---
 
-## Esquema de base de datos
+## 3. Arquitectura
 
-**12 tablas** organizadas en 4 capas:
+### Vista de componentes
 
-### Catálogos (datos maestros, se llenan una vez)
+```mermaid
+flowchart LR
+    U[Usuario<br/>navegador] -->|:8080| N[frontend<br/>nginx 1.27]
+    N -->|HTML/JS estático| U
+    N -->|/api/* proxy| A[api<br/>FastAPI + uvicorn :8000]
+    A -->|SQL async| DB[(db<br/>PostgreSQL 16)]
+    A -->|encola job| R[(redis<br/>Redis 7)]
+    A -->|guarda archivo| S[[volumen storage]]
+    W[worker<br/>ARQ] -->|toma job| R
+    W -->|lee archivo| S
+    W -->|SQL async| DB
+    W -->|texto ANONIMIZADO<br/>HTTPS| G[Groq LLM]
+    M[migrate<br/>alembic upgrade head] --> DB
+```
 
-| Tabla | Registros | Descripción |
+| Servicio Docker | Imagen | Puerto (solo `127.0.0.1`) | Función |
+|---|---|---|---|
+| `frontend` | `nginx:1.27-alpine` | 8080 | Sirve `frontend/` y reenvía `/api` y `/health` al backend (mismo origen, sin CORS). Límite de subida 20 MB |
+| `api` | `complianceai-backend` | 8000 | FastAPI (`/docs` para Swagger) |
+| `worker` | `complianceai-backend` | — | ARQ: valida evidencias y recalcula el benchmark (cron 02:00 UTC) |
+| `migrate` | `complianceai-backend` | — | `alembic upgrade head` y termina |
+| `db` | `postgres:16` | 5433 | Base de datos `complaince_db` |
+| `redis` | `redis:7-alpine` | 6379 | Cola de trabajos de ARQ |
+
+Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` → `frontend`. La API y el worker comparten el volumen `storage` (evidencias). La imagen del backend es única (multi-stage, Python 3.13-slim, usuario sin privilegios) e incluye spaCy con el modelo `es_core_news_md`.
+
+### Clean Architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ api/            Rutas FastAPI, validación de entrada, errores  │
+├────────────────────────────────────────────────────────────────┤
+│ application/    Casos de uso, filtros, schemas, capa de IA     │
+├────────────────────────────────────────────────────────────────┤
+│ domain/         Modelos (entidades) y puertos (interfaces ABC) │
+├────────────────────────────────────────────────────────────────┤
+│ infrastructure/ Adaptadores: repositorios SQLAlchemy, Groq,    │
+│                 storage local, NER, cifrado, prompt guard      │
+├────────────────────────────────────────────────────────────────┤
+│ core/           Configuración, BD, autenticación               │
+│ worker/         Tareas ARQ                                     │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Regla de dependencia:** las capas externas dependen de las internas, nunca al revés. Cambiar el LLM (Groq → otro proveedor) o el storage (local → S3) es reemplazar un adaptador sin tocar la lógica de negocio. Puertos definidos: `LLMProviderPort`, `SanitizerPort`, `RegistroIAPort`, `PromptGuardPort`, `EvidenceValidatorPort`, `FileStoragePort`.
+
+### Principios de diseño
+
+1. **El LLM nunca accede a la BD.** Solo recibe texto (prompt) y devuelve JSON validado con Pydantic. El backend es el único que lee y escribe.
+2. **El backend decide, el LLM propone.** Umbral de confianza, degradación y asignación de brechas son reglas de negocio del backend.
+3. **Ningún dato personal sale en claro.** Todo texto no confiable pasa por el motor NER antes de llegar al proveedor; si la sanitización falla, se aborta (*fail-closed*).
+4. **Todo queda auditado.** Cada llamada al LLM se registra en `llamadas_llm`; cada mapa de entidades se guarda cifrado en `sanitizaciones`; cada intento de inyección en `eventos_seguridad`; cada cambio ARCOP en `eventos_solicitud_arcop`.
+
+---
+
+## 4. Estructura del repositorio
+
+```
+Capstone/
+├── Documentos/                     # Entregables académicos por fase e integrante
+│   ├── Fase 1/                     # Guía, formativa, bitácora CPCITT, presentación, autoevaluaciones
+│   └── Fase 2/                     # Diarios de reflexión
+├── Extras/
+│   └── Guia_ComplianceAI_PromptInjection.docx.pdf
+└── Proyecto/
+    ├── README.md                   # ← este documento
+    ├── docker-compose.yml          # Sistema completo (6 servicios)
+    ├── docker/nginx.conf           # Frontend estático + proxy /api
+    ├── frontend/                   # Demo estática (ver sección 10)
+    │   ├── *.html                  # 14 páginas
+    │   ├── css/styles.css
+    │   └── js/                     # data.js, logica.js, store.js, ui.js, pdf-informe.js
+    └── backend/
+        ├── Dockerfile              # Imagen única para migrate, api y worker
+        ├── requirements.txt
+        ├── .env.example            # Plantilla de configuración (copiar a .env)
+        ├── env.example             # Variante con valores para Docker local (ver deuda #12)
+        ├── alembic.ini
+        ├── CAMBIOS_ARCOP.md        # Detalle funcional de la historia de usuario ARCOP
+        ├── reporte_latencia_live_c10.md
+        ├── evidencia.txt / evidencia_maliciosa.txt   # Archivos de ejemplo para pruebas manuales
+        ├── migrations/versions/    # 13 migraciones Alembic
+        ├── tests/                  # Suite pytest (ver sección 14)
+        └── app/
+            ├── main.py             # App FastAPI, routers y pool ARQ
+            ├── core/
+            │   ├── config.py       # Settings (pydantic-settings) + validaciones de producción
+            │   ├── database.py     # Engine async, sesión, Base
+            │   ├── autenticacion.py# Tokens HMAC, roles, hash de contraseñas, dependencias
+            │   └── crear_admin.py  # CLI para crear/desactivar administradores
+            ├── api/routes/         # arcop, auth, catalogos, controles, evaluaciones, evidencias,
+            │                       # filtro, metricas_ia, reportes, respuestas, seguridad
+            ├── application/
+            │   ├── ai/             # gateway.py, politicas.py, metricas.py, evidence_validator.py,
+            │   │                   # prompts/ (base.py, validar_evidencia.py)
+            │   ├── filters/control_tree.py   # Árbol de aplicabilidad F1–F7
+            │   ├── schemas/        # api_schemas, arcop_schemas, evidence_validation
+            │   └── use_cases/      # create_respuesta, upload_evidence, process_evidence,
+            │                       # responder_filtro, generate_resumen, update_benchmark,
+            │                       # obtener_metricas_ia, registrar_evento_seguridad,
+            │                       # gestionar_solicitud_arcop, iniciar_sesion
+            ├── domain/
+            │   ├── models/         # 19 entidades SQLAlchemy (ver sección 6)
+            │   └── ports/          # Interfaces ABC
+            ├── infrastructure/
+            │   ├── llm/            # groq_provider.py, factory.py
+            │   ├── repositories/   # 10 repositorios
+            │   ├── security/       # ner_sanitizer.py, cifrado.py, prompt_guard.py, seguridad.py
+            │   └── storage/local_storage.py
+            └── worker/tasks.py     # process_evidence_task + cron update_benchmark_task
+```
+
+---
+
+## 5. Flujos funcionales
+
+### 5.1 Recorrido completo de un diagnóstico
+
+```mermaid
+flowchart TD
+    A[Invitación: usuario_temporal + rubro] --> B[Crear evaluación]
+    B --> C[Filtro de aplicabilidad<br/>POST /evaluaciones/id/filtro]
+    C -->|F1 = NO| Z[Ningún control aplica]
+    C -->|F1 = SI| D[Controles aplicables<br/>22 base + condicionales]
+    D --> E[Responder cada control<br/>POST /respuestas]
+    E -->|cumplido / parcial| F[Subir evidencia<br/>POST /respuestas/id/evidencias]
+    E -->|no_cumplido| G[Brecha asignada al instante]
+    E -->|no_aplica| H[Sin brecha, fuera del puntaje]
+    F --> I[Worker: seguridad → NER → LLM → reglas]
+    I --> J[Clasificación final]
+    G --> K
+    H --> K
+    J --> K[Cerrar evaluación<br/>POST /evaluaciones/id/cerrar]
+    K --> L[Resumen por dominio + puntaje general + nivel]
+    L --> M[Comparativa vs. benchmark del rubro]
+    L --> N[Brechas → rutas formativas]
+    O[Oficial de Cumplimiento] -.->|PATCH /respuestas/id/revision| J
+```
+
+> Los pasos A y B aún no tienen endpoint: se crean por SQL (ver [12.3](#123-preparar-datos-de-prueba)).
+
+### 5.2 Filtro de aplicabilidad (preguntas de compuerta)
+
+Las 7 preguntas se responden SI/NO y deben venir **todas** en un mismo envío (se puede rehacer: las anteriores se reemplazan). F1 es la compuerta raíz; F2–F7 suman controles al conjunto base.
+
+| Código | Pregunta | Controles que activa (si SI) |
 |---|---|---|
-| `dominio` | 4 | Dominios temáticos (Protección de Datos, Gobernanza IA, Gestión de Riesgos, Uso Responsable) |
-| `rubro` | 8 | Sectores económicos (Banca, Salud, Retail, etc.) |
-| `ruta_formativa` | 12 | Rutas de capacitación (3 niveles × 4 dominios) |
-| `catalogo_brechas` | 40 | Brechas detectables (ERR-XXX-001 a ERR-XXX-010) |
-| `matriz_controles` | 40 | Controles de evaluación (DAT-001 a SEG-010) |
+| F1 | ¿La organización utiliza, desarrolla o integra algún sistema, modelo o herramienta de IA? | **Base (22):** DAT-001, 003, 004, 005, 006, 010 · GOB-001, 002, 003, 004, 005, 007, 009, 010 · RIE-001, 003, 004, 008, 010 · SEG-006, 007, 009. Si es NO no aplica ninguno |
+| F2 | ¿Procesa datos sensibles (salud, biométricos o perfilamiento de personas/menores)? | DAT-002, DAT-009 |
+| F3 | ¿Usa servicios, APIs, SaaS o plataformas de IA de terceros o en nube internacional? | DAT-007, DAT-008, GOB-008, SEG-008 |
+| F4 | ¿Usa LLM, IA generativa o arquitecturas RAG / bases vectoriales? | RIE-002, SEG-001, SEG-002, SEG-005 |
+| F5 | ¿La IA genera código/SQL/HTML o ejecuta acciones/agentes conectados a otros sistemas? | RIE-009, SEG-003, SEG-004 |
+| F6 | ¿La IA toma decisiones que afectan derechos, personas, crédito o contrataciones? | RIE-005, RIE-006, SEG-010 |
+| F7 | ¿La empresa desarrolla, entrena o adapta internamente modelos o agentes de IA? | RIE-007, GOB-006 |
 
-### Operacionales (se crean dinámicamente)
+Lógica en `app/application/filters/control_tree.py`.
 
-| Tabla | Descripción |
-|---|---|
-| `usuario_temporal` | Usuarios invitados con expiración |
-| `evaluacion` | Sesión de evaluación de un usuario |
-| `respuestas` | Respuesta del usuario a un control |
-| `evidencias` | Archivos subidos que respaldan respuestas |
+### 5.3 Respuesta a un control
 
-### Analíticas (agregados, se recalculan)
+| Clasificación declarada | Valor | ¿Requiere evidencia? | ¿Pasa por el LLM? | Brecha |
+|---|---|---|---|---|
+| Cumplido | `cumplido` | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
+| Parcialmente cumplido | `parcialmente_cumplido` | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
+| No cumplido | `no_cumplido` | No | No | **Se asigna al crear la respuesta** |
+| No aplica | `no_aplica` | No (subirla da 400) | No | No |
+| *(solo backend)* Requiere revisión | `requiere_revision` | — | — | La asigna la capa de seguridad; cuenta 0 puntos |
 
-| Tabla | Descripción |
-|---|---|
-| `benchmark` | Estadísticas por rubro y dominio |
-| `resumen` | Resumen agregado por evaluación y dominio |
+Al crear la respuesta, la **justificación** pasa por el detector de prompt injection: si es sospechosa se rechaza con `422 PROMPT_INJECTION` y se registra un evento de seguridad.
 
-### Control interno
+### 5.4 Validación asíncrona de evidencias
 
-| Tabla | Descripción |
-|---|---|
-| `alembic_version` | Control de migraciones |
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant API as API FastAPI
+    participant FS as Storage
+    participant Q as Redis (ARQ)
+    participant W as Worker
+    participant G as Capa IA (AIGateway)
+    participant L as Groq
+    participant DB as PostgreSQL
 
-### Relaciones (12 foreign keys)
-
+    C->>API: POST /api/respuestas/{id}/evidencias (archivo)
+    API->>DB: valida respuesta (solo cumplido/parcial)
+    API->>FS: guarda archivo (uuid_nombre) + hash SHA-256
+    API->>DB: evidencia estado=pending
+    API->>Q: enqueue process_evidence_task
+    API-->>C: 202 Accepted
+    Q->>W: job
+    W->>DB: evidencia → processing; carga respuesta, control y brecha
+    W->>W: prompt guard sobre justificación y evidencia
+    alt inyección detectada (modo bloquear)
+        W->>DB: evidencia rejected, respuesta requiere_revision, evento_seguridad
+    else texto limpio
+        W->>G: ejecutar(VALIDAR_EVIDENCIA, textos, datos)
+        G->>G: NER anonimiza (falla ⇒ aborta)
+        G->>DB: mapa de entidades CIFRADO (sanitizaciones)
+        G->>L: prompt versionado SOLO con texto anonimizado
+        L-->>G: JSON (clasificación, confianza, justificación…)
+        G->>DB: métrica (llamadas_llm)
+        G-->>W: resultado validado
+        W->>W: reglas de decisión del backend
+        W->>DB: evidencia + clasificación final de la respuesta
+    end
 ```
-rubro ─┬─ usuario_temporal ── evaluacion ── respuestas ── evidencias
-       └─ benchmark
 
-dominio ─┬─ matriz_controles ── respuestas
-         ├─ benchmark
-         └─ resumen
+**Reglas de decisión** (`ProcessEvidenceUseCase._apply_classification_decision`), con `UMBRAL_CONFIANZA = 0.8` por defecto:
 
-ruta_formativa ── catalogo_brechas ─┬─ respuestas
-                                    └─ matriz_controles
+| # | Condición | Resultado en la respuesta | Evidencia | Fuente |
+|---|---|---|---|---|
+| 0 | Evidencia marcada como sospechosa y confianza < umbral | `requiere_revision` | `rejected` | `seguridad` |
+| 1 | Confianza < umbral | Se mantiene lo declarado por el usuario | `rejected` | `usuario` |
+| 2 | Confianza ≥ umbral | Clasificación propuesta por el LLM | `validated` | `llm` |
+| 3 | Clasificación final = `no_cumplido` | Se asigna la brecha del control | — | — |
+| — | Error de la capa de IA (NER, timeout, rate limit, salida inválida…) | Sin cambios | `error` con mensaje sin PII | — |
 
-evaluacion ── resumen
+Estados de una evidencia: `pending` → `processing` → `validated` | `rejected` | `error`. El worker reintenta hasta 3 veces y cada job tiene 300 s de límite.
+
+### 5.5 Revisión humana
+
+`PATCH /api/respuestas/{id}/revision` permite al Oficial de Cumplimiento fijar la clasificación final (`fuente_clasificacion = revision`). Si queda en `no_cumplido` se asigna la brecha. Esa revisión es la **verdad de referencia** para medir la precisión del LLM en `/api/ia/metricas`.
+
+### 5.6 Cierre, puntaje y nivel de madurez
+
+`POST /api/evaluaciones/{id}/cerrar` (re)genera la tabla `resumen`:
+
+1. Considera solo controles **aplicables** según el filtro y con respuesta registrada.
+2. Excluye `no_aplica`.
+3. Puntúa: `cumplido` = 1 · `parcialmente_cumplido` = 0,5 · `no_cumplido` = 0 · `requiere_revision` = 0 (cuenta en el denominador, para que inyectar texto nunca suba el puntaje).
+4. Puntaje del dominio = promedio × 100. Puntaje general = promedio ponderado por cantidad de controles.
+
+| Puntaje | Nivel de madurez |
+|---|---|
+| 0 – 25 | `inicial` |
+| > 25 – 50 | `en_desarrollo` |
+| > 50 – 75 | `gestionado` |
+| > 75 – 100 | `optimizado` |
+
+Si todos los controles quedan fuera (F1 = NO o 100 % `no_aplica`), no se genera resumen y `GET /resumen` responde 404.
+
+### 5.7 Benchmark sectorial
+
+Tarea cron de ARQ `update_benchmark_task` (diaria, 02:00 UTC): borra y recalcula `benchmark` agrupando los resúmenes por **rubro × dominio** (promedio, mediana, máximo, mínimo, cantidad) de las evaluaciones con `estado_progreso = 'completada'`. `GET /api/evaluaciones/{id}/comparativa` compara la evaluación con el benchmark de su rubro (diferencia contra el promedio).
+
+### 5.8 Solicitudes de derechos ARCOP (Ley 21.719)
+
+Historia de usuario: *como Titular de Datos Personales quiero registrar solicitudes formales de Acceso, Rectificación, Supresión, Oposición, Portabilidad o Bloqueo.* Tipos: `acceso`, `rectificacion`, `supresion`, `oposicion`, `portabilidad`, `bloqueo`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> recibida: titular crea
+    recibida --> en_revision: admin
+    recibida --> rechazada: admin
+    recibida --> cancelada: titular
+    en_revision --> en_proceso: admin
+    en_revision --> pendiente_informacion: admin (comentario obligatorio)
+    en_revision --> rechazada: admin
+    en_revision --> cancelada: titular
+    pendiente_informacion --> en_revision: titular aporta información
+    pendiente_informacion --> rechazada: admin
+    pendiente_informacion --> cancelada: titular
+    en_proceso --> resuelta: admin
+    en_proceso --> rechazada: admin
+    resuelta --> [*]
+    rechazada --> [*]
+    cancelada --> [*]
 ```
 
-### Modelo ER
+- Cada cambio queda en `eventos_solicitud_arcop` en la misma transacción.
+- Una **supresión resuelta** anonimiza de forma irreversible los datos del titular (email, justificaciones, evidencias y sus archivos, mapas de entidades, extractos de seguridad, descripciones ARCOP) y conserva clasificaciones y puntajes sin vínculo personal. El titular pierde el acceso al instante.
+- Plazos de respuesta e información configurables (`ARCOP_PLAZO_*_DIAS`), vacíos hasta que el equipo los defina; se informa `plazo_vencido` y el filtro `?vencidas=true`.
+- Detalle completo, tabla de anonimización y decisiones pendientes: [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md).
+
+### 5.9 Autenticación y roles
+
+| Rol | Quién | Cómo obtiene el token |
+|---|---|---|
+| `referente` | Usuario temporal (titular de sus datos) | `POST /api/auth/titular` con `{usuario_temporal_id, email}`; requiere invitación vigente y no anonimizada |
+| `admin_therion` | Administrador de Therion Labs (tabla `usuarios_admin`) | `POST /api/auth/login` con `{email, password}` |
+
+- Token bearer firmado con HMAC-SHA256 (`AUTH_SECRET`), vigencia `AUTH_TOKEN_TTL_MIN` (480 min por defecto). Respuesta: `{access_token, token_type, rol, usuario_id, expira_en_min}`.
+- Contraseñas con PBKDF2-SHA256 (600 000 iteraciones); verificación en tiempo constante y hash señuelo para no revelar emails existentes.
+- En cada petición se comprueba en BD que el admin siga activo o que el titular no esté anonimizado (401 `USUARIO_DESHABILITADO`).
+- Administradores: `docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl` (contraseña mínima de 12 caracteres; `--desactivar` corta el acceso).
+- Token de prueba solo para desarrollo: `python -m app.core.autenticacion --usuario 1 --rol referente`.
+
+---
+
+## 6. Base de datos
+
+PostgreSQL 16, **19 tablas** + `alembic_version`, **27 claves foráneas**. Los nombres de algunas columnas FK están en mayúscula inicial (`"Rubro_id"`, `"Evaluacion_id"`…): en `psql` hay que escribirlas entre comillas dobles.
+
+### 6.1 Tablas por capa
+
+**Catálogos (datos maestros, sembrados por migración)**
+
+| Tabla | Filas | Descripción |
+|---|---|---|
+| `dominio` | 4 | Dominios temáticos |
+| `rubro` | 8 | Sectores económicos |
+| `ruta_formativa` | 12 | 4 dominios × 3 niveles |
+| `catalogo_brechas` | 40 | Brechas `ERR-XXX-NNN`: comportamiento detectado, criticidad, acción del sistema y ruta formativa |
+| `matriz_controles` | 40 | Controles `DAT/GOB/RIE/SEG-NNN`: marco, artículo, obligación, pregunta, evidencia esperada, criticidad, recomendación, test asociado, dominio y brecha |
+| `preguntas_filtro` | 7 | Preguntas de compuerta F1–F7 |
+
+**Operacionales**
+
+| Tabla | Descripción |
+|---|---|
+| `usuario_temporal` | Invitado por link, con expiración, rubro y `fecha_anonimizacion` |
+| `evaluacion` | Sesión de diagnóstico: estado, `filtro_completado`, fechas |
+| `respuestas_filtro` | Respuesta SI/NO a cada pregunta de compuerta (única por evaluación y pregunta) |
+| `respuestas` | Respuesta a un control: clasificación declarada, justificación, clasificación final, fuente (`usuario`/`llm`/`seguridad`/`revision`), confianza, brecha, revisión humana |
+| `evidencias` | Archivo de respaldo: ruta, MIME, hash, estado de validación, resultado del LLM |
+
+**Analíticas**
+
+| Tabla | Descripción |
+|---|---|
+| `resumen` | Puntaje y nivel por evaluación × dominio |
+| `benchmark` | Promedio, mediana, máximo, mínimo y cantidad por rubro × dominio |
+
+**Capa de IA y seguridad (auditoría)**
+
+| Tabla | Descripción |
+|---|---|
+| `llamadas_llm` | Una fila por ejecución de la capa de IA: tarea, proveedor, modelo, versión de prompt, éxito/tipo de error, tokens, costo, latencia, entidades anonimizadas, clasificación y confianza. **Nunca guarda texto del usuario** |
+| `sanitizaciones` | Mapa de entidades por texto: metadatos sin PII (`entidades` con huella HMAC) y `mapa_cifrado` (Fernet) con los valores originales. **Nunca se envía al LLM** |
+| `eventos_seguridad` | Intentos de prompt injection: origen (justificación/evidencia), extracto anonimizado, hash, revisado |
+
+**Derechos ARCOP y administración**
+
+| Tabla | Descripción |
+|---|---|
+| `solicitudes_arcop` | Solicitud del titular: tipo, estado, descripción, plazos, respuesta, fechas |
+| `eventos_solicitud_arcop` | Historial: tipo de evento, estado anterior/nuevo, rol e id del actor, comentario |
+| `usuarios_admin` | Administradores `admin_therion`: email único, hash de contraseña, activo, último acceso |
+
+### 6.2 Modelo entidad-relación
 
 ```mermaid
 erDiagram
@@ -166,625 +450,505 @@ erDiagram
     dominio ||--o{ benchmark : "dominio_id"
     dominio ||--o{ resumen : "dominio_id"
     ruta_formativa ||--o{ catalogo_brechas : "ruta_formativa_id"
+    catalogo_brechas ||--o{ matriz_controles : "catalogo_brechas_id_brecha"
+    catalogo_brechas ||--o{ respuestas : "Catalogo_brechas_id_brecha"
     usuario_temporal ||--o{ evaluacion : "Usuario_temporal_id"
+    usuario_temporal ||--o{ solicitudes_arcop : "Usuario_temporal_id"
     evaluacion ||--o{ respuestas : "Evaluacion_id"
     evaluacion ||--o{ resumen : "Evaluacion_id"
+    evaluacion ||--o{ respuestas_filtro : "Evaluacion_id"
+    preguntas_filtro ||--o{ respuestas_filtro : "pregunta_id"
     matriz_controles ||--o{ respuestas : "Matriz_controles_id_control"
-    catalogo_brechas ||--o{ respuestas : "Catalogo_brechas_id_brecha"
     respuestas ||--o{ evidencias : "Respuestas_id_respuesta"
+    solicitudes_arcop ||--o{ eventos_solicitud_arcop : "Solicitudes_arcop_id_solicitud"
+    evaluacion ||--o{ eventos_seguridad : "Evaluacion_id"
+    matriz_controles ||--o{ eventos_seguridad : "Matriz_controles_id_control"
+    respuestas ||--o{ eventos_seguridad : "Respuestas_id_respuesta"
+    evidencias ||--o{ eventos_seguridad : "Evidencias_id_evidencia"
+    evaluacion ||--o{ llamadas_llm : "Evaluacion_id"
+    respuestas ||--o{ llamadas_llm : "Respuestas_id_respuesta"
+    evidencias ||--o{ llamadas_llm : "Evidencias_id_evidencia"
+    evaluacion ||--o{ sanitizaciones : "Evaluacion_id"
+    respuestas ||--o{ sanitizaciones : "Respuestas_id_respuesta"
+    evidencias ||--o{ sanitizaciones : "Evidencias_id_evidencia"
 ```
+
+`usuarios_admin` no tiene relaciones (el actor de un evento ARCOP se guarda como `actor_rol` + `actor_id`).
+
+### 6.3 Migraciones (Alembic)
+
+Cadena lineal; la cabeza actual es **`f7b2d1a8c3e9`**.
+
+| # | Revisión | Contenido |
+|---|---|---|
+| 1 | `84d29cadfb28` | Esquema inicial: `evaluacion`, `matriz_controles`, `respuestas`, `evidencias` |
+| 2 | `20674abc0fc2` | `dominio`, `rubro`, `ruta_formativa`, `usuario_temporal`, `catalogo_brechas`, `benchmark`, `resumen` |
+| 3 | `b54cdc747a36` | Amplía `matriz_controles` y `catalogo_brechas` |
+| 4 | `2e398c9a9b2e` | **Seed:** dominios, rubros, rutas, 40 brechas y 40 controles |
+| 5 | `24ce495af093` | `preguntas_filtro`, `respuestas_filtro`, estado del filtro en `evaluacion` |
+| 6 | `2d93373ba237` | **Seed:** preguntas F1–F7 |
+| 7 | `7c1e5a9d3f20` | `eventos_seguridad` |
+| 8 | `a53fb924d0ac` | Ajustes en `eventos_seguridad` y `resumen` |
+| 9 | `c4f2a8e1b7d3` | Capa de IA: `llamadas_llm`, `sanitizaciones`, revisión humana en `respuestas` |
+| 10 | `b25cc4eed4b0` | Vacía (sin cambios) |
+| 11 | `a168283ff2b8` | Clasificaciones a `VARCHAR(25)` y ajustes de columnas de IA |
+| 12 | `e5a1c9d4b2f7` | `solicitudes_arcop`, `eventos_solicitud_arcop` |
+| 13 | `f7b2d1a8c3e9` | `usuarios_admin`, plazos ARCOP, `usuario_temporal.fecha_anonimizacion` |
+
+Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
 
 ---
 
-## Inicio rápido con Docker (recomendado)
+## 7. Endpoints de la API
 
-Todo el sistema (PostgreSQL, Redis, migraciones, API, worker y frontend) se levanta con un solo comando. Solo necesitas **Docker Desktop**; no hace falta Python, venv ni spaCy en tu máquina.
+Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 `referente` · 🛡️ `admin_therion`.
 
-**1. Crea `backend/.env`** a partir de `backend/.env.example` y completa dos valores:
+### Sistema
 
-```powershell
-copy backend\.env.example backend\.env
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/health` | 🔓 | Health check (`{"status":"ok"}`) |
+| GET | `/docs` | 🔓 | Swagger UI (botón *Authorize* para el token) |
+
+### Autenticación — `/api/auth`
+
+| Método | Ruta | Auth | Body / Respuesta |
+|---|---|---|---|
+| POST | `/api/auth/login` | 🔓 | `{email, password}` → token de admin |
+| POST | `/api/auth/titular` | 🔓 | `{usuario_temporal_id, email}` → token de referente |
+| GET | `/api/auth/me` | 🔑 | `{usuario_id, rol}` |
+
+### Catálogos y controles
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/dominios` | 🔓 | 4 dominios |
+| GET | `/api/rubros` | 🔓 | 8 rubros |
+| GET | `/api/rutas-formativas` | 🔓 | 12 rutas |
+| GET | `/api/brechas` | 🔓 | 40 brechas con su ruta anidada |
+| GET | `/api/controles?dominio_id=&criticidad=` | 🔓 | 40 controles con dominio y brecha anidados (filtros opcionales; `criticidad` = `Alta`/`Media`/`Baja`) |
+| GET | `/api/controles/{id}` | 🔓 | Detalle de un control |
+
+### Evaluaciones, filtro y reportes — `/api/evaluaciones`
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/evaluaciones?page=&size=&estado_progreso=` | 🔓 | Lista paginada |
+| GET | `/api/evaluaciones/{id}` | 🔓 | Detalle |
+| GET | `/api/evaluaciones/{id}/respuestas?page=&size=&estado_final=&fuente=` | 🔓 | Respuestas paginadas (filtra por clasificación final o fuente) |
+| GET | `/api/evaluaciones/{id}/filtro` | 🔓 | Preguntas F1–F7, respuestas guardadas y cantidad de controles aplicables |
+| POST | `/api/evaluaciones/{id}/filtro` | 🔓 | `{"respuestas":[{"codigo":"F1","respuesta":true}, …]}` (las 7) → controles aplicables |
+| GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo) |
+| POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general |
+| GET | `/api/evaluaciones/{id}/resumen` | 🔓 | Resumen guardado (404 si no se ha cerrado) |
+| GET | `/api/evaluaciones/{id}/comparativa` | 🔓 | Resumen vs. benchmark del rubro |
+| GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔓 | Benchmark por rubro × dominio |
+
+Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size, pages}`.
+
+### Respuestas y evidencias
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` → 201 `{id_respuesta}`; 422 `PROMPT_INJECTION` si la justificación es sospechosa |
+| GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
+| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana |
+| POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío |
+| GET | `/api/evidencias/{id}` | 🔓 | Estado de validación y resultado del LLM |
+
+### Capa de IA y seguridad
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/ia/metricas?desde=&hasta=&tarea=&modelo=` | 🔓 | `operacion_modelo` (tasa de error global y por tipo, latencia p50/p95, tokens, costo), `precision_modelo` (LLM vs. revisión humana: accuracy, P/R/F1, matriz de confusión) y `sanitizacion` (entidades por tipo, fallos, truncados) |
+| GET | `/api/seguridad/eventos?solo_pendientes=&limit=` | 🔓 | Bandeja de intentos de prompt injection |
+| PATCH | `/api/seguridad/eventos/{id}/revisado` | 🔓 | Marca un evento como revisado |
+
+### Derechos ARCOP — `/api/arcop`
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/arcop/catalogo` | 🔓 | Tipos, estados, transiciones y plazos configurados |
+| POST | `/api/arcop/solicitudes` | 👤 | `{tipo, descripcion}` → 201, estado `recibida` |
+| GET | `/api/arcop/solicitudes?page=&size=&estado=&tipo=&usuario_temporal_id=&vencidas=` | 🔑 | Titular: solo las suyas. Admin: todas, con filtros |
+| GET | `/api/arcop/solicitudes/{id}` | 🔑 | Detalle e historial (404 si es de otro titular) |
+| PATCH | `/api/arcop/solicitudes/{id}/estado` | 🛡️ | `{estado, comentario?}` → `en_revision` / `pendiente_informacion` / `en_proceso` |
+| POST | `/api/arcop/solicitudes/{id}/resolucion` | 🛡️ | `{resultado: resuelta\|rechazada, respuesta}` |
+| POST | `/api/arcop/solicitudes/{id}/cancelacion` | 👤 | `{motivo?}` |
+| POST | `/api/arcop/solicitudes/{id}/informacion` | 👤 | `{informacion}` → vuelve a `en_revision` |
+
+### Códigos de error
+
+| HTTP | Código (`detail.codigo`) | Cuándo |
+|---|---|---|
+| 400 | — (texto) | Validación de negocio |
+| 401 | `NO_AUTENTICADO`, `TOKEN_INVALIDO`, `CREDENCIALES_INVALIDAS`, `USUARIO_DESHABILITADO` | Autenticación |
+| 403 | `NO_AUTORIZADO` | Rol insuficiente |
+| 404 | — | Recurso no encontrado |
+| 409 | `TRANSICION_INVALIDA` (incluye `estado_actual` y `permitidas`) | Cambio de estado ARCOP no permitido |
+| 422 | `PROMPT_INJECTION` | Justificación bloqueada |
+| 503 | `AUTH_NO_CONFIGURADA` | Falta `AUTH_SECRET` |
+
+---
+
+## 8. Capa de Políticas e IA
+
+Intermediario entre la lógica de negocio y el LLM (`app/application/ai/`). Los casos de uso solo piden una **tarea** (`TareaIA.VALIDAR_EVIDENCIA`); la capa se encarga del resto.
+
+```
+caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
+   1. Router        PoliticaTarea: prompt versionado, schema, límites, campos no confiables
+   2. Sanitización  motor NER sobre cada texto no confiable ── falla ⇒ ABORTA (no llama al LLM)
+   3. Auditoría     mapa de entidades CIFRADO en `sanitizaciones` ── no se puede guardar ⇒ ABORTA
+   4. Prompt        plantilla versionada (validar_evidencia/1.1.0) SOLO con texto sanitizado
+   5. Proveedor     LLMProviderPort → GroqProvider (reintentos 429/5xx, timeout)
+   6. Validación    schema Pydantic + reglas post-salida (p. ej. divergencia sin explicar)
+   7. Métricas      una fila en `llamadas_llm` por ejecución, con éxito o con tipo de error
 ```
 
-- `GROQ_API_KEY`: tu clave de [console.groq.com/keys](https://console.groq.com/keys).
-- `ENTITY_MAP_KEY`: la clave que imprime el segundo comando. Guárdala: sin ella no se pueden descifrar los mapas de entidades ya guardados.
+**Reglas de negocio:** R1 el texto original nunca llega al LLM · R2 el mapa de entidades se guarda en BD y no va al proveedor · R3 si la sanitización falla se aborta y se registra · R4 si el LLM falla se registra `exito=False` con el tipo de error (`sanitizacion`, `auditoria`, `timeout`, `rate_limit`, `autenticacion`, `conexion`, `proveedor`, `salida_invalida`, `desconocido`) · R5 etiquetas fijas por tipo · R6 `SANITIZER_ENABLED=false` solo para depurar (prohibido con `APP_ENV=production`).
 
-Si no tienes Python, genera la clave con Docker: `docker run --rm python:3.13-slim sh -c "pip install -q cryptography && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"`.
+**Salida esperada del LLM** (`EvidenceValidation`): `clasificacion` (`cumplido` | `parcialmente_cumplido` | `no_cumplido`), `confianza` (0–1), `justificacion`, `respalda_clasificacion_usuario`, `divergencia_explicada`, `evidencia_suficiente`, `datos_extraidos`, `errores`.
 
-**2. Levanta todo** desde la carpeta `Proyecto/`:
+**Modelo por defecto:** `openai/gpt-oss-safeguard-20b` vía Groq (debe soportar *structured outputs*), temperatura 0.
+
+**Motor NER** (`infrastructure/security/ner_sanitizer.py`, versión 1.0.0): híbrido reglas + spaCy `es_core_news_md`. Detecta primero todos los spans, fusiona solapados y reemplaza en una sola pasada, lo que permite devolver el mapa (tipo, valor, inicio, fin) para auditoría. Etiquetas: `[RUT_ANON]` (con validación de dígito verificador), `[NOMBRE_ANON]`, `[CORREO_ANON]` (incluye ofuscaciones tipo "arroba"/"punto"), `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]` (Base64/Hex/Binario/Base32 hasta 3 niveles). El worker no arranca si falta el modelo de spaCy.
+
+**Cifrado:** Fernet con `ENTITY_MAP_KEY`; las entidades además llevan una huella HMAC que permite buscar coincidencias sin descifrar. Guarda la clave fuera del repositorio: sin ella los mapas ya guardados no se pueden descifrar.
+
+**Agregar una tarea nueva** (p. ej. recomendación de ruta formativa): crear su prompt en `ai/prompts/<tarea>.py` con `PROMPT_VERSION`, su schema Pydantic y registrar una `PoliticaTarea` en `crear_politicas`. **Cambiar de proveedor:** crear un adaptador de `LLMProviderPort` en `infrastructure/llm/`, registrarlo en `factory.py` y cambiar `LLM_PROVIDER`/`LLM_MODEL`.
+
+---
+
+## 9. Seguridad y privacidad (Ley 21.719)
+
+| Riesgo | Control implementado | Dónde |
+|---|---|---|
+| Datos personales enviados a un tercero (LLM) | Anonimización NER obligatoria, fail-closed; recorte después de sanitizar para no cortar PII a medias | `ner_sanitizer.py`, `gateway.py` |
+| Re-identificación desde la auditoría | Mapa de entidades cifrado con Fernet; métricas sin texto del usuario | `cifrado.py`, `llamadas_llm` |
+| Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); bloqueo 422 y registro | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
+| Prompt injection en evidencias | `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `process_evidence.py` |
+| Que una inyección suba el puntaje | `requiere_revision` vale 0 y cuenta en el denominador | `generate_resumen.py` |
+| Derechos del titular | Solicitudes ARCOP con trazabilidad completa y anonimización irreversible al aprobar una supresión | `gestionar_solicitud_arcop.py`, `anonimizacion_repository.py` |
+| Credenciales | PBKDF2-SHA256 600k, tokens HMAC con expiración, revocación inmediata, errores genéricos | `autenticacion.py` |
+| Configuración insegura en producción | La app no arranca con `APP_ENV=production` si `SANITIZER_ENABLED=false`, falta `ENTITY_MAP_KEY` o `AUTH_SECRET` < 32 caracteres | `config.py` |
+| Exposición de servicios | Puertos publicados solo en `127.0.0.1`; contenedor con usuario sin privilegios | `docker-compose.yml`, `Dockerfile` |
+
+> `infrastructure/security/seguridad.py` es una copia del repositorio separado **ComplianceAI-Prompt-Injection**. Si se actualiza allá (nuevos patrones o tests), hay que volver a copiarlo aquí.
+
+---
+
+## 10. Frontend
+
+**Estado:** demo estática navegable, servida por nginx en `http://localhost:8080`. **Todavía no consume el backend**: `js/store.js` implementa una "API" simulada (Promises sobre `localStorage`) con la misma forma que tendrá el cliente real basado en `fetch`, y `js/data.js` contiene la matriz, el árbol de aplicabilidad, módulos formativos, evaluaciones precargadas y el panel sectorial de ejemplo.
+
+**Cuentas de la demo** (cualquier contraseña): `nuevo@therionlabs.cl` (referente sin diagnóstico), `completo@therionlabs.cl` (referente con diagnóstico cerrado), `admin@therionlabs.cl` (`admin_therion`).
+
+| Página | Función | Rol |
+|---|---|---|
+| `index.html` | Entrada / redirección según sesión | — |
+| `login.html` | Ingreso | — |
+| `dashboard.html` | Panel principal: estado del diagnóstico y brechas prioritarias | ambos |
+| `diagnostico.html` | Inicio del autodiagnóstico | referente |
+| `cuestionario.html` | Preguntas de compuerta y de control, carga de evidencias | referente |
+| `resumen.html` | Diagnóstico cerrado: resumen de madurez | referente |
+| `informe.html` | Informe de madurez por dimensión y brechas priorizadas; exporta PDF (jsPDF) | referente |
+| `formacion-mapa.html` | Mapa formativo por dimensión y nivel | referente |
+| `formacion-modulo.html` | Contenido de un módulo formativo | referente |
+| `formacion-progreso.html` | Progreso de formación | referente |
+| `panel-sectorial.html` | Benchmark por rubro | ambos |
+| `panel-metodologia.html` | Metodología de evaluación | ambos |
+| `admin-matriz.html` | Backoffice: edición de la matriz de controles | admin_therion |
+| `admin-arbol.html` | Backoffice: árbol de aplicabilidad | admin_therion |
+
+Diferencias con el backend que hay que resolver al integrar (ver deuda #3): estados abreviados (`parcial`, `no`, `na`, `revision`), `revision` pondera 50 en la demo y 0 en el backend, y la escala de niveles de la demo (*Riesgo bajo/moderado/alto*, *Adecuado/Parcial*) no coincide con la del backend (*inicial … optimizado*).
+
+---
+
+## 11. Datos maestros
+
+**Dominios:** 1 Protección de Datos · 2 Gobernanza de IA · 3 Gestión de Riesgos · 4 Uso Responsable.
+
+**Rubros:** 1 Banca y Finanzas · 2 Salud · 3 Retail y E-commerce · 4 Telecomunicaciones · 5 Educación · 6 Tecnología/SaaS · 7 Manufactura · 8 Servicios/Otros.
+
+**Rutas formativas (12):** cada dominio × {Inicial, Intermedio, Avanzado}. Cada brecha apunta a una ruta (no necesariamente de su mismo dominio; p. ej. `ERR-DAT-002` → *Gestión de Riesgos – Intermedio*).
+
+**Controles (40):**
+
+| Prefijo | Dominio | Marco principal | Alta | Media | Baja |
+|---|---|---|---:|---:|---:|
+| DAT-001…010 | Protección de Datos | Ley N.º 21.719 | 7 | 3 | 0 |
+| GOB-001…010 | Gobernanza de IA | ISO/IEC 42001 | 3 | 5 | 2 |
+| RIE-001…010 | Gestión de Riesgos | NIST AI RMF 100-1 (RIE-004: ISO/IEC 42001) | 5 | 5 | 0 |
+| SEG-001…010 | Uso Responsable | OWASP LLM, NIST 600-1 (SEG-006/007), Ley 21.719 (SEG-008/010) | 8 | 1 | 1 |
+| **Total** | | | **23** | **14** | **3** |
+
+Cada control tiene su brecha `ERR-<prefijo>-<n>` (40 en total). La fuente de verdad es la migración `2e398c9a9b2e_seed_catalogs_and_controls.py`.
+
+---
+
+## 12. Puesta en marcha
+
+### 12.1 Con Docker (recomendado)
+
+Solo se necesita **Docker Desktop** (en Windows, con WSL 2). No hace falta Python ni spaCy en la máquina.
+
+**1. Crear `backend/.env`** desde la plantilla y completar las claves:
+
+```powershell
+cd Proyecto
+copy backend\.env.example backend\.env
+```
+
+| Variable | Cómo obtenerla |
+|---|---|
+| `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) |
+| `ENTITY_MAP_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `AUTH_SECRET` | `python -c "import secrets; print(secrets.token_urlsafe(48))"` (necesaria para `/api/auth` y `/api/arcop`) |
+
+Sin Python local: `docker run --rm python:3.13-slim sh -c "pip install -q cryptography && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"`.
+
+**2. Levantar todo:**
 
 ```powershell
 docker compose up -d --build
 ```
 
-La primera vez tarda varios minutos (descarga imágenes e instala spaCy con su modelo). Luego:
+La primera vez tarda varios minutos (descarga imágenes e instala spaCy con su modelo).
 
-| Servicio | URL / puerto | Qué hace |
-|---|---|---|
-| `frontend` | http://localhost:8080 | HTML estático (nginx) y proxy de `/api` al backend |
-| `api` | http://localhost:8000/docs | FastAPI |
-| `worker` | — | Procesa evidencias con la capa de Políticas e IA (spaCy + Groq) |
-| `migrate` | — | Ejecuta `alembic upgrade head` y termina |
-| `db` | `localhost:5433` | PostgreSQL 16 (usuario `postgres`, clave `1234`, BD `complaince_db`) |
-| `redis` | `localhost:6379` | Cola de ARQ |
+| URL | Qué es |
+|---|---|
+| http://localhost:8080 | Frontend (demo) |
+| http://localhost:8000/docs | Swagger de la API |
+| `localhost:5433` | PostgreSQL (`postgres` / `1234`, BD `complaince_db`) — solo desarrollo |
+| `localhost:6379` | Redis |
 
-El orden de arranque es automático: `db` sano → `migrate` termina bien → `api` y `worker` → `frontend`. La API y el worker comparten el volumen `storage`, donde se guardan las evidencias. Los puertos solo se publican en `127.0.0.1`.
-
-**Comandos útiles:**
+**3. Crear un administrador** (opcional, para ARCOP):
 
 ```powershell
-docker compose ps                       # estado de cada servicio
-docker compose logs -f worker           # ver cómo se procesan las evidencias
-docker compose logs migrate             # si la API no arranca, mira aquí primero
-docker compose up -d --build api worker # tras cambiar código del backend
-docker compose down                     # detener (conserva los datos)
-docker compose down -v                  # detener y BORRAR BD y evidencias
+docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl
 ```
 
-**Pruebas:**
+En Docker se ignoran `DATABASE_URL`, `DATABASE_URL_SYNC`, `REDIS_URL` y `STORAGE_DIR` del `.env` (el compose los reemplaza por los servicios internos). Si cambias el `.env`, aplica con `docker compose up -d`.
+
+### 12.2 Manual (para depurar la API o el worker)
+
+Requisitos: Python 3.12+ (probado en 3.13), Docker para PostgreSQL y Redis.
 
 ```powershell
-# Suite completa (SQLite en memoria, no toca la BD de Docker)
+cd Proyecto
+docker compose up -d db redis
+
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1          # si PowerShell lo bloquea: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+pip install --upgrade pip
+pip install -r requirements.txt      # incluye spaCy y el wheel de es_core_news_md 3.8.0
+copy env.example .env                # valores para 127.0.0.1:5433 / complaince_db; agrega AUTH_SECRET
+alembic upgrade head
+
+# Terminal 1
+uvicorn app.main:app --reload --port 8000
+# Terminal 2
+arq app.worker.tasks.WorkerSettings
+```
+
+Notas: usa `127.0.0.1` y no `localhost` (en Windows `localhost` resuelve primero a IPv6). Si `python -m spacy download es_core_news_md` falla por incompatibilidad con pydantic, el wheel ya viene fijado en `requirements.txt`.
+
+### 12.3 Preparar datos de prueba
+
+Mientras no existan endpoints de alta (deuda #1), se insertan por SQL:
+
+```powershell
+docker compose exec db psql -U postgres -d complaince_db -c "INSERT INTO usuario_temporal (fecha_expiracion, email, validacion_invitacion, `"Rubro_id`") VALUES ('2027-12-31', 'test@example.com', 'S', 6);"
+docker compose exec db psql -U postgres -d complaince_db -c "INSERT INTO evaluacion (fecha_inicio, estado_progreso, `"Usuario_temporal_id`", filtro_completado) VALUES (CURRENT_DATE, 'en_progreso', 1, false);"
+```
+
+`filtro_completado` es `NOT NULL` sin valor por defecto en la BD, por eso se indica explícitamente. En PowerShell las comillas dobles internas se escapan con acento grave (`` ` ``).
+
+### 12.4 Recorrido de prueba (PowerShell)
+
+```powershell
+$api = "http://localhost:8000/api"
+
+# 1. Filtro: usa IA y LLM (F1 y F4 = SI)
+Invoke-RestMethod -Method Post "$api/evaluaciones/1/filtro" -ContentType "application/json" -Body '{"respuestas":[{"codigo":"F1","respuesta":true},{"codigo":"F2","respuesta":false},{"codigo":"F3","respuesta":false},{"codigo":"F4","respuesta":true},{"codigo":"F5","respuesta":false},{"codigo":"F6","respuesta":false},{"codigo":"F7","respuesta":false}]}'
+
+# 2. No cumplido -> brecha automática
+Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json" -Body '{"evaluacion_id":1,"matriz_control_id":3,"estado_clasificacion":"no_cumplido","justificacion":"No tenemos politica formal."}'
+
+# 3. Cumplido + evidencia (procesada por el worker)
+$r = Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json" -Body '{"evaluacion_id":1,"matriz_control_id":1,"estado_clasificacion":"cumplido","justificacion":"Politica aprobada."}'
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/evidencia.txt"
+Start-Sleep 10
+Invoke-RestMethod "$api/respuestas/$($r.id_respuesta)" | ConvertTo-Json -Depth 5
+
+# 4. Evidencia maliciosa -> bloqueo preventivo y evento de seguridad
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/evidencia_maliciosa.txt"
+Invoke-RestMethod "$api/seguridad/eventos"
+
+# 5. Cerrar y ver reporte
+Invoke-RestMethod -Method Post "$api/evaluaciones/1/cerrar"
+Invoke-RestMethod "$api/evaluaciones/1/comparativa"
+Invoke-RestMethod "$api/ia/metricas"
+```
+
+El recorrido ARCOP (login, titular, solicitudes) está en [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md#probar-a-mano-docker-powershell-desde-proyecto).
+
+---
+
+## 13. Variables de entorno
+
+| Variable | Defecto | Descripción |
+|---|---|---|
+| `DATABASE_URL` | — (obligatoria) | URL async (`postgresql+asyncpg://…`) |
+| `DATABASE_URL_SYNC` | — (obligatoria) | URL síncrona para Alembic (`postgresql+psycopg2://…`) |
+| `REDIS_URL` | — (obligatoria) | Redis para ARQ |
+| `GROQ_API_KEY` | — (obligatoria) | Clave de Groq |
+| `LLM_PROVIDER` | `groq` | Proveedor del LLM |
+| `LLM_MODEL` | `openai/gpt-oss-safeguard-20b` | Modelo (con *structured outputs*) |
+| `LLM_TIMEOUT_S` / `LLM_MAX_REINTENTOS` | `60` / `2` | Timeout por intento y reintentos (429/5xx) |
+| `LLM_MAX_TOKENS_SALIDA` | `1500` | Tope de tokens de respuesta |
+| `LLM_PRECIO_ENTRADA_USD_1M` / `LLM_PRECIO_SALIDA_USD_1M` | `0` / `0` | Precio del modelo para estimar costo en métricas |
+| `UMBRAL_CONFIANZA` | `0.8` | Confianza mínima para aceptar la clasificación del LLM |
+| `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | `8000` / `4000` | Caracteres enviados al LLM (tras sanitizar) |
+| `MODO_SEGURIDAD_EVIDENCIA` | `bloquear` | `bloquear` o `marcar` ante posible inyección en evidencias |
+| `SANITIZER_ENABLED` | `true` | Anonimización NER antes del LLM (`false` solo debug) |
+| `ENTITY_MAP_KEY` | — | Clave Fernet del mapa de entidades (obligatoria si el sanitizador está activo) |
+| `REQUIERE_NER` | `false` | **Obsoleta** (reemplazada por `SANITIZER_ENABLED`) |
+| `APP_ENV` | `development` | `development` · `test` · `production` (activa validaciones estrictas) |
+| `STORAGE_DIR` | `./storage` | Carpeta de evidencias (`/data/storage` en Docker) |
+| `AUTH_SECRET` | — | Secreto HMAC de tokens (≥ 32 caracteres en producción) |
+| `AUTH_TOKEN_TTL_MIN` | `480` | Vigencia del token |
+| `ARCOP_PLAZO_RESPUESTA_DIAS` | vacío | Plazo de respuesta ARCOP (días corridos). **Dejar comentada** hasta definirla: con `=` vacío la app no arranca |
+| `ARCOP_PLAZO_INFORMACION_DIAS` | vacío | Plazo para aportar información (mismo cuidado) |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `postgres` / `1234` / `complaince_db` | Solo `docker-compose.yml` (variables del shell o `Proyecto/.env`) |
+
+---
+
+## 14. Pruebas y calidad
+
+Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**: usan repositorios falsos o SQLite en memoria (`aiosqlite`).
+
+| Archivo | Pruebas | Qué cubre |
+|---|---:|---|
+| `test_bordes_na_y_evidencia.py` | 39 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje |
+| `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
+| `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (12 casos) |
+| `test_capa_ia.py` | 17 | AIGateway contra las reglas R1–R6 |
+| `test_seguridad_integracion.py` | 10 | Capa anti prompt-injection en el backend |
+| `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
+| `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
+| `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |
+| `test_defectos_api.py` | 1 | Variante anterior de la prueba de latencia (ver deuda #12) |
+| `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
+
+Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba).
+
+```powershell
+# Suite completa en Docker (no toca la BD real)
 docker compose run --rm --no-deps api pytest tests -q
+
+# Suite local (Windows, venv en backend/)
+pytest tests -v -rxX
+
+# Precisión del NER con detalle
+pytest tests/test_ner_sanitizer.py -s
 
 # Prueba en vivo contra el sistema levantado (usa la BD real, evaluación 9101)
 docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/test_live_capa_ia.py -v -s'
 ```
 
-Sobre el `.env`: en Docker se ignoran `DATABASE_URL`, `DATABASE_URL_SYNC`, `REDIS_URL` y `STORAGE_DIR`, porque el `docker-compose.yml` los reemplaza por los servicios internos (`db`, `redis`, `/data/storage`). El resto de variables (Groq, sanitizador, umbrales, precios) se toman del `.env`. Si cambias el `.env`, aplica con `docker compose up -d`.
+**Últimos resultados reportados**
 
-**Problemas comunes:**
-- *El puerto 5433, 6379 u 8000 ya está en uso:* detén el uvicorn/worker local o el Redis/PostgreSQL que tengas corriendo fuera de Docker.
-- *`worker` se reinicia una y otra vez:* revisa `docker compose logs worker`. Lo normal es que falte `ENTITY_MAP_KEY` o `GROQ_API_KEY` en `backend/.env`.
-- *`migrate` falla:* mira `docker compose logs migrate`; la API no arranca hasta que las migraciones terminen bien.
-
-> La sección siguiente describe el levantamiento manual (sin Docker para la API y el worker), útil para depurar.
-
-## Levantamiento paso a paso
-
-### Paso 1: Clonar/ubicar el proyecto
-
-```powershell
-cd C:\Users\<usuario>\Documents\Repositorios\Capstone\Proyecto
-```
-
-### Paso 2: Crear y activar el entorno virtual
-
-```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-
-**Si PowerShell bloquea la ejecución de scripts:**
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-### Paso 3: Instalar dependencias
-
-```powershell
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-**Contenido de `requirements.txt`:**
-
-```txt
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-sqlalchemy[asyncio]==2.0.36
-asyncpg==0.30.0
-psycopg2-binary==2.9.10
-alembic==1.14.0
-pydantic==2.10.0
-pydantic-settings==2.6.0
-python-multipart==0.0.12
-langchain-groq==0.2.0
-langchain-core==0.3.20
-arq==0.26.1
-redis==5.2.0
-aiofiles==24.1.0
-```
-
-### Paso 4: Crear el archivo `.env`
-
-Crea `backend\.env` con este contenido:
-
-```env
-DATABASE_URL=postgresql+asyncpg://user:password@127.0.0.1:5433/mydb
-DATABASE_URL_SYNC=postgresql://user:password@127.0.0.1:5433/mydb
-REDIS_URL=redis://127.0.0.1:6379
-GROQ_API_KEY=gsk_tu_clave_aqui
-LLM_MODEL=openai/gpt-oss-safeguard-20b
-UMBRAL_CONFIANZA=0.8
-STORAGE_DIR=./storage
-```
-
-**Notas importantes:**
-
-- Usa `127.0.0.1`, **no `localhost`**. En Windows, `localhost` se resuelve primero a IPv6 y Docker solo publica IPv4.
-- El puerto `5433` evita conflicto con PostgreSQL nativo de Windows.
-- `GROQ_API_KEY` se obtiene en [console.groq.com/keys](https://console.groq.com/keys).
-- `LLM_MODEL` debe ser un modelo con soporte de `structured_outputs`. `openai/gpt-oss-safeguard-20b` funciona.
-
-### Paso 5: Configurar `docker-compose.yml`
-
-```yaml
-version: '3.8'
-
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydb
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-```
-
-### Paso 6: Levantar Docker
-
-```powershell
-cd ..
-docker-compose up -d
-docker-compose ps
-```
-
-Ambos servicios deben estar `Up (healthy)`.
-
-### Paso 7: Aplicar migraciones
-
-```powershell
-cd backend
-.\venv\Scripts\Activate.ps1
-alembic upgrade head
-```
-
-Verifica las 12 tablas:
-
-```powershell
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "\dt"
-```
-
-### Paso 8: Levantar los servicios (3 terminales)
-
-**Terminal 1 — Docker** (ya corriendo).
-
-**Terminal 2 — FastAPI:**
-
-```powershell
-cd C:\Users\<usuario>\Documents\Repositorios\Capstone\Proyecto\backend
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8000
-```
-
-**Terminal 3 — Worker ARQ:**
-
-```powershell
-cd C:\Users\<usuario>\Documents\Repositorios\Capstone\Proyecto\backend
-.\venv\Scripts\Activate.ps1
-arq app.worker.tasks.WorkerSettings
-```
+- **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre.
+- **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumple `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
 
 ---
 
-## Reglas de negocio
+## 15. Comandos útiles y solución de problemas
 
-### Clasificaciones posibles
+```powershell
+docker compose ps                        # estado de cada servicio
+docker compose logs -f worker            # procesamiento de evidencias
+docker compose logs migrate              # si la API no arranca, mirar aquí primero
+docker compose up -d --build api worker  # tras cambiar código del backend
+docker compose down                      # detener (conserva datos)
+docker compose down -v                   # detener y BORRAR BD y evidencias
 
-El usuario elige **1 de 4 opciones** al responder un control:
+docker compose exec db psql -U postgres -d complaince_db           # consola SQL
+docker compose exec db psql -U postgres -d complaince_db -c "\dt"  # listar tablas
+docker compose exec redis redis-cli ping                           # PONG
 
-| Clasificación | Valor en BD | ¿Requiere evidencia? | ¿Activa LLM? | ¿Asigna brecha? |
-|---|---|---|---|---|
-| Cumplido | `cumplido` | Sí | Sí | Solo si LLM lo degrada |
-| Parcialmente cumplido | `parcialmente_cumplido` | Sí | Sí | Solo si LLM lo degrada |
-| No cumplido | `no_cumplido` | No | No | **Sí, directo** |
-| No aplica | `no_aplica` | No | No | No |
-
-### Reglas de decisión del LLM
-
-1. **Umbral de confianza:** si `confianza < 0.8` → fallback a la clasificación del usuario.
-2. **Degradación:** si el LLM detecta que la evidencia no alcanza el nivel declarado, degrada la clasificación.
-3. **Asignación de brecha:** cuando la clasificación final sea `no_cumplido`, el backend asigna automáticamente la brecha del control (regla de negocio, no del LLM).
-
-### Principio de separación LLM/Backend
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  BACKEND (única capa con acceso a BD)                    │
-│  - Lee control, respuesta, brecha, contenido del archivo │
-│  - Construye el prompt                                   │
-│  - Envía al LLM vía HTTPS                                │
-│  - Recibe JSON estructurado                              │
-│  - Aplica reglas de negocio                              │
-│  - Escribe en la BD                                      │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-                  ┌────────▼────────┐
-                  │      LLM        │
-                  │  (solo texto)   │
-                  │  Sin BD, sin    │
-                  │  estado, sin    │
-                  │  credenciales   │
-                  └─────────────────┘
+docker compose exec api alembic current                            # revisión aplicada
+docker compose exec api alembic history --verbose
+alembic revision --autogenerate -m "descripcion"                   # nueva migración (modo manual)
 ```
 
-**El LLM:**
-- Solo recibe texto y devuelve JSON validado con Pydantic.
-- No tiene acceso a la BD ni credenciales.
-- No asigna brechas (regla de negocio del backend).
-- No tiene memoria entre llamadas.
+| Problema | Causa probable | Solución |
+|---|---|---|
+| Puerto 5433, 6379, 8000 u 8080 en uso | Servicios locales fuera de Docker | Detener el uvicorn/worker/Redis/PostgreSQL local |
+| `worker` se reinicia en bucle | Falta `ENTITY_MAP_KEY` o `GROQ_API_KEY`, o el modelo de spaCy | `docker compose logs worker` |
+| `migrate` falla | Error de migración o BD no disponible | `docker compose logs migrate` |
+| 503 `AUTH_NO_CONFIGURADA` | Falta `AUTH_SECRET` | Agregarla al `.env` y `docker compose up -d` |
+| La app no arranca tras definir plazos ARCOP | Variable con `=` vacío | Comentarla o poner un número |
+| `ConnectionDoesNotExistError` (asyncpg) | `localhost` resuelve a IPv6 | Usar `127.0.0.1` |
+| `404 model does not exist` (Groq) | Modelo deprecado | `LLM_MODEL=openai/gpt-oss-safeguard-20b` |
+| `ModuleNotFoundError: No module named 'app'` | Carpeta equivocada | Ejecutar desde `backend/` |
+| `column "Matriz_controles_id_control" does not exist` | PostgreSQL pasa a minúsculas | Envolver en comillas dobles |
+| `-Form` no se reconoce | PowerShell 5.1 | Usar `curl.exe -F "file=@archivo"` |
+| Caracteres raros (`polÃtica`) | Codificación de la consola | Verificar en `psql`; suele ser solo visual |
 
 ---
 
-## Endpoints disponibles
+## 16. Backlog, deuda técnica y riesgos
 
-### Sistema
+Priorizado para la planificación del próximo sprint. Los números se usan como referencia en el resto del documento.
 
-| Método | Ruta | Descripción |
+### Prioridad alta
+
+| # | Ítem | Impacto | Propuesta |
+|---|---|---|---|
+| 1 | **No hay endpoints para crear invitaciones (`usuario_temporal`) ni evaluaciones** | El flujo completo depende de SQL manual | `POST /api/invitaciones` (admin) con código aleatorio y `POST /api/evaluaciones` (referente) |
+| 2 | **Solo `/api/arcop` y `/api/auth/me` exigen token**: respuestas, evidencias, revisión, métricas, eventos de seguridad y reportes son públicos y no verifican que la evaluación pertenezca al usuario | Exposición de datos entre organizaciones | Aplicar `requerir_rol` y control de propiedad en todos los routers |
+| 3 | **Frontend no integrado** con el backend (`store.js` simulado) y con reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | La demo no refleja los resultados reales | Cliente `fetch` con la misma interfaz que `store.js`; unificar puntaje y niveles en una sola fuente |
+| 4 | **Benchmark siempre vacío:** el cron solo cuenta evaluaciones con `estado_progreso='completada'`, pero ningún endpoint fija ese estado (`POST /cerrar` no lo cambia) | Panel sectorial y comparativa sin datos | Que `/cerrar` marque `completada` (y decidir si se permite reabrir) |
+| 5 | **Falta `backend/.dockerignore`**: su contenido está en un archivo llamado `backend/download`; como el `Dockerfile` hace `COPY . .`, el `.env` (con claves) y el `venv` local terminan dentro de la imagen | Fuga de secretos en la imagen; imágenes pesadas | Renombrar `backend/download` a `backend/.dockerignore` |
+
+### Prioridad media
+
+| # | Ítem | Propuesta |
 |---|---|---|
-| GET | `/health` | Health check |
-| GET | `/docs` | Documentación interactiva (Swagger UI) |
-
-### Catálogos (sin paginación)
-
-| Método | Ruta | Devuelve |
-|---|---|---|
-| GET | `/api/dominios` | Los 4 dominios |
-| GET | `/api/rubros` | Los 8 rubros |
-| GET | `/api/rutas-formativas` | Las 12 rutas |
-| GET | `/api/brechas` | Las 40 brechas con ruta anidada |
-
-### Controles (sin paginación)
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/controles` | Los 40 controles con dominio y brecha anidados |
-| GET | `/api/controles?dominio_id={id}` | Filtrar por dominio |
-| GET | `/api/controles?criticidad={Alta\|Media\|Baja}` | Filtrar por criticidad |
-| GET | `/api/controles/{id}` | Detalle de un control |
-
-### Respuestas
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/api/respuestas/` | Crear respuesta |
-| GET | `/api/respuestas/{id}` | Consultar respuesta + evidencias |
-| PATCH | `/api/respuestas/{id}/revision` | Revisión humana (Oficial de Cumplimiento) |
-
-### Capa de IA
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/ia/metricas?desde=&hasta=&tarea=&modelo=` | Tasa de error, latencia, tokens, costo, precisión del LLM y sanitización |
-
-### Evidencias
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/api/respuestas/{id}/evidencias` | Subir evidencia (202 Accepted) |
-| GET | `/api/evidencias/{id}` | Consultar evidencia |
-
-### Evaluaciones (con paginación)
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/evaluaciones?page=1&size=20` | Lista paginada |
-| GET | `/api/evaluaciones/{id}` | Detalle |
-| GET | `/api/evaluaciones/{id}/respuestas?page=1&size=20` | Respuestas paginadas |
-
-**Parámetros de paginación:**
-
-- `page` (int, ≥1): número de página, empieza en 1.
-- `size` (int, 1-100): registros por página.
-- Respuesta incluye: `{items, total, page, size, pages}`.
-
----
-
-## Probar el flujo completo
-
-### Preparar datos base
-
-```powershell
-# Usuario temporal
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "INSERT INTO usuario_temporal (fecha_expiracion, email, validacion_invitacion, `"Rubro_id`") VALUES ('2027-12-31', 'test@example.com', 'S', 6);"
-
-# Evaluación
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "INSERT INTO evaluacion (fecha_inicio, estado_progreso, `"Usuario_temporal_id`") VALUES (CURRENT_DATE, 'en_progreso', 1);"
-```
-
-### Caso 1: No cumplido (sin evidencia, brecha automática)
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8000/api/respuestas/" `
-  -Method Post -ContentType "application/json" `
-  -Body '{"evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "no_cumplido", "justificacion": "No tenemos politica formal."}'
-```
-
-Verifica:
-
-```powershell
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "SELECT id_respuesta, estado_clasificacion_final, `"Catalogo_brechas_id_brecha`" FROM respuestas ORDER BY id_respuesta DESC LIMIT 1;"
-```
-
-Debe mostrar la brecha asignada (por ejemplo `1` para ERR-DAT-001).
-
-### Caso 2: No aplica (sin brecha)
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8000/api/respuestas/" `
-  -Method Post -ContentType "application/json" `
-  -Body '{"evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "no_aplica", "justificacion": "No aplica."}'
-```
-
-### Caso 3: Cumplido + evidencia
-
-```powershell
-# Crear respuesta
-Invoke-RestMethod -Uri "http://localhost:8000/api/respuestas/" `
-  -Method Post -ContentType "application/json" `
-  -Body '{"evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "cumplido", "justificacion": "Politica aprobada."}'
-```
-
-Anota el `id_respuesta`. Sube evidencia:
-
-```powershell
-@"
-Politica de Seguridad de la Informacion
-Aprobada por la Direccion General el 15 de enero de 2026
-Version: 2.1. Alcance: Todas las areas.
-Firma: Gerente General
-"@ | Out-File -Encoding utf8 evidencia.txt
-
-curl.exe -X POST "http://localhost:8000/api/respuestas/{ID}/evidencias" -F "file=@evidencia.txt"
-```
-
-Espera 5-10 segundos (worker procesa) y consulta:
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8000/api/respuestas/{ID}" | ConvertTo-Json -Depth 5
-```
-
-### Caso 4: Intento de evidencia sobre `no_aplica` (debe fallar 400)
-
-```powershell
-curl.exe -X POST "http://localhost:8000/api/respuestas/{ID_NO_APLICA}/evidencias" -F "file=@evidencia.txt"
-```
-
-Debe responder `HTTP 400`.
-
----
-
-## Variables de entorno
-
-| Variable | Descripción | Ejemplo |
-|---|---|---|
-| `DATABASE_URL` | URL asíncrona para la app | `postgresql+asyncpg://user:password@127.0.0.1:5433/mydb` |
-| `DATABASE_URL_SYNC` | URL síncrona para Alembic | `postgresql://user:password@127.0.0.1:5433/mydb` |
-| `REDIS_URL` | URL de Redis para ARQ | `redis://127.0.0.1:6379` |
-| `GROQ_API_KEY` | API key de Groq | `gsk_...` |
-| `LLM_MODEL` | Modelo a usar | `openai/gpt-oss-safeguard-20b` |
-| `UMBRAL_CONFIANZA` | Umbral para aceptar LLM | `0.8` |
-| `STORAGE_DIR` | Carpeta de archivos | `./storage` |
-| `APP_ENV` | `development`, `test` o `production` | `development` |
-| `LLM_PROVIDER` | Proveedor del LLM | `groq` |
-| `LLM_TIMEOUT_S` / `LLM_MAX_REINTENTOS` | Tiempo máximo por intento y reintentos (429/5xx) | `60` / `2` |
-| `LLM_MAX_TOKENS_SALIDA` | Tope de tokens de respuesta | `1500` |
-| `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | Caracteres enviados al LLM (tras sanitizar) | `8000` / `4000` |
-| `LLM_PRECIO_ENTRADA_USD_1M` / `LLM_PRECIO_SALIDA_USD_1M` | Precio del modelo para estimar costo | según proveedor |
-| `SANITIZER_ENABLED` | `true` anonimiza antes del LLM; `false` solo debug (prohibido en producción) | `true` |
-| `ENTITY_MAP_KEY` | Clave Fernet para cifrar el mapa de entidades | ver abajo |
-
----
-
-## Capa de Políticas e IA
-
-Intermediario entre la lógica de negocio y el LLM (`app/application/ai/`). Los casos de uso piden una **tarea** (`TareaIA.VALIDAR_EVIDENCIA`) y la capa se encarga del resto:
-
-```
-caso de uso ─► AIGateway.ejecutar(tarea, textos, datos)
-                 1. Política de la tarea (prompt versionado, schema, límites)
-                 2. Motor NER: anonimiza RUT, nombres, correos, teléfonos, direcciones
-                    └─ falla ⇒ se aborta, no se llama al LLM (fail-closed)
-                 3. Guarda el mapa de entidades CIFRADO en `sanitizaciones`
-                 4. Prompt solo con texto sanitizado ─► LLMProviderPort (Groq)
-                 5. Valida la salida (schema + reglas) ─► métrica en `llamadas_llm`
-```
-
-**Reglas de negocio:** el texto original nunca llega al LLM; el mapa de entidades se guarda en BD y no se envía al proveedor; si la sanitización falla se aborta y se registra; si el LLM falla se registra `exito=False` con el tipo de error; etiquetas fijas (`[RUT_ANON]`, `[NOMBRE_ANON]`, `[CORREO_ANON]`, `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]`).
-
-**Puesta en marcha:**
-
-```bash
-pip install -r requirements.txt
-python -m spacy download es_core_news_md      # obligatorio con SANITIZER_ENABLED=true
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"   # -> ENTITY_MAP_KEY
-alembic upgrade head                          # crea llamadas_llm y sanitizaciones
-```
-
-El worker no arranca si falta el modelo de spaCy (mejor fallar al inicio que en cada evidencia). Guarda `ENTITY_MAP_KEY` fuera del repositorio: sin ella no se pueden descifrar los mapas ya guardados.
-
-**Cambiar de proveedor:** crear un adaptador de `LLMProviderPort` en `app/infrastructure/llm/` y registrarlo en `factory.py`; luego cambiar `LLM_PROVIDER` y `LLM_MODEL`. Los prompts y la lógica de negocio no cambian.
-
-**Métricas** (`GET /api/ia/metricas`):
-- *Operación del modelo*: tasa de error global y por tipo (`sanitizacion`, `auditoria`, `timeout`, `rate_limit`, `salida_invalida`…), latencia p50/p95, tokens y costo estimado.
-- *Precisión del modelo*: compara la clasificación del LLM con la revisión humana (`PATCH /api/respuestas/{id}/revision`): accuracy, precisión/recall/F1 por clase y matriz de confusión.
-- *Precisión del motor NER*: `pytest tests/test_ner_sanitizer.py -s` evalúa el motor contra `tests/data/ner_gold.jsonl` (P/R/F1 por tipo y cobertura de PII). Amplía ese archivo con casos reales anonimizados.
-
----
-
-## Comandos útiles
-
-### Docker
-
-```powershell
-docker-compose up -d          # Levantar servicios
-docker-compose down           # Detener (mantiene datos)
-docker-compose down -v        # Detener y borrar BD
-docker-compose logs -f db     # Logs de PostgreSQL
-docker-compose ps             # Estado de servicios
-```
-
-### PostgreSQL
-
-```powershell
-docker exec -it proyecto-db-1 psql -U user -d mydb                    # Entrar a psql
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "\dt"           # Listar tablas
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "\d respuestas" # Describir tabla
-
-# Ver todas las FKs
-docker exec -it proyecto-db-1 psql -U user -d mydb -c "
-SELECT tc.table_name, kcu.column_name, ccu.table_name AS foreign_table
-FROM information_schema.table_constraints AS tc
-JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
-JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name
-WHERE tc.constraint_type = 'FOREIGN KEY' ORDER BY tc.table_name;
-"
-```
-
-### Redis
-
-```powershell
-docker exec -it proyecto-redis-1 redis-cli ping       # Debe responder PONG
-docker exec -it proyecto-redis-1 redis-cli KEYS "*"   # Ver claves
-```
-
-### Alembic
-
-```powershell
-alembic current                                        # Revisión actual
-alembic history --verbose                              # Historial detallado
-alembic revision --autogenerate -m "descripcion"       # Nueva migración
-alembic upgrade head                                   # Aplicar
-alembic downgrade -1                                   # Revertir última
-```
-
----
-
-## Solución de problemas comunes
-
-| Error | Causa | Solución |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'app'` | Ejecutando desde carpeta equivocada | `cd backend` antes de ejecutar |
-| `Activate.ps1 no se puede cargar` | Política de ejecución | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
-| `ConnectionDoesNotExistError` con asyncpg | `localhost` resuelve a IPv6 | Usa `127.0.0.1` en `.env` |
-| `port is already allocated` | Puerto 5432 en uso | Cambia a `5433:5432` en Docker |
-| `404 model does not exist` (Groq) | Modelo deprecado | Cambia `LLM_MODEL` a `openai/gpt-oss-safeguard-20b` |
-| `Invalid API Key` (Groq) | Key mal pasada | Verifica `$env:GROQ_API_KEY` o pásala directa |
-| `-Form no se reconoce` | PowerShell 5.1 | Usa `curl.exe -F "file=@archivo"` |
-| `psycopg2` no instala en Python 3.13 | Sin wheels para 3.13 | Usa `psycopg[binary]` y ajusta `DATABASE_URL_SYNC` a `postgresql+psycopg://` |
-| `ForeignKeyViolation` al crear respuesta | Faltan datos padre | Inserta `usuario_temporal` y `evaluacion` primero |
-| `column "Matriz_controles_id_control" does not exist` | PostgreSQL convierte a minúsculas | Envuelve en comillas dobles: `"Matriz_controles_id_control"` |
-| `Revision <el anterior> referenced ... is not present` | Placeholders sin reemplazar en migración | Copia los hashes reales de `alembic history` |
-| Caracteres raros (`polÃtica`) | Mojibake en consola | Verifica con `psql`; suele ser solo visual |
-
----
-
-## Arquitectura de Clean Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  api/ (FastAPI)                                          │
-│  └─ Rutas, dependencias, schemas de entrada/salida       │
-├──────────────────────────────────────────────────────────┤
-│  application/ (Casos de uso)                             │
-│  └─ Orquesta el flujo, sin saber de FastAPI ni del LLM   │
-├──────────────────────────────────────────────────────────┤
-│  domain/ (Núcleo)                                        │
-│  └─ Modelos y puertos (interfaces ABC)                   │
-├──────────────────────────────────────────────────────────┤
-│  infrastructure/ (Adaptadores)                           │
-│  └─ SQLAlchemy, Groq, ARQ, storage                       │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Regla de dependencia:** las capas externas dependen de las internas, nunca al revés. Cambiar el LLM (Groq → OpenAI) o el storage (local → S3) es reemplazar un adaptador sin tocar la lógica de negocio.
-
-**Ejemplo:** `ProcessEvidenceUseCase` depende de `EvidenceValidatorPort` (interfaz), no de `GroqEvidenceValidator` (implementación).
-
----
-
-## Datos maestros
-
-### 4 dominios
-
-| ID | Nombre |
+| 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo nginx, 20 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
+| 7 | `GET /evaluaciones/{id}/controles-aplicables` p95 542 ms (único fuera del requisito) | Cachear códigos aplicables al guardar el filtro o índice por `codigo_control` |
+| 8 | Falsos positivos del NER ("la Ley 21", cargos como "Presidenta del Directorio") | Ampliar términos protegidos y `ner_gold.jsonl` con casos reales anonimizados |
+| 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
+| 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `CAMBIOS_ARCOP.md` |
+| 11 | Sin CRUD de administración de matriz y árbol en el backend (solo en la demo) ni versionado de controles | Endpoints admin + migración de versionado |
+
+### Prioridad baja
+
+| # | Ítem |
 |---|---|
-| 1 | Protección de Datos |
-| 2 | Gobernanza de IA |
-| 3 | Gestión de Riesgos |
-| 4 | Uso Responsable |
+| 12 | Limpieza: `.env.example` y `env.example` desalineados (el segundo no tiene `AUTH_*`); `test_defectos_api.py` parece una versión anterior de `test_latencia_api.py`; `domain/ports/document_validator_port.py` importa un módulo inexistente (`schemas.validation`) y no se usa; migración vacía `b25cc4eed4b0` |
+| 13 | `seguridad.py` se sincroniza a mano con el repo ComplianceAI-Prompt-Injection: riesgo de divergencia (evaluar paquete compartido o submódulo) |
+| 14 | Fechas de respuestas/evidencias en `Date` (sin hora): limita la trazabilidad fina |
+| 15 | Credenciales por defecto de PostgreSQL (`postgres`/`1234`) en el compose: aceptables solo en desarrollo |
+| 16 | Pipeline CI/CD (pytest + build de imagen) y entorno de staging (Sprint 4) |
 
-### 8 rubros
+---
 
-| ID | Nombre |
+## 17. Documentación complementaria
+
+| Documento | Contenido |
 |---|---|
-| 1 | Banca y Finanzas |
-| 2 | Salud |
-| 3 | Retail y E-commerce |
-| 4 | Telecomunicaciones |
-| 5 | Educación |
-| 6 | Tecnología/SaaS |
-| 7 | Manufactura |
-| 8 | Servicios/Otros |
-
-### 40 controles (por dominio)
-
-| Prefijo | Dominio | Controles |
-|---|---|---|
-| DAT | Protección de Datos | 10 |
-| GOB | Gobernanza de IA | 10 |
-| RIE | Gestión de Riesgos | 10 |
-| SEG | Uso Responsable | 10 |
-
-Marcos normativos: Ley N.º 21.719, ISO/IEC 42001, NIST AI RMF 100-1, OWASP LLM, NIST 600-1.
+| [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md) | Historia de usuario ARCOP: archivos, acceso, anonimización, plazos, endpoints y decisiones pendientes |
+| [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
+| `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
+| `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |
+| `../Documentos/Fase 1/`, `../Documentos/Fase 2/` | Guía del estudiante, evaluaciones formativas, autoevaluaciones y diarios de reflexión por integrante |
+| `../Extras/Guia_ComplianceAI_PromptInjection.docx.pdf` | Guía del módulo anti prompt-injection |
 
 ---
 
-## Roadmap
-
-- [x] Backend FastAPI con Clean Architecture
-- [x] PostgreSQL con 12 tablas y 12 FKs
-- [x] Worker ARQ con procesamiento asíncrono
-- [x] Validador LLM con Groq
-- [x] Seeds de catálogos y controles (104 registros)
-- [x] Reglas de negocio (4 clasificaciones, brecha automática)
-- [x] Endpoints de catálogos, controles y evaluaciones
-- [x] Paginación en evaluaciones y respuestas
-- [ ] Endpoints CRUD para administración de catálogos
-- [ ] Panel de auditoría de divergencias
-- [ ] Reportes agregados (`benchmark`, `resumen`)
-- [ ] Frontend (React + TypeScript + Vite)
-- [ ] Dockerización completa de backend y worker
-- [ ] Tests automatizados (pytest)
-- [ ] Capa de políticas de IA entre backend y LLM
-
----
-
-## Licencia
-
-Proyecto académico (Capstone).
+**Licencia:** proyecto académico (Capstone APT122, Duoc UC) desarrollado para Therion Labs.
