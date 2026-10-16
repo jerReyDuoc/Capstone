@@ -936,7 +936,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | 2 | **Solo `/api/arcop` y `/api/auth/me` exigen token**: respuestas, evidencias, revisión, métricas, eventos de seguridad y reportes son públicos y no verifican que la evaluación pertenezca al usuario | Exposición de datos entre organizaciones | Aplicar `requerir_rol` y control de propiedad en todos los routers |
 | 3 | **Frontend no integrado** con el backend (`store.js` simulado) y con reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | La demo no refleja los resultados reales | Cliente `fetch` con la misma interfaz que `store.js`; unificar puntaje y niveles en una sola fuente |
 | 4 | ~~Benchmark siempre vacío: ningún endpoint fijaba `completada`~~ **Resuelto:** `POST /completar` marca la evaluación como `completada` | — | Pendiente decidir si se permite reabrir una evaluación completada |
-| 5 | **Falta `backend/.dockerignore`**: su contenido está en un archivo llamado `backend/download`; como el `Dockerfile` hace `COPY . .`, el `.env` (con claves) y el `venv` local terminan dentro de la imagen | Fuga de secretos en la imagen; imágenes pesadas | Renombrar `backend/download` a `backend/.dockerignore` |
+| 5 | ~~Falta `backend/.dockerignore`~~ **Resuelto (15-oct):** `backend/download` renombrado a `backend/.dockerignore`; el `.env` y el `venv` ya no entran en la imagen | — | — |
 
 ### Prioridad media
 
