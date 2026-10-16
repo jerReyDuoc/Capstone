@@ -14,6 +14,9 @@ Condiciones para completar:
   3. Todos los controles aplicables tienen respuesta.
   4. Ninguna evidencia está pendiente o en proceso de validación por el LLM
      (si no, su resultado llegaría después del cierre y el puntaje quedaría viejo).
+  5. HU-02: todo control que el usuario declaró 'requiere_revision' tiene al menos
+     una evidencia, porque es el LLM quien lo resuelve con ella (sin evidencia
+     quedaría en 0 puntos sin que nadie lo revise).
 """
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +31,7 @@ from app.application.use_cases.generate_resumen import GenerateResumenUseCase
 from app.application.use_cases.progreso_cuestionario import calcular_progreso
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
-from app.domain.models.respuesta import Respuesta
+from app.domain.models.respuesta import EstadoClasificacion, Respuesta
 from app.infrastructure.cache import catalogo_controles
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
@@ -45,6 +48,11 @@ class CuestionarioIncompletoError(RespuestaRechazadaError):
 class EvidenciasEnProcesoError(RespuestaRechazadaError):
     status_code = 409
     codigo = "EVIDENCIAS_EN_PROCESO"
+
+
+class RevisionSinEvidenciaError(RespuestaRechazadaError):
+    status_code = 409
+    codigo = "REVISION_SIN_EVIDENCIA"
 
 
 class CompletarEvaluacionUseCase:
@@ -93,6 +101,22 @@ class CompletarEvaluacionUseCase:
                 f"Hay {en_proceso} evidencia(s) en validación; espera a que terminen "
                 "antes de completar la evaluación"
             )
+
+        revision = {
+            r.id_respuesta: r.codigo_control for r in progreso.respondidos
+            if r.estado_clasificacion == EstadoClasificacion.REQUIERE_REVISION.value
+        }
+        if revision:
+            con_evidencia = set((await self.session.execute(
+                select(Evidencia.respuesta_id).where(Evidencia.respuesta_id.in_(revision)).distinct()
+            )).scalars().all())
+            sin_evidencia = sorted(c for rid, c in revision.items() if rid not in con_evidencia)
+            if sin_evidencia:
+                raise RevisionSinEvidenciaError(
+                    f"{len(sin_evidencia)} control(es) en 'requiere revisión' no tienen "
+                    f"evidencia para que el LLM los clasifique: {', '.join(sin_evidencia)}. "
+                    "Sube una evidencia o elige otro estado."
+                )
 
         # El estado se fija antes de generar el resumen: GenerateResumenUseCase hace
         # el único commit, así resumen y estado quedan guardados juntos (o ninguno).

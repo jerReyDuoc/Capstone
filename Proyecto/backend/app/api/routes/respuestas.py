@@ -157,7 +157,7 @@ async def revisar_respuesta(
     Revisión humana del Oficial de Cumplimiento. Fija la clasificación final y
     sirve como verdad de referencia para medir la precisión del LLM (/api/ia/metricas).
     """
-    valores = EstadoClasificacion.declarables()
+    valores = EstadoClasificacion.resolutivos()
     if payload.clasificacion_revisada not in valores:
         raise HTTPException(
             status_code=400,

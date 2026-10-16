@@ -282,7 +282,7 @@ async def _flujo_completo(monkeypatch):
         m1 = llamadas[0]
         assert m1.exito and m1.tipo_error is None and m1.sanitizado
         assert m1.traza_id == san_ev.traza_id                     # trazabilidad completa
-        assert m1.prompt_version == "validar_evidencia/1.1.0"
+        assert m1.prompt_version == "validar_evidencia/1.2.0"
         assert m1.respuesta_id == r1 and m1.evaluacion_id == h.EVAL_ID
         assert m1.entidades_anonimizadas == sum(s.total_entidades for s in sans)
         assert m1.tokens_entrada and m1.tokens_salida and m1.costo_estimado_usd > 0

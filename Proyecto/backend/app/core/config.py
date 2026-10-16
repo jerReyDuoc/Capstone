@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     STORAGE_DIR: str = "./storage"
     # Caracteres de la evidencia que se analizan y se envían al LLM
     MAX_CHARS_EVIDENCIA_LLM: int = 8000
+    # HU-02: largo mínimo (caracteres, sin contar espacios repetidos ni de los
+    # extremos) de la justificación obligatoria en 'parcialmente_cumplido' y
+    # 'requiere_revision'.
+    JUSTIFICACION_MIN_CARACTERES: int = 20
     # OBSOLETO: lo reemplaza SANITIZER_ENABLED (con el sanitizador activo el NER es
     # siempre obligatorio). Se mantiene para no romper archivos .env existentes.
     REQUIERE_NER: bool = False

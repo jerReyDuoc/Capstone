@@ -173,10 +173,22 @@ def test_justificacion_legitima_se_guarda(texto):
     assert r.justificacion_usuario == texto   # en BD se guarda el texto original
 
 
-def test_usuario_no_puede_declarar_requiere_revision():
+def test_usuario_puede_declarar_requiere_revision_con_justificacion():
+    """HU-02 (decisión del PO): 'requiere_revision' es seleccionable; la resuelve el LLM.
+    Antes este test verificaba lo contrario (solo el sistema podía asignarla)."""
     uc = CreateRespuestaUseCase(FakeRespuestaRepo(control=_control()), FakeEvaluaciones(), guard=ReglasPromptGuard())
-    with pytest.raises(ValueError):
-        asyncio.run(uc.execute(1, 7, EstadoClasificacion.REQUIERE_REVISION.value, "texto"))
+    r = asyncio.run(uc.execute(1, 7, EstadoClasificacion.REQUIERE_REVISION.value,
+                               "No tenemos claro si el inventario cubre todos los modelos."))
+    assert r.estado_clasificacion == r.estado_clasificacion_final == "requiere_revision"
+    assert r.fuente_clasificacion == "usuario" and r.catalogo_brechas_id_brecha is None
+
+
+def test_requiere_revision_con_inyeccion_tambien_se_bloquea():
+    guard, eventos, repo = ReglasPromptGuard(), FakeEventoRepo(), FakeRespuestaRepo(control=_control())
+    uc = CreateRespuestaUseCase(repo, FakeEvaluaciones(), guard=guard, registrar_evento=RegistrarEventoSeguridad(eventos, guard))
+    with pytest.raises(InyeccionDetectadaError):
+        asyncio.run(uc.execute(1, 7, "requiere_revision", ATAQUES[0]))
+    assert repo.creadas == [] and len(eventos.eventos) == 1
 
 
 # ---------------------------------------------------------------- procesar evidencia

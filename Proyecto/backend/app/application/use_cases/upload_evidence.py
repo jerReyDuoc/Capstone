@@ -17,8 +17,9 @@ class UploadEvidenceUseCase:
     Caso de uso: subir una evidencia asociada a una respuesta.
 
     Reglas de negocio aplicadas aquí:
-    - Solo se admiten evidencias para respuestas con clasificación
-      'cumplido' o 'parcialmente_cumplido'.
+    - Solo se admiten evidencias para respuestas declaradas 'cumplido',
+      'parcialmente_cumplido' o 'requiere_revision' (HU-02: en este último el LLM
+      decide con la evidencia si el control es cumplido, parcial o no cumplido).
     - Las respuestas con 'no_cumplido' o 'no_aplica' NO requieren evidencia.
     - El archivo se guarda en el storage configurado (local por defecto).
     - Se calcula un hash SHA-256 del contenido para detectar duplicados.
@@ -52,7 +53,8 @@ class UploadEvidenceUseCase:
                 f"({contexto.estado_progreso}): ya no admite evidencias"
             )
 
-        # 2. Regla de negocio: solo cumplido/parcialmente_cumplido requieren evidencia
+        # 2. Regla de negocio: solo cumplido, parcialmente_cumplido y requiere_revision
+        #    llevan evidencia
         clasificacion_actual = respuesta.estado_clasificacion
         if not clasificacion_actual:
             raise ValueError(
@@ -62,8 +64,8 @@ class UploadEvidenceUseCase:
         if not EstadoClasificacion.requiere_evidencia(clasificacion_actual):
             raise ValueError(
                 f"No se puede subir evidencia para la clasificación "
-                f"'{clasificacion_actual}'. Solo 'cumplido' y "
-                f"'parcialmente_cumplido' requieren evidencia."
+                f"'{clasificacion_actual}'. Solo 'cumplido', 'parcialmente_cumplido' "
+                f"y 'requiere_revision' llevan evidencia."
             )
 
         # 3. Leer contenido y calcular hash

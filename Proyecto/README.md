@@ -78,7 +78,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Backend FastAPI (Clean Architecture) | ✅ Hecho | 11 routers, 35 endpoints |
 | Base de datos y migraciones | ✅ Hecho | 19 tablas, 13 migraciones Alembic, seeds de catálogos, controles y filtro |
 | Filtro de aplicabilidad (F1–F7) | ✅ Hecho | Árbol de decisión aditivo (22 controles base + 18 condicionales) |
-| Respuestas y reglas de clasificación | ✅ Hecho | 4 clasificaciones declarables + `requiere_revision` (solo backend) |
+| Respuestas y reglas de clasificación | ✅ Hecho | Matriz de 5 estados declarables (HU-02): `requiere_revision` la elige el usuario y la resuelve el LLM; justificación obligatoria en parcial y revisión |
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
@@ -262,13 +262,18 @@ Lógica en `app/application/filters/control_tree.py`.
 
 ### 5.3 Respuesta a un control
 
-| Clasificación declarada | Valor | ¿Requiere evidencia? | ¿Pasa por el LLM? | Brecha |
-|---|---|---|---|---|
-| Cumplido | `cumplido` | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
-| Parcialmente cumplido | `parcialmente_cumplido` | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
-| No cumplido | `no_cumplido` | No | No | **Se asigna al crear la respuesta** |
-| No aplica | `no_aplica` | No (subirla da 400) | No | No |
-| *(solo backend)* Requiere revisión | `requiere_revision` | — | — | La asigna la capa de seguridad; cuenta 0 puntos |
+Matriz de **5 estados** que el usuario elige (HU-02):
+
+| Clasificación declarada | Valor | ¿Justificación obligatoria? | ¿Lleva evidencia? | ¿Pasa por el LLM? | Brecha |
+|---|---|---|---|---|---|
+| Cumplido | `cumplido` | No | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
+| Parcialmente cumplido | `parcialmente_cumplido` | **Sí** (mín. 20 caracteres) | Sí | Sí | Solo si el LLM la degrada a `no_cumplido` |
+| No cumplido | `no_cumplido` | No | No | No | **Se asigna al crear la respuesta** |
+| No aplica | `no_aplica` | No | No (subirla da 400) | No | No |
+| Requiere revisión | `requiere_revision` | **Sí** (mín. 20 caracteres) | **Sí, obligatoria para completar** | Sí: **el LLM decide** `cumplido`, `parcialmente_cumplido` o `no_cumplido` | Si el LLM decide `no_cumplido` |
+
+- **Requiere revisión** (decisión del PO, 16-oct): el usuario la elige cuando no sabe cómo clasificar el control. Adjunta evidencia y el LLM la clasifica (prompt `validar_evidencia/1.2.0`). Si el LLM no alcanza el umbral de confianza, el control queda en `requiere_revision` para la **revisión humana** (`PATCH /revision`). Mientras no se resuelva puntúa 0. La capa de seguridad también puede asignar este estado (`fuente = seguridad`).
+- **Justificación obligatoria** en `parcialmente_cumplido` y `requiere_revision`: al menos `JUSTIFICACION_MIN_CARACTERES` (20) caracteres, sin contar espacios repetidos ni de los extremos, y con letras (no solo signos o números). Si no, `422 JUSTIFICACION_OBLIGATORIA` en `POST` y `PUT`.
 
 Al crear la respuesta, la **justificación** pasa por el detector de prompt injection: si es sospechosa se rechaza con `422 PROMPT_INJECTION` y se registra un evento de seguridad.
 
@@ -555,7 +560,7 @@ Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Do
 | GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo). El catálogo sale de una caché en memoria (TTL 5 min) |
 | GET | `/api/evaluaciones/{id}/progreso` | 🔓 | Progreso del cuestionario para reanudar: `etapa` (`filtro`/`cuestionario`/`completo`/`cerrada`), respondidos / aplicables, `por_dimension`, `siguiente_control`, `pendientes`, `respondidos` |
 | POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general (vista previa: **no** cierra la evaluación, se puede repetir) |
-| POST | `/api/evaluaciones/{id}/completar` | 🔓 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
+| POST | `/api/evaluaciones/{id}/completar` | 🔓 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `REVISION_SIN_EVIDENCIA` (control en `requiere_revision` sin evidencia), `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
 | GET | `/api/evaluaciones/{id}/resumen` | 🔓 | Resumen guardado (404 si no se ha cerrado) |
 | GET | `/api/evaluaciones/{id}/comparativa` | 🔓 | Resumen vs. benchmark del rubro |
 | GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔓 | Benchmark por rubro × dominio |
@@ -566,10 +571,10 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
+| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` (1 de 5 estados) → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 400 estado inválido, 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `JUSTIFICACION_OBLIGATORIA`, `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
 | PUT | `/api/respuestas/{id}` | 🔓 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
 | GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
-| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana |
+| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana; acepta `cumplido`, `parcialmente_cumplido`, `no_cumplido` o `no_aplica` (no `requiere_revision`) |
 | POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío; 409 `EVALUACION_CERRADA` si la evaluación está completada/cerrada |
 | GET | `/api/evidencias/{id}` | 🔓 | Estado de validación y resultado del LLM |
 
@@ -619,7 +624,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
    1. Router        PoliticaTarea: prompt versionado, schema, límites, campos no confiables
    2. Sanitización  motor NER sobre cada texto no confiable ── falla ⇒ ABORTA (no llama al LLM)
    3. Auditoría     mapa de entidades CIFRADO en `sanitizaciones` ── no se puede guardar ⇒ ABORTA
-   4. Prompt        plantilla versionada (validar_evidencia/1.1.0) SOLO con texto sanitizado
+   4. Prompt        plantilla versionada (validar_evidencia/1.2.0) SOLO con texto sanitizado
    5. Proveedor     LLMProviderPort → GroqProvider (reintentos 429/5xx, timeout)
    6. Validación    schema Pydantic + reglas post-salida (p. ej. divergencia sin explicar)
    7. Métricas      una fila en `llamadas_llm` por ejecución, con éxito o con tipo de error
@@ -832,6 +837,7 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`backend/CAMBIOS_ARCO
 | `LLM_MAX_TOKENS_SALIDA` | `1500` | Tope de tokens de respuesta |
 | `LLM_PRECIO_ENTRADA_USD_1M` / `LLM_PRECIO_SALIDA_USD_1M` | `0` / `0` | Precio del modelo para estimar costo en métricas |
 | `UMBRAL_CONFIANZA` | `0.8` | Confianza mínima para aceptar la clasificación del LLM |
+| `JUSTIFICACION_MIN_CARACTERES` | `20` | HU-02: largo mínimo de la justificación en `parcialmente_cumplido` y `requiere_revision` |
 | `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | `8000` / `4000` | Caracteres enviados al LLM (tras sanitizar) |
 | `MODO_SEGURIDAD_EVIDENCIA` | `bloquear` | `bloquear` o `marcar` ante posible inyección en evidencias |
 | `SANITIZER_ENABLED` | `true` | Anonimización NER antes del LLM (`false` solo debug) |
@@ -856,11 +862,12 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_bordes_na_y_evidencia.py` | 42 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje, una respuesta por control, evidencias en evaluación cerrada |
 | `test_hu01_cuestionario.py` | 14 | HU-01: upsert y PUT de respuestas, rechazo de controles no aplicables y evaluaciones cerradas, `controles-aplicables` optimizado, progreso (la de carrera de 10 POST corre solo live) |
 | `test_completar_evaluacion.py` | 9 | `POST /completar`: condiciones, cierre atómico y bloqueo de respuestas, filtro y evidencias |
+| `test_hu02_matriz_estados.py` | 18 | HU-02: 5 estados, justificación obligatoria (unitarias y API), `requiere_revision` resuelta por el LLM, revisión humana y requisito de evidencia al completar |
 | `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
 | `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
 | `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
 | `test_capa_ia.py` | 17 | AIGateway contra las reglas R1–R6 |
-| `test_seguridad_integracion.py` | 10 | Capa anti prompt-injection en el backend |
+| `test_seguridad_integracion.py` | 11 | Capa anti prompt-injection en el backend |
 | `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
 | `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
 | `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |

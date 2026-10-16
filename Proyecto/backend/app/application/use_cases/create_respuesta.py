@@ -8,9 +8,14 @@ Reglas:
   * Solo se aceptan respuestas a evaluaciones existentes, abiertas, con el filtro
     F1–F7 completado y a controles que ese filtro deja aplicables.
   * La justificación pasa por la capa anti prompt-injection antes de guardarse.
+  * HU-02: el usuario elige 1 de 5 estados (incluido 'requiere_revision', que luego
+    resuelve el LLM con la evidencia) y la justificación es obligatoria, con un largo
+    mínimo, en 'parcialmente_cumplido' y 'requiere_revision'.
 """
+import re
 from dataclasses import dataclass
 
+from app.core.config import settings
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.domain.ports.prompt_guard_port import PromptGuardPort
@@ -31,6 +36,11 @@ class RespuestaRechazadaError(ValueError):
     """La respuesta no se puede guardar. `status_code` y `codigo` van a la API."""
     status_code = 400
     codigo = "RESPUESTA_RECHAZADA"
+
+
+class JustificacionObligatoriaError(RespuestaRechazadaError):
+    status_code = 422
+    codigo = "JUSTIFICACION_OBLIGATORIA"
 
 
 class EvaluacionNoEncontradaError(RespuestaRechazadaError):
@@ -61,6 +71,34 @@ class ControlNoAplicableError(RespuestaRechazadaError):
 class RespuestaNoEncontradaError(RespuestaRechazadaError):
     status_code = 404
     codigo = "RESPUESTA_NO_ENCONTRADA"
+
+
+_ESPACIOS = re.compile(r"\s+")
+_LETRA = re.compile(r"[^\W\d_]")   # cualquier letra (incluye tildes y ñ)
+
+
+def normalizar_justificacion(texto: str | None) -> str:
+    """Quita espacios de los extremos y colapsa los repetidos (tabs, saltos de línea)."""
+    return _ESPACIOS.sub(" ", texto or "").strip()
+
+
+def validar_justificacion(estado_clasificacion: str, justificacion: str | None) -> None:
+    """
+    HU-02 C2: en 'parcialmente_cumplido' y 'requiere_revision' la justificación es
+    obligatoria: al menos JUSTIFICACION_MIN_CARACTERES caracteres (sin contar espacios
+    repetidos ni de los extremos) y con texto, no solo signos o números.
+    """
+    if not EstadoClasificacion.requiere_justificacion(estado_clasificacion):
+        return
+    minimo = settings.JUSTIFICACION_MIN_CARACTERES
+    texto = normalizar_justificacion(justificacion)
+    if len(texto) < minimo or not _LETRA.search(texto):
+        etiqueta = estado_clasificacion.replace("_", " ")
+        raise JustificacionObligatoriaError(
+            f"La justificación es obligatoria para '{etiqueta}': describe en al menos "
+            f"{minimo} caracteres por qué el control queda en ese estado "
+            f"(se recibieron {len(texto)})."
+        )
 
 
 @dataclass
@@ -136,13 +174,16 @@ class CreateRespuestaUseCase:
 
     # ------------------------------------------------------------ internos
     async def _validar(self, evaluacion_id, matriz_control_id, estado_clasificacion, justificacion):
-        # 1. Clasificación: una de las 4 que el usuario puede declarar
+        # 1. Clasificación: uno de los 5 estados de la matriz (HU-02)
         valores_validos = EstadoClasificacion.declarables()
         if estado_clasificacion not in valores_validos:
             raise ValueError(
                 f"Clasificación inválida: {estado_clasificacion}. "
                 f"Debe ser una de: {', '.join(valores_validos)}"
             )
+
+        # 1b. HU-02: justificación obligatoria en parcialmente_cumplido / requiere_revision
+        validar_justificacion(estado_clasificacion, justificacion)
 
         # 2. Evaluación: existe, está abierta y ya pasó por el filtro
         contexto = await self.evaluaciones.get_contexto(evaluacion_id)

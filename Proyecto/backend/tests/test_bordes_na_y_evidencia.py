@@ -496,13 +496,18 @@ class TestSubidaSinEvidencia:
             asyncio.run(uc.execute(10, FakeUpload(b"Politica de IA v1")))
         assert storage.guardados == [] and evid_repo.creadas == []
 
-    @pytest.mark.parametrize("clasif", [NOC, NA, REV])
+    @pytest.mark.parametrize("clasif", [NOC, NA])
     def test_clasificaciones_que_no_requieren_evidencia_rechazan_subida(self, clasif):
         storage = FakeStorage()
         uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(_respuesta(clasif)), storage, FakeEvaluaciones())
         with pytest.raises(ValueError, match="No se puede subir evidencia"):
             asyncio.run(uc.execute(10, FakeUpload(b"contenido")))
         assert storage.guardados == []
+
+    def test_requiere_revision_admite_evidencia_para_que_la_resuelva_el_llm(self):
+        """HU-02: el usuario declara 'requiere_revision' y sube la evidencia que el LLM clasifica."""
+        ev, storage, _ = self._subir(_respuesta(REV), FakeUpload(b"Inventario de modelos v1"))
+        assert ev.estado_validacion == EstadoValidacion.PENDING.value and len(storage.guardados) == 1
 
     def test_subida_valida_queda_pending_con_hash_y_mime_por_defecto(self):
         contenido = b"Politica de IA v1"

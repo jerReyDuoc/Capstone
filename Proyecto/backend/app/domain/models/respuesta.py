@@ -9,23 +9,42 @@ class EstadoClasificacion(str, Enum):
     PARCIALMENTE_CUMPLIDO = "parcialmente_cumplido"
     NO_CUMPLIDO = "no_cumplido"
     NO_APLICA = "no_aplica"
-    # Solo la asigna el BACKEND cuando la capa de seguridad bloquea una evidencia
-    # (posible prompt injection). El usuario NO puede declararla.
+    # HU-02 (decisión del PO, 16-oct): el usuario PUEDE declararla cuando no sabe
+    # cómo clasificar el control; adjunta evidencia y el LLM decide si es cumplido,
+    # parcialmente cumplido o no cumplido. Mientras no se resuelva puntúa 0.
+    # El backend también la asigna cuando la capa de seguridad bloquea una evidencia.
     REQUIERE_REVISION = "requiere_revision"
 
     @classmethod
     def requiere_evidencia(cls, valor: str) -> bool:
-        return valor in (cls.CUMPLIDO.value, cls.PARCIALMENTE_CUMPLIDO.value)
+        """Estados que admiten (y esperan) evidencia para que el LLM la valide."""
+        return valor in (
+            cls.CUMPLIDO.value,
+            cls.PARCIALMENTE_CUMPLIDO.value,
+            cls.REQUIERE_REVISION.value,
+        )
+
+    @classmethod
+    def requiere_justificacion(cls, valor: str) -> bool:
+        """HU-02 C2: la justificación es obligatoria (con largo mínimo) en estos estados."""
+        return valor in (cls.PARCIALMENTE_CUMPLIDO.value, cls.REQUIERE_REVISION.value)
 
     @classmethod
     def declarables(cls) -> list[str]:
-        """Las 4 opciones que el usuario puede elegir al responder."""
+        """Los 5 estados de la matriz que el usuario puede elegir al responder (HU-02)."""
         return [
             cls.CUMPLIDO.value,
             cls.PARCIALMENTE_CUMPLIDO.value,
             cls.NO_CUMPLIDO.value,
             cls.NO_APLICA.value,
+            cls.REQUIERE_REVISION.value,
         ]
+
+    @classmethod
+    def resolutivos(cls) -> list[str]:
+        """Estados con los que la revisión humana puede CERRAR un control: todos
+        menos 'requiere_revision' (revisar es justamente resolverlo)."""
+        return [v for v in cls.declarables() if v != cls.REQUIERE_REVISION.value]
 
 class FuenteClasificacion(str, Enum):
     USUARIO = "usuario"
