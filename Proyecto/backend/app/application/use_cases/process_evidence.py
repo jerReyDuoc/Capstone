@@ -159,6 +159,7 @@ class ProcessEvidenceUseCase:
         respuesta.fuente_clasificacion = FuenteClasificacion.SEGURIDAD.value
         respuesta.confianza_clasificacion = None
         respuesta.fecha_validacion = date.today()
+        respuesta.sincronizar_brecha(control)
         await self._registrar(respuesta, evidencia, origen, texto, control)
 
     async def _registrar(self, respuesta, evidencia, origen: str, texto: str, control) -> None:
@@ -192,6 +193,7 @@ class ProcessEvidenceUseCase:
             respuesta.confianza_clasificacion = result.confianza
             respuesta.fecha_validacion = date.today()
             evidencia.estado_validacion = EstadoValidacion.REJECTED.value
+            respuesta.sincronizar_brecha(control)
             return
 
         # Regla 1: Si el LLM no está seguro, fallback al usuario
@@ -201,6 +203,7 @@ class ProcessEvidenceUseCase:
             evidencia.estado_validacion = EstadoValidacion.REJECTED.value
             respuesta.confianza_clasificacion = result.confianza
             respuesta.fecha_validacion = date.today()
+            respuesta.sincronizar_brecha(control)
             return
 
         # Regla 2: El LLM decide la clasificación final
@@ -210,7 +213,6 @@ class ProcessEvidenceUseCase:
         respuesta.fecha_validacion = date.today()
         evidencia.estado_validacion = EstadoValidacion.VALIDATED.value
 
-        # Regla 3: ASIGNACIÓN AUTOMÁTICA DE BRECHA (regla de negocio, no LLM)
-        if result.clasificacion == EstadoClasificacion.NO_CUMPLIDO.value:
-            if control and control.catalogo_brechas_id_brecha:
-                respuesta.catalogo_brechas_id_brecha = control.catalogo_brechas_id_brecha
+        # Regla 3: BRECHA (regla de negocio, no LLM): se asigna si el estado final es
+        # no_cumplido y se quita en cualquier otro (p. ej. una evidencia nueva lo mejora)
+        respuesta.sincronizar_brecha(control)

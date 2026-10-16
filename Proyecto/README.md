@@ -328,7 +328,7 @@ sequenceDiagram
 | 0 | Evidencia marcada como sospechosa y confianza < umbral | `requiere_revision` | `rejected` | `seguridad` |
 | 1 | Confianza < umbral | Se mantiene lo declarado por el usuario | `rejected` | `usuario` |
 | 2 | Confianza ≥ umbral | Clasificación propuesta por el LLM | `validated` | `llm` |
-| 3 | Clasificación final = `no_cumplido` | Se asigna la brecha del control | — | — |
+| 3 | Clasificación final = `no_cumplido` | Se asigna la brecha del control; con cualquier otro estado final se **quita** (`Respuesta.sincronizar_brecha`) | — | — |
 | — | Error de la capa de IA (NER, timeout, rate limit, salida inválida…) | Sin cambios | `error` con mensaje sin PII | — |
 
 Estados de una evidencia: `pending` → `processing` → `validated` | `rejected` | `error`. El worker reintenta hasta 3 veces y cada job tiene 300 s de límite.
@@ -574,7 +574,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` (1 de 5 estados) → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 400 estado inválido, 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `JUSTIFICACION_OBLIGATORIA`, `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
 | PUT | `/api/respuestas/{id}` | 🔓 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
 | GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
-| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana; acepta `cumplido`, `parcialmente_cumplido`, `no_cumplido` o `no_aplica` (no `requiere_revision`) |
+| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana; acepta `cumplido`, `parcialmente_cumplido`, `no_cumplido` o `no_aplica` (no `requiere_revision`). Asigna la brecha si queda `no_cumplido` y la quita en otro caso |
 | POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío; 409 `EVALUACION_CERRADA` si la evaluación está completada/cerrada |
 | GET | `/api/evidencias/{id}` | 🔓 | Estado de validación y resultado del LLM |
 
@@ -862,7 +862,7 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_bordes_na_y_evidencia.py` | 42 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje, una respuesta por control, evidencias en evaluación cerrada |
 | `test_hu01_cuestionario.py` | 14 | HU-01: upsert y PUT de respuestas, rechazo de controles no aplicables y evaluaciones cerradas, `controles-aplicables` optimizado, progreso (la de carrera de 10 POST corre solo live) |
 | `test_completar_evaluacion.py` | 9 | `POST /completar`: condiciones, cierre atómico y bloqueo de respuestas, filtro y evidencias |
-| `test_hu02_matriz_estados.py` | 18 | HU-02: 5 estados, justificación obligatoria (unitarias y API), `requiere_revision` resuelta por el LLM, revisión humana y requisito de evidencia al completar |
+| `test_hu02_matriz_estados.py` | 24 | HU-02: 5 estados, justificación obligatoria (unitarias y API), `requiere_revision` resuelta por el LLM, revisión humana, requisito de evidencia al completar y brecha coherente con el estado vigente |
 | `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
 | `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
 | `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |

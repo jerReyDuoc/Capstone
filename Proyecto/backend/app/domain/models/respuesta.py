@@ -112,6 +112,18 @@ class Respuesta(Base):
         "fecha_revision", Date, nullable=True
     )
 
+    def sincronizar_brecha(self, control) -> None:
+        """
+        Regla de negocio única para la brecha (HU-02): una respuesta tiene la brecha
+        de su control si y solo si su estado VIGENTE (estado_clasificacion_final) es
+        'no_cumplido'. Se llama cada vez que cambia ese estado: declaración del
+        usuario, decisión del LLM, bloqueo de seguridad o revisión humana.
+        """
+        if self.estado_clasificacion_final != EstadoClasificacion.NO_CUMPLIDO.value:
+            self.catalogo_brechas_id_brecha = None
+        elif control is not None and control.catalogo_brechas_id_brecha:
+            self.catalogo_brechas_id_brecha = control.catalogo_brechas_id_brecha
+
     evaluacion: Mapped["Evaluacion"] = relationship(back_populates="respuestas")
     evidencias: Mapped[list["Evidencia"]] = relationship(
         back_populates="respuesta",

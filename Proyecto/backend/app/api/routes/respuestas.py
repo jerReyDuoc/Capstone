@@ -172,10 +172,12 @@ async def revisar_respuesta(
     respuesta.fecha_revision = date.today()
     respuesta.estado_clasificacion_final = payload.clasificacion_revisada
     respuesta.fuente_clasificacion = FuenteClasificacion.REVISION.value
+    # HU-02: la brecha sigue al estado vigente (se asigna en no_cumplido y se quita
+    # en cualquier otro), también cuando la revisión corrige una decisión del LLM.
+    control = None
     if payload.clasificacion_revisada == EstadoClasificacion.NO_CUMPLIDO.value:
         control = await repo.get_control(respuesta.matriz_controles_id_control)
-        if control and control.catalogo_brechas_id_brecha:
-            respuesta.catalogo_brechas_id_brecha = control.catalogo_brechas_id_brecha
+    respuesta.sincronizar_brecha(control)
     await repo.update(respuesta)
     return {
         "id_respuesta": respuesta.id,

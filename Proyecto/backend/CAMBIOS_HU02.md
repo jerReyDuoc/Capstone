@@ -112,6 +112,33 @@ docker compose exec worker pytest tests/test_hu02_matriz_estados.py -v
 docker compose exec worker pytest tests -v -rxX
 ```
 
+## 3. Corrección: la brecha sigue al estado vigente
+
+Defecto detectado en la revisión posterior: la brecha se asignaba cuando el estado final pasaba a
+`no_cumplido`, pero **nunca se quitaba**. Por ejemplo, si el LLM decidía `no_cumplido` y el Oficial
+lo revisaba como `cumplido`, el control quedaba cumplido con brecha. Lo mismo pasaba si una
+evidencia nueva mejoraba el estado.
+
+- Nueva regla única en el modelo: `Respuesta.sincronizar_brecha(control)`. La brecha del control
+  se asigna si y solo si `estado_clasificacion_final = no_cumplido`.
+- Se aplica en todos los puntos donde cambia el estado vigente:
+  - declaración del usuario (`create_respuesta.py`);
+  - revisión humana (`PATCH /revision`);
+  - decisión del LLM, fallback por baja confianza y bloqueos de seguridad (`process_evidence.py`).
+- **Migración `d4a7c2e9b8f3`** (solo datos, después de `b3c8e5d2a7f1`): quita la brecha de las filas
+  existentes cuyo estado final no es `no_cumplido`. Probada en PostgreSQL 16 (upgrade, downgrade y
+  upgrade). El downgrade no restaura esas brechas, porque eran incorrectas.
+- 6 pruebas nuevas en `test_hu02_matriz_estados.py` (15 casos). Antes de la corrección fallaban 14
+  de ellos.
+
+Archivos: `app/domain/models/respuesta.py`, `app/application/use_cases/create_respuesta.py`,
+`app/application/use_cases/process_evidence.py`, `app/api/routes/respuestas.py`,
+`migrations/versions/d4a7c2e9b8f3_hu02_brecha_coherente.py`, `tests/test_hu02_matriz_estados.py`.
+
+**Pendiente de decisión del PO:** `PATCH /revision` todavía permite cambiar la clasificación de
+una evaluación ya completada; el resumen y el benchmark no se recalculan. Opciones: bloquearlo con
+409 `EVALUACION_CERRADA`, o permitirlo y recalcular el resumen (HU-22, bandeja de revisión).
+
 ## Pendiente fuera del backend (Sprint 4, frontend)
 
 El prototipo ya permite elegir "Requiere revisión" (`cuestionario.html`), pero:

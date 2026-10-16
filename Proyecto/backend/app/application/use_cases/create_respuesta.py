@@ -251,8 +251,5 @@ class CreateRespuestaUseCase:
         respuesta.fecha_validacion = None
         respuesta.clasificacion_revisada = None
         respuesta.fecha_revision = None
-        # REGLA DE NEGOCIO: si declara "no_cumplido", asignar la brecha del control
-        if estado_clasificacion == EstadoClasificacion.NO_CUMPLIDO.value and control.catalogo_brechas_id_brecha:
-            respuesta.catalogo_brechas_id_brecha = control.catalogo_brechas_id_brecha
-        else:
-            respuesta.catalogo_brechas_id_brecha = None
+        # REGLA DE NEGOCIO: brecha del control solo si el estado vigente es "no_cumplido"
+        respuesta.sincronizar_brecha(control)
