@@ -275,7 +275,7 @@ Al crear la respuesta, la **justificación** pasa por el detector de prompt inje
 **Reglas del cuestionario (HU-01):**
 
 - **Una respuesta por control y evaluación** (restricción única `uq_respuesta_evaluacion_control`). `POST /api/respuestas/` es un *upsert*: la primera vez crea (201) y luego actualiza la misma fila (200, mismo `id_respuesta`). Si se reenvía exactamente la misma declaración no se modifica nada (el guardado automático no borra la validación del LLM); si cambia, la declaración nueva pasa a ser el estado vigente (`fuente = usuario`) y se descarta la validación anterior (LLM o revisión). Las evidencias ya subidas se conservan.
-- Solo se aceptan respuestas a evaluaciones **existentes** (404 `EVALUACION_NO_ENCONTRADA`), **abiertas** (409 `EVALUACION_CERRADA` si `estado_progreso` es `completada` o `cerrada`), **con el filtro completado** (409 `FILTRO_PENDIENTE`) y a controles **aplicables** según F1–F7 (422 `CONTROL_NO_APLICABLE`; 404 `CONTROL_NO_ENCONTRADO`). Una evaluación cerrada tampoco permite rehacer el filtro.
+- Solo se aceptan respuestas a evaluaciones **existentes** (404 `EVALUACION_NO_ENCONTRADA`), **abiertas** (409 `EVALUACION_CERRADA` si `estado_progreso` es `completada` o `cerrada`), **con el filtro completado** (409 `FILTRO_PENDIENTE`) y a controles **aplicables** según F1–F7 (422 `CONTROL_NO_APLICABLE`; 404 `CONTROL_NO_ENCONTRADO`). Una evaluación cerrada tampoco permite rehacer el filtro ni subir evidencias. Se cierra con `POST /api/evaluaciones/{id}/completar`.
 - `GET /api/evaluaciones/{id}/progreso` devuelve respondidos / aplicables, el avance por dimensión, el siguiente control pendiente y el estado declarado de cada control ya respondido, para **reanudar** el cuestionario. Si se rehace el filtro, las respuestas de controles que dejan de aplicar no cuentan (`respuestas_fuera_de_alcance`).
 
 ### 5.4 Validación asíncrona de evidencias
@@ -548,7 +548,8 @@ Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Do
 | POST | `/api/evaluaciones/{id}/filtro` | 🔓 | `{"respuestas":[{"codigo":"F1","respuesta":true}, …]}` (las 7) → controles aplicables |
 | GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo). El catálogo sale de una caché en memoria (TTL 5 min) |
 | GET | `/api/evaluaciones/{id}/progreso` | 🔓 | Progreso del cuestionario para reanudar: `etapa` (`filtro`/`cuestionario`/`completo`/`cerrada`), respondidos / aplicables, `por_dimension`, `siguiente_control`, `pendientes`, `respondidos` |
-| POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general |
+| POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general (vista previa: **no** cierra la evaluación, se puede repetir) |
+| POST | `/api/evaluaciones/{id}/completar` | 🔓 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
 | GET | `/api/evaluaciones/{id}/resumen` | 🔓 | Resumen guardado (404 si no se ha cerrado) |
 | GET | `/api/evaluaciones/{id}/comparativa` | 🔓 | Resumen vs. benchmark del rubro |
 | GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔓 | Benchmark por rubro × dominio |
@@ -563,7 +564,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | PUT | `/api/respuestas/{id}` | 🔓 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
 | GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
 | PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana |
-| POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío |
+| POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío; 409 `EVALUACION_CERRADA` si la evaluación está completada/cerrada |
 | GET | `/api/evidencias/{id}` | 🔓 | Estado de validación y resultado del LLM |
 
 ### Capa de IA y seguridad
@@ -844,7 +845,9 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 
 | Archivo | Pruebas | Qué cubre |
 |---|---:|---|
-| `test_bordes_na_y_evidencia.py` | 39 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje |
+| `test_bordes_na_y_evidencia.py` | 42 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje, una respuesta por control, evidencias en evaluación cerrada |
+| `test_hu01_cuestionario.py` | 14 | HU-01: upsert y PUT de respuestas, rechazo de controles no aplicables y evaluaciones cerradas, `controles-aplicables` optimizado, progreso (la de carrera de 10 POST corre solo live) |
+| `test_completar_evaluacion.py` | 9 | `POST /completar`: condiciones, cierre atómico y bloqueo de respuestas, filtro y evidencias |
 | `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
 | `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
 | `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
@@ -882,7 +885,7 @@ docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE
 - **T-04 · Motor NER (15-oct-2026, Docker, 8 núcleos):** página de 3.000 caracteres en 25,1 ms (p95; límite 2.000 ms), evidencia de 8.000 caracteres en 66,6 ms (p95). Precisión 0,988 y cobertura de PII 100 % sobre 40 páginas etiquetadas. Suite completa: 212 aprobadas, 1 omitida (prueba en vivo).
 - **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre (**corregidos en T-04**, motor v1.1.0).
 - **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumplía `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
-- **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). En una medición de referencia contra PostgreSQL real con concurrencia 10 bajó de p95 152 ms a 24–35 ms (≈5× más rápido); falta repetir la prueba live en Docker para el reporte oficial (ver `backend/CAMBIOS_HU01.md`).
+- **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). **Latencia live oficial (16-oct-2026, Docker, concurrencia 10): 12/12 endpoints cumplen**; `GET controles-aplicables` p95 24,1 ms (antes 542,7 ms). Detalle en [`backend/reporte_latencia_live_hu01.md`](backend/reporte_latencia_live_hu01.md) y [`backend/CAMBIOS_HU01.md`](backend/CAMBIOS_HU01.md).
 
 ---
 
@@ -932,7 +935,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | 1 | **No hay endpoints para crear invitaciones (`usuario_temporal`) ni evaluaciones** | El flujo completo depende de SQL manual | `POST /api/invitaciones` (admin) con código aleatorio y `POST /api/evaluaciones` (referente) |
 | 2 | **Solo `/api/arcop` y `/api/auth/me` exigen token**: respuestas, evidencias, revisión, métricas, eventos de seguridad y reportes son públicos y no verifican que la evaluación pertenezca al usuario | Exposición de datos entre organizaciones | Aplicar `requerir_rol` y control de propiedad en todos los routers |
 | 3 | **Frontend no integrado** con el backend (`store.js` simulado) y con reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | La demo no refleja los resultados reales | Cliente `fetch` con la misma interfaz que `store.js`; unificar puntaje y niveles en una sola fuente |
-| 4 | **Benchmark siempre vacío:** el cron solo cuenta evaluaciones con `estado_progreso='completada'`, pero ningún endpoint fija ese estado (`POST /cerrar` no lo cambia) | Panel sectorial y comparativa sin datos | Que `/cerrar` marque `completada` (y decidir si se permite reabrir) |
+| 4 | ~~Benchmark siempre vacío: ningún endpoint fijaba `completada`~~ **Resuelto:** `POST /completar` marca la evaluación como `completada` | — | Pendiente decidir si se permite reabrir una evaluación completada |
 | 5 | **Falta `backend/.dockerignore`**: su contenido está en un archivo llamado `backend/download`; como el `Dockerfile` hace `COPY . .`, el `.env` (con claves) y el `venv` local terminan dentro de la imagen | Fuga de secretos en la imagen; imágenes pesadas | Renombrar `backend/download` a `backend/.dockerignore` |
 
 ### Prioridad media
@@ -940,7 +943,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | # | Ítem | Propuesta |
 |---|---|---|
 | 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo nginx, 20 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
-| 7 | ~~`GET /evaluaciones/{id}/controles-aplicables` p95 542 ms~~ **Resuelto en HU-01** (consulta única + caché del catálogo); repetir la medición live en Docker | — |
+| 7 | ~~`GET /evaluaciones/{id}/controles-aplicables` p95 542 ms~~ **Resuelto en HU-01** (consulta única + caché del catálogo): p95 24,1 ms en la medición live del 16-oct | — |
 | 8 | NER: los falsos positivos "la Ley 21" y "Presidenta del Directorio" se corrigieron en T-04. Queda abierto: textos **completamente en mayúsculas** con frases largas, donde spaCy puede no aislar el nombre | Regla adicional para texto 100 % en mayúsculas; ampliar `ner_gold.jsonl` con casos reales anonimizados |
 | 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
 | 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `CAMBIOS_ARCOP.md` |

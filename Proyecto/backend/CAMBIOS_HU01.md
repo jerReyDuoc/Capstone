@@ -13,7 +13,7 @@ Este cambio cubre las 4 tareas pendientes.
 | C1 · 4 dimensiones | ✅ (ya cumplía) | `GET /progreso` además desglosa el avance por dimensión |
 | C2 · Saltos condicionales | ✅ reforzado | Ahora la API **rechaza** responder controles que el filtro ocultó (422) |
 | C3 · Progreso en PostgreSQL | ✅ reforzado | Upsert por (evaluación, control) + `GET /progreso` para reanudar |
-| C4 · Latencia < 500 ms | ✅ (medición de referencia; falta la oficial en Docker) | `controles-aplicables` p95 152 → **24–35 ms** |
+| C4 · Latencia < 500 ms | ✅ | `controles-aplicables` p95 542 → **24,1 ms** (reporte oficial `reporte_latencia_live_hu01.md`, 12/12 endpoints) |
 
 ## 1. Una respuesta por control (upsert + restricción única)
 
@@ -57,9 +57,7 @@ Validado en `CreateRespuestaUseCase` (POST y PUT), en este orden. Errores con cu
 
 Además, una evaluación cerrada **no permite rehacer el filtro** (`POST /filtro` → 400).
 
-> ⚠️ Hoy **ningún endpoint marca una evaluación como `completada`** (hallazgo #4 del README:
-> `/cerrar` no cambia `estado_progreso`). El bloqueo queda listo y probado, pero solo se activa
-> cuando el estado se fije (HU-19 / hallazgo #4).
+> La evaluación se cierra con `POST /api/evaluaciones/{id}/completar` (sección 5).
 
 ## 3. Optimización de `GET /evaluaciones/{id}/controles-aplicables` (C4)
 
@@ -86,8 +84,10 @@ y después:
 | GET progreso (nuevo) | — | 51 / 42 / 46 ms |
 
 Con concurrencia 25 (100 muestras) todos los endpoints siguen bajo 250 ms (controles-aplicables p95 92 ms).
-Las cifras absolutas no son comparables con el reporte del 11-oct (Windows + Docker); por eso hay
-que **repetir la prueba live en su entorno** (ver abajo) y adjuntar ese reporte como evidencia oficial.
+**Medición oficial** (16-oct-2026, Docker sobre WSL2, concurrencia 10, 50 muestras;
+[`reporte_latencia_live_hu01.md`](reporte_latencia_live_hu01.md)): **12/12 endpoints cumplen**.
+`GET controles-aplicables` p95 **24,1 ms** (antes 542,7 ms), `POST respuesta` 67,2 ms,
+`GET progreso` 43,7 ms; el más lento fue `GET filtro` con 52,1 ms.
 
 ## 4. Progreso para reanudar: `GET /api/evaluaciones/{id}/progreso`
 
@@ -109,6 +109,35 @@ que **repetir la prueba live en su entorno** (ver abajo) y adjuntar ese reporte 
   `respuestas_fuera_de_alcance` (tampoco puntúan en `/cerrar`, como ya ocurría).
 - No expone justificaciones (texto libre con posible PII): para el detalle está `GET /api/respuestas/{id}`.
 - 2 consultas por petición (contexto + estados de las respuestas) más el catálogo cacheado.
+
+## 5. Ampliación: completar la evaluación y bloquear evidencias
+
+**`POST /api/evaluaciones/{id}/completar`**: cierre definitivo. `POST /cerrar` sigue igual (recalcula
+el resumen como vista previa, no cambia el estado y se puede repetir).
+
+| Condición | Si no se cumple |
+|---|---|
+| La evaluación existe | 404 `EVALUACION_NO_ENCONTRADA` |
+| No está ya cerrada | 409 `EVALUACION_CERRADA` |
+| Filtro F1–F7 completo | 409 `FILTRO_PENDIENTE` |
+| Todos los controles aplicables respondidos | 409 `CUESTIONARIO_INCOMPLETO` ("Faltan N de M…: códigos") |
+| Ninguna evidencia `pending`/`processing` | 409 `EVIDENCIAS_EN_PROCESO` (su resultado llegaría después del cierre) |
+
+Si todo se cumple, genera el resumen y fija `estado_progreso = 'completada'` en la **misma
+transacción**, y responde el resumen más `estado_progreso` y `controles_aplicables`. La fila de la
+evaluación se bloquea (`SELECT … FOR UPDATE`): con 5 llamadas simultáneas contra PostgreSQL, una
+obtiene 200 y las otras 409. Con F1 = No se puede completar (0 controles, sin puntaje).
+
+Desde ahí la evaluación entra al benchmark (el cron solo cuenta las `completada`; hallazgo #4
+resuelto) y **no admite**: respuestas nuevas ni cambios (409), rehacer el filtro (400) ni
+**evidencias**: `POST /api/respuestas/{id}/evidencias` → 409 `EVALUACION_CERRADA`, sin guardar el
+archivo. El bloqueo de evidencias vale para `completada` y `cerrada`.
+
+Archivos: `app/application/use_cases/completar_evaluacion.py` (nuevo), `app/api/routes/reportes.py`,
+`app/application/use_cases/upload_evidence.py`, `app/api/routes/evidencias.py`,
+`tests/test_completar_evaluacion.py` (nuevo, 9 pruebas), `tests/test_bordes_na_y_evidencia.py`.
+
+No hay forma de **reabrir** una evaluación completada (decisión pendiente del PO).
 
 ## Archivos
 
@@ -157,8 +186,6 @@ endpoints y la prueba de carrera aprobada 6 de 6 veces.
 
 ## Fuera de alcance / pendiente
 
-- Marcar la evaluación como `completada` al cerrarla (hallazgo #4, HU-19): sin eso, el bloqueo de
-  evaluaciones cerradas no se activa por la API.
-- Subir evidencias a respuestas de una evaluación cerrada sigue permitido (`POST /respuestas/{id}/evidencias`).
+- Reabrir una evaluación completada (decisión del PO).
 - Autorización por sesión del encuestado (HU-20): hoy cualquiera puede responder cualquier evaluación.
 - Crear evaluaciones por API (HU-19).
