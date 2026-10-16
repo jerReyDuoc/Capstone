@@ -380,7 +380,9 @@ stateDiagram-v2
 
 - Cada cambio queda en `eventos_solicitud_arcop` en la misma transacción.
 - Una **supresión resuelta** anonimiza de forma irreversible los datos del titular (email, justificaciones, evidencias y sus archivos, mapas de entidades, extractos de seguridad, descripciones ARCOP) y conserva clasificaciones y puntajes sin vínculo personal. El titular pierde el acceso al instante.
-- Plazos de respuesta e información configurables (`ARCOP_PLAZO_*_DIAS`), vacíos hasta que el equipo los defina; se informa `plazo_vencido` y el filtro `?vencidas=true`.
+- Cada solicitud tiene un **código de seguimiento único** (`ARC-XXXX-XXXX`); el estado se consulta sin login en `GET /api/arcop/seguimiento/{codigo}`, sin datos personales.
+- **Plazos legales por defecto (Ley 21.719):** respuesta en 30 días corridos, prórroga única de 30 días con motivo, bloqueo temporal en 2 días hábiles (configurables con `ARCOP_PLAZO_*`). Se informa `plazo_vencido` y el filtro `?vencidas=true`.
+- El titular puede ser un **invitado** o un **encuestado anónimo** de la encuesta pública (entra con la clave de su evaluación).
 - Detalle completo, tabla de anonimización y decisiones pendientes: [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md).
 
 ### 5.9 Autenticación y roles
@@ -388,6 +390,7 @@ stateDiagram-v2
 | Rol | Quién | Cómo obtiene el token |
 |---|---|---|
 | `referente` | Usuario temporal (titular de sus datos) | `POST /api/auth/titular` con `{usuario_temporal_id, email}`; requiere invitación vigente y no anonimizada |
+| `encuestado` | Encuestado anónimo de la encuesta pública (titular de sus datos) | `POST /api/auth/encuestado` con `{evaluacion_id, clave}`; la clave se genera por evaluación (`POST /api/auth/encuestado/clave`, admin; luego HU-19) |
 | `admin_therion` | Administrador de Therion Labs (tabla `usuarios_admin`) | `POST /api/auth/login` con `{email, password}` |
 
 - Token bearer firmado con HMAC-SHA256 (`AUTH_SECRET`), vigencia `AUTH_TOKEN_TTL_MIN` (480 min por defecto). Respuesta: `{access_token, token_type, rol, usuario_id, expira_en_min}`.
@@ -462,6 +465,7 @@ erDiagram
     catalogo_brechas ||--o{ respuestas : "Catalogo_brechas_id_brecha"
     usuario_temporal ||--o{ evaluacion : "Usuario_temporal_id"
     usuario_temporal ||--o{ solicitudes_arcop : "Usuario_temporal_id"
+    evaluacion ||--o{ solicitudes_arcop : "Evaluacion_id"
     evaluacion ||--o{ respuestas : "Evaluacion_id"
     evaluacion ||--o{ resumen : "Evaluacion_id"
     evaluacion ||--o{ respuestas_filtro : "Evaluacion_id"
@@ -509,7 +513,7 @@ Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
 
 ## 7. Endpoints de la API
 
-Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 `referente` · 🛡️ `admin_therion`.
+Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 🛡️ `admin_therion`.
 
 ### Sistema
 
@@ -524,6 +528,8 @@ Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Do
 |---|---|---|---|
 | POST | `/api/auth/login` | 🔓 | `{email, password}` → token de admin |
 | POST | `/api/auth/titular` | 🔓 | `{usuario_temporal_id, email}` → token de referente |
+| POST | `/api/auth/encuestado` | 🔓 | `{evaluacion_id, clave}` → token de encuestado |
+| POST | `/api/auth/encuestado/clave` | 🛡️ | `{evaluacion_id}` → 201 `{clave}` (se muestra una vez; invalida la anterior) |
 | GET | `/api/auth/me` | 🔑 | `{usuario_id, rol}` |
 
 ### Catálogos y controles
@@ -581,9 +587,11 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 |---|---|---|---|
 | GET | `/api/arcop/catalogo` | 🔓 | Tipos, estados, transiciones y plazos configurados |
 | POST | `/api/arcop/solicitudes` | 👤 | `{tipo, descripcion}` → 201, estado `recibida` |
-| GET | `/api/arcop/solicitudes?page=&size=&estado=&tipo=&usuario_temporal_id=&vencidas=` | 🔑 | Titular: solo las suyas. Admin: todas, con filtros |
+| GET | `/api/arcop/seguimiento/{codigo}` | 🔓 | Estado y plazos por código de seguimiento (sin datos personales) |
+| GET | `/api/arcop/solicitudes?page=&size=&estado=&tipo=&usuario_temporal_id=&evaluacion_id=&vencidas=` | 🔑 | Titular: solo las suyas. Admin: todas, con filtros |
 | GET | `/api/arcop/solicitudes/{id}` | 🔑 | Detalle e historial (404 si es de otro titular) |
 | PATCH | `/api/arcop/solicitudes/{id}/estado` | 🛡️ | `{estado, comentario?}` → `en_revision` / `pendiente_informacion` / `en_proceso` |
+| POST | `/api/arcop/solicitudes/{id}/prorroga` | 🛡️ | `{motivo}` → prórroga única del plazo (+30 días), antes de que venza |
 | POST | `/api/arcop/solicitudes/{id}/resolucion` | 🛡️ | `{resultado: resuelta\|rechazada, respuesta}` |
 | POST | `/api/arcop/solicitudes/{id}/cancelacion` | 👤 | `{motivo?}` |
 | POST | `/api/arcop/solicitudes/{id}/informacion` | 👤 | `{informacion}` → vuelve a `en_revision` |

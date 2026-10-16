@@ -12,24 +12,36 @@ Cubre:
   - login de administrador y acceso del titular (app/api/routes/auth.py)
   - firma/expiración de tokens, roles y revocación (app/core/autenticacion.py)
   - anonimización al aprobar una supresión
-  - plazos configurables (ARCOP_PLAZO_*_DIAS)
+  - plazos legales (30 días corridos, prórroga única, bloqueo en 2 días hábiles)
+  - código de seguimiento único y consulta pública sin datos personales
+  - acceso del encuestado anónimo de la encuesta pública (clave de la evaluación)
   - máquina de estados (TRANSICIONES_ARCOP)
   - aislamiento entre titulares, permisos por rol, validaciones y trazabilidad
 """
 import asyncio
 import os
+import re
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, body_filtro, cliente_api  # noqa: E402
+from _api_harness import (  # noqa: E402
+    ADMIN_EMAIL, ADMIN_PASSWORD, EVAL_NA_ID, MODO, body_filtro, cliente_api,
+)
 
 from app.core import autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.models.solicitud_arcop import (  # noqa: E402
     TRANSICIONES_ARCOP, EstadoSolicitudARCOP, transicion_permitida,
+)
+from app.application.use_cases.gestionar_solicitud_arcop import (  # noqa: E402
+    _sumar_dias_habiles, normalizar_codigo, nuevo_codigo_seguimiento,
+)
+from app.application.use_cases.clave_acceso_encuestado import (  # noqa: E402
+    hash_clave, normalizar_clave, nueva_clave, verificar_clave,
 )
 
 SECRETO = "secreto-solo-para-pytest-0123456789abcdef"
@@ -42,7 +54,10 @@ DESCRIPCION = "Solicito acceso a todos mis datos personales tratados por la plat
 @pytest.fixture(autouse=True)
 def _auth_secret(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_SECRET", SECRETO)
-    monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", None)
+    # Plazos legales por defecto (Ley 21.719), aunque el .env del equipo los cambie
+    monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", 30)
+    monkeypatch.setattr(settings, "ARCOP_PLAZO_PRORROGA_DIAS", 30)
+    monkeypatch.setattr(settings, "ARCOP_PLAZO_BLOQUEO_DIAS_HABILES", 2)
     monkeypatch.setattr(settings, "ARCOP_PLAZO_INFORMACION_DIAS", None)
 
 
@@ -419,8 +434,9 @@ def test_sin_anonimizacion_si_no_es_supresion_aprobada(tipo, resultado):
 
 
 # ---------------------------------------------------------------- plazos
-def test_sin_plazos_configurados_no_hay_fechas_limite():
+def test_plazos_desactivados_no_hay_fechas_limite(monkeypatch):
     async def esc(c):
+        monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", None)
         s = await _crear(c)
         assert s["fecha_limite_respuesta"] is None and s["plazo_vencido"] is False
         cat = (await c.get("/api/arcop/catalogo")).json()
@@ -446,8 +462,266 @@ def test_plazos_configurados_y_vencidas(monkeypatch):
 
         # una solicitud con plazo ya vencido aparece en ?vencidas=true
         monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", -1)
-        vencida = await _crear(c, "bloqueo")
+        vencida = await _crear(c, "acceso")
         assert vencida["plazo_vencido"] is True
         r = await c.get("/api/arcop/solicitudes?vencidas=true", headers=ADMIN())
         assert [x["id_solicitud"] for x in r.json()["items"]] == [vencida["id_solicitud"]]
+    _correr(esc)
+
+
+# ================================================================ HU-08 v3
+# ---------------------------------------------------------------- unitarias
+_PATRON_CODIGO = re.compile(r"^ARC-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$")
+
+
+def _iso(texto: str) -> datetime:
+    return datetime.fromisoformat(texto.replace("Z", ""))
+
+
+def test_codigo_formato_y_normalizacion():
+    codigos = {nuevo_codigo_seguimiento() for _ in range(500)}
+    assert len(codigos) == 500 and all(_PATRON_CODIGO.match(c) for c in codigos)
+    assert normalizar_codigo("arc-7k3f-9qx2") == "ARC-7K3F-9QX2"
+    assert normalizar_codigo(" ARC 7K3F 9QX2 ") == "ARC-7K3F-9QX2"
+    assert normalizar_codigo("7k3f9qx2") == "ARC-7K3F-9QX2"
+    assert normalizar_codigo("ARC-OOII-LL00") == "ARC-0011-1100"   # O->0, I/L->1
+    assert normalizar_codigo("ARC-123") == ""
+
+
+def test_dias_habiles_saltan_fin_de_semana():
+    viernes = datetime(2026, 10, 16, 10, 0)
+    assert _sumar_dias_habiles(viernes, 2) == datetime(2026, 10, 20, 10, 0)   # martes
+    lunes = datetime(2026, 10, 19, 10, 0)
+    assert _sumar_dias_habiles(lunes, 2) == datetime(2026, 10, 21, 10, 0)     # miércoles
+    sabado = datetime(2026, 10, 17, 10, 0)
+    assert _sumar_dias_habiles(sabado, 2) == datetime(2026, 10, 20, 10, 0)    # martes
+    assert _sumar_dias_habiles(lunes, None) is None
+
+
+def test_clave_encuestado_normalizada_y_hasheada():
+    clave = nueva_clave()
+    assert re.match(r"^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$", clave)
+    h = hash_clave(clave)
+    assert clave not in h and normalizar_clave(clave) not in h
+    assert verificar_clave(clave.lower().replace("-", " "), h)
+    assert not verificar_clave(nueva_clave(), h)
+    assert not verificar_clave(clave, None)
+
+
+# ---------------------------------------------------------------- código de seguimiento
+def test_cada_solicitud_tiene_codigo_unico():
+    async def esc(c):
+        a, b = await _crear(c), await _crear(c)
+        assert _PATRON_CODIGO.match(a["codigo_seguimiento"])
+        assert a["codigo_seguimiento"] != b["codigo_seguimiento"]
+        r = await c.get("/api/arcop/solicitudes", headers=ADMIN())
+        assert {x["codigo_seguimiento"] for x in r.json()["items"]} >= {a["codigo_seguimiento"], b["codigo_seguimiento"]}
+    _correr(esc)
+
+
+def test_seguimiento_publico_sin_login_y_sin_datos_personales():
+    async def esc(c):
+        s = await _crear(c, "rectificacion")
+        codigo = s["codigo_seguimiento"]
+        r = await c.get(f"/api/arcop/seguimiento/{codigo.lower().replace('-', '')}")   # sin token
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["codigo_seguimiento"] == codigo and body["estado"] == "recibida"
+        assert body["tipo"] == "rectificacion" and body["prorrogada"] is False
+        for prohibido in ("descripcion", "respuesta", "id_solicitud", "usuario_temporal_id",
+                          "evaluacion_id", "historial"):
+            assert prohibido not in body
+        assert (await c.get("/api/arcop/seguimiento/ARC-0000-0000")).status_code == 404
+        assert (await c.get("/api/arcop/seguimiento/basura")).status_code == 404
+    _correr(esc)
+
+
+# ---------------------------------------------------------------- plazos legales
+def test_plazo_legal_por_defecto_30_dias_corridos():
+    async def esc(c):
+        s = await _crear(c, "acceso")
+        dif = _iso(s["fecha_limite_respuesta"]) - _iso(s["fecha_creacion"])
+        assert dif == timedelta(days=30)
+        cat = (await c.get("/api/arcop/catalogo")).json()
+        assert cat["plazo_respuesta_dias"] == 30 and cat["plazo_respuesta_tipo"] == "corridos"
+        assert cat["plazo_prorroga_dias"] == 30 and cat["plazo_bloqueo_dias_habiles"] == 2
+    _correr(esc)
+
+
+def test_bloqueo_se_responde_en_2_dias_habiles():
+    async def esc(c):
+        s = await _crear(c, "bloqueo")
+        creada, limite = _iso(s["fecha_creacion"]), _iso(s["fecha_limite_respuesta"])
+        assert limite == _sumar_dias_habiles(creada, 2)
+        assert limite.weekday() < 5 and timedelta(days=2) <= limite - creada <= timedelta(days=4)
+    _correr(esc)
+
+
+def test_prorroga_unica_con_motivo(monkeypatch):
+    async def esc(c):
+        s = await _crear(c, "portabilidad")
+        sid, limite = s["id_solicitud"], _iso(s["fecha_limite_respuesta"])
+        url = f"/api/arcop/solicitudes/{sid}/prorroga"
+        motivo = {"motivo": "Requiere reunir datos de varios sistemas."}
+
+        assert (await c.post(url, json=motivo, headers=TITULAR())).status_code == 403
+        assert (await c.post(url, json={"motivo": "corto"}, headers=ADMIN())).status_code == 400
+
+        r = await c.post(url, json=motivo, headers=ADMIN())
+        assert r.status_code == 200, r.text
+        p = r.json()
+        assert _iso(p["fecha_limite_respuesta"]) - limite == timedelta(days=30)
+        assert p["fecha_prorroga"] is not None and p["estado"] == "recibida"
+        assert p["historial"][-1]["tipo_evento"] == "prorroga"
+        assert "varios sistemas" in p["historial"][-1]["comentario"]
+
+        r = await c.post(url, json=motivo, headers=ADMIN())                 # segunda vez
+        assert r.status_code == 409 and "una" in r.json()["detail"]["mensaje"]
+        seg = (await c.get(f"/api/arcop/seguimiento/{s['codigo_seguimiento']}")).json()
+        assert seg["prorrogada"] is True
+
+        b = await _crear(c, "bloqueo")                                       # no aplica al bloqueo
+        assert (await c.post(f"/api/arcop/solicitudes/{b['id_solicitud']}/prorroga",
+                             json=motivo, headers=ADMIN())).status_code == 400
+
+        monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", -1)      # ya vencida
+        v = await _crear(c, "acceso")
+        r = await c.post(f"/api/arcop/solicitudes/{v['id_solicitud']}/prorroga", json=motivo, headers=ADMIN())
+        assert r.status_code == 409 and "venció" in r.json()["detail"]["mensaje"]
+    _correr(esc)
+
+
+def test_no_se_prorroga_una_solicitud_cerrada():
+    async def esc(c):
+        sid = (await _crear(c))["id_solicitud"]
+        await c.post(f"/api/arcop/solicitudes/{sid}/cancelacion", json={}, headers=TITULAR())
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/prorroga",
+                         json={"motivo": "Motivo suficientemente largo."}, headers=ADMIN())
+        assert r.status_code == 409
+    _correr(esc)
+
+
+# ---------------------------------------------------------------- encuestado anónimo
+async def _clave_de(c, evaluacion_id: int) -> str:
+    r = await c.post("/api/auth/encuestado/clave", json={"evaluacion_id": evaluacion_id}, headers=ADMIN())
+    assert r.status_code == 201, r.text
+    return r.json()["clave"]
+
+
+async def _token_encuestado(c, evaluacion_id: int, clave: str) -> dict:
+    r = await c.post("/api/auth/encuestado", json={"evaluacion_id": evaluacion_id, "clave": clave})
+    assert r.status_code == 200, r.text
+    assert r.json()["rol"] == "encuestado" and r.json()["usuario_id"] == evaluacion_id
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_solo_admin_genera_la_clave_de_una_evaluacion():
+    async def esc(c):
+        body = {"evaluacion_id": EVAL_NA_ID}
+        assert (await c.post("/api/auth/encuestado/clave", json=body, headers=TITULAR())).status_code == 403
+        assert (await c.post("/api/auth/encuestado/clave", json=body)).status_code == 401
+        r = await c.post("/api/auth/encuestado/clave", json={"evaluacion_id": 999}, headers=ADMIN())
+        assert r.status_code == 404
+    _correr(esc)
+
+
+def test_acceso_del_encuestado_con_la_clave_de_su_evaluacion():
+    async def esc(c):
+        clave = await _clave_de(c, EVAL_NA_ID)
+        # minúsculas y espacios se aceptan
+        await _token_encuestado(c, EVAL_NA_ID, clave.lower().replace("-", " "))
+        # clave equivocada, otra evaluación o evaluación sin clave: mismo error genérico
+        r1 = await c.post("/api/auth/encuestado", json={"evaluacion_id": EVAL_NA_ID, "clave": "AAAA-BBBB-CCCC"})
+        r2 = await c.post("/api/auth/encuestado", json={"evaluacion_id": 1, "clave": clave})
+        r3 = await c.post("/api/auth/encuestado", json={"evaluacion_id": 999, "clave": clave})
+        assert r1.status_code == r2.status_code == r3.status_code == 401
+        assert r1.json() == r2.json() == r3.json()
+        # regenerar invalida la clave anterior
+        nueva = await _clave_de(c, EVAL_NA_ID)
+        r = await c.post("/api/auth/encuestado", json={"evaluacion_id": EVAL_NA_ID, "clave": clave})
+        assert r.status_code == 401
+        await _token_encuestado(c, EVAL_NA_ID, nueva)
+    _correr(esc)
+
+
+def test_encuestado_gestiona_solo_sus_solicitudes():
+    async def esc(c):
+        ENC = await _token_encuestado(c, EVAL_NA_ID, await _clave_de(c, EVAL_NA_ID))
+        r = await c.post("/api/arcop/solicitudes", json={"tipo": "acceso", "descripcion": DESCRIPCION}, headers=ENC)
+        assert r.status_code == 201, r.text
+        s = r.json()
+        assert s["evaluacion_id"] == EVAL_NA_ID and s["usuario_temporal_id"] is None
+        assert _PATRON_CODIGO.match(s["codigo_seguimiento"])
+        sid = s["id_solicitud"]
+
+        propia = await _crear(c)                       # solicitud del invitado 1
+        lista = (await c.get("/api/arcop/solicitudes", headers=ENC)).json()
+        assert [x["id_solicitud"] for x in lista["items"]] == [sid]
+        assert (await c.get(f"/api/arcop/solicitudes/{propia['id_solicitud']}", headers=ENC)).status_code == 404
+        # y el invitado no ve la del encuestado
+        assert (await c.get(f"/api/arcop/solicitudes/{sid}", headers=TITULAR())).status_code == 404
+        lista_inv = (await c.get("/api/arcop/solicitudes", headers=TITULAR())).json()
+        assert sid not in [x["id_solicitud"] for x in lista_inv["items"]]
+
+        # el encuestado no puede gestionar
+        assert (await c.patch(f"/api/arcop/solicitudes/{sid}/estado", json={"estado": "en_revision"},
+                              headers=ENC)).status_code == 403
+        # el admin filtra por evaluación
+        r = await c.get(f"/api/arcop/solicitudes?evaluacion_id={EVAL_NA_ID}", headers=ADMIN())
+        assert [x["id_solicitud"] for x in r.json()["items"]] == [sid]
+        # ciclo con pedido de información y cancelación por el encuestado
+        await c.patch(f"/api/arcop/solicitudes/{sid}/estado", json={"estado": "en_revision"}, headers=ADMIN())
+        await c.patch(f"/api/arcop/solicitudes/{sid}/estado",
+                      json={"estado": "pendiente_informacion", "comentario": "Indique qué datos."}, headers=ADMIN())
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/informacion",
+                         json={"informacion": "Mis respuestas de la encuesta."}, headers=ENC)
+        assert r.status_code == 200 and r.json()["estado"] == "en_revision"
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/cancelacion", json={}, headers=ENC)
+        assert r.json()["estado"] == "cancelada"
+    _correr(esc)
+
+
+def test_supresion_del_encuestado_anonimiza_solo_su_evaluacion():
+    async def esc(c):
+        # datos personales en las dos evaluaciones
+        for ev in (1, EVAL_NA_ID):
+            assert (await c.post(f"/api/evaluaciones/{ev}/filtro", json=body_filtro(True))).status_code == 200
+            r = await c.post("/api/respuestas/", json={
+                "evaluacion_id": ev, "matriz_control_id": 1, "estado_clasificacion": "no_cumplido",
+                "justificacion": "Responsable: Juan Pérez, encargado de TI.",
+            })
+            assert r.status_code == 201, r.text
+        resp_por_eval = {
+            ev: (await c.get(f"/api/evaluaciones/{ev}/respuestas")).json()["items"][0]["id_respuesta"]
+            for ev in (1, EVAL_NA_ID)
+        }
+
+        clave = await _clave_de(c, EVAL_NA_ID)
+        ENC = await _token_encuestado(c, EVAL_NA_ID, clave)
+        r = await c.post("/api/arcop/solicitudes", json={"tipo": "supresion", "descripcion": DESCRIPCION}, headers=ENC)
+        sid = r.json()["id_solicitud"]
+        for estado in ("en_revision", "en_proceso"):
+            await c.patch(f"/api/arcop/solicitudes/{sid}/estado", json={"estado": estado}, headers=ADMIN())
+        r = await c.post(f"/api/arcop/solicitudes/{sid}/resolucion",
+                         json={"resultado": "resuelta", "respuesta": "Se anonimizaron sus datos."}, headers=ADMIN())
+        assert r.status_code == 200, r.text
+        s = r.json()
+        assert s["descripcion"] == "[anonimizado]" and s["historial"][-1]["tipo_evento"] == "anonimizacion"
+        assert "claves_evaluacion=1" in s["historial"][-1]["comentario"]
+        assert "usuario_temporal" not in s["historial"][-1]["comentario"]
+
+        # textos de SU evaluación borrados; la otra evaluación intacta
+        r_enc = (await c.get(f"/api/respuestas/{resp_por_eval[EVAL_NA_ID]}")).json()
+        r_otra = (await c.get(f"/api/respuestas/{resp_por_eval[1]}")).json()
+        assert r_enc["justificacion_usuario"] is None and r_enc["estado_clasificacion"] == "no_cumplido"
+        assert r_otra["justificacion_usuario"] is not None
+
+        # el encuestado pierde el acceso; el invitado 1 sigue igual
+        assert (await c.get("/api/arcop/solicitudes", headers=ENC)).status_code == 401
+        r = await c.post("/api/auth/encuestado", json={"evaluacion_id": EVAL_NA_ID, "clave": clave})
+        assert r.status_code == 401
+        assert (await c.get("/api/arcop/solicitudes", headers=TITULAR())).status_code == 200
+        # el código de seguimiento sigue respondiendo (sin datos personales)
+        seg = await c.get(f"/api/arcop/seguimiento/{s['codigo_seguimiento']}")
+        assert seg.status_code == 200 and seg.json()["estado"] == "resuelta"
     _correr(esc)

@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import CheckConstraint, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -45,6 +45,7 @@ class EventoSolicitudARCOP(str, Enum):
     RESOLUCION = "resolucion"
     CANCELACION = "cancelacion"
     ANONIMIZACION = "anonimizacion"
+    PRORROGA = "prorroga"
 
 
 _E = EstadoSolicitudARCOP
@@ -72,20 +73,42 @@ class SolicitudARCOP(Base):
     """
     Solicitud formal de un titular de datos personales para ejercer un derecho
     ARCOP (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
-    El titular es un usuario de la plataforma (usuario_temporal).
+
+    El titular es UNO de estos dos (exactamente uno, CHECK en BD):
+      - usuario_temporal_id: usuario invitado (acceso por invitación).
+      - evaluacion_id: encuestado anónimo de la encuesta pública (acceso con la
+        clave de su evaluación).
     """
     __tablename__ = "solicitudes_arcop"
+    __table_args__ = (
+        CheckConstraint(
+            '("Usuario_temporal_id" IS NULL) <> ("Evaluacion_id" IS NULL)',
+            name="ck_solicitudes_arcop_un_titular",
+        ),
+    )
 
     id: Mapped[int] = mapped_column("id_solicitud", Integer, primary_key=True)
     tipo: Mapped[str] = mapped_column("tipo", String(20), nullable=False)
     estado: Mapped[str] = mapped_column("estado", String(25), nullable=False, index=True)
     descripcion: Mapped[str] = mapped_column("descripcion", Text, nullable=False)
 
-    usuario_temporal_id: Mapped[int] = mapped_column(
+    # Código público e irrepetible para que el titular siga su solicitud (ARC-XXXX-XXXX)
+    codigo_seguimiento: Mapped[str] = mapped_column(
+        "codigo_seguimiento", String(20), nullable=False, unique=True
+    )
+
+    usuario_temporal_id: Mapped[int | None] = mapped_column(
         "Usuario_temporal_id",
         Integer,
         ForeignKey("usuario_temporal.id"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    evaluacion_id: Mapped[int | None] = mapped_column(
+        "Evaluacion_id",
+        Integer,
+        ForeignKey("evaluacion.id"),
+        nullable=True,
         index=True,
     )
 
@@ -94,7 +117,8 @@ class SolicitudARCOP(Base):
     # Se fija al llegar a un estado final (resuelta, rechazada o cancelada)
     fecha_cierre: Mapped[datetime | None] = mapped_column("fecha_cierre", DateTime, nullable=True)
 
-    # Plazos (ARCOP_PLAZO_*_DIAS en config). Quedan en NULL mientras no se definan.
+    # Plazos (ARCOP_PLAZO_* en config). Ley 21.719: 30 días corridos, prorrogables
+    # una vez; bloqueo temporal: 2 días hábiles.
     fecha_limite_respuesta: Mapped[datetime | None] = mapped_column(
         "fecha_limite_respuesta", DateTime, nullable=True
     )
@@ -102,6 +126,9 @@ class SolicitudARCOP(Base):
     fecha_limite_informacion: Mapped[datetime | None] = mapped_column(
         "fecha_limite_informacion", DateTime, nullable=True
     )
+
+    # Prórroga única del plazo de respuesta (fecha en que se aplicó; NULL = sin prórroga)
+    fecha_prorroga: Mapped[datetime | None] = mapped_column("fecha_prorroga", DateTime, nullable=True)
 
     # Respuesta/resolución comunicada al titular (obligatoria al resolver o rechazar)
     respuesta: Mapped[str | None] = mapped_column("respuesta", Text, nullable=True)

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.models.solicitud_arcop import EstadoSolicitudARCOP, SolicitudARCOP, EventoSolicitud
+from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 
 
@@ -14,6 +15,17 @@ class SolicitudARCOPRepository:
 
     async def existe_usuario(self, usuario_id: int) -> bool:
         return await self.session.get(UsuarioTemporal, usuario_id) is not None
+
+    async def existe_evaluacion(self, evaluacion_id: int) -> bool:
+        return await self.session.get(Evaluacion, evaluacion_id) is not None
+
+    async def existe_codigo(self, codigo: str) -> bool:
+        q = select(func.count()).select_from(SolicitudARCOP).where(SolicitudARCOP.codigo_seguimiento == codigo)
+        return ((await self.session.execute(q)).scalar() or 0) > 0
+
+    async def get_por_codigo(self, codigo: str) -> SolicitudARCOP | None:
+        q = select(SolicitudARCOP).where(SolicitudARCOP.codigo_seguimiento == codigo)
+        return (await self.session.execute(q)).scalar_one_or_none()
 
     async def create(self, solicitud: SolicitudARCOP, evento: EventoSolicitud) -> SolicitudARCOP:
         """Crea la solicitud y su primer evento en una sola transacción."""
@@ -42,6 +54,7 @@ class SolicitudARCOPRepository:
         self,
         usuario_temporal_id: int | None = None,
         estado: str | None = None,
+        evaluacion_id: int | None = None,
         tipo: str | None = None,
         solo_vencidas_al: datetime | None = None,
         offset: int = 0,
@@ -52,6 +65,8 @@ class SolicitudARCOPRepository:
         filtros = []
         if usuario_temporal_id is not None:
             filtros.append(SolicitudARCOP.usuario_temporal_id == usuario_temporal_id)
+        if evaluacion_id is not None:
+            filtros.append(SolicitudARCOP.evaluacion_id == evaluacion_id)
         if estado:
             filtros.append(SolicitudARCOP.estado == estado)
         if tipo:

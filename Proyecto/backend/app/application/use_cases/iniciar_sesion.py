@@ -4,6 +4,8 @@ Emisión de tokens de acceso (ver app/core/autenticacion.py).
   - Admin:   email + contraseña contra usuarios_admin (hash PBKDF2).
   - Titular: usuario_temporal_id + email de la invitación; la invitación no debe
              estar expirada ni el usuario anonimizado.
+  - Encuestado anónimo (encuesta pública): evaluacion_id + clave de acceso de la
+             evaluación (ver clave_acceso_encuestado.py).
 
 Los errores son deliberadamente genéricos ("credenciales inválidas") para no
 revelar si un email o id existe.
@@ -18,6 +20,8 @@ from app.core.autenticacion import (
     Rol, emitir_token, verificar_password, verificar_password_senuelo,
 )
 from app.core.config import settings
+from app.application.use_cases.clave_acceso_encuestado import verificar_clave
+from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_temporal import UsuarioTemporal
 
@@ -82,3 +86,16 @@ class IniciarSesionUseCase:
                 "Credenciales inválidas o invitación expirada."
             )
         return _respuesta(usuario.id, Rol.REFERENTE)
+
+    async def encuestado(self, evaluacion_id: int, clave: str) -> dict:
+        evaluacion = await self.db.get(Evaluacion, evaluacion_id)
+        almacenado = evaluacion.clave_acceso_hash if evaluacion else None
+        if almacenado is None:
+            verificar_password_senuelo(clave or "")  # mismo tiempo de respuesta
+            ok = False
+        else:
+            ok = verificar_clave(clave, almacenado)
+        if not ok:
+            logger.warning("Acceso de encuestado fallido (evaluacion=%s)", evaluacion_id)
+            raise CredencialesInvalidasError("Credenciales inválidas.")
+        return _respuesta(evaluacion.id, Rol.ENCUESTADO)

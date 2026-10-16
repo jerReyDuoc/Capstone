@@ -26,20 +26,40 @@ class AportarInformacionARCOPRequest(BaseModel):
     informacion: str
 
 
+class ProrrogarSolicitudARCOPRequest(BaseModel):
+    motivo: str          # se registra en el historial y justifica la prórroga
+
+
 # ------------------------------------------------------------ respuestas
 class SolicitudARCOPResumenResponse(BaseModel):
     """Para listados: sin descripción ni respuesta (no expone texto libre)."""
     model_config = ConfigDict(from_attributes=True)
     id_solicitud: int
+    codigo_seguimiento: str
     tipo: str
     estado: str
-    usuario_temporal_id: int
+    usuario_temporal_id: int | None      # titular invitado
+    evaluacion_id: int | None = None     # titular encuestado anónimo
     fecha_creacion: datetime
     fecha_actualizacion: datetime
     fecha_cierre: datetime | None
     fecha_limite_respuesta: datetime | None = None
     fecha_limite_informacion: datetime | None = None
     plazo_vencido: bool = False
+    fecha_prorroga: datetime | None = None
+
+
+class SeguimientoARCOPResponse(BaseModel):
+    """Consulta pública por código: sin ids, sin textos ni datos del titular."""
+    codigo_seguimiento: str
+    tipo: str
+    estado: str
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    fecha_limite_respuesta: datetime | None
+    fecha_cierre: datetime | None
+    prorrogada: bool
+    plazo_vencido: bool
 
 
 class EventoSolicitudARCOPResponse(BaseModel):

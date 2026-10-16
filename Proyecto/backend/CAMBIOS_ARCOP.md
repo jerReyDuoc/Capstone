@@ -12,6 +12,73 @@ garantizar el cumplimiento de los derechos de la Ley N.º 21.719.*
   3. Plazos de respuesta y de aporte de información **configurables y vacíos** hasta que el
      equipo los defina.
 
+- **Versión 3** (migración `b3c8e5d2a7f1`, revisa `9a4e2c7b1f05`) — cierra lo pendiente de la HU-08:
+  1. **Código de seguimiento único** por solicitud (`ARC-XXXX-XXXX`) y consulta pública del estado
+     sin login ni datos personales: `GET /api/arcop/seguimiento/{codigo}`.
+  2. **Plazos legales por defecto** (Ley 21.719): respuesta en **30 días corridos**, **prórroga única**
+     de 30 días con motivo (`POST .../prorroga`), y **bloqueo temporal en 2 días hábiles**.
+  3. **Acceso del encuestado anónimo** de la encuesta pública (rol `encuestado`): entra con el id de su
+     evaluación y una **clave de acceso** (`POST /api/auth/encuestado`). El acceso por invitación se mantiene.
+
+## Versión 3 en detalle
+
+### Código de seguimiento
+- Se genera al crear la solicitud: `ARC-` + 8 caracteres al azar (alfabeto sin I, L, O, U), 40 bits.
+  No revela el id ni el orden de llegada. Columna `codigo_seguimiento` con restricción `UNIQUE`.
+- `GET /api/arcop/seguimiento/{codigo}` (público): acepta minúsculas, espacios y sin guiones.
+  Devuelve solo `codigo_seguimiento`, `tipo`, `estado`, fechas, `fecha_limite_respuesta`, `prorrogada`
+  y `plazo_vencido`. **Nunca** la descripción, la respuesta, ids ni datos del titular.
+- Las solicitudes que ya existían reciben un código en la migración.
+
+### Plazos legales
+| Variable (`.env`, opcional) | Defecto | Qué hace |
+|---|---|---|
+| `ARCOP_PLAZO_RESPUESTA_DIAS` | 30 | Días **corridos** desde que se recibe la solicitud |
+| `ARCOP_PLAZO_PRORROGA_DIAS` | 30 | Días que agrega la prórroga (una sola vez) |
+| `ARCOP_PLAZO_BLOQUEO_DIAS_HABILES` | 2 | Plazo del bloqueo temporal, de lunes a viernes |
+| `ARCOP_PLAZO_INFORMACION_DIAS` | vacío | Plazo del titular para aportar antecedentes (la ley no lo fija) |
+
+- **Prórroga** (`POST /api/arcop/solicitudes/{id}/prorroga`, solo admin, `{"motivo": "..."}`): una sola vez,
+  antes de que venza el plazo, con la solicitud abierta. No aplica al bloqueo. Queda en el historial (evento
+  `prorroga`) y en `fecha_prorroga`.
+- **Días hábiles:** se cuentan de lunes a viernes, **sin descontar feriados** (no hay calendario de feriados
+  en el proyecto). Las fechas se guardan en UTC.
+- El plazo **sigue corriendo** mientras la solicitud está en `pendiente_informacion` (la ley no dice que se
+  suspenda; ver decisiones).
+- Las solicitudes abiertas que no tenían plazo reciben el legal en la migración (desde su fecha de creación).
+- Solo se **informa** el vencimiento (`plazo_vencido`, `?vencidas=true`); no hay cierre automático.
+
+### Acceso del encuestado anónimo (encuesta pública)
+| Paso | Endpoint | Quién |
+|---|---|---|
+| 1. Generar la clave de una evaluación | `POST /api/auth/encuestado/clave` `{"evaluacion_id": N}` | admin (hoy); HU-19 lo hará al crear la evaluación pública |
+| 2. Obtener el token | `POST /api/auth/encuestado` `{"evaluacion_id": N, "clave": "XXXX-XXXX-XXXX"}` | encuestado |
+| 3. Usar ARCOP | los mismos endpoints `/api/arcop/...` que el invitado | encuestado |
+
+- La clave se muestra **una sola vez**; en BD se guarda solo su hash PBKDF2 (`evaluacion.clave_acceso_hash`).
+  Generar otra invalida la anterior. Se aceptan minúsculas, espacios y confusiones O/0, I/L/1.
+- La solicitud de un encuestado queda ligada a `Evaluacion_id` (y `Usuario_temporal_id` en NULL);
+  un `CHECK` exige exactamente uno de los dos. Cada titular ve solo las suyas (404 para las ajenas).
+- **Supresión aprobada de un encuestado:** se anonimiza **solo su evaluación** (justificaciones, evidencias
+  y archivos, mapa cifrado, extractos de seguridad, sus solicitudes) y se borra su clave: pierde el acceso
+  y sus tokens dejan de servir. Si el titular es un invitado, se anonimizan todas sus evaluaciones (como antes)
+  y también se borran las claves de esas evaluaciones.
+- Para la HU-19: llamar a `generar_clave_acceso(db, evaluacion_id)`
+  (`app/application/use_cases/clave_acceso_encuestado.py`) al crear la evaluación pública y mostrar la clave
+  al encuestado una vez.
+
+### Archivos de la versión 3
+| Tipo | Archivo |
+|---|---|
+| nuevo | `app/application/use_cases/clave_acceso_encuestado.py` |
+| nuevo | `migrations/versions/b3c8e5d2a7f1_hu08_codigo_plazos_encuestado.py` |
+| modificado | `app/domain/models/solicitud_arcop.py` · `app/domain/models/evaluacion.py` |
+| modificado | `app/core/autenticacion.py` (rol `encuestado`) · `app/core/config.py` (plazos) |
+| modificado | `app/application/use_cases/gestionar_solicitud_arcop.py` · `iniciar_sesion.py` |
+| modificado | `app/application/schemas/arcop_schemas.py` · `app/api/routes/arcop.py` · `app/api/routes/auth.py` |
+| modificado | `app/infrastructure/repositories/solicitud_arcop_repository.py` · `anonimizacion_repository.py` |
+| modificado | `.env.example` · `tests/test_solicitudes_arcop.py` (13 pruebas nuevas) · `CAMBIOS_ARCOP.md` |
+
 ## Archivos de la versión 2
 
 | Tipo | Archivo | Qué hace |
@@ -71,7 +138,7 @@ falla, queda en el log `arcop` para revisarlo a mano.
 **Importante para los admin:** la `respuesta` de la resolución se conserva, así que no debe
 contener datos personales del titular.
 
-## Plazos (pendientes de definir)
+## Plazos (versión 2; reemplazado por la versión 3)
 
 | Variable | Qué fija | Columna |
 |---|---|---|
@@ -171,12 +238,17 @@ usuario temporal de prueba**, no con uno que necesites conservar.
 
 ## Decisiones que requieren confirmación
 
-1. **Identificación del titular.** Se valida con `usuario_temporal_id` + email de la invitación.
+1. **Identificación del titular.** Invitado: `usuario_temporal_id` + email de la invitación. Encuestado
+   anónimo (v3): `evaluacion_id` + clave de acceso de la evaluación (la entrega HU-19 al iniciar la encuesta).
    Es tan fuerte como lo secreto que sea el id: si el link de invitación es adivinable, conviene
    agregar un código de invitación aleatorio.
 2. **Sin límite de intentos.** El login no bloquea tras varios intentos fallidos; queda registrado
    en el log `seguridad`. Si se expone a internet, agregar limitación de intentos.
-3. **Plazos.** Valores en días, días corridos o hábiles, y qué hacer al vencer (Ley 21.719).
+3. **Plazos (v3).** Se usan 30 días corridos + prórroga única de 30 + bloqueo en 2 días hábiles,
+   según fuentes secundarias sobre la Ley 21.719 (art. 11 de la Ley 19.628 reemplazado). Conviene
+   confirmarlo con el texto oficial en bcn.cl. Pendiente: feriados en los días hábiles, si el plazo se
+   suspende en `pendiente_informacion`, y qué hacer al vencer (el titular puede reclamar ante la Agencia
+   dentro de 30 días hábiles).
 4. **Alcance de la anonimización.** Se conservan clasificaciones y puntajes sin vínculo personal;
    no se tocan los respaldos de la BD. Confirmar si la ley exige más (o permite menos).
 5. **Solicitudes abiertas del mismo titular** al anonimizarlo: quedan abiertas y anonimizadas,

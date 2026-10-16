@@ -3,8 +3,9 @@ Solicitudes de derechos ARCOP del titular de datos personales
 (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
 
 Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.py):
-  referente      -> titular (POST /api/auth/titular): crea, consulta, cancela y aporta
-                    información a SUS solicitudes.
+  referente      -> titular invitado (POST /api/auth/titular)
+  encuestado     -> titular anónimo de la encuesta pública (POST /api/auth/encuestado)
+                    Ambos crean, consultan, cancelan y aportan información a SUS solicitudes.
   admin_therion  -> administrador (POST /api/auth/login): consulta todas, cambia estados
                     intermedios y registra la resolución. Una supresión resuelta
                     anonimiza los datos del titular.
@@ -21,7 +22,9 @@ from app.application.schemas.arcop_schemas import (
     CancelarSolicitudARCOPRequest,
     CrearSolicitudARCOPRequest,
     EventoSolicitudARCOPResponse,
+    ProrrogarSolicitudARCOPRequest,
     ResolverSolicitudARCOPRequest,
+    SeguimientoARCOPResponse,
     SolicitudARCOPDetalleResponse,
     SolicitudARCOPResumenResponse,
 )
@@ -44,7 +47,7 @@ from app.infrastructure.storage.local_storage import LocalFileStorage
 
 router = APIRouter(prefix="/api/arcop", tags=["arcop"])
 
-solo_titular = requerir_rol(Rol.REFERENTE)
+solo_titular = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO)
 solo_admin = requerir_rol(Rol.ADMIN_THERION)
 
 
@@ -55,6 +58,8 @@ def _use_case(db: AsyncSession) -> GestionarSolicitudARCOPUseCase:
         storage=LocalFileStorage(),
         plazo_respuesta_dias=settings.ARCOP_PLAZO_RESPUESTA_DIAS,
         plazo_informacion_dias=settings.ARCOP_PLAZO_INFORMACION_DIAS,
+        plazo_prorroga_dias=settings.ARCOP_PLAZO_PRORROGA_DIAS,
+        plazo_bloqueo_dias_habiles=settings.ARCOP_PLAZO_BLOQUEO_DIAS_HABILES,
     )
 
 
@@ -83,15 +88,18 @@ async def _ejecutar(coro):
 def _resumen(s: SolicitudARCOP) -> SolicitudARCOPResumenResponse:
     return SolicitudARCOPResumenResponse(
         id_solicitud=s.id,
+        codigo_seguimiento=s.codigo_seguimiento,
         tipo=s.tipo,
         estado=s.estado,
         usuario_temporal_id=s.usuario_temporal_id,
+        evaluacion_id=s.evaluacion_id,
         fecha_creacion=s.fecha_creacion,
         fecha_actualizacion=s.fecha_actualizacion,
         fecha_cierre=s.fecha_cierre,
         fecha_limite_respuesta=s.fecha_limite_respuesta,
         fecha_limite_informacion=s.fecha_limite_informacion,
         plazo_vencido=plazo_vencido(s),
+        fecha_prorroga=s.fecha_prorroga,
     )
 
 
@@ -125,10 +133,33 @@ async def catalogo_arcop():
         "estados": EstadoSolicitudARCOP.valores(),
         "estados_finales": sorted(EstadoSolicitudARCOP.finales()),
         "transiciones": {k: sorted(v) for k, v in TRANSICIONES_ARCOP.items()},
-        # None = plazo aún no definido por el equipo
+        # Plazos vigentes (Ley 21.719 por defecto). None = sin plazo.
         "plazo_respuesta_dias": settings.ARCOP_PLAZO_RESPUESTA_DIAS,
+        "plazo_respuesta_tipo": "corridos",
+        "plazo_prorroga_dias": settings.ARCOP_PLAZO_PRORROGA_DIAS,
+        "plazo_bloqueo_dias_habiles": settings.ARCOP_PLAZO_BLOQUEO_DIAS_HABILES,
         "plazo_informacion_dias": settings.ARCOP_PLAZO_INFORMACION_DIAS,
     }
+
+
+@router.get("/seguimiento/{codigo}", response_model=SeguimientoARCOPResponse)
+async def seguimiento_publico(codigo: str, db: AsyncSession = Depends(get_db)):
+    """
+    Consulta pública del estado con el código de seguimiento (ARC-XXXX-XXXX), sin login.
+    Solo muestra tipo, estado y fechas: nunca la descripción, la respuesta ni el titular.
+    """
+    s = await _ejecutar(_use_case(db).seguimiento(codigo))
+    return SeguimientoARCOPResponse(
+        codigo_seguimiento=s.codigo_seguimiento,
+        tipo=s.tipo,
+        estado=s.estado,
+        fecha_creacion=s.fecha_creacion,
+        fecha_actualizacion=s.fecha_actualizacion,
+        fecha_limite_respuesta=s.fecha_limite_respuesta,
+        fecha_cierre=s.fecha_cierre,
+        prorrogada=s.fecha_prorroga is not None,
+        plazo_vencido=plazo_vencido(s),
+    )
 
 
 @router.post("/solicitudes", status_code=201, response_model=SolicitudARCOPDetalleResponse)
@@ -148,7 +179,8 @@ async def listar_solicitudes(
     size: int = Query(20, ge=1, le=100, description="Registros por página (máx 100)"),
     estado: str | None = Query(None, description="Filtrar por estado"),
     tipo: str | None = Query(None, description="Filtrar por tipo de derecho"),
-    usuario_temporal_id: int | None = Query(None, description="Solo admin_therion: filtrar por titular"),
+    usuario_temporal_id: int | None = Query(None, description="Solo admin_therion: filtrar por titular invitado"),
+    evaluacion_id: int | None = Query(None, description="Solo admin_therion: filtrar por evaluación (encuestado)"),
     vencidas: bool = Query(False, description="Solo solicitudes abiertas con algún plazo vencido"),
     actor: Actor = Depends(obtener_actor),
     db: AsyncSession = Depends(get_db),
@@ -158,7 +190,8 @@ async def listar_solicitudes(
     admin_therion: todas, con filtros.
     """
     items, total = await _ejecutar(
-        _use_case(db).listar(actor, estado, tipo, usuario_temporal_id, page, size, solo_vencidas=vencidas)
+        _use_case(db).listar(actor, estado, tipo, usuario_temporal_id, page, size,
+                             solo_vencidas=vencidas, evaluacion_id=evaluacion_id)
     )
     return {
         "items": [_resumen(s) for s in items],
@@ -191,6 +224,21 @@ async def cambiar_estado(
     s = await _ejecutar(
         _use_case(db).cambiar_estado(actor, solicitud_id, payload.estado, payload.comentario)
     )
+    return _detalle(s, actor)
+
+
+@router.post("/solicitudes/{solicitud_id}/prorroga", response_model=SolicitudARCOPDetalleResponse)
+async def prorrogar_solicitud(
+    solicitud_id: int,
+    payload: ProrrogarSolicitudARCOPRequest,
+    actor: Actor = Depends(solo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    admin_therion prorroga UNA vez el plazo de respuesta (por defecto 30 días más),
+    con motivo, antes de que venza. No aplica al bloqueo temporal.
+    """
+    s = await _ejecutar(_use_case(db).prorrogar(actor, solicitud_id, payload.motivo))
     return _detalle(s, actor)
 
 

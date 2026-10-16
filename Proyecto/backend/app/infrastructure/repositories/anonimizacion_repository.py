@@ -4,9 +4,14 @@ Anonimización de los datos personales de un titular (supresión ARCOP aprobada)
 NO hace commit: el caso de uso la ejecuta dentro de la MISMA transacción que la
 resolución de la solicitud, así o se aplica todo o nada.
 
+Dos titulares posibles:
+  - invitado (usuario_temporal): todas sus evaluaciones y solicitudes.
+  - encuestado anónimo (encuesta pública): una evaluación y sus solicitudes.
+
 Qué se borra / qué se conserva (decisión del equipo, ver CAMBIOS_ARCOP.md):
-  usuario_temporal      email y validacion_invitacion -> NULL; fecha_anonimizacion = ahora.
-                        Se conserva Rubro_id (benchmark por rubro).
+  usuario_temporal      (solo invitado) email y validacion_invitacion -> NULL;
+                        fecha_anonimizacion = ahora. Se conserva Rubro_id (benchmark).
+  evaluacion            clave_acceso_hash -> NULL (el encuestado pierde el acceso).
   respuestas            justificacion_usuario -> NULL. Se conservan clasificaciones.
   evidencias            nombre, ruta, hash, datos extraídos, justificación del LLM y
                         errores -> vacíos. Los ARCHIVOS se borran del disco después
@@ -42,12 +47,24 @@ class AnonimizacionRepository:
         self.session = session
 
     async def anonimizar_titular(self, usuario_id: int, ahora: datetime) -> tuple[dict, list[str]]:
+        """Invitado: todas sus evaluaciones y solicitudes (también las hechas como encuestado)."""
+        evals = select(Evaluacion.id).where(Evaluacion.usuario_temporal_id == usuario_id)
+        filtro_sols = (SolicitudARCOP.usuario_temporal_id == usuario_id) | SolicitudARCOP.evaluacion_id.in_(evals)
+        return await self._anonimizar(evals, filtro_sols, ahora, usuario_id=usuario_id)
+
+    async def anonimizar_encuestado(self, evaluacion_id: int, ahora: datetime) -> tuple[dict, list[str]]:
+        """Encuestado anónimo: su evaluación y las solicitudes hechas con su clave."""
+        evals = select(Evaluacion.id).where(Evaluacion.id == evaluacion_id)
+        filtro_sols = SolicitudARCOP.evaluacion_id == evaluacion_id
+        return await self._anonimizar(evals, filtro_sols, ahora, usuario_id=None)
+
+    async def _anonimizar(self, evals, filtro_sols, ahora: datetime,
+                          usuario_id: int | None) -> tuple[dict, list[str]]:
         """Devuelve (conteo de filas por tabla, rutas de archivos a borrar tras el commit)."""
         s = self.session
-        evals = select(Evaluacion.id).where(Evaluacion.usuario_temporal_id == usuario_id)
         resps = select(Respuesta.id).where(Respuesta.evaluacion_id.in_(evals))
         evids = select(Evidencia.id_evidencia).where(Evidencia.respuesta_id.in_(resps))
-        sols = select(SolicitudARCOP.id).where(SolicitudARCOP.usuario_temporal_id == usuario_id)
+        sols = select(SolicitudARCOP.id).where(filtro_sols)
 
         rutas = [
             r for r in (await s.execute(
@@ -60,9 +77,13 @@ class AnonimizacionRepository:
         async def _upd(nombre, stmt):
             conteo[nombre] = (await s.execute(stmt.execution_options(synchronize_session=False))).rowcount or 0
 
-        await _upd("usuario_temporal", update(UsuarioTemporal)
-                   .where(UsuarioTemporal.id == usuario_id)
-                   .values(email=None, validacion_invitacion=None, fecha_anonimizacion=ahora))
+        if usuario_id is not None:
+            await _upd("usuario_temporal", update(UsuarioTemporal)
+                       .where(UsuarioTemporal.id == usuario_id)
+                       .values(email=None, validacion_invitacion=None, fecha_anonimizacion=ahora))
+        await _upd("claves_evaluacion", update(Evaluacion)
+                   .where(Evaluacion.id.in_(evals), Evaluacion.clave_acceso_hash.is_not(None))
+                   .values(clave_acceso_hash=None))
         await _upd("respuestas", update(Respuesta)
                    .where(Respuesta.id.in_(resps))
                    .values(justificacion_usuario=None))
@@ -84,13 +105,14 @@ class AnonimizacionRepository:
                        | EventoSeguridad.evidencia_id.in_(evids)
                    )
                    .values(extracto=None, hash_texto=""))
-        await _upd("solicitudes_arcop", update(SolicitudARCOP)
-                   .where(SolicitudARCOP.usuario_temporal_id == usuario_id)
-                   .values(descripcion=TEXTO_ANONIMIZADO))
+        # Comentarios antes que solicitudes: `sols` es una subconsulta sobre solicitudes_arcop
         await _upd("comentarios_titular", update(EventoSolicitud)
                    .where(EventoSolicitud.solicitud_id.in_(sols),
-                          EventoSolicitud.actor_rol == Rol.REFERENTE.value,
+                          EventoSolicitud.actor_rol.in_([Rol.REFERENTE.value, Rol.ENCUESTADO.value]),
                           EventoSolicitud.comentario.is_not(None))
                    .values(comentario=None))
+        await _upd("solicitudes_arcop", update(SolicitudARCOP)
+                   .where(filtro_sols)
+                   .values(descripcion=TEXTO_ANONIMIZADO))
         conteo["archivos"] = len(rutas)
         return conteo, rutas

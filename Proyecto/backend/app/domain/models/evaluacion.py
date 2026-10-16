@@ -25,6 +25,9 @@ class Evaluacion(Base):
         "filtro_completado", Boolean, default=False, nullable=False
     )
     fecha_filtro: Mapped[date | None] = mapped_column("fecha_filtro", Date, nullable=True)
+    # Clave de acceso del encuestado anónimo (encuesta pública) para ejercer sus
+    # derechos ARCOP. Solo se guarda el hash; NULL = sin acceso (o ya anonimizada).
+    clave_acceso_hash: Mapped[str | None] = mapped_column("clave_acceso_hash", String(200), nullable=True)
 
     respuestas: Mapped[list["Respuesta"]] = relationship(
         back_populates="evaluacion",

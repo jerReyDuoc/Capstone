@@ -51,9 +51,14 @@ class Settings(BaseSettings):
     AUTH_SECRET: str | None = None
     AUTH_TOKEN_TTL_MIN: int = 480
     # ------------------------------------------------ Plazos de solicitudes ARCOP
-    # PENDIENTES DE DEFINIR por el equipo (dependen de la Ley 21.719). Vacíos = no
-    # se calcula fecha límite. Se cuentan en días CORRIDOS.
-    ARCOP_PLAZO_RESPUESTA_DIAS: int | None = None
+    # Ley 21.719 (art. 11 de la Ley 19.628 reemplazado): el responsable responde en
+    # 30 días CORRIDOS desde que recibe la solicitud, prorrogables UNA vez por hasta
+    # 30 días más; el bloqueo temporal se responde en 2 días HÁBILES.
+    ARCOP_PLAZO_RESPUESTA_DIAS: int = 30
+    ARCOP_PLAZO_PRORROGA_DIAS: int = 30
+    ARCOP_PLAZO_BLOQUEO_DIAS_HABILES: int = 2
+    # Días que tiene el titular para aportar antecedentes pedidos. La ley no lo fija:
+    # vacío = sin plazo (decisión del equipo).
     ARCOP_PLAZO_INFORMACION_DIAS: int | None = None
 
     model_config = SettingsConfigDict(env_file=".env")

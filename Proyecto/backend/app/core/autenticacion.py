@@ -1,20 +1,22 @@
 """
 Autenticación y roles de la API (punto ÚNICO de identidad del backend).
 
-Roles (los mismos que usa el frontend, ver frontend/js/store.js):
-  - referente      -> usuario temporal (usuario_temporal). Es el TITULAR de sus
-                      datos personales en las solicitudes ARCOP.
-  - admin_therion  -> administrador (usuarios_admin). Gestiona las solicitudes.
+Roles (referente y admin_therion son los mismos que usa el frontend):
+  - referente      -> usuario temporal invitado (sub = usuario_temporal.id).
+  - encuestado     -> encuestado anónimo de la encuesta pública (sub = evaluacion.id).
+  - admin_therion  -> administrador (sub = usuarios_admin.id). Gestiona las solicitudes.
+referente y encuestado son TITULARES de sus datos en las solicitudes ARCOP.
 
 Cómo se obtiene el token (app/api/routes/auth.py):
-  - Titular: POST /api/auth/titular  {usuario_temporal_id, email}
-  - Admin:   POST /api/auth/login    {email, password}
+  - Invitado:   POST /api/auth/titular     {usuario_temporal_id, email}
+  - Encuestado: POST /api/auth/encuestado  {evaluacion_id, clave}
+  - Admin:      POST /api/auth/login       {email, password}
 
 El token es un HMAC-SHA256 firmado con AUTH_SECRET (solo librería estándar):
     base64url(json {"sub": <id>, "rol": <rol>, "exp": <epoch>}) . base64url(firma)
 
 En cada petición se comprueba además en BD que el usuario siga habilitado
-(admin activo / titular no anonimizado), así desactivar a alguien corta su acceso
+(admin activo / titular no anonimizado / evaluación con clave vigente), así desactivar a alguien corta su acceso
 sin esperar a que expire el token.
 
 Token de prueba sin pasar por el login (solo desarrollo):
@@ -39,6 +41,7 @@ from app.core.database import get_db
 
 class Rol(str, Enum):
     REFERENTE = "referente"
+    ENCUESTADO = "encuestado"
     ADMIN_THERION = "admin_therion"
 
     @classmethod
@@ -48,13 +51,20 @@ class Rol(str, Enum):
 
 @dataclass(frozen=True)
 class Actor:
-    """Quién hace la petición. `id` es usuario_temporal.id (referente) o usuarios_admin.id (admin)."""
+    """
+    Quién hace la petición. `id` es usuario_temporal.id (referente),
+    evaluacion.id (encuestado) o usuarios_admin.id (admin).
+    """
     id: int
     rol: str
 
     @property
     def es_admin(self) -> bool:
         return self.rol == Rol.ADMIN_THERION.value
+
+    @property
+    def es_encuestado(self) -> bool:
+        return self.rol == Rol.ENCUESTADO.value
 
 
 class TokenInvalidoError(Exception):
@@ -144,7 +154,10 @@ _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 
 # Esquema de seguridad: lee el header Authorization y hace que Swagger (/docs)
 # muestre el botón "Authorize". auto_error=False -> los errores los damos nosotros.
-_bearer = HTTPBearer(auto_error=False, description="Token de /api/auth/login o /api/auth/titular (sin la palabra Bearer)")
+_bearer = HTTPBearer(
+    auto_error=False,
+    description="Token de /api/auth/login, /api/auth/titular o /api/auth/encuestado (sin la palabra Bearer)",
+)
 
 
 def _no_autorizado(codigo: str, mensaje: str) -> HTTPException:
@@ -157,6 +170,10 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
         from app.domain.models.usuario_admin import UsuarioAdmin
         admin = await db.get(UsuarioAdmin, actor.id)
         return bool(admin and admin.activo)
+    if actor.es_encuestado:
+        from app.domain.models.evaluacion import Evaluacion
+        evaluacion = await db.get(Evaluacion, actor.id)
+        return bool(evaluacion and evaluacion.clave_acceso_hash)
     from app.domain.models.usuario_temporal import UsuarioTemporal
     usuario = await db.get(UsuarioTemporal, actor.id)
     return bool(usuario and usuario.fecha_anonimizacion is None)
@@ -205,7 +222,8 @@ if __name__ == "__main__":  # emisión de tokens de prueba
     import argparse
 
     p = argparse.ArgumentParser(description="Emite un token de acceso de prueba (solo desarrollo).")
-    p.add_argument("--usuario", type=int, required=True, help="usuario_temporal.id o usuarios_admin.id")
+    p.add_argument("--usuario", type=int, required=True,
+                   help="usuario_temporal.id, evaluacion.id (encuestado) o usuarios_admin.id")
     p.add_argument("--rol", choices=Rol.valores(), required=True)
     p.add_argument("--ttl", type=int, default=None, help="minutos de validez")
     a = p.parse_args()
