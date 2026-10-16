@@ -23,6 +23,10 @@ class ResponderFiltroUseCase:
         evaluacion = await self.evaluacion_repo.get(evaluacion_id)
         if not evaluacion:
             raise ValueError(f"Evaluación {evaluacion_id} no encontrada")
+        if evaluacion.esta_cerrada:
+            raise ValueError(
+                f"La evaluación {evaluacion_id} está cerrada: no se puede rehacer el filtro"
+            )
 
         # 2. Validar que las 7 preguntas estén respondidas
         preguntas = await self.pregunta_repo.list_activas()

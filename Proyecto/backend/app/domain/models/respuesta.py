@@ -1,6 +1,6 @@
 from datetime import date
 from enum import Enum
-from sqlalchemy import Integer, String, Text, Float, Date, ForeignKey
+from sqlalchemy import Integer, String, Text, Float, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -35,6 +35,15 @@ class FuenteClasificacion(str, Enum):
 
 class Respuesta(Base):
     __tablename__ = "respuestas"
+    # HU-01: una sola respuesta por control en cada evaluación. Responder de nuevo
+    # un control ACTUALIZA la fila existente (POST /api/respuestas es un upsert).
+    # El índice único también acelera las consultas por evaluación (progreso).
+    __table_args__ = (
+        UniqueConstraint(
+            "Evaluacion_id", "Matriz_controles_id_control",
+            name="uq_respuesta_evaluacion_control",
+        ),
+    )
 
     id: Mapped[int] = mapped_column("id_respuesta", Integer, primary_key=True)
     estado_clasificacion: Mapped[str | None] = mapped_column(

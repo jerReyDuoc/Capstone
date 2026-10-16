@@ -13,6 +13,7 @@ y el LLM son dobles de prueba.
 Convención de nombres:
   test_*            -> comportamiento esperado; debe pasar.
   test_riesgo_*     -> documenta el comportamiento ACTUAL en un borde discutible
+                       (el de respuestas duplicadas pasó a prueba esperada en HU-01)
                        (pasa hoy; si el equipo cambia la regla, se actualiza).
   xfail(strict=True)-> DEFECTO confirmado. Falla "esperadamente" hasta que se
                        corrija; cuando se corrija pasará y pytest avisará
@@ -29,7 +30,7 @@ import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchem
 import app.application.use_cases.generate_resumen as gen_mod
 from app.application.filters.control_tree import CONTROLES_BASE, CONTROLES_POR_FILTRO
 from app.application.schemas.evidence_validation import EvidenceValidation
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase
+from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, EvaluacionCerradaError
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.upload_evidence import UploadEvidenceUseCase
@@ -37,6 +38,7 @@ from app.core.config import settings
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.domain.models.resumen import Resumen
+from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 
 NA = EstadoClasificacion.NO_APLICA.value
@@ -126,7 +128,7 @@ def _resumen(monkeypatch, pares, filtro=FILTRO_SOLO_BASE):
 
 class FakeRespuestaRepo:
     def __init__(self, respuesta=None, control=None):
-        self.respuesta, self.control, self.creadas = respuesta, control, []
+        self.respuesta, self.control, self.creadas, self.actualizadas = respuesta, control, [], []
 
     async def create(self, r):
         r.id = len(self.creadas) + 1
@@ -136,7 +138,12 @@ class FakeRespuestaRepo:
     async def get(self, _id):
         return self.respuesta
 
+    async def get_by_evaluacion_control(self, evaluacion_id, control_id):
+        return next((r for r in self.creadas
+                     if r.evaluacion_id == evaluacion_id and r.matriz_controles_id_control == control_id), None)
+
     async def update(self, r):
+        self.actualizadas.append(r)
         return r
 
     async def get_control(self, _id):
@@ -144,6 +151,21 @@ class FakeRespuestaRepo:
 
     async def get_brecha(self, _id):
         return None
+
+
+class FakeEvaluaciones:
+    """Contexto de evaluación abierta con el filtro completo (todo SI) por defecto."""
+
+    def __init__(self, estado="en_progreso", filtro_completado=True, filtro=None, existe=True):
+        self.estado, self.filtro_completado, self.existe = estado, filtro_completado, existe
+        self.filtro = FILTRO_TODO_SI if filtro is None else filtro
+
+    async def get_contexto(self, evaluacion_id):
+        if not self.existe:
+            return None
+        return ContextoEvaluacion(id=evaluacion_id, estado_progreso=self.estado,
+                                  filtro_completado=self.filtro_completado,
+                                  respuestas_filtro=dict(self.filtro))
 
 
 class FakeEvidenciaRepo:
@@ -201,8 +223,8 @@ class FakeValidator:
         )
 
 
-def _control():
-    return SimpleNamespace(id_control=7, catalogo_brechas_id_brecha=3)
+def _control(codigo="GOB-001"):
+    return SimpleNamespace(id_control=7, codigo_control=codigo, catalogo_brechas_id_brecha=3)
 
 
 def _respuesta(declarada=CUMP, justificacion="Política aprobada por el directorio."):
@@ -339,26 +361,36 @@ class TestResumenConNAMasivo:
         asyncio.run(GenerateResumenUseCase(session).execute(1))
         assert session.borrados == viejos
 
-    def test_volumen_10000_respuestas_mayoria_na_es_rapido_y_correcto(self, monkeypatch):
+    def test_volumen_10000_filas_mayoria_na_es_rapido_y_cuenta_una_por_control(self, monkeypatch):
+        """HU-01: la BD ya no admite estas filas repetidas (restricción única); si
+        llegaran, el resumen sigue siendo rápido y solo cuenta la última por control."""
         pares = [_par(CONTROLES_BASE[i % 22], NA) for i in range(9_990)]
         pares += [_par("DAT-001", CUMP) for _ in range(10)]
         t0 = time.perf_counter()
         r, _ = _resumen(monkeypatch, pares)
         ms = (time.perf_counter() - t0) * 1000
-        assert r["total_controles_evaluados"] == 10 and r["puntaje_general"] == 100.0
+        assert r["total_controles_evaluados"] == 1 and r["puntaje_general"] == 100.0
         assert ms < 500, f"Cálculo de resumen tardó {ms:.1f} ms"
 
-    def test_riesgo_respuestas_duplicadas_de_un_control_cuentan_doble(self, monkeypatch):
+    def test_respuestas_duplicadas_de_un_control_cuentan_una_sola_vez(self, monkeypatch):
         """
-        RIESGO: POST /api/respuestas siempre INSERTA (no hay upsert ni unique
-        evaluacion+control). Si el usuario responde dos veces el mismo control,
-        ambas filas puntúan: 'no_cumplido' + 'cumplido' => 50 %.
+        HU-01 (antes test_riesgo_..._cuentan_doble): POST /api/respuestas es un upsert
+        y la BD tiene unique (evaluación, control). Aun si llegaran dos filas del
+        mismo control, el resumen cuenta solo la más reciente: 'no_cumplido' y luego
+        'cumplido' => 1 control evaluado y 100 % (antes: 2 controles y 50 %).
         """
         pares = [_par(c, NA) for c in CONTROLES_BASE[1:]]
         pares += [_par("DAT-001", NOC), _par("DAT-001", CUMP)]
         r, _ = _resumen(monkeypatch, pares)
-        assert r["total_controles_evaluados"] == 2
-        assert r["puntaje_general"] == 50.0
+        assert r["total_controles_evaluados"] == 1
+        assert r["puntaje_general"] == 100.0
+
+    def test_la_tabla_respuestas_tiene_unique_evaluacion_control(self):
+        restricciones = {
+            tuple(c.name for c in u.columns)
+            for u in Respuesta.__table__.constraints if u.__class__.__name__ == "UniqueConstraint"
+        }
+        assert ("Evaluacion_id", "Matriz_controles_id_control") in restricciones
 
     def test_evaluacion_inexistente(self, monkeypatch):
         _usar_filtro(monkeypatch, FILTRO_SOLO_BASE)
@@ -387,8 +419,8 @@ class TestNivelMadurez:
 # =====================================================================
 class TestCrearRespuestasNA:
 
-    def _uc(self, repo):
-        return CreateRespuestaUseCase(repo, guard=ReglasPromptGuard())
+    def _uc(self, repo, evaluaciones=None):
+        return CreateRespuestaUseCase(repo, evaluaciones or FakeEvaluaciones(), guard=ReglasPromptGuard())
 
     def test_na_masivo_40_controles_se_acepta_sin_brechas(self):
         repo = FakeRespuestaRepo(control=_control())
@@ -413,9 +445,17 @@ class TestCrearRespuestasNA:
     def test_no_cumplido_asigna_brecha_pero_na_no(self):
         repo = FakeRespuestaRepo(control=_control())
         noc = asyncio.run(self._uc(repo).execute(1, 7, NOC, "No existe política."))
-        na = asyncio.run(self._uc(repo).execute(1, 7, NA, ""))
         assert noc.catalogo_brechas_id_brecha == 3
+        na = asyncio.run(self._uc(repo).execute(1, 8, NA, ""))
         assert na.catalogo_brechas_id_brecha is None
+
+    def test_cambiar_no_cumplido_a_na_actualiza_la_misma_fila_y_quita_la_brecha(self):
+        repo = FakeRespuestaRepo(control=_control())
+        uc = self._uc(repo)
+        noc = asyncio.run(uc.execute(1, 7, NOC, "No existe política."))
+        na = asyncio.run(uc.execute(1, 7, NA, ""))
+        assert na is noc and len(repo.creadas) == 1 and repo.actualizadas == [noc]
+        assert na.estado_clasificacion_final == NA and na.catalogo_brechas_id_brecha is None
 
 
 # =====================================================================
@@ -425,32 +465,41 @@ class TestSubidaSinEvidencia:
 
     def _subir(self, respuesta, archivo):
         storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
-        uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(respuesta), storage)
+        uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(respuesta), storage, FakeEvaluaciones())
         return asyncio.run(uc.execute(10, archivo)), storage, evid_repo
 
     def test_archivo_vacio_se_rechaza_y_no_se_guarda(self):
         storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
-        uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(_respuesta()), storage)
+        uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(_respuesta()), storage, FakeEvaluaciones())
         with pytest.raises(ValueError, match="vacío"):
             asyncio.run(uc.execute(10, FakeUpload(b"")))
         assert storage.guardados == [] and evid_repo.creadas == []
 
     def test_respuesta_inexistente(self):
-        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(None), FakeStorage())
+        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(None), FakeStorage(), FakeEvaluaciones())
         with pytest.raises(ValueError, match="no encontrada"):
             asyncio.run(uc.execute(10, FakeUpload(b"x")))
 
     def test_respuesta_sin_clasificacion_declarada(self):
         r = _respuesta()
         r.estado_clasificacion = None
-        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(r), FakeStorage())
+        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(r), FakeStorage(), FakeEvaluaciones())
         with pytest.raises(ValueError, match="no tiene clasificación"):
             asyncio.run(uc.execute(10, FakeUpload(b"x")))
+
+    @pytest.mark.parametrize("estado", ["completada", "cerrada"])
+    def test_evaluacion_cerrada_rechaza_evidencia_y_no_guarda_el_archivo(self, estado):
+        storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
+        uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(_respuesta()), storage,
+                                   FakeEvaluaciones(estado=estado))
+        with pytest.raises(EvaluacionCerradaError, match="no admite evidencias"):
+            asyncio.run(uc.execute(10, FakeUpload(b"Politica de IA v1")))
+        assert storage.guardados == [] and evid_repo.creadas == []
 
     @pytest.mark.parametrize("clasif", [NOC, NA, REV])
     def test_clasificaciones_que_no_requieren_evidencia_rechazan_subida(self, clasif):
         storage = FakeStorage()
-        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(_respuesta(clasif)), storage)
+        uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(_respuesta(clasif)), storage, FakeEvaluaciones())
         with pytest.raises(ValueError, match="No se puede subir evidencia"):
             asyncio.run(uc.execute(10, FakeUpload(b"contenido")))
         assert storage.guardados == []

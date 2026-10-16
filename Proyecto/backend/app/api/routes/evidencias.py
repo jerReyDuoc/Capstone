@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.application.use_cases.upload_evidence import UploadEvidenceUseCase
 from app.application.schemas.api_schemas import EvidenciaUploadResponse, EvidenciaDetalleResponse
+from app.application.use_cases.create_respuesta import RespuestaRechazadaError
+from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 from app.infrastructure.storage.local_storage import LocalFileStorage
@@ -25,10 +27,12 @@ async def upload_evidencia(
     respuesta_repo = RespuestaRepository(db)
     storage = LocalFileStorage()
 
-    use_case = UploadEvidenceUseCase(evidencia_repo, respuesta_repo, storage)
+    use_case = UploadEvidenceUseCase(evidencia_repo, respuesta_repo, storage, EvaluacionRepository(db))
 
     try:
         evidencia = await use_case.execute(respuesta_id, file)
+    except RespuestaRechazadaError as e:
+        raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

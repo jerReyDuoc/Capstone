@@ -182,6 +182,10 @@ async def _live():
             api = API(client)
             await api.verificar()
             await bd.preparar()
+            # HU-01: solo se responden controles aplicables según el filtro F1–F7
+            r = await client.post(f"/api/evaluaciones/{EVAL_ID}/filtro", json={"respuestas": [
+                {"codigo": f"F{i}", "respuesta": True} for i in range(1, 8)]})
+            assert r.status_code == 200, r.text
             controles = [r["id_control"] for r in await bd.filas(
                 "SELECT id_control FROM matriz_controles ORDER BY id_control LIMIT 3")]
             print(f"\n{'=' * 70}\nPRUEBA EN VIVO  |  API {BASE_URL}  |  evaluación {EVAL_ID}\n{'=' * 70}")

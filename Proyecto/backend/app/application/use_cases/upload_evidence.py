@@ -6,6 +6,8 @@ from fastapi import UploadFile
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion
 from app.domain.ports.file_storage_port import FileStoragePort
+from app.application.use_cases.create_respuesta import EvaluacionCerradaError
+from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
@@ -20,6 +22,7 @@ class UploadEvidenceUseCase:
     - Las respuestas con 'no_cumplido' o 'no_aplica' NO requieren evidencia.
     - El archivo se guarda en el storage configurado (local por defecto).
     - Se calcula un hash SHA-256 del contenido para detectar duplicados.
+    - No se admiten evidencias en evaluaciones cerradas (409 EVALUACION_CERRADA).
     """
 
     def __init__(
@@ -27,16 +30,27 @@ class UploadEvidenceUseCase:
         evidencia_repo: EvidenciaRepository,
         respuesta_repo: RespuestaRepository,
         storage: FileStoragePort,
+        evaluaciones: EvaluacionRepository,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
         self.storage = storage
+        self.evaluaciones = evaluaciones
 
     async def execute(self, respuesta_id: int, file: UploadFile) -> Evidencia:
         # 1. Verificar que la respuesta existe
         respuesta = await self.respuesta_repo.get(respuesta_id)
         if not respuesta:
             raise ValueError(f"Respuesta {respuesta_id} no encontrada")
+
+        # 1b. La evaluación debe seguir abierta: tras completarla el puntaje ya
+        #     está fijado y una evidencia nueva lo cambiaría después del cierre.
+        contexto = await self.evaluaciones.get_contexto(respuesta.evaluacion_id)
+        if contexto is not None and contexto.cerrada:
+            raise EvaluacionCerradaError(
+                f"La evaluación {respuesta.evaluacion_id} está cerrada "
+                f"({contexto.estado_progreso}): ya no admite evidencias"
+            )
 
         # 2. Regla de negocio: solo cumplido/parcialmente_cumplido requieren evidencia
         clasificacion_actual = respuesta.estado_clasificacion

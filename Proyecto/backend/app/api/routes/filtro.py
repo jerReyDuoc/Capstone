@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.models.matriz_control import MatrizControl
-from sqlalchemy import select
-from app.application.schemas.api_schemas import ControlResponse
+from app.application.schemas.api_schemas import ControlResponse, ProgresoCuestionarioResponse
+from app.application.use_cases.progreso_cuestionario import calcular_progreso
+from app.infrastructure.cache import catalogo_controles
+from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
 from app.core.database import get_db
 from app.application.use_cases.responder_filtro import ResponderFiltroUseCase
@@ -97,34 +98,41 @@ async def listar_controles_aplicables(
     """
     Devuelve solo los controles que aplican a esta evaluación,
     según las respuestas del filtro.
-    """
-    eval_repo = EvaluacionRepository(db)
-    resp_repo = RespuestaFiltroRepository(db)
 
-    evaluacion = await eval_repo.get(evaluacion_id)
-    if not evaluacion:
+    HU-01 C4: una sola consulta (evaluación + filtro) y el catálogo de controles
+    sale de una caché en memoria ya serializada (ver catalogo_controles.py).
+    """
+    contexto = await EvaluacionRepository(db).get_contexto(evaluacion_id)
+    if contexto is None:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
-    if not evaluacion.filtro_completado:
+    if not contexto.filtro_completado:
         raise HTTPException(
             status_code=400,
             detail="La evaluación aún no ha completado el filtro de aplicabilidad"
         )
 
-    respuestas = await resp_repo.list_by_evaluacion(evaluacion_id)
-    respuestas_dict = {
-        r.pregunta.codigo: r.respuesta
-        for r in respuestas
-        if r.pregunta is not None
-    }
-    codigos_aplicables = get_controles_aplicables(respuestas_dict)
+    cuerpo = await catalogo_controles.json_controles(db, contexto.codigos_aplicables)
+    return Response(content=cuerpo, media_type="application/json")
 
-    if not codigos_aplicables:
-        return []
 
-    result = await db.execute(
-        select(MatrizControl)
-        .where(MatrizControl.codigo_control.in_(codigos_aplicables))
-        .order_by(MatrizControl.codigo_control)
-    )
-    return list(result.scalars().all())
+@router.get("/{evaluacion_id}/progreso", response_model=ProgresoCuestionarioResponse)
+async def progreso_cuestionario(
+    evaluacion_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Progreso del cuestionario para **reanudarlo** (HU-01): controles respondidos /
+    aplicables, desglose por dimensión, el siguiente control pendiente y el estado
+    declarado de cada control ya respondido.
+
+    `etapa` indica dónde retomar: `filtro` (falta F1–F7), `cuestionario`
+    (quedan controles pendientes), `completo` (todos respondidos) o `cerrada`.
+    """
+    contexto = await EvaluacionRepository(db).get_contexto(evaluacion_id)
+    if contexto is None:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+
+    catalogo = await catalogo_controles.obtener(db)
+    filas = await RespuestaRepository(db).list_estado_por_evaluacion(evaluacion_id)
+    return calcular_progreso(contexto, catalogo, filas)

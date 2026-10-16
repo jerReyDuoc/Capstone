@@ -4,6 +4,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
+# Estados de `estado_progreso` en los que la evaluación ya no admite respuestas.
+# "completada" es el estado que usa el benchmark (update_benchmark.py).
+ESTADOS_CERRADOS = frozenset({"completada", "cerrada"})
+
+
 class Evaluacion(Base):
     __tablename__ = "evaluacion"
 
@@ -25,3 +30,7 @@ class Evaluacion(Base):
         back_populates="evaluacion",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def esta_cerrada(self) -> bool:
+        return self.estado_progreso in ESTADOS_CERRADOS

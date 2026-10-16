@@ -272,6 +272,12 @@ Lógica en `app/application/filters/control_tree.py`.
 
 Al crear la respuesta, la **justificación** pasa por el detector de prompt injection: si es sospechosa se rechaza con `422 PROMPT_INJECTION` y se registra un evento de seguridad.
 
+**Reglas del cuestionario (HU-01):**
+
+- **Una respuesta por control y evaluación** (restricción única `uq_respuesta_evaluacion_control`). `POST /api/respuestas/` es un *upsert*: la primera vez crea (201) y luego actualiza la misma fila (200, mismo `id_respuesta`). Si se reenvía exactamente la misma declaración no se modifica nada (el guardado automático no borra la validación del LLM); si cambia, la declaración nueva pasa a ser el estado vigente (`fuente = usuario`) y se descarta la validación anterior (LLM o revisión). Las evidencias ya subidas se conservan.
+- Solo se aceptan respuestas a evaluaciones **existentes** (404 `EVALUACION_NO_ENCONTRADA`), **abiertas** (409 `EVALUACION_CERRADA` si `estado_progreso` es `completada` o `cerrada`), **con el filtro completado** (409 `FILTRO_PENDIENTE`) y a controles **aplicables** según F1–F7 (422 `CONTROL_NO_APLICABLE`; 404 `CONTROL_NO_ENCONTRADO`). Una evaluación cerrada tampoco permite rehacer el filtro.
+- `GET /api/evaluaciones/{id}/progreso` devuelve respondidos / aplicables, el avance por dimensión, el siguiente control pendiente y el estado declarado de cada control ya respondido, para **reanudar** el cuestionario. Si se rehace el filtro, las respuestas de controles que dejan de aplicar no cuentan (`respuestas_fuera_de_alcance`).
+
 ### 5.4 Validación asíncrona de evidencias
 
 ```mermaid
@@ -416,7 +422,7 @@ PostgreSQL 16, **19 tablas** + `alembic_version`, **27 claves foráneas**. Los n
 | `usuario_temporal` | Invitado por link, con expiración, rubro y `fecha_anonimizacion` |
 | `evaluacion` | Sesión de diagnóstico: estado, `filtro_completado`, fechas |
 | `respuestas_filtro` | Respuesta SI/NO a cada pregunta de compuerta (única por evaluación y pregunta) |
-| `respuestas` | Respuesta a un control: clasificación declarada, justificación, clasificación final, fuente (`usuario`/`llm`/`seguridad`/`revision`), confianza, brecha, revisión humana |
+| `respuestas` | Respuesta a un control (única por evaluación y control): clasificación declarada, justificación, clasificación final, fuente (`usuario`/`llm`/`seguridad`/`revision`), confianza, brecha, revisión humana |
 | `evidencias` | Archivo de respaldo: ruta, MIME, hash, estado de validación, resultado del LLM |
 
 **Analíticas**
@@ -540,7 +546,8 @@ Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Do
 | GET | `/api/evaluaciones/{id}/respuestas?page=&size=&estado_final=&fuente=` | 🔓 | Respuestas paginadas (filtra por clasificación final o fuente) |
 | GET | `/api/evaluaciones/{id}/filtro` | 🔓 | Preguntas F1–F7, respuestas guardadas y cantidad de controles aplicables |
 | POST | `/api/evaluaciones/{id}/filtro` | 🔓 | `{"respuestas":[{"codigo":"F1","respuesta":true}, …]}` (las 7) → controles aplicables |
-| GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo) |
+| GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo). El catálogo sale de una caché en memoria (TTL 5 min) |
+| GET | `/api/evaluaciones/{id}/progreso` | 🔓 | Progreso del cuestionario para reanudar: `etapa` (`filtro`/`cuestionario`/`completo`/`cerrada`), respondidos / aplicables, `por_dimension`, `siguiente_control`, `pendientes`, `respondidos` |
 | POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general |
 | GET | `/api/evaluaciones/{id}/resumen` | 🔓 | Resumen guardado (404 si no se ha cerrado) |
 | GET | `/api/evaluaciones/{id}/comparativa` | 🔓 | Resumen vs. benchmark del rubro |
@@ -552,7 +559,8 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` → 201 `{id_respuesta}`; 422 `PROMPT_INJECTION` si la justificación es sospechosa |
+| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
+| PUT | `/api/respuestas/{id}` | 🔓 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
 | GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
 | PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana |
 | POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío |
@@ -873,7 +881,8 @@ docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE
 
 - **T-04 · Motor NER (15-oct-2026, Docker, 8 núcleos):** página de 3.000 caracteres en 25,1 ms (p95; límite 2.000 ms), evidencia de 8.000 caracteres en 66,6 ms (p95). Precisión 0,988 y cobertura de PII 100 % sobre 40 páginas etiquetadas. Suite completa: 212 aprobadas, 1 omitida (prueba en vivo).
 - **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre (**corregidos en T-04**, motor v1.1.0).
-- **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumple `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
+- **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumplía `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
+- **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). En una medición de referencia contra PostgreSQL real con concurrencia 10 bajó de p95 152 ms a 24–35 ms (≈5× más rápido); falta repetir la prueba live en Docker para el reporte oficial (ver `backend/CAMBIOS_HU01.md`).
 
 ---
 
@@ -931,7 +940,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | # | Ítem | Propuesta |
 |---|---|---|
 | 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo nginx, 20 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
-| 7 | `GET /evaluaciones/{id}/controles-aplicables` p95 542 ms (único fuera del requisito) | Cachear códigos aplicables al guardar el filtro o índice por `codigo_control` |
+| 7 | ~~`GET /evaluaciones/{id}/controles-aplicables` p95 542 ms~~ **Resuelto en HU-01** (consulta única + caché del catálogo); repetir la medición live en Docker | — |
 | 8 | NER: los falsos positivos "la Ley 21" y "Presidenta del Directorio" se corrigieron en T-04. Queda abierto: textos **completamente en mayúsculas** con frases largas, donde spaCy puede no aislar el nombre | Regla adicional para texto 100 % en mayúsculas; ampliar `ner_gold.jsonl` con casos reales anonimizados |
 | 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
 | 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `CAMBIOS_ARCOP.md` |

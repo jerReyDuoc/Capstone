@@ -80,6 +80,13 @@ class Op:
     # False = reescribe la MISMA evaluación (filtro, cerrar): en paralelo chocaría
     # consigo misma, algo que no hacen usuarios reales; se mide secuencial.
     concurrente: bool = True
+    # Otros códigos HTTP correctos. HU-01: POST /api/respuestas es un upsert y
+    # responde 200 cuando el control ya estaba respondido (la medición recorre los
+    # controles más de una vez).
+    otros_validos: tuple = ()
+
+    def valido(self, codigo: int) -> bool:
+        return codigo == self.esperado or codigo in self.otros_validos
 
 
 @dataclass
@@ -101,7 +108,7 @@ class Medicion:
 
 
 def _guardar_respuesta(r, ctx):
-    if r.status_code == 201:
+    if r.status_code in (200, 201):
         ctx["respuestas"].append(r.json()["id_respuesta"])
 
 
@@ -127,7 +134,7 @@ OPERACIONES = [
     Op("POST respuesta", "C", "POST", lambda i, c: "/api/respuestas/", 201,
        lambda i, c: {"json": {"evaluacion_id": EVAL_ID, "matriz_control_id": _control(i, c),
                               "estado_clasificacion": "cumplido", "justificacion": JUSTIFICACION}},
-       _guardar_respuesta),
+       _guardar_respuesta, otros_validos=(200,)),
     Op("GET respuesta", "R", "GET", lambda i, c: f"/api/respuestas/{_respuesta_id(i, c)}", 200),
     Op("GET respuestas de evaluación (paginado)", "R", "GET",
        lambda i, c: f"/api/evaluaciones/{EVAL_ID}/respuestas?page=1&size=50", 200),
@@ -217,7 +224,7 @@ async def _medir_todo() -> dict[str, Medicion]:
 
 def _cumple(op: Op, m: Medicion) -> bool:
     valor = m.maximo if ESTRICTO else m.p(.95)
-    return all(x == op.esperado for x in m.codigos) and valor < UMBRAL_MS
+    return all(op.valido(x) for x in m.codigos) and valor < UMBRAL_MS
 
 
 def _reportar(res: dict[str, Medicion]):
@@ -272,7 +279,7 @@ def _params():
 @pytest.mark.parametrize("op", list(_params()))
 def test_endpoint_responde_bajo_umbral(mediciones, op):
     m = mediciones[op.nombre]
-    incorrectos = [x for x in m.codigos if x != op.esperado]
+    incorrectos = [x for x in m.codigos if not op.valido(x)]
     assert not incorrectos, f"{op.nombre}: esperaba HTTP {op.esperado}, recibió {sorted(set(incorrectos))}"
 
     valor = m.maximo if ESTRICTO else m.p(.95)

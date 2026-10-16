@@ -21,6 +21,7 @@ from app.application.schemas.evidence_validation import EvidenceValidation
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.core.config import settings
+from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard, escapar_para_prompt
 
 RUT = "15.444.333-2"
@@ -55,6 +56,9 @@ class FakeRespuestaRepo:
 
     async def update(self, r):
         return r
+
+    async def get_by_evaluacion_control(self, _evaluacion_id, _control_id):
+        return None
 
     async def get_control(self, _id):
         return self.control
@@ -107,7 +111,15 @@ class FakeValidator:
 
 
 def _control():
-    return SimpleNamespace(id_control=7, catalogo_brechas_id_brecha=3)
+    return SimpleNamespace(id_control=7, codigo_control="GOB-001", catalogo_brechas_id_brecha=3)
+
+
+class FakeEvaluaciones:
+    """Evaluación abierta con el filtro completo (todo SI): el control GOB-001 aplica."""
+
+    async def get_contexto(self, evaluacion_id):
+        return ContextoEvaluacion(id=evaluacion_id, estado_progreso="en_progreso", filtro_completado=True,
+                                  respuestas_filtro={f"F{i}": True for i in range(1, 8)})
 
 
 def _respuesta(justificacion="Política aprobada."):
@@ -145,7 +157,7 @@ def _process(contenido, respuesta, confianza=0.95, validator=None):
 @pytest.mark.parametrize("ataque", ATAQUES)
 def test_justificacion_con_inyeccion_se_bloquea_y_registra(ataque):
     guard, eventos, repo = ReglasPromptGuard(), FakeEventoRepo(), FakeRespuestaRepo(control=_control())
-    uc = CreateRespuestaUseCase(repo, guard=guard, registrar_evento=RegistrarEventoSeguridad(eventos, guard))
+    uc = CreateRespuestaUseCase(repo, FakeEvaluaciones(), guard=guard, registrar_evento=RegistrarEventoSeguridad(eventos, guard))
     with pytest.raises(InyeccionDetectadaError):
         asyncio.run(uc.execute(1, 7, "cumplido", ataque))
     assert repo.creadas == []                 # no se guardó la respuesta
@@ -156,13 +168,13 @@ def test_justificacion_con_inyeccion_se_bloquea_y_registra(ataque):
 @pytest.mark.parametrize("texto", LEGITIMOS)
 def test_justificacion_legitima_se_guarda(texto):
     guard, repo = ReglasPromptGuard(), FakeRespuestaRepo(control=_control())
-    uc = CreateRespuestaUseCase(repo, guard=guard, registrar_evento=RegistrarEventoSeguridad(FakeEventoRepo(), guard))
+    uc = CreateRespuestaUseCase(repo, FakeEvaluaciones(), guard=guard, registrar_evento=RegistrarEventoSeguridad(FakeEventoRepo(), guard))
     r = asyncio.run(uc.execute(1, 7, "cumplido", texto))
     assert r.justificacion_usuario == texto   # en BD se guarda el texto original
 
 
 def test_usuario_no_puede_declarar_requiere_revision():
-    uc = CreateRespuestaUseCase(FakeRespuestaRepo(control=_control()), guard=ReglasPromptGuard())
+    uc = CreateRespuestaUseCase(FakeRespuestaRepo(control=_control()), FakeEvaluaciones(), guard=ReglasPromptGuard())
     with pytest.raises(ValueError):
         asyncio.run(uc.execute(1, 7, EstadoClasificacion.REQUIERE_REVISION.value, "texto"))
 

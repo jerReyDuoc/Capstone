@@ -46,3 +46,14 @@ def bd_live():
     yield
     if not h.CONSERVAR_DATOS:
         asyncio.run(h.limpiar_bd())
+
+
+@pytest.fixture(autouse=True)
+def _catalogo_controles_limpio():
+    """HU-01: el catálogo de controles se cachea en memoria; cada prueba en proceso
+    crea su propia BD SQLite, así que se invalida antes y después de cada test."""
+    from app.infrastructure.cache import catalogo_controles
+
+    catalogo_controles.invalidar()
+    yield
+    catalogo_controles.invalidar()

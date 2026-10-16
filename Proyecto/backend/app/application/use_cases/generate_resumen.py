@@ -56,8 +56,14 @@ class GenerateResumenUseCase:
             select(Respuesta, MatrizControl)
             .join(MatrizControl, Respuesta.matriz_controles_id_control == MatrizControl.id_control)
             .where(Respuesta.evaluacion_id == evaluacion_id)
+            .order_by(Respuesta.id)
         )
-        pares = list(result.all())
+        # HU-01: una respuesta por control. La BD ya lo garantiza (restricción única);
+        # por defensa, si llegaran duplicados solo cuenta la más reciente.
+        ultima_por_control = {}
+        for respuesta, control in result.all():
+            ultima_por_control[control.codigo_control] = (respuesta, control)
+        pares = list(ultima_por_control.values())
 
         # 4. Filtrar a los que aplican y no son "no_aplica"
         por_dominio: dict[int, list[dict]] = {}

@@ -24,7 +24,7 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, cliente_api  # noqa: E402
+from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, body_filtro, cliente_api  # noqa: E402
 
 from app.core import autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
@@ -355,6 +355,9 @@ async def _llevar_a_en_proceso(c, sid):
 def test_supresion_resuelta_anonimiza_datos_del_titular():
     async def esc(c):
         # Datos personales del titular 1: una respuesta con justificación y una evidencia
+        # (HU-01: antes de responder hay que completar el filtro de aplicabilidad)
+        r = await c.post("/api/evaluaciones/1/filtro", json=body_filtro(True))
+        assert r.status_code == 200, r.text
         r = await c.post("/api/respuestas/", json={
             "evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "cumplido",
             "justificacion": "Política aprobada por Juan Pérez, gerente de TI.",

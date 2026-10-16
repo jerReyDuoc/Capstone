@@ -179,6 +179,9 @@ async def entorno(monkeypatch, sanitizer_enabled=True):
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://e2e") as c:
+            # HU-01: solo se responden controles aplicables según el filtro F1–F7
+            r = await c.post(f"/api/evaluaciones/{h.EVAL_ID}/filtro", json=h.body_filtro(True))
+            assert r.status_code == 200, r.text
             yield SimpleEnv(c, Session, espia, app.state.arq, tasks, factory, desc_ner)
     finally:
         app.dependency_overrides.pop(get_db, None)

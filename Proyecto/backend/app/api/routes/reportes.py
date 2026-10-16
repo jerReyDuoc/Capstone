@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
+from app.application.use_cases.completar_evaluacion import CompletarEvaluacionUseCase
+from app.application.use_cases.create_respuesta import RespuestaRechazadaError
 from app.domain.models.resumen import Resumen
 from app.domain.models.dominio import Dominio
 from app.domain.models.benchmark import Benchmark
@@ -22,6 +24,26 @@ async def cerrar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_d
         return await use_case.execute(evaluacion_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post(
+    "/{evaluacion_id}/completar",
+    responses={
+        404: {"description": "Evaluación inexistente"},
+        409: {"description": "Ya cerrada, filtro pendiente, cuestionario incompleto o evidencias en validación"},
+    },
+)
+async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Cierre DEFINITIVO de la evaluación: exige el cuestionario completo y sin
+    evidencias en validación, genera el resumen y marca `estado_progreso = completada`.
+    Desde ahí no admite respuestas, cambios de filtro ni evidencias, y entra al
+    benchmark. (`POST /cerrar` sigue siendo el recálculo/vista previa sin cerrar.)
+    """
+    try:
+        return await CompletarEvaluacionUseCase(db).execute(evaluacion_id)
+    except RespuestaRechazadaError as e:
+        raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
 
 
 @router.get("/{evaluacion_id}/resumen")

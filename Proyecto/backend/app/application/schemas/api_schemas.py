@@ -165,3 +165,46 @@ class EstadoFiltroResponse(BaseModel):
     preguntas: list[PreguntaFiltroResponse]
     respuestas: list[RespuestaFiltroResponse] = []
     controles_aplicables: int = 0
+
+# ============================================================
+# Schemas del progreso del cuestionario (HU-01)
+# ============================================================
+
+class ControlPendienteResponse(BaseModel):
+    id_control: int
+    codigo_control: str
+    dominio_id: int | None
+    dominio: str | None
+
+
+class ControlRespondidoResponse(ControlPendienteResponse):
+    id_respuesta: int
+    estado_clasificacion: str | None
+    estado_clasificacion_final: str | None
+
+
+class ProgresoDimensionResponse(BaseModel):
+    dominio_id: int | None
+    dominio: str | None
+    aplicables: int
+    respondidos: int
+    porcentaje: float
+
+
+class ProgresoCuestionarioResponse(BaseModel):
+    evaluacion_id: int
+    estado_progreso: str | None
+    cerrada: bool
+    filtro_completado: bool
+    etapa: str                       # filtro | cuestionario | completo | cerrada
+    controles_aplicables: int
+    controles_respondidos: int
+    controles_pendientes: int
+    porcentaje: float                # respondidos / aplicables * 100
+    # Respuestas a controles que el filtro actual ya no deja aplicables (p.ej. tras
+    # rehacer el filtro). No cuentan en el progreso ni en el puntaje.
+    respuestas_fuera_de_alcance: int
+    por_dimension: list[ProgresoDimensionResponse]
+    siguiente_control: ControlPendienteResponse | None
+    pendientes: list[ControlPendienteResponse]
+    respondidos: list[ControlRespondidoResponse]
