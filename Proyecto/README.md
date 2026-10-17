@@ -82,6 +82,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
+| PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `backend/CAMBIOS_HU06.md` |
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado por cron diario (ver deuda técnica #4) |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
@@ -152,7 +153,8 @@ Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` →
 1. **El LLM nunca accede a la BD.** Solo recibe texto (prompt) y devuelve JSON validado con Pydantic. El backend es el único que lee y escribe.
 2. **El backend decide, el LLM propone.** Umbral de confianza, degradación y asignación de brechas son reglas de negocio del backend.
 3. **Ningún dato personal sale en claro.** Todo texto no confiable pasa por el motor NER antes de llegar al proveedor; si la sanitización falla, se aborta (*fail-closed*).
-4. **Todo queda auditado.** Cada llamada al LLM se registra en `llamadas_llm`; cada mapa de entidades se guarda cifrado en `sanitizaciones`; cada intento de inyección en `eventos_seguridad`; cada cambio ARCOP en `eventos_solicitud_arcop`.
+4. **Nada se guarda con PII en claro (HU-06).** Justificaciones y nombres de archivo se anonimizan antes de escribirse; los archivos de evidencia viven cifrados hasta que el worker los reemplaza por su texto anonimizado; los textos ARCOP se cifran (excepción documentada).
+5. **Todo queda auditado.** Cada llamada al LLM se registra en `llamadas_llm`; cada mapa de entidades (tipos, huellas HMAC y conteos, sin valores: HU-06) en `sanitizaciones`; cada intento de inyección en `eventos_seguridad`; cada cambio ARCOP en `eventos_solicitud_arcop`.
 
 ---
 
@@ -211,7 +213,7 @@ Capstone/
             │   ├── llm/            # groq_provider.py, factory.py
             │   ├── repositories/   # 10 repositorios
             │   ├── security/       # ner_sanitizer.py, cifrado.py, prompt_guard.py, seguridad.py
-            │   └── storage/local_storage.py
+            │   └── storage/        # local_storage.py, archivo_cifrado_storage.py (HU-06)
             └── worker/tasks.py     # process_evidence_task + cron update_benchmark_task
 ```
 
@@ -445,7 +447,7 @@ PostgreSQL 16, **19 tablas** + `alembic_version`, **27 claves foráneas**. Los n
 | Tabla | Descripción |
 |---|---|
 | `llamadas_llm` | Una fila por ejecución de la capa de IA: tarea, proveedor, modelo, versión de prompt, éxito/tipo de error, tokens, costo, latencia, entidades anonimizadas, clasificación y confianza. **Nunca guarda texto del usuario** |
-| `sanitizaciones` | Mapa de entidades por texto: metadatos sin PII (`entidades` con huella HMAC) y `mapa_cifrado` (Fernet) con los valores originales. **Nunca se envía al LLM** |
+| `sanitizaciones` | Mapa de entidades por texto: metadatos sin PII (`entidades` con huella HMAC) y conteos. `mapa_cifrado` queda en NULL (HU-06: irreversible; solo se llena con `GUARDAR_MAPA_ENTIDADES_CIFRADO=true`). **Nunca se envía al LLM** |
 | `eventos_seguridad` | Intentos de prompt injection: origen (justificación/evidencia), extracto anonimizado, hash, revisado |
 
 **Derechos ARCOP y administración**
@@ -612,6 +614,8 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | 409 | `TRANSICION_INVALIDA` (incluye `estado_actual` y `permitidas`) | Cambio de estado ARCOP no permitido |
 | 422 | `PROMPT_INJECTION` | Justificación bloqueada |
 | 503 | `AUTH_NO_CONFIGURADA` | Falta `AUTH_SECRET` |
+| 503 | `ANONIMIZACION_NO_DISPONIBLE` | HU-06: el motor NER falló; no se guardó la justificación ni la evidencia |
+| 503 | `CIFRADO_NO_CONFIGURADO` | HU-06: falta `ENTITY_MAP_KEY` para cifrar evidencias |
 
 ---
 
@@ -651,7 +655,8 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | Riesgo | Control implementado | Dónde |
 |---|---|---|
 | Datos personales enviados a un tercero (LLM) | Anonimización NER obligatoria, fail-closed; recorte después de sanitizar para no cortar PII a medias | `ner_sanitizer.py`, `gateway.py` |
-| Re-identificación desde la auditoría | Mapa de entidades cifrado con Fernet; métricas sin texto del usuario | `cifrado.py`, `llamadas_llm` |
+| Re-identificación desde la auditoría | Mapa de entidades sin valores originales (solo huellas HMAC y conteos, HU-06); métricas sin texto del usuario | `cifrado.py`, `registro_ia_repository.py` |
+| PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `cifrado_columnas.py`, `test_hu06_regresion_pii.py` |
 | Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); bloqueo 422 y registro | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
 | Prompt injection en evidencias | `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `process_evidence.py` |
 | Que una inyección suba el puntaje | `requiere_revision` vale 0 y cuenta en el denominador | `generate_resumen.py` |
@@ -841,7 +846,8 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`backend/CAMBIOS_ARCO
 | `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | `8000` / `4000` | Caracteres enviados al LLM (tras sanitizar) |
 | `MODO_SEGURIDAD_EVIDENCIA` | `bloquear` | `bloquear` o `marcar` ante posible inyección en evidencias |
 | `SANITIZER_ENABLED` | `true` | Anonimización NER antes del LLM (`false` solo debug) |
-| `ENTITY_MAP_KEY` | — | Clave Fernet del mapa de entidades (obligatoria si el sanitizador está activo) |
+| `ENTITY_MAP_KEY` | — | Clave maestra Fernet: huellas del mapa, cifrado de evidencias y de textos ARCOP (obligatoria) |
+| `GUARDAR_MAPA_ENTIDADES_CIFRADO` | `false` | HU-06: `true` reactiva el mapa reversible (debe documentarse como excepción) |
 | `REQUIERE_NER` | `false` | **Obsoleta** (reemplazada por `SANITIZER_ENABLED`) |
 | `APP_ENV` | `development` | `development` · `test` · `production` (activa validaciones estrictas) |
 | `STORAGE_DIR` | `./storage` | Carpeta de evidencias (`/data/storage` en Docker) |
@@ -872,6 +878,8 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
 | `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |
 | `test_defectos_api.py` | 1 | Variante anterior de la prueba de latencia (ver deuda #12) |
+| `test_hu06_anonimizacion.py` | 20 | HU-06: etiquetas fijas, fail-closed, archivo cifrado y reemplazado por el texto anonimizado, mapa irreversible, textos ARCOP cifrados |
+| `test_hu06_regresion_pii.py` | 1 | HU-06 C3: siembra PII por todas las entradas y verifica que no aparece en ninguna tabla (lectura en crudo), en disco, en los logs ni en lo enviado al LLM |
 | `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
 
 Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba), `_corpus_ner.py` (corpus sintético etiquetado para medir el NER).
@@ -982,6 +990,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 |---|---|
 | [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md) | Historia de usuario ARCOP: archivos, acceso, anonimización, plazos, endpoints y decisiones pendientes |
 | [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
+| [`backend/CAMBIOS_HU06.md`](backend/CAMBIOS_HU06.md) | HU-06: anonimización antes de persistir, decisiones del PO, excepción ARCOP y migración de datos existentes |
 | [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
 | `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
 | `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |

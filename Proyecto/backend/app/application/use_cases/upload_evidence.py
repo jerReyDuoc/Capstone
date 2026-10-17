@@ -6,7 +6,11 @@ from fastapi import UploadFile
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion
 from app.domain.ports.file_storage_port import FileStoragePort
-from app.application.use_cases.create_respuesta import EvaluacionCerradaError
+from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
+from app.application.use_cases.create_respuesta import (
+    AnonimizacionNoDisponibleError,
+    EvaluacionCerradaError,
+)
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
@@ -24,6 +28,10 @@ class UploadEvidenceUseCase:
     - El archivo se guarda en el storage configurado (local por defecto).
     - Se calcula un hash SHA-256 del contenido para detectar duplicados.
     - No se admiten evidencias en evaluaciones cerradas (409 EVALUACION_CERRADA).
+    - HU-06: el storage de la API cifra el archivo en reposo (lo inyecta la ruta) y el
+      nombre del archivo se guarda anonimizado ("CV_Juan_Perez.pdf" -> "CV_[NOMBRE_ANON].pdf").
+      El hash SHA-256 se calcula sobre el contenido original (detección de duplicados);
+      no permite reconstruir el documento.
     """
 
     def __init__(
@@ -32,11 +40,13 @@ class UploadEvidenceUseCase:
         respuesta_repo: RespuestaRepository,
         storage: FileStoragePort,
         evaluaciones: EvaluacionRepository,
+        anonimizador: AnonimizadorPII | None = None,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
         self.storage = storage
         self.evaluaciones = evaluaciones
+        self.anonimizador = anonimizador
 
     async def execute(self, respuesta_id: int, file: UploadFile) -> Evidencia:
         # 1. Verificar que la respuesta existe
@@ -75,13 +85,24 @@ class UploadEvidenceUseCase:
 
         hash_archivo = hashlib.sha256(content).hexdigest()
 
-        # 4. Guardar el archivo en el storage
-        storage_path = await self.storage.save(content, file.filename)
+        # 3b. HU-06: el nombre del archivo también puede traer datos personales
+        nombre_archivo = file.filename or "evidencia"
+        if self.anonimizador is not None:
+            try:
+                nombre_archivo = await self.anonimizador.anonimizar_nombre_archivo(nombre_archivo)
+            except AnonimizacionError as e:
+                raise AnonimizacionNoDisponibleError(
+                    "No se pudo anonimizar el nombre del archivo (motor de anonimización no "
+                    "disponible). Por seguridad no se guardó la evidencia."
+                ) from e
+
+        # 4. Guardar el archivo en el storage (cifrado en reposo; el nombre en disco es un UUID)
+        storage_path = await self.storage.save(content, nombre_archivo)
 
         # 5. Crear el registro en BD
         evidencia = Evidencia(
             respuesta_id=respuesta_id,
-            nombre_archivo=file.filename,
+            nombre_archivo=nombre_archivo,
             storage_path=storage_path,
             mime_type=file.content_type or "application/octet-stream",
             hash_archivo=hash_archivo,

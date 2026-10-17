@@ -12,6 +12,8 @@ class Sanitizacion(Base):
     - `entidades`: metadatos en claro sin PII -> [{tipo, inicio, fin, fuente, huella}]
       (`huella` = HMAC del valor: permite buscar coincidencias sin descifrar).
     - `mapa_cifrado`: token Fernet con [{tipo, inicio, fin, valor}] (valores originales).
+      HU-06 (decisión del PO): queda en NULL salvo GUARDAR_MAPA_ENTIDADES_CIFRADO=true,
+      para que la anonimización sea irreversible.
     """
     __tablename__ = "sanitizaciones"
 

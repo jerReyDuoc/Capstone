@@ -4,8 +4,11 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-from app.infrastructure.storage.local_storage import LocalFileStorage
-from app.infrastructure.llm.factory import crear_validador_evidencias
+from app.infrastructure.llm.factory import (
+    crear_anonimizador,
+    crear_storage_evidencias,
+    crear_validador_evidencias,
+)
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
@@ -17,7 +20,8 @@ async def process_evidence_task(ctx, evidencia_id: int):
     async with AsyncSessionLocal() as session, AsyncSessionLocal() as sesion_ia:
         evidencia_repo = EvidenciaRepository(session)
         respuesta_repo = RespuestaRepository(session)
-        storage = LocalFileStorage()
+        # HU-06: lee el archivo cifrado y, al terminar, deja solo el texto anonimizado
+        storage = crear_storage_evidencias()
         validator = crear_validador_evidencias(sesion_ia)  # capa de Políticas e IA
         guard = ReglasPromptGuard()
 
@@ -25,6 +29,7 @@ async def process_evidence_task(ctx, evidencia_id: int):
             evidencia_repo, respuesta_repo, storage, validator,
             guard=guard,
             registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(session), guard),
+            anonimizador=crear_anonimizador(),
         )
         await use_case.execute(evidencia_id)
 

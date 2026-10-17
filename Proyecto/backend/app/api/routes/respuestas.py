@@ -17,6 +17,7 @@ from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepo
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.llm.factory import crear_anonimizador
 from app.domain.models.respuesta import EstadoClasificacion, FuenteClasificacion
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
@@ -40,6 +41,7 @@ def _use_case(db: AsyncSession) -> CreateRespuestaUseCase:
         EvaluacionRepository(db),
         guard=guard,
         registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(db), guard),
+        anonimizador=crear_anonimizador(),  # HU-06: la justificación se guarda anonimizada
     )
 
 

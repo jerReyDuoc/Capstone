@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import CheckConstraint, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import CheckConstraint, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.core.cifrado_columnas import TextoCifrado
 from app.core.database import Base
 
 
@@ -90,7 +91,9 @@ class SolicitudARCOP(Base):
     id: Mapped[int] = mapped_column("id_solicitud", Integer, primary_key=True)
     tipo: Mapped[str] = mapped_column("tipo", String(20), nullable=False)
     estado: Mapped[str] = mapped_column("estado", String(25), nullable=False, index=True)
-    descripcion: Mapped[str] = mapped_column("descripcion", Text, nullable=False)
+    # HU-06: excepción documentada (CAMBIOS_HU06.md). Puede traer datos personales que
+    # se necesitan para atender el derecho, así que se guarda CIFRADA, no con etiquetas.
+    descripcion: Mapped[str] = mapped_column("descripcion", TextoCifrado, nullable=False)
 
     # Código público e irrepetible para que el titular siga su solicitud (ARC-XXXX-XXXX)
     codigo_seguimiento: Mapped[str] = mapped_column(
@@ -131,7 +134,7 @@ class SolicitudARCOP(Base):
     fecha_prorroga: Mapped[datetime | None] = mapped_column("fecha_prorroga", DateTime, nullable=True)
 
     # Respuesta/resolución comunicada al titular (obligatoria al resolver o rechazar)
-    respuesta: Mapped[str | None] = mapped_column("respuesta", Text, nullable=True)
+    respuesta: Mapped[str | None] = mapped_column("respuesta", TextoCifrado, nullable=True)  # HU-06: cifrada
 
     eventos: Mapped[list["EventoSolicitud"]] = relationship(
         back_populates="solicitud",
@@ -162,6 +165,6 @@ class EventoSolicitud(Base):
     # Rol e id del actor tal como los entrega la autenticación (app/core/autenticacion.py)
     actor_rol: Mapped[str] = mapped_column("actor_rol", String(20), nullable=False)
     actor_id: Mapped[int | None] = mapped_column("actor_id", Integer, nullable=True)
-    comentario: Mapped[str | None] = mapped_column("comentario", Text, nullable=True)
+    comentario: Mapped[str | None] = mapped_column("comentario", TextoCifrado, nullable=True)  # HU-06: cifrado
 
     solicitud: Mapped["SolicitudARCOP"] = relationship(back_populates="eventos")

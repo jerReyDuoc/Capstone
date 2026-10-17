@@ -5,7 +5,8 @@ Pipeline de `ejecutar(tarea, textos, datos, contexto)`:
   1. Router        -> PoliticaTarea de la tarea (prompt, schema, límites).
   2. Sanitización  -> cada texto no confiable pasa por el motor NER.
                       Excepción => se ABORTA (no se llama al LLM) y se registra.
-  3. Auditoría     -> el mapa de entidades se guarda cifrado en BD (no va al LLM).
+  3. Auditoría     -> el mapa de entidades (tipos, posiciones y huellas HMAC; HU-06:
+                      sin los valores originales) se guarda en BD y no va al LLM.
                       Si no se puede guardar => se aborta.
   4. Prompt        -> plantilla versionada, construida SOLO con texto sanitizado.
   5. Proveedor     -> LLMProviderPort (Groq hoy; intercambiable por config).

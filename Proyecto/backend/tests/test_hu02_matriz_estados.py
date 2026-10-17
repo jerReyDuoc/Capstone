@@ -155,7 +155,7 @@ async def _procesar_con_llm(evidencia_id, clasificacion, confianza):
     from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
     from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
     from app.infrastructure.security.prompt_guard import ReglasPromptGuard
-    from app.infrastructure.storage.local_storage import LocalFileStorage
+    from app.infrastructure.llm.factory import crear_storage_evidencias  # HU-06: archivos cifrados
 
     class LLM:
         def __init__(self):
@@ -171,7 +171,7 @@ async def _procesar_con_llm(evidencia_id, clasificacion, confianza):
     gen = await _sesion()
     s = await gen.__anext__()
     try:
-        await ProcessEvidenceUseCase(EvidenciaRepository(s), RespuestaRepository(s), LocalFileStorage(),
+        await ProcessEvidenceUseCase(EvidenciaRepository(s), RespuestaRepository(s), crear_storage_evidencias(),
                                      llm, guard=ReglasPromptGuard()).execute(evidencia_id)
     finally:
         await gen.aclose()

@@ -8,7 +8,11 @@ from app.application.use_cases.create_respuesta import RespuestaRechazadaError
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-from app.infrastructure.storage.local_storage import LocalFileStorage
+from app.infrastructure.llm.factory import (
+    ClaveNoConfiguradaError,
+    crear_anonimizador,
+    crear_storage_evidencias,
+)
 
 router = APIRouter(prefix="/api", tags=["evidencias"])
 
@@ -25,9 +29,19 @@ async def upload_evidencia(
 ):
     evidencia_repo = EvidenciaRepository(db)
     respuesta_repo = RespuestaRepository(db)
-    storage = LocalFileStorage()
+    try:
+        # HU-06: el archivo queda cifrado en reposo hasta que el worker lo anonimiza
+        storage = crear_storage_evidencias()
+    except ClaveNoConfiguradaError:
+        raise HTTPException(status_code=503, detail={
+            "codigo": "CIFRADO_NO_CONFIGURADO",
+            "mensaje": "El servidor no tiene configurado el cifrado de evidencias (ENTITY_MAP_KEY).",
+        })
 
-    use_case = UploadEvidenceUseCase(evidencia_repo, respuesta_repo, storage, EvaluacionRepository(db))
+    use_case = UploadEvidenceUseCase(
+        evidencia_repo, respuesta_repo, storage, EvaluacionRepository(db),
+        anonimizador=crear_anonimizador(),  # HU-06: nombre de archivo sin PII
+    )
 
     try:
         evidencia = await use_case.execute(respuesta_id, file)

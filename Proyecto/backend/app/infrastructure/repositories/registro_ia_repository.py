@@ -14,9 +14,13 @@ class RegistroIARepository(RegistroIAPort):
     de uso) para que un rollback del negocio no borre la auditoría ni las métricas.
     """
 
-    def __init__(self, session: AsyncSession, cifrador: CifradorEntidades | None):
+    def __init__(self, session: AsyncSession, cifrador: CifradorEntidades | None,
+                 guardar_mapa: bool = False):
         self.session = session
         self.cifrador = cifrador
+        # HU-06: por defecto no se guardan los valores originales (irreversible); solo
+        # tipos, posiciones, huellas HMAC y conteos.
+        self.guardar_mapa = guardar_mapa
 
     async def guardar_llamada(self, r: RegistroLlamada) -> int:
         fila = LlamadaLLM(
@@ -78,7 +82,8 @@ class RegistroIARepository(RegistroIAPort):
                 total_entidades=len(r.entidades),
                 conteo_por_tipo=conteo,
                 entidades=metadatos,
-                mapa_cifrado=self.cifrador.cifrar_json(valores) if valores else None,
+                mapa_cifrado=(self.cifrador.cifrar_json(valores)
+                              if valores and self.guardar_mapa else None),
                 evaluacion_id=r.contexto.evaluacion_id,
                 respuesta_id=r.contexto.respuesta_id,
                 evidencia_id=r.contexto.evidencia_id,

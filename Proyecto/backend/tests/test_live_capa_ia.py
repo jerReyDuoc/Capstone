@@ -227,15 +227,26 @@ async def _live():
             conteo = _json(san_ev["conteo_por_tipo"])
             en_claro = json.dumps(_json(san_ev["entidades"]), ensure_ascii=False) + (san_ev["mapa_cifrado"] or "")
             assert not any(v in en_claro for v in PII.values()), "Hay PII en claro en la tabla sanitizaciones"
-            mapa = cifrador.descifrar_json(san_ev["mapa_cifrado"])
-            valores = {e["valor"] for e in mapa}
-            no_detectados = [k for k in ("rut", "correo", "telefono", "nombre_encargado", "nombre_presidenta")
-                             if not any(PII[k] in v for v in valores)]
+            if san_ev["mapa_cifrado"] is None:
+                # HU-06 (decisión del PO): irreversible. Se verifica por huellas HMAC y conteos.
+                huellas = {e["huella"] for e in _json(san_ev["entidades"])}
+                no_detectados = [k for k in ("rut", "correo", "telefono")
+                                 if cifrador.huella(PII[k]) not in huellas]
+                if conteo.get("NOMBRE", 0) < 2:
+                    no_detectados.append("nombres (se esperaban 2)")
+                if not conteo.get("DIRECCION"):
+                    no_detectados.append("direccion")
+                detalle = [(e["tipo"], e["huella"][:12]) for e in _json(san_ev["entidades"])]
+            else:  # GUARDAR_MAPA_ENTIDADES_CIFRADO=true en el .env del worker
+                mapa = cifrador.descifrar_json(san_ev["mapa_cifrado"])
+                valores = {e["valor"] for e in mapa}
+                no_detectados = [k for k in ("rut", "correo", "telefono", "nombre_encargado", "nombre_presidenta")
+                                 if not any(PII[k] in v for v in valores)]
+                assert any("1234, oficina 501" in v for v in valores), "La dirección no incluyó el número de oficina"
+                detalle = [(e["tipo"], e["valor"]) for e in mapa]
             assert not no_detectados, f"El motor NER real no detectó: {no_detectados}"
-            assert any("1234, oficina 501" in v for v in valores), "La dirección no incluyó el número de oficina"
             assert "spacy" in san_ev["motor"]
-            paso("   sanitizaciones (PostgreSQL)", motor=san_ev["motor"], por_tipo=conteo,
-                 mapa_descifrado=[(e["tipo"], e["valor"]) for e in mapa])
+            paso("   sanitizaciones (PostgreSQL)", motor=san_ev["motor"], por_tipo=conteo, entidades=detalle)
 
             # R4/métrica: la llamada real a Groq quedó registrada
             llamadas = await bd.filas(

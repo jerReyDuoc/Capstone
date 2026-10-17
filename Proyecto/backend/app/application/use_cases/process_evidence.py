@@ -1,4 +1,16 @@
+"""
+Validación de una evidencia (lo ejecuta el worker ARQ).
+
+HU-06 (decisión del PO, 16-oct): el archivo llega CIFRADO desde la API. Aquí se
+descifra en memoria, la capa de seguridad revisa el original y la capa de IA lo
+anonimiza antes del LLM. Al terminar (con cualquier resultado) el archivo cifrado
+se REEMPLAZA por solo el texto anonimizado y se borra: en disco no queda el original.
+Si el motor de anonimización falla, el archivo se deja cifrado (nunca en claro).
+"""
+import logging
 from datetime import date
+
+from app.application.ai.anonimizador import AnonimizadorPII
 from app.core.config import settings
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
@@ -12,6 +24,10 @@ from app.application.use_cases.registrar_evento_seguridad import RegistrarEvento
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
+logger = logging.getLogger("evidencias")
+
+NOMBRE_TEXTO_ANONIMIZADO = "evidencia_anonimizada.txt"
+
 
 class ProcessEvidenceUseCase:
     def __init__(
@@ -22,6 +38,7 @@ class ProcessEvidenceUseCase:
         validator: EvidenceValidatorPort,
         guard: PromptGuardPort | None = None,
         registrar_evento: RegistrarEventoSeguridad | None = None,
+        anonimizador: AnonimizadorPII | None = None,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
@@ -29,12 +46,52 @@ class ProcessEvidenceUseCase:
         self.validator = validator
         self.guard = guard
         self.registrar_evento = registrar_evento
+        # HU-06: el worker lo inyecta (factory.crear_anonimizador); sin él el archivo no se toca.
+        self.anonimizador = anonimizador
 
     async def execute(self, evidencia_id: int) -> Evidencia:
         evidencia = await self.evidencia_repo.get(evidencia_id)
         if not evidencia:
             raise ValueError(f"Evidencia {evidencia_id} no encontrada")
+        evidencia = await self._validar(evidencia)
+        await self._conservar_solo_anonimizado(evidencia)
+        return evidencia
 
+    async def _conservar_solo_anonimizado(self, evidencia: Evidencia) -> None:
+        """
+        HU-06: reemplaza el archivo (cifrado) por su texto anonimizado y borra el original.
+        Nunca rompe el flujo: si algo falla, el archivo queda cifrado y se registra en el log
+        (sin contenido), para reintentarlo con scripts/migrar_pii_hu06.py.
+        """
+        anterior = evidencia.storage_path
+        if self.anonimizador is None or not self.anonimizador.habilitado or not anterior:
+            return
+        try:
+            original = await self.storage.get(anterior)
+            anonimo = await self.anonimizador.anonimizar(original.decode("utf-8", errors="ignore")) or ""
+            guardar = getattr(self.storage, "save_plano", self.storage.save)
+            nueva = await guardar(anonimo.encode("utf-8"), NOMBRE_TEXTO_ANONIMIZADO)
+        except Exception as e:  # noqa: BLE001
+            logger.error("HU-06: no se pudo anonimizar el archivo de la evidencia %s (%s); "
+                         "queda cifrado", evidencia.id_evidencia, type(e).__name__)
+            return
+        try:
+            evidencia.storage_path = nueva
+            await self.evidencia_repo.update(evidencia)
+        except Exception as e:  # noqa: BLE001
+            logger.error("HU-06: no se pudo registrar el archivo anonimizado de la evidencia %s (%s)",
+                         evidencia.id_evidencia, type(e).__name__)
+            await self._borrar(nueva)
+            return
+        await self._borrar(anterior)
+
+    async def _borrar(self, ruta: str) -> None:
+        try:
+            await self.storage.delete(ruta)
+        except Exception as e:  # noqa: BLE001
+            logger.error("HU-06: no se pudo borrar un archivo de evidencia (%s)", type(e).__name__)
+
+    async def _validar(self, evidencia: Evidencia) -> Evidencia:
         evidencia.estado_validacion = EstadoValidacion.PROCESSING.value
         await self.evidencia_repo.update(evidencia)
 

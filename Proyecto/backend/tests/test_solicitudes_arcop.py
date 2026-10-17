@@ -380,10 +380,13 @@ def test_supresion_resuelta_anonimiza_datos_del_titular():
         assert r.status_code == 201, r.text
         rid = r.json()["id_respuesta"]
         nombre = "evidencia_supresion_arcop_qa.txt"
+        antes = set(os.listdir(settings.STORAGE_DIR))
         r = await c.post(f"/api/respuestas/{rid}/evidencias",
                          files={"file": (nombre, b"Politica firmada por Juan Perez", "text/plain")})
         assert r.status_code == 202, r.text
-        assert any(f.endswith(nombre) for f in os.listdir(settings.STORAGE_DIR))
+        # HU-06: en disco el nombre es un UUID (sin el nombre original) y el contenido va cifrado
+        nuevos = set(os.listdir(settings.STORAGE_DIR)) - antes
+        assert len(nuevos) == 1 and not any(nombre in f for f in nuevos)
 
         otra = await _crear(c, "acceso")   # otra solicitud del mismo titular
         sid = (await _crear(c, "supresion"))["id_solicitud"]
@@ -403,7 +406,7 @@ def test_supresion_resuelta_anonimiza_datos_del_titular():
         assert resp["justificacion_usuario"] is None
         assert resp["estado_clasificacion"] == "cumplido"
         assert resp["evidencias"][0]["nombre_archivo"] == "[anonimizado]"
-        assert not any(f.endswith(nombre) for f in os.listdir(settings.STORAGE_DIR))
+        assert not (nuevos & set(os.listdir(settings.STORAGE_DIR)))   # archivo borrado
 
         # la otra solicitud del titular también queda anonimizada
         r = await c.get(f"/api/arcop/solicitudes/{otra['id_solicitud']}", headers=ADMIN())

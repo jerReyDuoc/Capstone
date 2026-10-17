@@ -4,14 +4,17 @@ Es el ÚNICO lugar que sabe qué proveedor concreto se usa (LLM_PROVIDER).
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.ai.anonimizador import AnonimizadorPII
 from app.application.ai.evidence_validator import GatewayEvidenceValidator
 from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import crear_politicas
 from app.core.config import settings
 from app.domain.ports.llm_provider_port import LLMProviderPort
 from app.infrastructure.repositories.registro_ia_repository import RegistroIARepository
-from app.infrastructure.security.cifrado import CifradorEntidades
+from app.infrastructure.security.cifrado import CifradorDatos, CifradorEntidades
 from app.infrastructure.security.ner_sanitizer import NERSanitizer
+from app.infrastructure.storage.archivo_cifrado_storage import ArchivoCifradoStorage
+from app.infrastructure.storage.local_storage import LocalFileStorage
 
 
 def crear_proveedor() -> LLMProviderPort:
@@ -42,7 +45,9 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
     return AIGateway(
         provider=crear_proveedor(),
         sanitizer=NERSanitizer(),
-        registro=RegistroIARepository(sesion_auditoria, cifrador),
+        registro=RegistroIARepository(
+            sesion_auditoria, cifrador, guardar_mapa=settings.GUARDAR_MAPA_ENTIDADES_CIFRADO
+        ),
         politicas=crear_politicas(
             max_chars_evidencia=settings.MAX_CHARS_EVIDENCIA_LLM,
             max_chars_justificacion=settings.MAX_CHARS_JUSTIFICACION_LLM,
@@ -56,3 +61,26 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
 
 def crear_validador_evidencias(sesion_auditoria: AsyncSession) -> GatewayEvidenceValidator:
     return GatewayEvidenceValidator(crear_gateway(sesion_auditoria))
+
+
+# ---------------------------------------------------------------- HU-06
+def crear_anonimizador() -> AnonimizadorPII:
+    """Mismo motor NER que el gateway, para anonimizar lo que se PERSISTE."""
+    if not settings.SANITIZER_ENABLED:
+        return AnonimizadorPII(None, habilitado=False)  # solo depuración (R6)
+    return AnonimizadorPII(NERSanitizer())
+
+
+class ClaveNoConfiguradaError(RuntimeError):
+    """Falta ENTITY_MAP_KEY: no se pueden guardar evidencias sin cifrar (fail-closed)."""
+
+
+def crear_storage_evidencias() -> ArchivoCifradoStorage:
+    """Storage de evidencias: archivos cifrados en reposo hasta que el worker los anonimiza."""
+    if not settings.ENTITY_MAP_KEY:
+        raise ClaveNoConfiguradaError(
+            "ENTITY_MAP_KEY no configurada: las evidencias se guardan cifradas (HU-06). "
+            "Genera una con: python -c \"from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())\""
+        )
+    return ArchivoCifradoStorage(LocalFileStorage(), CifradorDatos(settings.ENTITY_MAP_KEY, "evidencias"))

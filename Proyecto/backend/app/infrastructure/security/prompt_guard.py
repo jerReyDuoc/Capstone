@@ -24,8 +24,20 @@ class ReglasPromptGuard(PromptGuardPort):
         return seguridad.detectar_inyeccion(texto)
 
     def anonimizar(self, texto: str) -> str:
+        """
+        HU-06: con el sanitizador activo se usa el MISMO motor que antes del LLM
+        (NERSanitizer: también direcciones y etiquetas fijas). Si ese motor no está
+        disponible se usa seguridad.anonimizar (regex de RUT, correo, teléfono y datos
+        codificados; nombres si hay spaCy; falla si REQUIERE_NER=1).
+        """
         if not texto:
             return texto
+        if settings.SANITIZER_ENABLED:
+            try:
+                from app.infrastructure.security.ner_sanitizer import NERSanitizer
+                return NERSanitizer().sanitizar(texto).texto
+            except Exception:  # noqa: BLE001  (SanitizacionError: spaCy no disponible)
+                pass
         _compartir_modelo_ner()
         return seguridad.anonimizar(texto)
 

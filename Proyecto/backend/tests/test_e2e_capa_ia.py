@@ -10,7 +10,7 @@ Recorre el camino real de una evidencia, sin atajos internos:
 
 Escenario: la empresa demo declara "cumplido" en 4 controles y sube evidencias.
   1. Acta con datos personales (RUT, nombres, correo, teléfono, dirección)
-     -> se anonimiza, se guarda el mapa cifrado, el LLM valida, se registra la métrica.
+     -> se anonimiza, se guardan las huellas del mapa (HU-06: sin valores), el LLM valida, se registra la métrica.
   2. El LLM responde 429 (rate limit)  -> evidencia en error, métrica exito=False.
   3. El motor NER no carga            -> se aborta SIN llamar al LLM, métrica "sanitizacion".
   4. Evidencia con prompt injection   -> la bloquea la capa de seguridad antes de la IA.
@@ -201,13 +201,16 @@ class SimpleEnv:
         assert r.status_code == 201, r.text
         return r.json()["id_respuesta"]
 
-    async def subir_y_procesar(self, respuesta_id: int, contenido: bytes, nombre="acta.txt") -> dict:
+    async def subir_y_procesar(self, respuesta_id: int, contenido: bytes, nombre="acta.txt",
+                               antes_del_worker=None) -> dict:
         """Sube por la API, verifica que se encoló y ejecuta el job real del worker."""
         r = await self.c.post(f"/api/respuestas/{respuesta_id}/evidencias",
                               files={"file": (nombre, contenido, "text/plain")})
         assert r.status_code == 202, r.text
         evidencia_id = r.json()["id_evidencia"]
         assert self.arq.jobs[-1] == ("process_evidence_task", (evidencia_id,))
+        if antes_del_worker:
+            antes_del_worker()
         await self.tasks.process_evidence_task({}, evidencia_id)   # lo que haría ARQ
         r = await self.c.get(f"/api/evidencias/{evidencia_id}")
         assert r.status_code == 200
@@ -261,21 +264,22 @@ async def _flujo_completo(monkeypatch):
             assert ev1["estado_validacion"] == "validated" and ev1["clasificacion_llm"] == "cumplido"
             assert r["estado_clasificacion_final"] == "cumplido" and r["fuente_clasificacion"] == "llm"
 
-        # R2: mapa de entidades en BD, cifrado, y coherente con la métrica
+        # R2: mapa de entidades en BD (sin PII) y coherente con la métrica
         sans = await env.filas(Sanitizacion, evidencia_id=ev1["id_evidencia"])
         assert {s.campo for s in sans} == {"evidencia", "justificacion"}
         san_ev = next(s for s in sans if s.campo == "evidencia")
         metadatos = json.dumps(san_ev.entidades, ensure_ascii=False)
         assert not any(v in metadatos for v in PII.values()), "PII en claro en la columna entidades"
-        assert not any(v in (san_ev.mapa_cifrado or "") for v in PII.values())
-        mapa = CifradorEntidades(settings.ENTITY_MAP_KEY).descifrar_json(san_ev.mapa_cifrado)
-        valores = {e["valor"] for e in mapa}
+        # HU-06 (decisión del PO): irreversible -> sin valores originales, solo huellas HMAC
+        assert all(s.mapa_cifrado is None for s in sans), "El mapa reversible no debe guardarse"
+        cifrador = CifradorEntidades(settings.ENTITY_MAP_KEY)
+        huellas = {e["huella"] for e in san_ev.entidades}
         for clave in ("rut", "correo", "telefono"):
-            assert PII[clave] in valores, f"{clave} no quedó en el mapa de auditoría"
+            assert cifrador.huella(PII[clave]) in huellas, f"{clave} no quedó en el mapa de auditoría"
         assert {"RUT", "NOMBRE", "CORREO", "TEL", "DIRECCION"} <= set(san_ev.conteo_por_tipo)
-        paso("   R2 mapa de entidades (descifrado con ENTITY_MAP_KEY)",
+        paso("   R2 mapa de entidades (huellas HMAC, sin valores: HU-06)",
              por_tipo=san_ev.conteo_por_tipo, motor=san_ev.motor,
-             ejemplo=[(e["tipo"], e["valor"]) for e in mapa[:3]])
+             ejemplo=[(e["tipo"], e["huella"][:12]) for e in san_ev.entidades[:3]])
 
         llamadas = await env.filas(LlamadaLLM, evidencia_id=ev1["id_evidencia"])
         assert len(llamadas) == 1
@@ -314,8 +318,16 @@ async def _flujo_completo(monkeypatch):
                 raise OSError("Can't find model 'es_core_news_md'")
             return NERSanitizer(cargar)
 
+        # HU-06: con el NER caído la API tampoco guarda la evidencia (fail-closed)
         monkeypatch.setattr(env.factory, "NERSanitizer", ner_roto)
-        ev3 = await env.subir_y_procesar(r3, ACTA, nombre="acta3.txt")
+        r = await env.c.post(f"/api/respuestas/{r3}/evidencias",
+                             files={"file": ("acta3.txt", ACTA, "text/plain")})
+        assert r.status_code == 503 and r.json()["detail"]["codigo"] == "ANONIMIZACION_NO_DISPONIBLE"
+        monkeypatch.setattr(env.factory, "NERSanitizer", _sanitizador_para_el_entorno()[0])
+        # El NER se cae DESPUÉS de recibir la evidencia: el worker aborta sin llamar al LLM
+        ev3 = await env.subir_y_procesar(
+            r3, ACTA, nombre="acta3.txt",
+            antes_del_worker=lambda: monkeypatch.setattr(env.factory, "NERSanitizer", ner_roto))
         paso("3. Motor NER no disponible", estado=ev3["estado_validacion"],
              errores=ev3["errores_validacion"], llamadas_al_llm=len(env.espia.requests) - llamadas_antes)
         assert len(env.espia.requests) == llamadas_antes                    # R3: el LLM NO se llamó

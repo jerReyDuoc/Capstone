@@ -11,10 +11,14 @@ Reglas:
   * HU-02: el usuario elige 1 de 5 estados (incluido 'requiere_revision', que luego
     resuelve el LLM con la evidencia) y la justificación es obligatoria, con un largo
     mínimo, en 'parcialmente_cumplido' y 'requiere_revision'.
+  * HU-06: la justificación se ANONIMIZA (etiquetas fijas) antes de guardarse. El
+    orden es: validar largo -> capa anti prompt-injection sobre el ORIGINAL ->
+    anonimizar -> persistir. Si el motor no puede anonimizar, no se guarda (503).
 """
 import re
 from dataclasses import dataclass
 
+from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
 from app.core.config import settings
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
@@ -73,6 +77,12 @@ class RespuestaNoEncontradaError(RespuestaRechazadaError):
     codigo = "RESPUESTA_NO_ENCONTRADA"
 
 
+class AnonimizacionNoDisponibleError(RespuestaRechazadaError):
+    """HU-06: el motor de anonimización falló; por seguridad no se guarda nada."""
+    status_code = 503
+    codigo = "ANONIMIZACION_NO_DISPONIBLE"
+
+
 _ESPACIOS = re.compile(r"\s+")
 _LETRA = re.compile(r"[^\W\d_]")   # cualquier letra (incluye tildes y ñ)
 
@@ -116,11 +126,15 @@ class CreateRespuestaUseCase:
         evaluaciones: EvaluacionRepository,
         guard: PromptGuardPort | None = None,
         registrar_evento: RegistrarEventoSeguridad | None = None,
+        anonimizador: AnonimizadorPII | None = None,
     ):
         self.repo = repo
         self.evaluaciones = evaluaciones
         self.guard = guard
         self.registrar_evento = registrar_evento
+        # HU-06: la API siempre lo inyecta (factory.crear_anonimizador). Sin él (pruebas
+        # unitarias de otras reglas) la justificación se guarda tal cual.
+        self.anonimizador = anonimizador
 
     async def execute(
         self,
@@ -142,6 +156,7 @@ class CreateRespuestaUseCase:
     ) -> ResultadoRespuesta:
         """POST /api/respuestas: crea la respuesta o actualiza la del mismo control."""
         control = await self._validar(evaluacion_id, matriz_control_id, estado_clasificacion, justificacion)
+        justificacion = await self._anonimizar(justificacion)
 
         existente = await self.repo.get_by_evaluacion_control(evaluacion_id, matriz_control_id)
         if existente is None:
@@ -170,6 +185,7 @@ class CreateRespuestaUseCase:
             existente.evaluacion_id, existente.matriz_controles_id_control,
             estado_clasificacion, justificacion,
         )
+        justificacion = await self._anonimizar(justificacion)
         return await self._actualizar(existente, estado_clasificacion, justificacion, control)
 
     # ------------------------------------------------------------ internos
@@ -226,7 +242,21 @@ class CreateRespuestaUseCase:
             )
         return control
 
+    async def _anonimizar(self, justificacion: str | None) -> str | None:
+        """HU-06: reemplaza la PII por etiquetas fijas ANTES de persistir (fail-closed)."""
+        if self.anonimizador is None:
+            return justificacion
+        try:
+            return await self.anonimizador.anonimizar(justificacion)
+        except AnonimizacionError as e:
+            raise AnonimizacionNoDisponibleError(
+                "No se pudo anonimizar la justificación (motor de anonimización no disponible). "
+                "Por seguridad no se guardó; intenta nuevamente en unos minutos."
+            ) from e
+
     async def _actualizar(self, respuesta, estado_clasificacion, justificacion, control) -> ResultadoRespuesta:
+        # `justificacion` ya viene anonimizada: se compara contra lo guardado (también
+        # anonimizado), así el guardado automático con PII no se toma como un cambio.
         if (
             respuesta.estado_clasificacion == estado_clasificacion
             and (respuesta.justificacion_usuario or "") == (justificacion or "")

@@ -47,9 +47,16 @@ class Settings(BaseSettings):
     # true  -> el motor NER anonimiza todo antes del LLM (obligatorio en producción)
     # false -> SOLO DEBUG: el texto va en claro al LLM. Prohibido si APP_ENV=production.
     SANITIZER_ENABLED: bool = True
-    # Clave Fernet para cifrar el mapa de entidades guardado en BD. Generar con:
+    # Clave maestra Fernet de los datos personales (ver app/infrastructure/security/cifrado.py).
+    # De ella se derivan: las huellas HMAC del mapa de entidades, el cifrado de los
+    # archivos de evidencia hasta que se anonimizan y el de los textos ARCOP (HU-06).
+    # Generar con:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENTITY_MAP_KEY: str | None = None
+    # HU-06 (decisión del PO, 16-oct): la anonimización es IRREVERSIBLE. En la tabla
+    # sanitizaciones quedan solo conteos y huellas HMAC, no los valores originales.
+    # true reactiva el mapa cifrado (reversible) y debe documentarse como excepción.
+    GUARDAR_MAPA_ENTIDADES_CIFRADO: bool = False
     # ------------------------------------------------ Autenticación de la API
     # Secreto HMAC para firmar/verificar los tokens bearer (app/core/autenticacion.py).
     AUTH_SECRET: str | None = None

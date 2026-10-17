@@ -170,7 +170,7 @@ def test_justificacion_legitima_se_guarda(texto):
     guard, repo = ReglasPromptGuard(), FakeRespuestaRepo(control=_control())
     uc = CreateRespuestaUseCase(repo, FakeEvaluaciones(), guard=guard, registrar_evento=RegistrarEventoSeguridad(FakeEventoRepo(), guard))
     r = asyncio.run(uc.execute(1, 7, "cumplido", texto))
-    assert r.justificacion_usuario == texto   # en BD se guarda el texto original
+    assert r.justificacion_usuario == texto   # sin anonimizador inyectado se guarda tal cual (HU-06: ver test_hu06_*)
 
 
 def test_usuario_puede_declarar_requiere_revision_con_justificacion():

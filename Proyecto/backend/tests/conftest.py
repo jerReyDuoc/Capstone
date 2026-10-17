@@ -48,6 +48,39 @@ def bd_live():
         asyncio.run(h.limpiar_bd())
 
 
+def _spacy_disponible() -> bool:
+    try:
+        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        cargar_spacy()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _motor_ner_para_la_api():
+    """
+    HU-06: la API anonimiza la justificación y el nombre del archivo ANTES de guardarlos
+    y, si el motor NER no carga, responde 503 (fail-closed). En Docker spaCy está
+    instalado y se usa el motor real. Si no lo está (p. ej. un entorno de revisión sin
+    PyPI), las pruebas de API en proceso usan el mismo motor con un NLP simulado
+    (reglas de RUT, correo, teléfono, direcciones y datos codificados intactas), como
+    ya hacía test_e2e_capa_ia.py. Las pruebas que necesitan spaCy real siguen
+    omitiéndose por su cuenta. Alcance de sesión: también cubre los fixtures de módulo
+    (p. ej. la medición de test_latencia_api.py).
+    """
+    if _spacy_disponible():
+        yield
+        return
+    import app.infrastructure.llm.factory as factory
+    from app.infrastructure.security.ner_sanitizer import NERSanitizer
+    from _capa_ia_fakes import StubNLP
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(factory, "NERSanitizer", lambda: NERSanitizer(lambda: StubNLP()))
+        yield
+
+
 @pytest.fixture(autouse=True)
 def _catalogo_controles_limpio():
     """HU-01: el catálogo de controles se cachea en memoria; cada prueba en proceso
