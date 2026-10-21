@@ -1,0 +1,113 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
+import { BarrasDominio } from "@/components/charts/BarrasDominio";
+import { RadarMadurez } from "@/components/charts/RadarMadurez";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
+import { Icon } from "@/components/ui/Icon";
+import { usePanel } from "@/hooks/usePanel";
+import { formatoPuntaje, NIVELES } from "@/lib/madurez";
+import { slug } from "@/lib/slug";
+import { ResumenBrechas } from "./ResumenBrechas";
+
+export function VistaDiagnostico() {
+  const router = useRouter();
+  const { href } = usePanel();
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Cumplimiento y protección de datos"
+        titulo="Diagnóstico"
+        subtitulo="Visión ejecutiva de la madurez en gobernanza de IA de tu empresa y de las brechas que requieren acción."
+      />
+
+      <EstadoPanel>
+        {(p) => {
+          const altas = p.brechasPorCriticidad.Alta;
+          return (
+            <>
+              <div className="grid">
+                <Kpi
+                  className="col-3 md-col-3 card-glow"
+                  icono="escudo"
+                  etiqueta="Madurez general"
+                  valor={formatoPuntaje(p.puntajeGeneral)}
+                  sufijo="/ 100"
+                  medidor={p.puntajeGeneral}
+                  pista={<BadgeNivel nivel={p.nivelGeneral} />}
+                />
+                <Kpi
+                  className="col-3 md-col-3"
+                  icono="chispa"
+                  etiqueta="Nivel de madurez"
+                  valor={NIVELES[p.nivelGeneral].etiqueta}
+                  pista={NIVELES[p.nivelGeneral].descripcion}
+                />
+                <Kpi
+                  className="col-3 md-col-3"
+                  icono="brechas"
+                  etiqueta="Brechas abiertas"
+                  valor={p.brechas.length}
+                  pista={
+                    altas > 0 ? (
+                      <span>
+                        <strong style={{ color: "var(--alto)" }}>{altas}</strong> de criticidad alta
+                      </span>
+                    ) : (
+                      "Ninguna de criticidad alta"
+                    )
+                  }
+                />
+                <Kpi
+                  className="col-3 md-col-3"
+                  icono="lista"
+                  etiqueta="Controles evaluados"
+                  valor={p.controlesEvaluados}
+                  pista={p.enRevision > 0 ? `${p.enRevision} en revisión por la IA` : "Sin respuestas pendientes de revisión"}
+                />
+              </div>
+
+              <div className="grid">
+                <div className="card col-7 md-col-7">
+                  <RadarMadurez
+                    dominios={p.dominios}
+                    onSeleccionar={(d) => router.push(`${href("/panel/dominios")}#${slug(d.nombre)}`)}
+                  />
+                </div>
+                <div className="card col-5 md-col-5">
+                  <BarrasCriticidad
+                    conteo={p.brechasPorCriticidad}
+                    onSeleccionar={(c) => router.push(href("/panel/brechas", { criticidad: c }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid">
+                <div className="card col-6 md-col-12">
+                  <BarrasDominio
+                    dominios={p.dominios}
+                    onSeleccionar={(d) => router.push(`${href("/panel/dominios")}#${slug(d.nombre)}`)}
+                  />
+                </div>
+                <div className="col-6 md-col-12" style={{ display: "grid" }}>
+                  <ResumenBrechas brechas={p.brechas} />
+                </div>
+              </div>
+
+              <p className="callout">
+                <Icon name="info" />
+                <span>
+                  <strong>De la señal a la decisión.</strong> Empieza por las brechas de criticidad alta: cada una trae
+                  la acción sugerida y la ruta formativa recomendada para cerrarla.
+                </span>
+              </p>
+            </>
+          );
+        }}
+      </EstadoPanel>
+    </>
+  );
+}

@@ -8,8 +8,8 @@
 | **Marcos normativos** | Ley N.º 21.719 (Chile), ISO/IEC 42001, NIST AI RMF 100-1, NIST AI 600-1, OWASP Top 10 for LLM |
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
-| **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · LangChain + Groq · spaCy · Docker Compose · nginx · HTML/JS estático |
-| **Última actualización** | 15-oct-2026 (T-04: optimización del motor NER) |
+| **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · LangChain + Groq · spaCy · Next.js 15 + React 19 (panel) · Docker Compose · nginx · HTML/JS estático (prototipo) |
+| **Última actualización** | 20-oct-2026 (HU-13: panel web en Next.js con gráficos de madurez y brechas) |
 
 ---
 
@@ -86,9 +86,10 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado por cron diario (ver deuda técnica #4) |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
-| Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios |
+| Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 7 servicios; puertos del host configurables por `.env` (ver 12.1) |
 | Suite de pruebas (pytest) | ✅ Hecho | 133 funciones de prueba (212 casos) + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
-| Frontend | 🟡 Demo estática | 14 páginas HTML funcionando con una API **simulada** en `localStorage`; falta conectarlo al backend |
+| Panel web (HU-13) | ✅ Hecho | `frontend-next/` (Next.js 15 + React 19): diagnóstico, dominios y brechas con radar y barras interactivos, conectado a la API real; responsivo ≥ 1024 px y WCAG 2.1 AA. Ver [sección 10.1](#101-panel-web-hu-13) |
+| Resto del frontend (cuestionario, informe, formación, backoffice) | 🟡 Demo estática | Prototipo HTML en `frontend/` con API **simulada** en `localStorage`; se migrará a `frontend-next/` |
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
 | Autenticación en todos los endpoints | 🔴 Pendiente | Solo `/api/arcop` y `/api/auth/me` exigen token |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
@@ -104,7 +105,9 @@ El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deud
 
 ```mermaid
 flowchart LR
-    U[Usuario<br/>navegador] -->|:8080| N[frontend<br/>nginx 1.27]
+    U[Usuario<br/>navegador] -->|:3000| P[web<br/>Next.js 15]
+    P -->|/api/* proxy| A
+    U -->|:8088| N[frontend<br/>nginx 1.27 · prototipo]
     N -->|HTML/JS estático| U
     N -->|/api/* proxy| A[api<br/>FastAPI + uvicorn :8000]
     A -->|SQL async| DB[(db<br/>PostgreSQL 16)]
@@ -119,14 +122,15 @@ flowchart LR
 
 | Servicio Docker | Imagen | Puerto (solo `127.0.0.1`) | Función |
 |---|---|---|---|
-| `frontend` | `nginx:1.27-alpine` | 8080 | Sirve `frontend/` y reenvía `/api` y `/health` al backend (mismo origen, sin CORS). Límite de subida 20 MB |
+| `web` | `complianceai-web` | 3000 | Panel en Next.js (`frontend-next/`); reenvía `/api` al servicio `api` (mismo origen, sin CORS) |
+| `frontend` | `nginx:1.27-alpine` | 8088 | Prototipo: sirve `frontend/` y reenvía `/api` y `/health` al backend. Límite de subida 20 MB |
 | `api` | `complianceai-backend` | 8000 | FastAPI (`/docs` para Swagger) |
 | `worker` | `complianceai-backend` | — | ARQ: valida evidencias y recalcula el benchmark (cron 02:00 UTC) |
 | `migrate` | `complianceai-backend` | — | `alembic upgrade head` y termina |
 | `db` | `postgres:16` | 5433 | Base de datos `complaince_db` |
 | `redis` | `redis:7-alpine` | 6379 | Cola de trabajos de ARQ |
 
-Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` → `frontend`. La API y el worker comparten el volumen `storage` (evidencias). La imagen del backend es única (multi-stage, Python 3.13-slim, usuario sin privilegios) e incluye spaCy con el modelo `es_core_news_md`.
+Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` → `web` y `frontend`. Cada puerto del host se puede cambiar con variables (`WEB_PORT`, `FRONTEND_PORT`, `API_PORT`, `DB_PORT`, `REDIS_PORT`) en `Proyecto/.env`. La API y el worker comparten el volumen `storage` (evidencias). La imagen del backend es única (multi-stage, Python 3.13-slim, usuario sin privilegios) e incluye spaCy con el modelo `es_core_news_md`.
 
 ### Clean Architecture
 
@@ -169,9 +173,17 @@ Capstone/
 │   └── Guia_ComplianceAI_PromptInjection.docx.pdf
 └── Proyecto/
     ├── README.md                   # ← este documento
-    ├── docker-compose.yml          # Sistema completo (6 servicios)
-    ├── docker/nginx.conf           # Frontend estático + proxy /api
-    ├── frontend/                   # Demo estática (ver sección 10)
+    ├── docker-compose.yml          # Sistema completo (7 servicios)
+    ├── docker/nginx.conf           # Prototipo estático + proxy /api
+    ├── frontend-next/              # Panel web Next.js (HU-13, ver sección 10.1)
+    │   ├── app/                    # Rutas /panel, /panel/dominios, /panel/brechas + globals.css (tokens)
+    │   ├── components/             # charts/ (radar y barras SVG), shell/, vistas/, ui/
+    │   ├── hooks/usePanel.tsx      # Evaluación seleccionada y datos del panel
+    │   ├── lib/                    # Tipos de la API, adaptadores, cliente HTTP, datos demo
+    │   ├── tests/                  # vitest de los adaptadores
+    │   ├── docs/                   # HU-13_HANDOFF.md, ACCESIBILIDAD.md, capturas/
+    │   └── Dockerfile              # Build standalone (node 22)
+    ├── frontend/                   # Prototipo estático (ver sección 10.2)
     │   ├── *.html                  # 14 páginas
     │   ├── css/styles.css
     │   └── js/                     # data.js, logica.js, store.js, ui.js, pdf-informe.js
@@ -520,7 +532,7 @@ Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
 
 ## 7. Endpoints de la API
 
-Base: `http://localhost:8000` (o `http://localhost:8080` a través de nginx). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 🛡️ `admin_therion`.
+Base: `http://localhost:8000` (o a través del proxy del panel en `http://localhost:3000` y del prototipo en `http://localhost:8088`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 🛡️ `admin_therion`.
 
 ### Sistema
 
@@ -671,7 +683,25 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 
 ## 10. Frontend
 
-**Estado:** demo estática navegable, servida por nginx en `http://localhost:8080`. **Todavía no consume el backend**: `js/store.js` implementa una "API" simulada (Promises sobre `localStorage`) con la misma forma que tendrá el cliente real basado en `fetch`, y `js/data.js` contiene la matriz, el árbol de aplicabilidad, módulos formativos, evaluaciones precargadas y el panel sectorial de ejemplo.
+### 10.1 Panel web (HU-13)
+
+**Estado:** hecho y conectado a la API real. Carpeta `frontend-next/` (Next.js 15 + React 19 + TypeScript), servicio `web` en `http://localhost:3000/panel`.
+
+| Ruta | Contenido |
+|---|---|
+| `/panel?evaluacion=ID` | Diagnóstico: madurez general, nivel, brechas abiertas y controles evaluados; radar de madurez por dominio (empresa vs. promedio del rubro); barras de brechas por criticidad; comparativa con la industria; las 4 brechas más urgentes |
+| `/panel/dominios` | Una tarjeta por dominio: puntaje, nivel, marca del promedio del rubro y acceso a sus brechas |
+| `/panel/brechas?criticidad=&dominio=` | Listado filtrable y ordenable con acción sugerida y ruta formativa; los filtros viven en la URL |
+
+- **Datos:** consume `GET /api/evaluaciones`, `/{id}/resumen`, `/{id}/comparativa` (opcional), `/{id}/respuestas` y `GET /api/brechas`; no requirió cambios en el backend. Una evaluación sin resumen (sin `POST /cerrar` o `/completar`) muestra un aviso en vez de los gráficos.
+- **Reglas:** brecha = respuesta con estado vigente `no_cumplido` (misma regla que `Respuesta.sincronizar_brecha`, HU-02); las parciales se cuentan aparte. Niveles con los mismos cortes del backend (25/50/75).
+- **Criterios de aceptación:** responsivo ≥ 1024 px (barra lateral compacta entre 1024 y 1279 px); gráficos de radar y barras interactivos con mouse y teclado (tooltip, Enter filtra o abre el detalle, vista de tabla); WCAG 2.1 AA (contraste ≥ 5,7:1 en texto, foco visible, zoom 200 %, alternativas en texto). Paleta y tipografía del sitio TherionLabs.
+- **Documentación:** `frontend-next/README.md`, `docs/HU-13_HANDOFF.md` (tokens, layout, componentes, casos borde) y `docs/ACCESIBILIDAD.md` (auditoría).
+- **Modo demo** sin backend: `cd frontend-next && npm install && NEXT_PUBLIC_DEMO=1 npm run dev`.
+
+### 10.2 Prototipo estático
+
+**Estado:** demo estática navegable, servida por nginx en `http://localhost:8088`. El panel principal ya está reemplazado por `frontend-next/`; el resto de las páginas se migrará. **Todavía no consume el backend**: `js/store.js` implementa una "API" simulada (Promises sobre `localStorage`) con la misma forma que tendrá el cliente real basado en `fetch`, y `js/data.js` contiene la matriz, el árbol de aplicabilidad, módulos formativos, evaluaciones precargadas y el panel sectorial de ejemplo.
 
 **Cuentas de la demo** (cualquier contraseña): `nuevo@therionlabs.cl` (referente sin diagnóstico), `completo@therionlabs.cl` (referente con diagnóstico cerrado), `admin@therionlabs.cl` (`admin_therion`).
 
@@ -745,11 +775,21 @@ Sin Python local: `docker run --rm python:3.13-slim sh -c "pip install -q crypto
 docker compose up -d --build
 ```
 
-La primera vez tarda varios minutos (descarga imágenes e instala spaCy con su modelo).
+La primera vez tarda varios minutos (descarga imágenes, instala spaCy con su modelo y compila el panel Next.js).
+
+**Puertos en Windows:** Hyper-V/WSL reserva rangos de puertos y Docker puede fallar con `bind: An attempt was made to access a socket in a way forbidden by its access permissions` (pasó con el 8080). Cualquier puerto del host se cambia sin editar el compose, creando `Proyecto/.env`:
+
+```
+WEB_PORT=3001
+FRONTEND_PORT=8095
+```
+
+Para ver los rangos reservados: `netsh interface ipv4 show excludedportrange protocol=tcp`.
 
 | URL | Qué es |
 |---|---|
-| http://localhost:8080 | Frontend (demo) |
+| http://localhost:3000/panel | Panel web (HU-13) |
+| http://localhost:8088 | Prototipo estático (demo) |
 | http://localhost:8000/docs | Swagger de la API |
 | `localhost:5433` | PostgreSQL (`postgres` / `1234`, BD `complaince_db`) — solo desarrollo |
 | `localhost:6379` | Redis |
@@ -919,6 +959,7 @@ docker compose ps                        # estado de cada servicio
 docker compose logs -f worker            # procesamiento de evidencias
 docker compose logs migrate              # si la API no arranca, mirar aquí primero
 docker compose up -d --build api worker  # tras cambiar código del backend
+docker compose up -d --build web         # tras cambiar código del panel (frontend-next)
 docker compose down                      # detener (conserva datos)
 docker compose down -v                   # detener y BORRAR BD y evidencias
 
@@ -933,7 +974,9 @@ alembic revision --autogenerate -m "descripcion"                   # nueva migra
 
 | Problema | Causa probable | Solución |
 |---|---|---|
-| Puerto 5433, 6379, 8000 u 8080 en uso | Servicios locales fuera de Docker | Detener el uvicorn/worker/Redis/PostgreSQL local |
+| Puerto 3000, 5433, 6379, 8000 u 8088 en uso | Servicios locales fuera de Docker | Detener el uvicorn/worker/Redis/PostgreSQL/Next local, o cambiar el puerto en `Proyecto/.env` |
+| `bind: An attempt was made to access a socket in a way forbidden…` | Puerto reservado por Hyper-V/WSL (Windows) | Cambiar el puerto en `Proyecto/.env` (`WEB_PORT`, `FRONTEND_PORT`, …); ver 12.1 |
+| El panel muestra "Esta evaluación todavía no tiene resultados" | La evaluación no tiene resumen | Completar el cuestionario o llamar `POST /api/evaluaciones/{id}/cerrar` |
 | `worker` se reinicia en bucle | Falta `ENTITY_MAP_KEY` o `GROQ_API_KEY`, o el modelo de spaCy | `docker compose logs worker` |
 | `migrate` falla | Error de migración o BD no disponible | `docker compose logs migrate` |
 | 503 `AUTH_NO_CONFIGURADA` | Falta `AUTH_SECRET` | Agregarla al `.env` y `docker compose up -d` |
@@ -957,7 +1000,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 |---|---|---|---|
 | 1 | **No hay endpoints para crear invitaciones (`usuario_temporal`) ni evaluaciones** | El flujo completo depende de SQL manual | `POST /api/invitaciones` (admin) con código aleatorio y `POST /api/evaluaciones` (referente) |
 | 2 | **Solo `/api/arcop` y `/api/auth/me` exigen token**: respuestas, evidencias, revisión, métricas, eventos de seguridad y reportes son públicos y no verifican que la evaluación pertenezca al usuario | Exposición de datos entre organizaciones | Aplicar `requerir_rol` y control de propiedad en todos los routers |
-| 3 | **Frontend no integrado** con el backend (`store.js` simulado) y con reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | La demo no refleja los resultados reales | Cliente `fetch` con la misma interfaz que `store.js`; unificar puntaje y niveles en una sola fuente |
+| 3 | **Frontend parcialmente integrado:** el panel (HU-13) ya consume la API real en `frontend-next/`, pero cuestionario, informe, formación y backoffice siguen en el prototipo con `store.js` simulado y reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | Las demás pantallas no reflejan los resultados reales | Migrar esas páginas a `frontend-next/` reutilizando `lib/api.ts` y `lib/madurez.ts` (niveles del backend) |
 | 4 | ~~Benchmark siempre vacío: ningún endpoint fijaba `completada`~~ **Resuelto:** `POST /completar` marca la evaluación como `completada` | — | Pendiente decidir si se permite reabrir una evaluación completada |
 | 5 | ~~Falta `backend/.dockerignore`~~ **Resuelto (15-oct):** `backend/download` renombrado a `backend/.dockerignore`; el `.env` y el `venv` ya no entran en la imagen | — | — |
 
@@ -992,6 +1035,9 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
 | [`backend/CAMBIOS_HU06.md`](backend/CAMBIOS_HU06.md) | HU-06: anonimización antes de persistir, decisiones del PO, excepción ARCOP y migración de datos existentes |
 | [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
+| [`frontend-next/CAMBIOS_HU13.md`](frontend-next/CAMBIOS_HU13.md) | HU-13: qué se agregó, cómo aplicarlo y qué se verificó |
+| [`frontend-next/docs/HU-13_HANDOFF.md`](frontend-next/docs/HU-13_HANDOFF.md) | Especificación de diseño del panel: criterios de aceptación, tokens, layout, componentes y casos borde |
+| [`frontend-next/docs/ACCESIBILIDAD.md`](frontend-next/docs/ACCESIBILIDAD.md) | Auditoría WCAG 2.1 AA del panel |
 | `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
 | `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |
 | `../Documentos/Fase 1/`, `../Documentos/Fase 2/` | Guía del estudiante, evaluaciones formativas, autoevaluaciones y diarios de reflexión por integrante |
