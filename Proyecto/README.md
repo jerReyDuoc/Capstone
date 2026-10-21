@@ -83,6 +83,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
 | PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `backend/CAMBIOS_HU06.md` |
+| Minimización de datos y plazos de conservación (T-06) | ✅ Hecho | Inventario de las 171 columnas (26 con datos personales, en 9 tablas) con finalidad, base de licitud y plazo; auditoría de solo lectura sobre la BD real (DER, matriz, escaneo de contenido); anonimización por plazo vencido (cron diario, plazos pendientes del PO). Ver `backend/CAMBIOS_T06.md` |
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado por cron diario (ver deuda técnica #4) |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
@@ -195,10 +196,14 @@ Capstone/
         ├── alembic.ini
         ├── CAMBIOS_ARCOP.md        # Detalle funcional de la historia de usuario ARCOP
         ├── CAMBIOS_T04.md          # T-04: optimización del motor NER (resultados y decisiones)
+        ├── CAMBIOS_T06.md          # T-06: auditoría de minimización de datos (hallazgos y decisiones)
         ├── reporte_latencia_live_c10.md
         ├── evidencia.txt / evidencia_maliciosa.txt   # Archivos de ejemplo para pruebas manuales
         ├── migrations/versions/    # 13 migraciones Alembic
         ├── scripts/benchmark_ner.py  # Benchmark y profiling del motor NER (T-04)
+        ├── scripts/auditoria_minimizacion.py  # T-06: DER, matriz y escaneo de la BD (solo lectura)
+        ├── scripts/retencion_datos.py         # T-06: plazos de conservación (simulación / --aplicar)
+        ├── scripts/sql/t06_rol_auditor.sql    # T-06: rol de solo lectura para auditar
         ├── tests/                  # Suite pytest (ver sección 14)
         └── app/
             ├── main.py             # App FastAPI, routers y pool ARQ
@@ -527,6 +532,19 @@ Cadena lineal; la cabeza actual es **`f7b2d1a8c3e9`**.
 | 13 | `f7b2d1a8c3e9` | `usuarios_admin`, plazos ARCOP, `usuario_temporal.fecha_anonimizacion` |
 
 Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
+
+### 6.4 Minimización y conservación de datos personales (T-06)
+
+Cada columna del modelo está clasificada en `app/core/catalogo_datos_personales.py` con su categoría, tratamiento (en claro, anonimizado, cifrado, hash, HMAC o no se guarda), finalidad, base de licitud y plazo de conservación. `tests/test_t06_minimizacion.py` falla si una migración agrega una columna sin clasificarla. La auditoría sobre la BD real se corre con un rol de solo lectura y genera el DER, la matriz en CSV y un informe de controles; nunca imprime valores, solo conteos:
+
+```powershell
+docker compose cp backend/scripts/sql/t06_rol_auditor.sql db:/tmp/t06_rol_auditor.sql
+docker compose exec db psql -U postgres -d complaince_db -v "clave='UNA-CLAVE'" -f /tmp/t06_rol_auditor.sql
+docker compose exec worker python scripts/auditoria_minimizacion.py --url "postgresql+psycopg2://auditor_t06:UNA-CLAVE@db:5432/complaince_db" --salida /tmp/t06
+docker compose cp worker:/tmp/t06 ./auditoria_t06
+```
+
+Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a las 03:00 UTC con las mismas reglas de una supresión ARCOP: se borran correos, textos, archivos y huellas, y se conservan los puntajes. Detalle en [`backend/CAMBIOS_T06.md`](backend/CAMBIOS_T06.md).
 
 ---
 

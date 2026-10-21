@@ -11,6 +11,7 @@ from app.infrastructure.llm.factory import (
 )
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+from app.application.use_cases.aplicar_retencion import AplicarRetencionUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
@@ -41,6 +42,13 @@ async def update_benchmark_task(ctx):
         print(f"[benchmark] actualizado: {result}")
         return result
 
+async def aplicar_retencion_task(ctx):
+    """T-06: anonimiza los datos personales cuyo plazo de conservación venció.
+    Sin RETENCION_* configurados no hace nada (reglas desactivadas)."""
+    async with AsyncSessionLocal() as session:
+        resultado = await AplicarRetencionUseCase(session, storage=crear_storage_evidencias()).execute()
+        return resultado.como_dict()
+
 async def startup(ctx):
     """Carga el motor NER al iniciar: si falta spaCy/modelo, el worker no arranca
     (mejor fallar al inicio que en cada evidencia)."""
@@ -54,6 +62,7 @@ class WorkerSettings:
     on_startup = startup
     cron_jobs = [
         cron(update_benchmark_task, hour=2, minute=0),  # 02:00 UTC diario
+        cron(aplicar_retencion_task, hour=3, minute=0),  # 03:00 UTC diario (T-06)
     ]
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     max_tries = 3

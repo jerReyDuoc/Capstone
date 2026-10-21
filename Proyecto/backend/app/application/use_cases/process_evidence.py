@@ -172,7 +172,11 @@ class ProcessEvidenceUseCase:
             evidencia.clasificacion_llm = result.clasificacion
             evidencia.confianza = result.confianza
             evidencia.justificacion_llm = result.justificacion
-            evidencia.datos_extraidos = result.datos_extraidos
+            # T-06 (minimización): `datos_extraidos` es un diccionario libre que el LLM
+            # arma a partir de la evidencia, sin finalidad ni consumidor definidos (ni el
+            # backend ni el frontend lo usan). No se persiste: cualquier dato que el NER
+            # no hubiera detectado quedaría duplicado aquí.
+            evidencia.datos_extraidos = None
             evidencia.errores_validacion = result.errores
             evidencia.fecha_procesada = date.today()
 

@@ -9,7 +9,8 @@ Dos titulares posibles:
   - encuestado anónimo (encuesta pública): una evaluación y sus solicitudes.
 
 Qué se borra / qué se conserva (decisión del equipo, ver CAMBIOS_ARCOP.md):
-  usuario_temporal      (solo invitado) email y validacion_invitacion -> NULL;
+  usuario_temporal      invitado: email y validacion_invitacion -> NULL;
+                        encuestado público: su email opcional (HU-19) -> NULL (T-06);
                         fecha_anonimizacion = ahora. Se conserva Rubro_id (benchmark).
   evaluacion            clave_acceso_hash -> NULL (el encuestado pierde el acceso).
   respuestas            justificacion_usuario -> NULL. Se conservan clasificaciones.
@@ -30,7 +31,7 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.evidencia import Evidencia
 from app.domain.models.respuesta import Respuesta
@@ -81,6 +82,22 @@ class AnonimizacionRepository:
             await _upd("usuario_temporal", update(UsuarioTemporal)
                        .where(UsuarioTemporal.id == usuario_id)
                        .values(email=None, validacion_invitacion=None, fecha_anonimizacion=ahora))
+        else:
+            # T-06 (hallazgo H1): desde HU-19 el encuestado público puede dejar un email
+            # OPCIONAL en su usuario temporal anónimo. Ese usuario es solo de su evaluación
+            # pública, así que la supresión también borra el email.
+            # Si la evaluación no es pública no se toca a nadie y no aparece en el conteo.
+            filas = (await s.execute(
+                update(UsuarioTemporal)
+                .where(UsuarioTemporal.id.in_(
+                    select(Evaluacion.usuario_temporal_id)
+                    .where(Evaluacion.id.in_(evals), Evaluacion.origen == ORIGEN_PUBLICA)
+                ))
+                .values(email=None, fecha_anonimizacion=ahora)
+                .execution_options(synchronize_session=False)
+            )).rowcount or 0
+            if filas:
+                conteo["usuario_temporal"] = filas
         await _upd("claves_evaluacion", update(Evaluacion)
                    .where(Evaluacion.id.in_(evals), Evaluacion.clave_acceso_hash.is_not(None))
                    .values(clave_acceso_hash=None))

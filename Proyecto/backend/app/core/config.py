@@ -101,6 +101,19 @@ class Settings(BaseSettings):
     # evaluaciones por invitación. Las de la encuesta pública lo exigen SIEMPRE.
     EXIGIR_TOKEN_EVALUACIONES: bool = False
 
+    # ------------------------------------------------ T-06: plazos de conservación
+    # Ley 21.719 (principio de proporcionalidad): los datos personales se conservan
+    # solo el tiempo necesario para su finalidad. Vencido el plazo, el worker
+    # (cron diario) los anonimiza con las mismas reglas que una supresión ARCOP:
+    # se borran correos, textos, archivos y huellas y se conservan los puntajes.
+    # Vacío = regla desactivada (el PO debe fijar los valores; ver CAMBIOS_T06.md).
+    #   Titulares: días DESPUÉS de vencer el acceso (usuario_temporal.fecha_expiracion).
+    RETENCION_DATOS_TITULAR_DIAS: int | None = None
+    #   Solicitudes ARCOP: días después del cierre; quedan tipo, estados, fechas e historial.
+    RETENCION_ARCOP_CERRADAS_DIAS: int | None = None
+    #   Eventos de seguridad: días después del evento, solo si ya fue revisado.
+    RETENCION_EVENTOS_SEGURIDAD_DIAS: int | None = None
+
     model_config = SettingsConfigDict(env_file=".env")
 
     @model_validator(mode="after")
@@ -110,6 +123,16 @@ class Settings(BaseSettings):
                 "SANITIZER_ENABLED=false está prohibido con APP_ENV=production "
                 "(enviaría datos personales en claro al LLM)."
             )
+        if self.APP_ENV == "production" and self.GUARDAR_MAPA_ENTIDADES_CIFRADO:
+            raise ValueError(
+                "GUARDAR_MAPA_ENTIDADES_CIFRADO=true está prohibido con APP_ENV=production "
+                "(T-06: la anonimización es irreversible por decisión del PO en HU-06)."
+            )
+        for nombre in ("RETENCION_DATOS_TITULAR_DIAS", "RETENCION_ARCOP_CERRADAS_DIAS",
+                       "RETENCION_EVENTOS_SEGURIDAD_DIAS"):
+            valor = getattr(self, nombre)
+            if valor is not None and valor < 1:
+                raise ValueError(f"{nombre} debe ser un número de días mayor que 0 (o vacío).")
         if self.APP_ENV == "production" and not self.ENTITY_MAP_KEY:
             raise ValueError("ENTITY_MAP_KEY es obligatoria con APP_ENV=production.")
         if self.APP_ENV == "production" and (not self.AUTH_SECRET or len(self.AUTH_SECRET) < 32):
