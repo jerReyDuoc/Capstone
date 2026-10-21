@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.alcance import actor_opcional, alcance_respuesta, verificar_alcance
+from app.core.autenticacion import Actor
 from app.core.database import get_db
 from app.application.use_cases.create_respuesta import (
     CreateRespuestaUseCase,
@@ -79,6 +81,7 @@ async def create_respuesta(
     payload: CreateRespuestaRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
+    actor: Actor | None = Depends(actor_opcional),
 ):
     """
     Guarda la respuesta a un control (HU-01, guardado automático del progreso).
@@ -86,6 +89,7 @@ async def create_respuesta(
     Es un **upsert** por (evaluación, control): la primera vez crea la fila (201);
     si el control ya estaba respondido la actualiza (200, mismo `id_respuesta`).
     """
+    await verificar_alcance(db, actor, payload.evaluacion_id)  # HU-19: solo su evaluación
     resultado = await _ejecutar(_use_case(db).guardar(
         evaluacion_id=payload.evaluacion_id,
         matriz_control_id=payload.matriz_control_id,
@@ -97,7 +101,7 @@ async def create_respuesta(
     return _cuerpo(resultado)
 
 
-@router.put("/{respuesta_id}")
+@router.put("/{respuesta_id}", dependencies=[Depends(alcance_respuesta)])
 async def update_respuesta(
     respuesta_id: int,
     payload: UpdateRespuestaRequest,
@@ -111,7 +115,7 @@ async def update_respuesta(
     ))
     return _cuerpo(resultado)
 
-@router.get("/{respuesta_id}", response_model=RespuestaDetalleResponse)
+@router.get("/{respuesta_id}", response_model=RespuestaDetalleResponse, dependencies=[Depends(alcance_respuesta)])
 async def get_respuesta(respuesta_id: int, db: AsyncSession = Depends(get_db)):
     repo = RespuestaRepository(db)
     respuesta = await repo.get(respuesta_id)
@@ -154,11 +158,17 @@ async def revisar_respuesta(
     respuesta_id: int,
     payload: RevisionRequest,
     db: AsyncSession = Depends(get_db),
+    actor: Actor | None = Depends(alcance_respuesta),
 ):
     """
     Revisión humana del Oficial de Cumplimiento. Fija la clasificación final y
     sirve como verdad de referencia para medir la precisión del LLM (/api/ia/metricas).
     """
+    if actor is not None and actor.es_encuestado:
+        # La revisión es del Oficial de Cumplimiento, nunca del propio encuestado
+        raise HTTPException(status_code=403, detail={
+            "codigo": "SIN_PERMISO", "mensaje": "La revisión humana no está disponible para el encuestado.",
+        })
     valores = EstadoClasificacion.resolutivos()
     if payload.clasificacion_revisada not in valores:
         raise HTTPException(

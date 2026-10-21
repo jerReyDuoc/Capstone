@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,7 +7,9 @@ from app.application.use_cases.clave_acceso_encuestado import (
 )
 from app.application.use_cases.iniciar_sesion import CredencialesInvalidasError, IniciarSesionUseCase
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
+from app.core.cliente import huella, ip_cliente
 from app.core.config import settings
+from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
 from app.core.database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -63,14 +65,37 @@ async def acceso_titular(payload: AccesoTitularRequest, db: AsyncSession = Depen
         raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
 
 
+# HU-19: límites de intentos para retomar con clave (fuerza bruta). La clave tiene ~60
+# bits de azar y PBKDF2 lento; esto además corta los intentos masivos por IP y por evaluación.
+_RETOMAR_IP_10MIN = 20
+_RETOMAR_EVALUACION_15MIN = 10
+
+
 @router.post("/encuestado")
-async def acceso_encuestado(payload: AccesoEncuestadoRequest, db: AsyncSession = Depends(get_db)):
+async def acceso_encuestado(
+    payload: AccesoEncuestadoRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
     """
     Acceso del encuestado anónimo de la encuesta pública (rol encuestado) con el id de
-    su evaluación y la clave de acceso que recibió al iniciarla. Con el token puede
-    registrar y consultar sus solicitudes ARCOP.
+    su evaluación y la clave de acceso que recibió al iniciarla. Con el token retoma su
+    evaluación (HU-19) y puede registrar y consultar sus solicitudes ARCOP.
     """
     _exigir_secreto()
+    try:
+        por_ip = await limitador.consumir(f"ret:ip:{huella(ip_cliente(request))}", _RETOMAR_IP_10MIN, 600)
+        por_ev = await limitador.consumir(f"ret:ev:{payload.evaluacion_id}", _RETOMAR_EVALUACION_15MIN, 900)
+    except LimitadorNoDisponibleError:
+        raise HTTPException(status_code=503, headers={"Retry-After": "60"}, detail={
+            "codigo": "LIMITADOR_NO_DISPONIBLE", "mensaje": "Intenta de nuevo en unos minutos."})
+    if not (por_ip.permitido and por_ev.permitido):
+        espera = max(por_ip.reintentar_en_s if not por_ip.permitido else 0,
+                     por_ev.reintentar_en_s if not por_ev.permitido else 0)
+        raise HTTPException(status_code=429, headers={"Retry-After": str(espera)}, detail={
+            "codigo": "DEMASIADOS_INTENTOS", "reintentar_en_s": espera,
+            "mensaje": "Demasiados intentos. Espera unos minutos antes de volver a probar tu clave."})
     try:
         return await IniciarSesionUseCase(db).encuestado(payload.evaluacion_id, payload.clave)
     except CredencialesInvalidasError as e:

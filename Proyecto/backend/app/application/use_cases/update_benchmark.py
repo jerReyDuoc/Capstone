@@ -36,6 +36,7 @@ class UpdateBenchmarkUseCase:
             .join(Evaluacion, Resumen.evaluacion_id == Evaluacion.id)
             .join(UsuarioTemporal, Evaluacion.usuario_temporal_id == UsuarioTemporal.id)
             .where(Evaluacion.estado_progreso == "completada")
+            .where(Evaluacion.es_prueba.is_(False))  # HU-19: sin evaluaciones de prueba
             .where(UsuarioTemporal.rubro_id.isnot(None))
             .group_by(UsuarioTemporal.rubro_id, Resumen.dominio_id)
         )
@@ -52,6 +53,7 @@ class UpdateBenchmarkUseCase:
                 .join(Evaluacion, Resumen.evaluacion_id == Evaluacion.id)
                 .join(UsuarioTemporal, Evaluacion.usuario_temporal_id == UsuarioTemporal.id)
                 .where(Evaluacion.estado_progreso == "completada")
+                .where(Evaluacion.es_prueba.is_(False))  # HU-19: sin evaluaciones de prueba
                 .where(UsuarioTemporal.rubro_id == fila.rubro_id)
                 .where(Resumen.dominio_id == fila.dominio_id)
             )

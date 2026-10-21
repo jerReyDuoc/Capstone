@@ -24,3 +24,8 @@ class UsuarioTemporal(Base):
     fecha_anonimizacion: Mapped[datetime | None] = mapped_column(
         "fecha_anonimizacion", DateTime, nullable=True
     )
+    # HU-04/HU-19: versión del aviso legal que aceptó y cuándo (UTC).
+    aviso_legal_version: Mapped[str | None] = mapped_column("aviso_legal_version", String(20), nullable=True)
+    fecha_aceptacion_aviso: Mapped[datetime | None] = mapped_column(
+        "fecha_aceptacion_aviso", DateTime, nullable=True
+    )

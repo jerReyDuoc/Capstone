@@ -21,7 +21,7 @@ from app.core.autenticacion import (
 )
 from app.core.config import settings
 from app.application.use_cases.clave_acceso_encuestado import verificar_clave
-from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_temporal import UsuarioTemporal
 
@@ -81,6 +81,16 @@ class IniciarSesionUseCase:
             and usuario.email.strip().lower() == _normalizar_email(email)
             and (usuario.fecha_expiracion is None or usuario.fecha_expiracion >= date.today())
         )
+        if valido:
+            # HU-19: el usuario anónimo de la encuesta pública entra solo con su clave
+            # (POST /api/auth/encuestado); su email opcional no lo convierte en "referente".
+            publica = await self.db.scalar(
+                select(Evaluacion.id).where(
+                    Evaluacion.usuario_temporal_id == usuario.id,
+                    Evaluacion.origen == ORIGEN_PUBLICA,
+                ).limit(1)
+            )
+            valido = publica is None
         if not valido:
             raise CredencialesInvalidasError(
                 "Credenciales inválidas o invitación expirada."

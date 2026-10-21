@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.alcance import alcance_evaluacion
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
 from app.application.use_cases.completar_evaluacion import CompletarEvaluacionUseCase
@@ -16,7 +17,7 @@ from app.domain.models.usuario_temporal import UsuarioTemporal
 router = APIRouter(prefix="/api/evaluaciones", tags=["reportes"])
 
 
-@router.post("/{evaluacion_id}/cerrar")
+@router.post("/{evaluacion_id}/cerrar", dependencies=[Depends(alcance_evaluacion)])
 async def cerrar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
     """Genera los resúmenes por dominio y calcula el puntaje general."""
     use_case = GenerateResumenUseCase(db)
@@ -28,6 +29,7 @@ async def cerrar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_d
 
 @router.post(
     "/{evaluacion_id}/completar",
+    dependencies=[Depends(alcance_evaluacion)],
     responses={
         404: {"description": "Evaluación inexistente"},
         409: {"description": "Ya cerrada, filtro pendiente, cuestionario incompleto o evidencias en validación"},
@@ -46,7 +48,7 @@ async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
 
 
-@router.get("/{evaluacion_id}/resumen")
+@router.get("/{evaluacion_id}/resumen", dependencies=[Depends(alcance_evaluacion)])
 async def get_resumen(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
     """Devuelve los resúmenes guardados por dominio + puntaje general."""
     result = await db.execute(
@@ -124,7 +126,7 @@ async def get_benchmark(
     ]
 
 
-@router.get("/{evaluacion_id}/comparativa")
+@router.get("/{evaluacion_id}/comparativa", dependencies=[Depends(alcance_evaluacion)])
 async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
     """
     Compara el resumen de una evaluación contra el benchmark de su rubro.

@@ -5,6 +5,7 @@ from app.application.use_cases.progreso_cuestionario import calcular_progreso
 from app.infrastructure.cache import catalogo_controles
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
+from app.core.alcance import alcance_evaluacion
 from app.core.database import get_db
 from app.application.use_cases.responder_filtro import ResponderFiltroUseCase
 from app.application.schemas.api_schemas import (
@@ -19,7 +20,8 @@ from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaF
 from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
 
 
-router = APIRouter(prefix="/api/evaluaciones", tags=["filtro"])
+# HU-19: todas las rutas llevan {evaluacion_id}; el encuestado solo accede a la suya.
+router = APIRouter(prefix="/api/evaluaciones", tags=["filtro"], dependencies=[Depends(alcance_evaluacion)])
 
 
 @router.get("/{evaluacion_id}/filtro", response_model=EstadoFiltroResponse)

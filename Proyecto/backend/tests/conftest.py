@@ -90,3 +90,16 @@ def _catalogo_controles_limpio():
     catalogo_controles.invalidar()
     yield
     catalogo_controles.invalidar()
+
+
+@pytest.fixture(autouse=True)
+def _limitador_en_memoria(monkeypatch):
+    """
+    HU-19: los límites contra abuso usan Redis. En las pruebas en proceso se usa un
+    limitador en memoria NUEVO en cada prueba: no se toca el Redis real (en Docker el
+    .env dice APP_ENV=development) y los contadores no se acumulan entre pruebas.
+    """
+    from app.infrastructure.cache import limitador
+
+    monkeypatch.setattr(limitador, "_limitador", limitador.LimitadorMemoria())
+

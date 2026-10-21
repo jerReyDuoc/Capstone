@@ -72,6 +72,35 @@ class Settings(BaseSettings):
     # vacío = sin plazo (decisión del equipo).
     ARCOP_PLAZO_INFORMACION_DIAS: int | None = None
 
+    # ------------------------------------------------ HU-19: encuesta pública (landing)
+    # Versión vigente del aviso legal (HU-04). El frontend envía la versión que mostró;
+    # si no coincide se rechaza (409 AVISO_DESACTUALIZADO) y debe volver a aceptarlo.
+    AVISO_LEGAL_VERSION: str = "2026-10-v1"
+    # Días que el usuario temporal anónimo puede retomar su evaluación.
+    ENCUESTA_DIAS_VIGENCIA: int = 30
+    # Cloudflare Turnstile (CAPTCHA al iniciar). Vacío solo en development/test: se omite
+    # la verificación con un aviso en el log. Claves de prueba de Cloudflare:
+    #   secreto que siempre aprueba 1x0000000000000000000000000000000AA
+    TURNSTILE_SECRET_KEY: str | None = None
+    TURNSTILE_VERIFY_URL: str = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    # Secreto compartido con el BFF de Next.js (frontend-next). Solo con él la API
+    # confía en la IP del cliente que el BFF reenvía en X-Cliente-IP; sin él, la IP
+    # sería la del contenedor web y todos compartirían el mismo límite.
+    BFF_SHARED_SECRET: str | None = None
+    # Límites contra abuso (solo evaluaciones de la encuesta pública, origen='publica')
+    ENCUESTA_INTENTOS_IP_10MIN: int = 10          # intentos de iniciar (también fallidos)
+    ENCUESTA_EVALUACIONES_IP_DIA: int = 10        # evaluaciones creadas por IP y día
+    ENCUESTA_MAX_EVIDENCIAS_EVALUACION: int = 30  # evidencias en toda la evaluación
+    ENCUESTA_MAX_EVIDENCIAS_IP_DIA: int = 100     # evidencias por IP y día
+    # Cuota diaria de validaciones con IA (1 evidencia subida = 1 validación). Se
+    # reinicia a medianoche de ZONA_HORARIA_CUOTAS. 0 = sin límite.
+    LLM_CUOTA_DIARIA_EVALUACION: int = 40
+    LLM_CUOTA_DIARIA_GLOBAL: int = 2000
+    ZONA_HORARIA_CUOTAS: str = "America/Santiago"
+    # HU-20 (interruptor): true = las rutas de evaluaciones exigen token también en las
+    # evaluaciones por invitación. Las de la encuesta pública lo exigen SIEMPRE.
+    EXIGIR_TOKEN_EVALUACIONES: bool = False
+
     model_config = SettingsConfigDict(env_file=".env")
 
     @model_validator(mode="after")
@@ -85,6 +114,10 @@ class Settings(BaseSettings):
             raise ValueError("ENTITY_MAP_KEY es obligatoria con APP_ENV=production.")
         if self.APP_ENV == "production" and (not self.AUTH_SECRET or len(self.AUTH_SECRET) < 32):
             raise ValueError("AUTH_SECRET (mínimo 32 caracteres) es obligatorio con APP_ENV=production.")
+        if self.APP_ENV == "production" and not self.TURNSTILE_SECRET_KEY:
+            raise ValueError("TURNSTILE_SECRET_KEY es obligatoria con APP_ENV=production (HU-19).")
+        if self.APP_ENV == "production" and (not self.BFF_SHARED_SECRET or len(self.BFF_SHARED_SECRET) < 32):
+            raise ValueError("BFF_SHARED_SECRET (mínimo 32 caracteres) es obligatorio con APP_ENV=production (HU-19).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),
         # para no bloquear alembic ni la API, que no la necesitan.
         return self

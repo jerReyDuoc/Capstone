@@ -16,6 +16,14 @@ const PATHS = {
   flechaArriba: "M12 19V5m-6 6 6-6 6 6",
   flechaAbajo: "M12 5v14m6-6-6 6-6-6",
   ordenar: "M8 4v16m0 0-3-3m3 3 3-3M16 20V4m0 0-3 3m3-3 3 3",
+  // HU-19
+  check: "M20 6 9 17l-5-5",
+  candado: "M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Zm2 0V7a4 4 0 1 1 8 0v4",
+  reloj: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2",
+  copiar: "M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1ZM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1",
+  descargar: "M12 4v11m0 0-4-4m4 4 4-4M5 19h14",
+  usuario: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
+  alerta: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v5m0 3h.01",
 } as const;
 
 export type IconName = keyof typeof PATHS;

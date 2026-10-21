@@ -327,6 +327,7 @@ button, select, input { font: inherit; color: inherit; }
 /* el área clicable de los botones pequeños se amplía a 44px sin cambiar su aspecto */
 .btn-sm { position: relative; }
 .btn-sm::after { content: ""; position: absolute; inset: -4px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; } /* HU-19 */
 
 .chip-group { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .chip {

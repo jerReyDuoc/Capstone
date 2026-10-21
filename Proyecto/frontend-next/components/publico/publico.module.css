@@ -1,0 +1,136 @@
+/* =====================================================================
+   HU-19 · Páginas públicas (landing, comenzar, retomar, encuesta)
+   Usa los tokens de app/globals.css (paleta TherionLabs). Móvil primero:
+   a diferencia del panel (≥1024 px), la landing la abre cualquiera.
+   ===================================================================== */
+
+.pagina { min-height: 100vh; display: flex; flex-direction: column; }
+.contenedor { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 var(--sp-5); }
+.contenedorEstrecho { width: 100%; max-width: 720px; margin: 0 auto; padding: 0 var(--sp-5); }
+
+/* ---------- encabezado ---------- */
+.encabezado {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(5, 8, 7, 0.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.encabezadoFila { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); min-height: 68px; }
+.marca { display: inline-flex; align-items: center; gap: var(--sp-3); color: var(--text); text-decoration: none; }
+.marca svg { width: 32px; height: 32px; flex: none; }
+.marcaNombre { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-lg); }
+.marcaSub { display: block; font-size: var(--fs-xs); color: var(--text-subtle); letter-spacing: 0.04em; }
+.navPublica { display: flex; align-items: center; gap: var(--sp-2); }
+.navEnlace {
+  display: none;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text-muted); text-decoration: none; font-size: var(--fs-sm); font-weight: 500;
+  border-radius: var(--radius-pill);
+}
+.navEnlace:hover { color: var(--text); background: var(--surface-2); }
+@media (min-width: 760px) { .navEnlace { display: inline-flex; } }
+
+/* ---------- héroe ---------- */
+.heroe { padding: var(--sp-12) 0 var(--sp-10); }
+.heroeGrid { display: grid; gap: var(--sp-10); align-items: center; }
+@media (min-width: 960px) { .heroeGrid { grid-template-columns: 1.15fr 0.85fr; } .heroe { padding: 88px 0 72px; } }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 6px var(--sp-3);
+  border: 1px solid rgba(20, 216, 158, 0.32); border-radius: var(--radius-pill);
+  background: var(--accent-soft); color: var(--accent);
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.titulo {
+  margin-top: var(--sp-5);
+  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  font-weight: 600; letter-spacing: -0.025em; line-height: 1.05;
+  text-wrap: balance;
+}
+.titulo em { font-style: normal; color: var(--accent); }
+.bajada { margin-top: var(--sp-5); font-size: var(--fs-lg); color: var(--text-muted); max-width: 56ch; }
+.acciones { margin-top: var(--sp-8); display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.btnGrande { min-height: 52px; padding: 0 var(--sp-6); font-size: var(--fs-md); }
+.garantias { margin: var(--sp-8) 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6); }
+.garantias li { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); }
+.garantias svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+
+.visual {
+  position: relative;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, rgba(20, 216, 158, 0.08), transparent 50%), var(--surface);
+  padding: var(--sp-6);
+}
+.visualCabecera { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+.visualEtiqueta { font-size: var(--fs-xs); color: var(--text-subtle); letter-spacing: 0.06em; text-transform: uppercase; }
+.visualValor { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 600; }
+.visualValor small { font-size: var(--fs-sm); color: var(--text-muted); margin-left: 4px; }
+.visual svg { display: block; width: 100%; height: auto; margin-top: var(--sp-4); }
+.visualPie { margin-top: var(--sp-3); font-size: var(--fs-xs); color: var(--text-subtle); text-align: center; }
+
+/* ---------- secciones ---------- */
+.seccion { padding: var(--sp-12) 0; border-top: 1px solid var(--line); }
+.seccionTitulo { font-size: var(--fs-xl); font-weight: 600; }
+@media (min-width: 760px) { .seccionTitulo { font-size: 2rem; } }
+.seccionBajada { margin-top: var(--sp-2); color: var(--text-muted); max-width: 62ch; }
+
+.pasos { margin: var(--sp-8) 0 0; padding: 0; list-style: none; display: grid; gap: var(--sp-4); counter-reset: paso; }
+@media (min-width: 760px) { .pasos { grid-template-columns: repeat(3, 1fr); } }
+.paso {
+  counter-increment: paso;
+  padding: var(--sp-6);
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface);
+}
+.paso::before {
+  content: counter(paso, decimal-leading-zero);
+  display: block; margin-bottom: var(--sp-3);
+  font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600; color: var(--accent);
+}
+.paso h3 { font-size: var(--fs-lg); }
+.paso p { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); }
+
+.dominios { margin: var(--sp-8) 0 0; padding: 0; list-style: none; display: grid; gap: var(--sp-3); }
+@media (min-width: 640px) { .dominios { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .dominios { grid-template-columns: repeat(4, 1fr); } }
+.dominio {
+  display: grid; gap: var(--sp-2);
+  padding: var(--sp-5);
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface);
+}
+.dominio svg { width: 24px; height: 24px; color: var(--accent); }
+.dominio h3 { font-size: var(--fs-md); }
+.dominio p { font-size: var(--fs-sm); color: var(--text-muted); }
+
+.privacidad { display: grid; gap: var(--sp-6); }
+@media (min-width: 900px) { .privacidad { grid-template-columns: 1fr 1fr; align-items: start; } }
+.listaCheck { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--sp-3); }
+.listaCheck li { display: flex; gap: var(--sp-3); align-items: flex-start; color: var(--text-muted); }
+.listaCheck svg { width: 20px; height: 20px; flex: none; color: var(--accent); margin-top: 2px; }
+
+.cierre {
+  margin: var(--sp-4) 0 var(--sp-12);
+  padding: var(--sp-10) var(--sp-6);
+  text-align: center;
+  border: 1px solid rgba(20, 216, 158, 0.28); border-radius: var(--radius-lg);
+  background: radial-gradient(600px 240px at 50% 0%, rgba(20, 216, 158, 0.14), transparent 70%), var(--surface);
+}
+.cierre .acciones { justify-content: center; }
+
+/* ---------- pie ---------- */
+.pie { margin-top: auto; border-top: 1px solid var(--line); padding: var(--sp-6) 0; font-size: var(--fs-sm); color: var(--text-subtle); }
+.pieFila { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-3); }
+.pie a { color: var(--text-muted); }
+
+/* ---------- páginas del flujo ---------- */
+.flujo { padding: var(--sp-10) 0 var(--sp-12); }
+.flujoCabecera { margin-bottom: var(--sp-6); }
+.flujoTitulo { font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 600; }
+.flujoBajada { margin-top: var(--sp-2); color: var(--text-muted); }
+.tarjeta {
+  padding: var(--sp-6);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface);
+}
+@media (min-width: 640px) { .tarjeta { padding: var(--sp-8); } }
+.volver { display: inline-flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-5); font-size: var(--fs-sm); color: var(--text-muted); text-decoration: none; }
+.volver:hover { color: var(--text); }
+.volver svg { width: 16px; height: 16px; transform: rotate(180deg); }

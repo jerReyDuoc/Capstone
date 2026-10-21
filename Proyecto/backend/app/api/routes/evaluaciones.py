@@ -1,14 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.alcance import actor_opcional, alcance_evaluacion
+from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.core.config import settings
 from app.core.database import get_db
 from app.application.schemas.api_schemas import (
     EvaluacionResumenResponse,
     RespuestaResumenResponse,
 )
-from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.respuesta import Respuesta
 
 
@@ -21,6 +25,7 @@ async def list_evaluaciones(
     size: int = Query(20, ge=1, le=100, description="Registros por página (máx 100)"),
     estado_progreso: str | None = Query(None, description="Filtrar por estado"),
     db: AsyncSession = Depends(get_db),
+    actor: Actor | None = Depends(actor_opcional),
 ):
     """
     Lista evaluaciones con paginación.
@@ -33,6 +38,23 @@ async def list_evaluaciones(
     if estado_progreso:
         query = query.where(Evaluacion.estado_progreso == estado_progreso)
         count_query = count_query.where(Evaluacion.estado_progreso == estado_progreso)
+
+    # HU-19: las evaluaciones de la encuesta pública solo las lista un admin; un
+    # encuestado ve solo la suya y un referente solo las de su invitación.
+    if actor is None:
+        if settings.EXIGIR_TOKEN_EVALUACIONES:
+            raise HTTPException(status_code=401, detail={"codigo": "NO_AUTENTICADO", "mensaje": "Falta el token."},
+                                headers={"WWW-Authenticate": "Bearer"})
+        filtro = Evaluacion.origen != ORIGEN_PUBLICA
+    elif actor.es_encuestado:
+        filtro = Evaluacion.id == actor.id
+    elif actor.rol == Rol.REFERENTE.value:
+        filtro = (Evaluacion.usuario_temporal_id == actor.id) & (Evaluacion.origen != ORIGEN_PUBLICA)
+    else:
+        filtro = None
+    if filtro is not None:
+        query = query.where(filtro)
+        count_query = count_query.where(filtro)
 
     total = (await db.execute(count_query)).scalar() or 0
 
@@ -49,7 +71,7 @@ async def list_evaluaciones(
     }
 
 
-@router.get("/{evaluacion_id}", response_model=EvaluacionResumenResponse)
+@router.get("/{evaluacion_id}", response_model=EvaluacionResumenResponse, dependencies=[Depends(alcance_evaluacion)])
 async def get_evaluacion(
     evaluacion_id: int,
     db: AsyncSession = Depends(get_db),
@@ -66,7 +88,7 @@ async def get_evaluacion(
     return evaluacion
 
 
-@router.get("/{evaluacion_id}/respuestas")
+@router.get("/{evaluacion_id}/respuestas", dependencies=[Depends(alcance_evaluacion)])
 async def list_respuestas_evaluacion(
     evaluacion_id: int,
     page: int = Query(1, ge=1),
@@ -119,3 +141,27 @@ async def list_respuestas_evaluacion(
         "size": size,
         "pages": (total + size - 1) // size if size > 0 else 0,
     }
+
+
+class MarcarPruebaRequest(BaseModel):
+    es_prueba: bool
+
+
+@router.patch("/{evaluacion_id}/prueba")
+async def marcar_prueba(
+    evaluacion_id: int,
+    payload: MarcarPruebaRequest,
+    actor: Actor = Depends(requerir_rol(Rol.ADMIN_THERION)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    HU-19 criterio 4 (solo admin): marca (o desmarca) una evaluación como de prueba para
+    que no entre al benchmark sectorial aunque esté completada. El cambio se refleja en
+    el próximo recálculo del benchmark.
+    """
+    evaluacion = await db.get(Evaluacion, evaluacion_id)
+    if evaluacion is None:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    evaluacion.es_prueba = payload.es_prueba
+    await db.commit()
+    return {"evaluacion_id": evaluacion.id, "origen": evaluacion.origen, "es_prueba": evaluacion.es_prueba}

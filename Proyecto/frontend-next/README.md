@@ -36,7 +36,20 @@ npm run typecheck
 npm run build
 ```
 
-## Rutas
+## Encuesta pública (HU-19)
+
+| Ruta | Contenido |
+|---|---|
+| `/` | Landing estática con el CTA al autodiagnóstico |
+| `/comenzar` | Aviso legal → rubro + verificación (Turnstile) → número y clave de la evaluación (+ email opcional) |
+| `/retomar` | Continuar desde cualquier dispositivo con número + clave |
+| `/encuesta` | Evaluación propia del encuestado (requiere sesión) |
+| `/aviso-legal` | Texto del aviso legal (HU-04) |
+
+El navegador habla con el BFF (`/bff/*`), que guarda el token en una cookie httpOnly y lo agrega como Bearer
+hacia FastAPI. Detalles, variables y checklist en `CAMBIOS_HU19.md`.
+
+## Rutas del panel
 
 | Ruta | Contenido |
 |---|---|
