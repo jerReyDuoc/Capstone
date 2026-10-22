@@ -7,6 +7,7 @@ import { construirPanel } from "./adaptadores";
 import type {
   BrechaCatalogoApi,
   ComparativaApi,
+  ControlApi,
   EvaluacionApi,
   PanelVista,
   RespuestaApi,
@@ -39,6 +40,18 @@ const CATALOGO: BrechaCatalogoApi[] = [
   accion_sistema: accion,
   ruta_formativa: { id: i + 1, nombre: ruta },
 }));
+
+/** HU-11: control sin brecha de catálogo; el análisis toma su criticidad y código. */
+const CONTROLES: ControlApi[] = [
+  {
+    id_control: 141,
+    codigo_control: "GOB-007",
+    obligacion: "Mantener un inventario actualizado de los sistemas de IA en uso y de sus responsables.",
+    criticidad: "Media",
+    recomendacion: "Levantar el inventario de sistemas de IA y asignar un responsable por sistema.",
+    dominio: { id: 2, nombre_dominio: "Gobernanza de IA" },
+  },
+];
 
 const PUNTAJES: Record<number, [string, number, number, number][]> = {
   // dominio, puntaje, controles, promedio industria
@@ -119,7 +132,17 @@ export function panelDemo(evaluacionId: number): PanelVista {
       matriz_controles_id_control: 140,
       catalogo_brechas_id_brecha: null,
     },
+    {
+      id_respuesta: 901,
+      estado_clasificacion: "no_cumplido",
+      estado_clasificacion_final: "no_cumplido",
+      fuente_clasificacion: "usuario",
+      confianza_clasificacion: null,
+      fecha_validacion: null,
+      matriz_controles_id_control: 141,
+      catalogo_brechas_id_brecha: null,
+    },
   ];
 
-  return construirPanel({ resumen, comparativa, respuestas, catalogo: CATALOGO });
+  return construirPanel({ resumen, comparativa, respuestas, catalogo: CATALOGO, controles: CONTROLES });
 }

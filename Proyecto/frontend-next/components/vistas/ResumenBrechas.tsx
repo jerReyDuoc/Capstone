@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePanel } from "@/hooks/usePanel";
 import type { BrechaVista } from "@/lib/types";
-import { BadgeCriticidad, BadgeEstado } from "@/components/ui/Basicos";
+import { BadgeEstado, BadgeSeveridad } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 
-/** Las N brechas más urgentes (ya vienen ordenadas por criticidad y estado). */
+/** Las N brechas más urgentes (ya vienen priorizadas por severidad, HU-11). */
 export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]; limite?: number }) {
   const { href } = usePanel();
   const top = brechas.slice(0, limite);
@@ -15,7 +15,7 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
     <section className="card" aria-labelledby="resumen-brechas-titulo" style={{ display: "grid", gap: 16, alignContent: "start" }}>
       <div className="card-head" style={{ marginBottom: 0 }}>
         <div>
-          <h2 className="card-title" id="resumen-brechas-titulo">Resumen de brechas</h2>
+          <h2 className="card-title" id="resumen-brechas-titulo">Brechas prioritarias</h2>
           <p className="card-sub">
             {brechas.length === 0
               ? "Sin brechas abiertas"
@@ -31,7 +31,8 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
           {top.map((b) => (
             <li key={b.respuestaId} className="gap-item">
               <div className="gap-top">
-                <BadgeCriticidad criticidad={b.criticidad} />
+                <span className="code" style={{ marginLeft: 0, color: "var(--text)" }}>#{b.prioridad}</span>
+                <BadgeSeveridad severidad={b.severidad} />
                 <BadgeEstado estado={b.estado} />
                 <span className="code">{b.codigo}</span>
               </div>
@@ -47,7 +48,7 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
 
       {brechas.length > 0 ? (
         <Link href={href("/panel/brechas")} className="btn btn-ghost" style={{ justifySelf: "start" }}>
-          Ver todas las brechas
+          Ver listado priorizado
           <Icon name="flecha" />
         </Link>
       ) : null}

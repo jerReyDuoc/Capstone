@@ -1,0 +1,4 @@
+﻿"Prioridad";"Severidad";"Código brecha";"Código control";"Dominio";"Estado";"Impacto del control";"Brecha detectada";"Acción sugerida";"Ruta formativa"
+"1";"Crítica";"ERR-DAT-001";"";"Protección de Datos";"No cumplido";"Alta";"Ingresar datos a la IA sin validar ni documentar el consentimiento previo.";"Bloqueo preventivo / Alerta";"Protección de Datos - Inicial"
+"4";"Alta";"ERR-DAT-010";"";"Protección de Datos";"No cumplido";"Media";"Lanzar un chatbot sin incluir el aviso de privacidad de uso de IA.";"Suspensión de interfaz";"Protección de Datos - Inicial"
+"6";"Alta";"ERR-DAT-004";"";"Protección de Datos";"Parcialmente cumplido";"Alta";"Omitir o rechazar injustificadamente una solicitud de eliminación (ARCOP).";"Escalamiento a DPO";"Protección de Datos - Intermedio"

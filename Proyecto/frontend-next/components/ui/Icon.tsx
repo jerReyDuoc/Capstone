@@ -24,6 +24,12 @@ const PATHS = {
   descargar: "M12 4v11m0 0-4-4m4 4 4-4M5 19h14",
   usuario: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
   alerta: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v5m0 3h.01",
+  // HU-11
+  buscar: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 3-4.35-4.35",
+  pdf: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M9 13h6M9 17h4",
+  tabla: "M4 5h16v14H4V5Zm0 5h16M4 15h16M10 5v14",
+  fijar: "M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6Zm3 11v6",
+  cerrar: "M6 6l12 12M18 6 6 18",
 } as const;
 
 export type IconName = keyof typeof PATHS;

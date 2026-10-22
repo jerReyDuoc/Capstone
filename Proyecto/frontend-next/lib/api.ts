@@ -3,6 +3,7 @@ import { DEMO_EVALUACIONES, panelDemo } from "./demo";
 import type {
   BrechaCatalogoApi,
   ComparativaApi,
+  ControlApi,
   EvaluacionApi,
   Paginado,
   PanelVista,
@@ -68,7 +69,7 @@ export async function listarEvaluaciones(signal?: AbortSignal): Promise<Evaluaci
 export async function cargarPanel(evaluacionId: number, signal?: AbortSignal): Promise<PanelVista> {
   if (MODO_DEMO) return panelDemo(evaluacionId);
 
-  const [resumen, respuestas, catalogo, comparativa] = await Promise.all([
+  const [resumen, respuestas, catalogo, comparativa, controles] = await Promise.all([
     getJson<ResumenApi>(`/api/evaluaciones/${evaluacionId}/resumen`, signal),
     getTodasLasPaginas<RespuestaApi>(`/api/evaluaciones/${evaluacionId}/respuestas`, signal),
     getJson<BrechaCatalogoApi[]>("/api/brechas", signal),
@@ -77,7 +78,13 @@ export async function cargarPanel(evaluacionId: number, signal?: AbortSignal): P
       if ((e as Error).name === "AbortError") throw e;
       return null;
     }),
+    // HU-11: el control aporta código, dominio y criticidad cuando la respuesta no trae brecha
+    // de catálogo. Si falla, el análisis sigue con el catálogo solo.
+    getJson<ControlApi[]>("/api/controles", signal).catch((e) => {
+      if ((e as Error).name === "AbortError") throw e;
+      return [] as ControlApi[];
+    }),
   ]);
 
-  return construirPanel({ resumen, comparativa, respuestas, catalogo });
+  return construirPanel({ resumen, comparativa, respuestas, catalogo, controles });
 }

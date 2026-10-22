@@ -83,11 +83,30 @@ export interface BrechaCatalogoApi {
   ruta_formativa: { id: number; nombre: string | null } | null;
 }
 
+/** GET /api/controles (HU-11: respaldo de criticidad, código y dominio del control) */
+export interface ControlApi {
+  id_control: number;
+  codigo_control: string | null;
+  obligacion: string | null;
+  criticidad: string | null;
+  recomendacion: string | null;
+  dominio: { id: number; nombre_dominio: string | null } | null;
+}
+
 /* ------------------------------------------------------------------
  * Modelo de vista: lo que dibujan los componentes.
  * ------------------------------------------------------------------ */
 
+/** Impacto del control según el catálogo (Alta/Media/Baja). */
 export type Criticidad = "Alta" | "Media" | "Baja" | "Sin clasificar";
+
+/**
+ * HU-11 · Severidad de la brecha = impacto del control × qué tan incumplido está.
+ * Es la que ordena el listado priorizado (ver lib/severidad.ts).
+ */
+export type Severidad = "Crítica" | "Alta" | "Media" | "Baja" | "Sin clasificar";
+
+export type EstadoBrecha = "no_cumplido" | "parcialmente_cumplido";
 
 export interface DominioVista {
   id: number | null;
@@ -105,11 +124,19 @@ export interface BrechaVista {
   codigo: string;
   dominio: string;
   descripcion: string;
+  /** Impacto del control (catálogo de brechas o, en su defecto, matriz de controles). */
   criticidad: Criticidad;
-  estado: "no_cumplido" | "parcialmente_cumplido";
+  /** HU-11: severidad resultante de la matriz impacto × estado. */
+  severidad: Severidad;
+  /** HU-11: posición en el listado priorizado (1 = la más urgente). Estable aunque se filtre. */
+  prioridad: number;
+  estado: EstadoBrecha;
   accion: string | null;
   rutaFormativa: string | null;
   controlId: number | null;
+  controlCodigo: string | null;
+  /** Puntaje 0-100 del dominio de la brecha (desempate: dominio menos maduro primero). */
+  puntajeDominio: number | null;
 }
 
 export interface PanelVista {
@@ -121,5 +148,9 @@ export interface PanelVista {
   dominios: DominioVista[];
   brechas: BrechaVista[];
   brechasPorCriticidad: Record<Criticidad, number>;
+  /** HU-11 */
+  brechasPorSeveridad: Record<Severidad, number>;
+  noCumplidos: number;
+  parciales: number;
   tieneBenchmark: boolean;
 }

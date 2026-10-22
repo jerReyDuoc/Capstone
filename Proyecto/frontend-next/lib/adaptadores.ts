@@ -1,10 +1,13 @@
-import { CRITICIDADES, nivelDesdePuntaje, normalizarCriticidad } from "./madurez";
+import { CRITICIDADES, nivelDesdePuntaje } from "./madurez";
+import { calcularSeveridad, contarPorSeveridad, PESO_SEVERIDAD } from "./severidad";
 import type {
   BrechaCatalogoApi,
   BrechaVista,
   ComparativaApi,
+  ControlApi,
   Criticidad,
   DominioVista,
+  EstadoBrecha,
   PanelVista,
   RespuestaApi,
   ResumenApi,
@@ -18,41 +21,72 @@ export function estadoEfectivo(r: RespuestaApi) {
 }
 
 /**
- * Brecha = respuesta no cumplida o parcialmente cumplida que el backend
- * asoció a una entrada del catálogo de brechas. Las respuestas sin brecha
- * asociada se cuentan igual (como "Sin clasificar") para no esconder riesgo.
+ * HU-11 · Análisis automático de brechas.
+ *
+ * Brecha = respuesta cuyo estado efectivo es no cumplido o parcialmente cumplido.
+ * Se enriquece con el catálogo de brechas y, si falta, con el control de la matriz
+ * (código, dominio, obligación, criticidad y recomendación). Las que no tienen
+ * impacto conocido quedan "Sin clasificar": se cuentan igual para no esconder riesgo.
+ *
+ * Devuelve la lista ya priorizada y numerada (prioridad 1 = la más urgente).
  */
 export function construirBrechas(
   respuestas: RespuestaApi[],
   catalogo: BrechaCatalogoApi[],
+  controles: ControlApi[] = [],
+  puntajesDominio: Map<string, number> = new Map(),
 ): BrechaVista[] {
   const porId = new Map(catalogo.map((b) => [b.id_brecha, b]));
+  const ctrlPorId = new Map(controles.map((c) => [c.id_control, c]));
 
   return respuestas
     .filter((r) => ESTADOS_BRECHA.has(estadoEfectivo(r) ?? ""))
     .map<BrechaVista>((r) => {
-      const cat = r.catalogo_brechas_id_brecha != null ? porId.get(r.catalogo_brechas_id_brecha) : undefined;
+      const ctrl = r.matriz_controles_id_control != null ? ctrlPorId.get(r.matriz_controles_id_control) : undefined;
+      const idBrecha = r.catalogo_brechas_id_brecha;
+      const cat = idBrecha != null ? porId.get(idBrecha) : undefined;
+      const estado = estadoEfectivo(r) as EstadoBrecha;
+      const { severidad, impacto } = calcularSeveridad(cat?.criticidad, estado, ctrl?.criticidad);
+      const dominio = cat?.categoria ?? ctrl?.dominio?.nombre_dominio ?? "Sin dominio";
       return {
         respuestaId: r.id_respuesta,
-        codigo: cat?.codigo_brecha ?? `RESP-${r.id_respuesta}`,
-        dominio: cat?.categoria ?? "Sin dominio",
-        descripcion: cat?.comportamiento_detectado ?? "Control no cumplido sin brecha de catálogo asociada.",
-        criticidad: normalizarCriticidad(cat?.criticidad),
-        estado: estadoEfectivo(r) as BrechaVista["estado"],
-        accion: cat?.accion_sistema ?? null,
+        codigo: cat?.codigo_brecha ?? ctrl?.codigo_control ?? `RESP-${r.id_respuesta}`,
+        dominio,
+        descripcion:
+          cat?.comportamiento_detectado ??
+          ctrl?.obligacion ??
+          "Control no cumplido sin brecha de catálogo asociada.",
+        criticidad: impacto,
+        severidad,
+        prioridad: 0, // se numera después de ordenar
+        estado,
+        accion: cat?.accion_sistema ?? ctrl?.recomendacion ?? null,
         rutaFormativa: cat?.ruta_formativa?.nombre ?? null,
         controlId: r.matriz_controles_id_control,
+        controlCodigo: ctrl?.codigo_control ?? null,
+        puntajeDominio: puntajesDominio.get(dominio) ?? null,
       };
     })
-    .sort(ordenarBrechas);
+    .sort(ordenarBrechas)
+    .map((b, i) => ({ ...b, prioridad: i + 1 }));
 }
 
-const PESO: Record<Criticidad, number> = { Alta: 0, Media: 1, Baja: 2, "Sin clasificar": 3 };
+const PESO_IMPACTO: Record<Criticidad, number> = { Alta: 0, Media: 1, Baja: 2, "Sin clasificar": 3 };
 
+/**
+ * Orden del listado priorizado:
+ * 1. severidad (Crítica → Baja → Sin clasificar)
+ * 2. no cumplidas antes que parciales
+ * 3. mayor impacto del control
+ * 4. dominio menos maduro primero (donde la empresa está más expuesta)
+ * 5. código, para que el orden sea estable
+ */
 export function ordenarBrechas(a: BrechaVista, b: BrechaVista) {
   return (
-    PESO[a.criticidad] - PESO[b.criticidad] ||
+    PESO_SEVERIDAD[a.severidad] - PESO_SEVERIDAD[b.severidad] ||
     (a.estado === b.estado ? 0 : a.estado === "no_cumplido" ? -1 : 1) ||
+    PESO_IMPACTO[a.criticidad] - PESO_IMPACTO[b.criticidad] ||
+    (a.puntajeDominio ?? 101) - (b.puntajeDominio ?? 101) ||
     a.codigo.localeCompare(b.codigo, "es")
   );
 }
@@ -89,9 +123,11 @@ export function construirPanel(args: {
   comparativa: ComparativaApi | null;
   respuestas: RespuestaApi[];
   catalogo: BrechaCatalogoApi[];
+  controles?: ControlApi[];
 }): PanelVista {
   const dominios = construirDominios(args.resumen, args.comparativa);
-  const brechas = construirBrechas(args.respuestas, args.catalogo);
+  const puntajes = new Map(dominios.map((d) => [d.nombre, d.puntaje]));
+  const brechas = construirBrechas(args.respuestas, args.catalogo, args.controles ?? [], puntajes);
   return {
     evaluacionId: args.resumen.evaluacion_id,
     puntajeGeneral: args.resumen.puntaje_general,
@@ -101,6 +137,9 @@ export function construirPanel(args: {
     dominios,
     brechas,
     brechasPorCriticidad: contarPorCriticidad(brechas),
+    brechasPorSeveridad: contarPorSeveridad(brechas),
+    noCumplidos: brechas.filter((b) => b.estado === "no_cumplido").length,
+    parciales: brechas.filter((b) => b.estado === "parcialmente_cumplido").length,
     tieneBenchmark: dominios.some((d) => d.promedioIndustria != null),
   };
 }

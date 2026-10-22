@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { VistasFijadas } from "@/components/brechas/VistasFijadas";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
 import { BarrasDominio } from "@/components/charts/BarrasDominio";
 import { RadarMadurez } from "@/components/charts/RadarMadurez";
@@ -26,7 +27,8 @@ export function VistaDiagnostico() {
 
       <EstadoPanel>
         {(p) => {
-          const altas = p.brechasPorCriticidad.Alta;
+          const criticas = p.brechasPorSeveridad["Crítica"];
+          const altas = p.brechasPorSeveridad.Alta;
           return (
             <>
               <div className="grid">
@@ -52,12 +54,13 @@ export function VistaDiagnostico() {
                   etiqueta="Brechas abiertas"
                   valor={p.brechas.length}
                   pista={
-                    altas > 0 ? (
+                    criticas + altas > 0 ? (
                       <span>
-                        <strong style={{ color: "var(--alto)" }}>{altas}</strong> de criticidad alta
+                        <strong style={{ color: "var(--critico)" }}>{criticas}</strong> {criticas === 1 ? "crítica" : "críticas"} ·{" "}
+                        <strong style={{ color: "var(--naranja)" }}>{altas}</strong> {altas === 1 ? "alta" : "altas"}
                       </span>
                     ) : (
-                      "Ninguna de criticidad alta"
+                      "Ninguna crítica ni alta"
                     )
                   }
                 />
@@ -70,6 +73,8 @@ export function VistaDiagnostico() {
                 />
               </div>
 
+              <VistasFijadas panel={p} />
+
               <div className="grid">
                 <div className="card col-7 md-col-7">
                   <RadarMadurez
@@ -79,8 +84,8 @@ export function VistaDiagnostico() {
                 </div>
                 <div className="card col-5 md-col-5">
                   <BarrasCriticidad
-                    conteo={p.brechasPorCriticidad}
-                    onSeleccionar={(c) => router.push(href("/panel/brechas", { criticidad: c }))}
+                    conteo={p.brechasPorSeveridad}
+                    onSeleccionar={(s) => router.push(href("/panel/brechas", { severidad: s }))}
                   />
                 </div>
               </div>
@@ -100,8 +105,9 @@ export function VistaDiagnostico() {
               <p className="callout">
                 <Icon name="info" />
                 <span>
-                  <strong>De la señal a la decisión.</strong> Empieza por las brechas de criticidad alta: cada una trae
-                  la acción sugerida y la ruta formativa recomendada para cerrarla.
+                  <strong>De la señal a la decisión.</strong> Empieza por las brechas críticas: cada una trae la acción
+                  sugerida y la ruta formativa para cerrarla. Desde Brechas puedes fijar aquí un listado filtrado o
+                  exportarlo a PDF y CSV.
                 </span>
               </p>
             </>

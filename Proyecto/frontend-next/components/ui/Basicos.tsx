@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { usePanel } from "@/hooks/usePanel";
 import { CRITICIDAD_TONO, formatoPuntaje, NIVELES } from "@/lib/madurez";
-import type { Criticidad, NivelMadurez } from "@/lib/types";
+import { SEVERIDAD_TONO } from "@/lib/severidad";
+import type { Criticidad, NivelMadurez, Severidad } from "@/lib/types";
 import { Icon, type IconName } from "./Icon";
 
 export function BadgeNivel({ nivel }: { nivel: NivelMadurez }) {
@@ -12,6 +13,16 @@ export function BadgeNivel({ nivel }: { nivel: NivelMadurez }) {
 
 export function BadgeCriticidad({ criticidad }: { criticidad: Criticidad }) {
   return <span className={`badge tone-${CRITICIDAD_TONO[criticidad]}`}>{criticidad}</span>;
+}
+
+/** HU-11: "Crítica" es sólida (forma distinta, no solo color); el resto, suave. */
+export function BadgeSeveridad({ severidad }: { severidad: Severidad }) {
+  return (
+    <span className={`badge tone-${SEVERIDAD_TONO[severidad]}`}>
+      <span className="sr-only">Severidad </span>
+      {severidad}
+    </span>
+  );
 }
 
 export function BadgeEstado({ estado }: { estado: "no_cumplido" | "parcialmente_cumplido" }) {
