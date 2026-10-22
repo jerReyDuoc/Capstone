@@ -94,7 +94,7 @@ export function Cargando() {
 }
 
 export function EstadoPanel({ children }: { children: (panel: import("@/lib/types").PanelVista) => ReactNode }) {
-  const { estado, recargar } = usePanel();
+  const { estado, recargar, modo } = usePanel();
 
   if (estado.tipo === "cargando") return <Cargando />;
 
@@ -112,10 +112,20 @@ export function EstadoPanel({ children }: { children: (panel: import("@/lib/type
       <div className="state" role="status">
         <Icon name="info" width={32} height={32} style={{ color: "var(--medio)" }} />
         <h2>Esta evaluación todavía no tiene resultados</h2>
-        <p>
-          El resumen se genera al completar el cuestionario. Termina las preguntas pendientes o elige otra evaluación
-          en el selector de arriba.
-        </p>
+        {modo === "encuestado" ? (
+          <>
+            <p>Los resultados se calculan cuando completas el cuestionario. Termina las preguntas pendientes y vuelve aquí.</p>
+            <a href="/encuesta" className="btn btn-primary">
+              Continuar mi cuestionario
+              <Icon name="flecha" />
+            </a>
+          </>
+        ) : (
+          <p>
+            El resumen se genera al completar el cuestionario. Termina las preguntas pendientes o elige otra evaluación
+            en el selector de arriba.
+          </p>
+        )}
       </div>
     );
 

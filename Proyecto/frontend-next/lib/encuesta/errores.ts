@@ -105,6 +105,72 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     detalle: "Recarga la página e inténtalo de nuevo desde el sitio.",
     accion: "recargar",
   },
+  // ---- Cuestionario (HU-01/02) y cierre de la evaluación
+  JUSTIFICACION_OBLIGATORIA: {
+    titulo: "Falta la justificación",
+    detalle: "Para este estado explica con tus palabras por qué el control queda así (al menos 20 caracteres).",
+    accion: "ninguna",
+  },
+  PROMPT_INJECTION: {
+    titulo: "No pudimos guardar ese texto",
+    detalle: "La justificación contiene instrucciones que parecen dirigidas a la IA. Descríbela con tus palabras, sin comandos.",
+    accion: "ninguna",
+  },
+  CONTROL_NO_APLICABLE: {
+    titulo: "Este control ya no aplica",
+    detalle: "Cambiaron las preguntas iniciales y este control quedó fuera. Recarga para ver el cuestionario actualizado.",
+    accion: "recargar",
+  },
+  FILTRO_PENDIENTE: {
+    titulo: "Faltan las preguntas iniciales",
+    detalle: "Responde primero las preguntas sobre el uso de IA en tu organización.",
+    accion: "recargar",
+  },
+  EVALUACION_CERRADA: {
+    titulo: "La evaluación ya está cerrada",
+    detalle: "Ya no admite cambios. Puedes revisar los resultados en el panel.",
+    accion: "recargar",
+  },
+  CUESTIONARIO_INCOMPLETO: {
+    titulo: "Aún quedan controles por responder",
+    detalle: "Responde todos los controles antes de completar la evaluación.",
+    accion: "ninguna",
+  },
+  EVIDENCIAS_EN_PROCESO: {
+    titulo: "Hay evidencias en validación",
+    detalle: "Espera a que la IA termine de revisarlas (suele tardar menos de un minuto) y vuelve a intentarlo.",
+    accion: "reintentar",
+  },
+  REVISION_SIN_EVIDENCIA: {
+    titulo: "Hay controles en 'Requiere revisión' sin evidencia",
+    detalle: "Adjunta una evidencia en esos controles o elige otro estado para poder completar.",
+    accion: "ninguna",
+  },
+  ANONIMIZACION_NO_DISPONIBLE: {
+    titulo: "Servicio de privacidad no disponible",
+    detalle: "Por seguridad no guardamos datos sin anonimizarlos. Intenta de nuevo en unos minutos.",
+    accion: "reintentar",
+  },
+  CIFRADO_NO_CONFIGURADO: {
+    titulo: "No podemos recibir evidencias ahora",
+    detalle: "El servidor no está listo para guardar archivos de forma segura. Puedes seguir respondiendo sin adjuntar.",
+    accion: "ninguna",
+  },
+  ARCHIVO_DEMASIADO_GRANDE: {
+    titulo: "El archivo es demasiado grande",
+    detalle: "El máximo es 12 MB por evidencia.",
+    accion: "ninguna",
+  },
+  TIPO_NO_SOPORTADO: {
+    titulo: "Formato no admitido",
+    detalle: "Adjunta la evidencia como archivo de texto.",
+    accion: "ninguna",
+  },
+  DATOS_INVALIDOS: {
+    titulo: "Revisa los datos",
+    detalle: "Algún campo no tiene el formato esperado.",
+    accion: "ninguna",
+  },
   SIN_CONEXION: {
     titulo: "Sin conexión con el servidor",
     detalle: "Revisa tu conexión a internet e inténtalo de nuevo.",
@@ -118,8 +184,17 @@ const GENERICO: Omit<MensajeError, "esperaS"> = {
   accion: "reintentar",
 };
 
+/** Códigos cuyo mensaje del backend es más preciso que el genérico (dice qué controles faltan). */
+const DETALLE_DEL_BACKEND = new Set([
+  "JUSTIFICACION_OBLIGATORIA",
+  "CUESTIONARIO_INCOMPLETO",
+  "EVIDENCIAS_EN_PROCESO",
+  "REVISION_SIN_EVIDENCIA",
+]);
+
 export function mensajeDeError(e: ErrorEncuesta): MensajeError {
-  const base = TEXTOS[e.codigo] ?? (e.mensaje ? { ...GENERICO, detalle: e.mensaje } : GENERICO);
+  let base = TEXTOS[e.codigo] ?? (e.mensaje ? { ...GENERICO, detalle: e.mensaje } : GENERICO);
+  if (TEXTOS[e.codigo] && e.mensaje && DETALLE_DEL_BACKEND.has(e.codigo)) base = { ...base, detalle: e.mensaje };
   return { ...base, esperaS: e.reintentarEnS };
 }
 

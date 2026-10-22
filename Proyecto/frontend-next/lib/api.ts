@@ -13,6 +13,15 @@ import type {
 
 export const MODO_DEMO = process.env.NEXT_PUBLIC_DEMO === "1";
 
+/**
+ * De dónde salen los datos del panel:
+ *   "/api"     → equipo interno (rewrite de Next a FastAPI, como hasta ahora)
+ *   "/bff/api" → encuestado de la landing (HU-19): su evaluación es pública y la API exige
+ *                su token, que vive en la cookie httpOnly; el BFF lo agrega y solo deja
+ *                pasar SU evaluación.
+ */
+export type BaseApi = "/api" | "/bff/api";
+
 /** Error con un mensaje apto para mostrar al usuario y el código HTTP. */
 export class ApiError extends Error {
   constructor(
@@ -35,7 +44,9 @@ async function getJson<T>(ruta: string, signal?: AbortSignal): Promise<T> {
   if (!res.ok) {
     let detalle: unknown;
     try {
-      detalle = (await res.json())?.detail;
+      const cuerpo = await res.json();
+      // FastAPI: { detail }; BFF: { error: { codigo, mensaje } }
+      detalle = cuerpo?.detail ?? cuerpo?.error;
     } catch {
       /* cuerpo vacío */
     }
@@ -66,21 +77,38 @@ export async function listarEvaluaciones(signal?: AbortSignal): Promise<Evaluaci
   return pagina.items;
 }
 
-export async function cargarPanel(evaluacionId: number, signal?: AbortSignal): Promise<PanelVista> {
+/** Sesión del encuestado (cookie httpOnly) o null si no hay / no se pudo consultar. */
+export async function sesionEncuestado(signal?: AbortSignal): Promise<number | null> {
+  if (MODO_DEMO) return null;
+  try {
+    const s = await getJson<{ activa: boolean; evaluacionId?: number }>("/bff/encuesta/sesion", signal);
+    return s.activa && typeof s.evaluacionId === "number" ? s.evaluacionId : null;
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw e;
+    return null; // sin BFF o sin backend: el panel sigue en modo interno
+  }
+}
+
+/** La evaluación del encuestado (una sola: la de su sesión). */
+export async function evaluacionDelEncuestado(evaluacionId: number, signal?: AbortSignal): Promise<EvaluacionApi> {
+  return getJson<EvaluacionApi>(`/bff/api/evaluaciones/${evaluacionId}`, signal);
+}
+
+export async function cargarPanel(evaluacionId: number, signal?: AbortSignal, base: BaseApi = "/api"): Promise<PanelVista> {
   if (MODO_DEMO) return panelDemo(evaluacionId);
 
   const [resumen, respuestas, catalogo, comparativa, controles] = await Promise.all([
-    getJson<ResumenApi>(`/api/evaluaciones/${evaluacionId}/resumen`, signal),
-    getTodasLasPaginas<RespuestaApi>(`/api/evaluaciones/${evaluacionId}/respuestas`, signal),
-    getJson<BrechaCatalogoApi[]>("/api/brechas", signal),
+    getJson<ResumenApi>(`${base}/evaluaciones/${evaluacionId}/resumen`, signal),
+    getTodasLasPaginas<RespuestaApi>(`${base}/evaluaciones/${evaluacionId}/respuestas`, signal),
+    getJson<BrechaCatalogoApi[]>(`${base}/brechas`, signal),
     // Sin rubro o sin benchmark el panel sigue funcionando: solo se oculta la serie "industria".
-    getJson<ComparativaApi>(`/api/evaluaciones/${evaluacionId}/comparativa`, signal).catch((e) => {
+    getJson<ComparativaApi>(`${base}/evaluaciones/${evaluacionId}/comparativa`, signal).catch((e) => {
       if ((e as Error).name === "AbortError") throw e;
       return null;
     }),
     // HU-11: el control aporta código, dominio y criticidad cuando la respuesta no trae brecha
     // de catálogo. Si falla, el análisis sigue con el catálogo solo.
-    getJson<ControlApi[]>("/api/controles", signal).catch((e) => {
+    getJson<ControlApi[]>(`${base}/controles`, signal).catch((e) => {
       if ((e as Error).name === "AbortError") throw e;
       return [] as ControlApi[];
     }),

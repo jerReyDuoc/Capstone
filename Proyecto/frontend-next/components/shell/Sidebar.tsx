@@ -13,7 +13,7 @@ const ITEMS: { ruta: string; etiqueta: string; icono: IconName }[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { href, estado, demo } = usePanel();
+  const { href, estado, demo, modo } = usePanel();
   const abiertas = estado.tipo === "listo" ? estado.panel.brechas.length : null;
 
   return (
@@ -55,6 +55,19 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {modo === "encuestado" ? (
+        <nav className="nav" aria-label="Mi evaluación">
+          <ul className="nav-list">
+            <li>
+              <Link href="/encuesta" className="nav-link" data-label="Mi evaluación" prefetch={false}>
+                <Icon name="lista" />
+                <span className="nav-label">Mi evaluación</span>
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      ) : null}
 
       <div className="sidebar-foot">
         {demo ? <span className="badge badge-demo">Modo demo</span> : null}
