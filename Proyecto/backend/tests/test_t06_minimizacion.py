@@ -212,7 +212,9 @@ def test_h3_mapa_reversible_prohibido_en_produccion():
     from app.core.config import Settings
     base = dict(DATABASE_URL="x", DATABASE_URL_SYNC="x", REDIS_URL="x", GROQ_API_KEY="x",
                 APP_ENV="production", ENTITY_MAP_KEY="k", AUTH_SECRET="a" * 32,
-                TURNSTILE_SECRET_KEY="t", BFF_SHARED_SECRET="b" * 32)
+                TURNSTILE_SECRET_KEY="t", BFF_SHARED_SECRET="b" * 32,
+                # HU-12: en producción CORREO_MODO=archivo (el valor por defecto) está prohibido
+                CORREO_MODO="desactivado")
     Settings(_env_file=None, **base)  # configuración válida
     with pytest.raises(ValueError, match="GUARDAR_MAPA_ENTIDADES_CIFRADO"):
         Settings(_env_file=None, GUARDAR_MAPA_ENTIDADES_CIFRADO=True, **base)

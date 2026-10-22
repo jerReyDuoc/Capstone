@@ -1,0 +1,27 @@
+# T-08 · Configuración de coverage.py (la usa pytest-cov en local y en GitHub Actions)
+
+[run]
+source = app
+# Rutas relativas (app/...): así SonarQube y el reporte HTML calzan con el repo
+relative_files = True
+omit =
+    */__pycache__/*
+
+[report]
+# Umbral de la tarea T-08: si la cobertura total baja de 70 %, pytest termina con error
+fail_under = 70
+precision = 1
+show_missing = True
+skip_empty = True
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    if TYPE_CHECKING:
+
+[html]
+directory = htmlcov
+title = Cobertura backend ComplianceIA
+
+[xml]
+output = coverage.xml

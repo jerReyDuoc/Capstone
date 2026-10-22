@@ -1,0 +1,106 @@
+# T-08 · Suite de pruebas automatizadas con cobertura >= 70 % (backend ComplianceIA)
+#
+# Se ejecuta en cada push y pull request a main que toque el backend, y también
+# a mano desde la pestaña Actions (workflow_dispatch).
+# Las pruebas NO necesitan PostgreSQL, Redis ni Groq (ver tests/conftest.py):
+# usan SQLite en memoria y repositorios falsos, por eso no se levantan servicios.
+# La prueba en vivo (test_live_capa_ia.py) se omite sola porque no hay LIVE_BASE_URL.
+
+name: CI backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Proyecto/backend/**"
+      - ".github/workflows/ci-backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Proyecto/backend/**"
+      - ".github/workflows/ci-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Pruebas + cobertura (>= 70 %)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: Proyecto/backend
+
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SonarQube necesita el historial para el análisis de código nuevo
+
+      - name: Instalar Python 3.13 (misma versión que la imagen Docker)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: Proyecto/backend/requirements.txt
+
+      - name: Instalar dependencias (incluye spaCy + es_core_news_md)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -c "import spacy; spacy.load('es_core_news_md')"
+
+      - name: Ejecutar la suite con cobertura
+        env:
+          APP_ENV: test
+        run: |
+          mkdir -p reports
+          pytest tests -v -rxX \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --junitxml=reports/junit.xml
+        # El umbral (fail_under = 70) está en .coveragerc: si la cobertura baja
+        # de 70 %, este paso falla y el commit queda marcado en rojo.
+
+      - name: Resumen de cobertura en la página del workflow
+        if: always()
+        run: |
+          if [ -f .coverage ]; then
+            echo "## Cobertura del backend" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            coverage report --skip-covered >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Guardar reportes (HTML de cobertura, XML y JUnit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-cobertura-backend
+          path: |
+            Proyecto/backend/htmlcov/
+            Proyecto/backend/coverage.xml
+            Proyecto/backend/reports/junit.xml
+          retention-days: 30
+
+      # ---------------------------------------------------------------- SonarQube
+      # Opcional: solo corre si existe el secreto SONAR_TOKEN (Settings > Secrets
+      # and variables > Actions). Sin él, el paso se salta y el CI sigue en verde.
+      - name: Análisis SonarQube Cloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: Proyecto/backend
+
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

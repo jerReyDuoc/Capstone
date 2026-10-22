@@ -6,3 +6,8 @@ backend/storage/
 __pycache__/
 *.pyc
 backend/.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+reports/

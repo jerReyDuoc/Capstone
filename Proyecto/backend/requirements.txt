@@ -26,5 +26,6 @@ reportlab>=4.2,<6
 
 # Tests
 pytest
+pytest-cov   # T-08: cobertura (coverage.py) en local y en GitHub Actions
 httpx        # pruebas de API (en proceso y live)
 aiosqlite    # BD en memoria para pruebas de latencia en proceso
