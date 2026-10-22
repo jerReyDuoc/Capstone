@@ -46,7 +46,12 @@ export interface ResumenApi {
 /** GET /api/evaluaciones/{id}/comparativa */
 export interface ComparativaApi {
   evaluacion_id: number;
-  rubro_id: number;
+  rubro_id: number | null;
+  /** HU-12/HU-13: lo que debería alcanzar cada dimensión (META_CUMPLIMIENTO_PUNTAJE). Backends previos no lo traen. */
+  meta_puntaje?: number;
+  meta_nivel?: NivelMadurez;
+  /** Evaluaciones del rubro necesarias para mostrar su promedio (COMPARATIVA_MIN_MUESTRAS). */
+  muestras_minimas?: number;
   comparativas: {
     dominio: string;
     tu_puntaje: number | null;
@@ -56,7 +61,11 @@ export interface ComparativaApi {
     maximo_industria: number | null;
     minimo_industria: number | null;
     muestras: number;
+    referencia_suficiente?: boolean;
     diferencia_vs_promedio: number | null;
+    meta?: number;
+    diferencia_vs_meta?: number;
+    cumple_meta?: boolean;
   }[];
 }
 
@@ -117,6 +126,9 @@ export interface DominioVista {
   promedioIndustria: number | null;
   diferencia: number | null;    // puntos vs. promedio de la industria
   muestras: number;
+  /** Puntaje que debería alcanzar la dimensión y cuánto le falta (negativo) o sobra. */
+  meta: number;
+  diferenciaMeta: number;
 }
 
 export interface BrechaVista {
@@ -153,4 +165,74 @@ export interface PanelVista {
   noCumplidos: number;
   parciales: number;
   tieneBenchmark: boolean;
+  /** Meta de cumplimiento por dimensión (0-100). */
+  meta: number;
+  /** Evaluaciones del rubro necesarias para mostrar su promedio, y las que hay hoy (máx. entre dominios). */
+  muestrasMinimas: number;
+  muestrasRubro: number;
+  /** El backend no tiene rubro para esta evaluación o falló la comparativa. */
+  sinRubro: boolean;
+}
+
+/* ------------------------------------------------------------------
+ * HU-12 · Plan formativo (GET /api/evaluaciones/{id}/plan-formativo)
+ * ------------------------------------------------------------------ */
+
+export type NivelFormativo = "Inicial" | "Intermedio" | "Avanzado";
+
+export interface RutaPlanApi {
+  id: number;
+  nombre: string;
+  dominio: string | null;
+  nivel: NivelFormativo | null;
+  objetivo: string | null;
+  objetivos_especificos: string[];
+  contenidos: string[];
+  horas: number | null;
+  modalidad: string | null;
+  publico_objetivo: string | null;
+}
+
+export interface BrechaCubiertaApi {
+  codigo: string;
+  control_codigo: string | null;
+  dominio: string;
+  severidad: Severidad;
+  estado: EstadoBrecha;
+  prioridad: number;
+}
+
+export interface ModuloPlanApi {
+  nivel: NivelFormativo;
+  /** "brechas": lo activó una brecha · "nivel": base del nivel asignado a la dimensión. */
+  motivo: "brechas" | "nivel";
+  prioridad: Severidad | "Complementario";
+  ruta: RutaPlanApi;
+  brechas: BrechaCubiertaApi[];
+}
+
+export interface DimensionPlanApi {
+  dominio_id: number | null;
+  dominio: string;
+  puntaje: number | null;
+  nivel_madurez: NivelMadurez | null;
+  nivel_asignado: NivelFormativo;
+  objetivo_nivel: string;
+  brechas: number;
+  horas: number;
+  modulos: ModuloPlanApi[];
+}
+
+export interface PlanFormativoApi {
+  evaluacion_id: number;
+  resumen: {
+    dimensiones: number;
+    modulos: number;
+    horas: number;
+    brechas_total: number;
+    brechas_mapeadas: number;
+    cobertura_mapeo: number;
+  };
+  brechas_sin_ruta: BrechaCubiertaApi[];
+  dimensiones: DimensionPlanApi[];
 }

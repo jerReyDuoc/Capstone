@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
-import { formatoDiferencia, formatoPuntaje, NIVELES } from "@/lib/madurez";
+import { notaIndustria } from "@/lib/adaptadores";
+import { formatoDiferencia, formatoDiferenciaMeta, formatoPuntaje, NIVELES } from "@/lib/madurez";
 import { slug } from "@/lib/slug";
 
 export function VistaDominios() {
@@ -26,14 +27,14 @@ export function VistaDominios() {
       <PageHeader
         eyebrow="Madurez por dominio"
         titulo="Dominios"
-        subtitulo="Detalle de cada dominio de gobernanza de IA: puntaje, nivel alcanzado, comparación con tu rubro y brechas abiertas."
+        subtitulo="Detalle de cada dominio de gobernanza de IA: puntaje, nivel alcanzado, distancia a la meta, comparación con tu rubro y brechas abiertas."
       />
 
       <EstadoPanel>
         {(p) => (
           <>
             <div className="card">
-              <BarrasDominio dominios={p.dominios} />
+              <BarrasDominio dominios={p.dominios} notaIndustria={notaIndustria(p) ?? undefined} />
             </div>
 
             <div className="grid">
@@ -56,9 +57,12 @@ export function VistaDominios() {
                         {formatoPuntaje(d.puntaje)}
                         <small>/ 100</small>
                       </p>
-                      <p className="card-sub" style={{ color: d.diferencia != null && d.diferencia < 0 ? "var(--alto)" : "var(--text-muted)" }}>
-                        {formatoDiferencia(d.diferencia)}
+                      <p className="card-sub" style={{ color: d.diferenciaMeta < 0 ? "var(--alto)" : "var(--bajo)", fontWeight: 600 }}>
+                        {formatoDiferenciaMeta(d.diferenciaMeta)}
                       </p>
+                      {d.promedioIndustria != null ? (
+                        <p className="card-sub">{formatoDiferencia(d.diferencia)} del rubro</p>
+                      ) : null}
                     </div>
 
                     <div
@@ -68,11 +72,12 @@ export function VistaDominios() {
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={Math.round(d.puntaje)}
-                      aria-valuetext={`${formatoPuntaje(d.puntaje)} de 100${d.promedioIndustria != null ? `; industria ${formatoPuntaje(d.promedioIndustria)}` : ""}`}
+                      aria-valuetext={`${formatoPuntaje(d.puntaje)} de 100; meta ${formatoPuntaje(d.meta)}${d.promedioIndustria != null ? `; rubro ${formatoPuntaje(d.promedioIndustria)}` : ""}`}
                     >
                       <span className="fill" style={{ width: `${d.puntaje}%` }} />
+                      <span className="mark mark-meta" style={{ left: `calc(${d.meta}% - 1px)` }} title={`Meta ${formatoPuntaje(d.meta)}`} />
                       {d.promedioIndustria != null ? (
-                        <span className="mark" style={{ left: `calc(${d.promedioIndustria}% - 1px)` }} title="Promedio de la industria" />
+                        <span className="mark" style={{ left: `calc(${d.promedioIndustria}% - 1px)` }} title="Promedio del rubro" />
                       ) : null}
                     </div>
 

@@ -1,4 +1,4 @@
-import { CRITICIDADES, nivelDesdePuntaje } from "./madurez";
+import { CRITICIDADES, META_POR_DEFECTO, nivelDesdePuntaje } from "./madurez";
 import { calcularSeveridad, contarPorSeveridad, PESO_SEVERIDAD } from "./severidad";
 import type {
   BrechaCatalogoApi,
@@ -99,11 +99,14 @@ export function contarPorCriticidad(brechas: BrechaVista[]): Record<Criticidad, 
 
 export function construirDominios(resumen: ResumenApi, comparativa: ComparativaApi | null): DominioVista[] {
   const bench = new Map((comparativa?.comparativas ?? []).map((c) => [c.dominio, c]));
+  const metaGeneral = comparativa?.meta_puntaje ?? META_POR_DEFECTO;
   return resumen.dominios
     .map<DominioVista>((d) => {
       const puntaje = d.puntaje ?? 0;
       const c = bench.get(d.dominio);
-      const prom = c?.promedio_industria ?? null;
+      // Backends previos devolvían el promedio aunque hubiera 1 sola evaluación (la propia)
+      const prom = c?.referencia_suficiente === false ? null : (c?.promedio_industria ?? null);
+      const meta = c?.meta ?? metaGeneral;
       return {
         id: d.dominio_id,
         nombre: d.dominio,
@@ -111,8 +114,10 @@ export function construirDominios(resumen: ResumenApi, comparativa: ComparativaA
         nivel: d.nivel_madurez ?? nivelDesdePuntaje(puntaje),
         controles: d.total_controles_evaluados ?? 0,
         promedioIndustria: prom,
-        diferencia: c?.diferencia_vs_promedio ?? (prom != null ? round(puntaje - prom) : null),
+        diferencia: prom == null ? null : (c?.diferencia_vs_promedio ?? round(puntaje - prom)),
         muestras: c?.muestras ?? 0,
+        meta,
+        diferenciaMeta: round(puntaje - meta),
       };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -141,7 +146,18 @@ export function construirPanel(args: {
     noCumplidos: brechas.filter((b) => b.estado === "no_cumplido").length,
     parciales: brechas.filter((b) => b.estado === "parcialmente_cumplido").length,
     tieneBenchmark: dominios.some((d) => d.promedioIndustria != null),
+    meta: args.comparativa?.meta_puntaje ?? META_POR_DEFECTO,
+    muestrasMinimas: args.comparativa?.muestras_minimas ?? 1,
+    muestrasRubro: Math.max(0, ...dominios.map((d) => d.muestras)),
+    sinRubro: args.comparativa == null || args.comparativa.rubro_id == null,
   };
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** Por qué el panel no muestra el promedio del rubro (null si sí lo muestra). */
+export function notaIndustria(p: PanelVista): string | null {
+  if (p.tieneBenchmark) return null;
+  if (p.sinRubro) return "Esta evaluación no tiene rubro asociado: se compara solo con la meta.";
+  return `El promedio del rubro aparece con al menos ${p.muestrasMinimas} evaluaciones completadas (hoy ${p.muestrasRubro === 1 ? "hay 1, la tuya" : `hay ${p.muestrasRubro}`}).`;
+}

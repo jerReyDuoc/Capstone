@@ -101,6 +101,34 @@ class Settings(BaseSettings):
     # evaluaciones por invitación. Las de la encuesta pública lo exigen SIEMPRE.
     EXIGIR_TOKEN_EVALUACIONES: bool = False
 
+    # ------------------------------------------------ Comparativa e informes (HU-12/HU-13)
+    # "Lo que debería cumplir": puntaje de referencia por dimensión que se muestra junto al
+    # resultado. 75 = techo de "gestionado" (controles definidos, documentados y con dueño).
+    META_CUMPLIMIENTO_PUNTAJE: float = 75.0
+    # El promedio del rubro solo se muestra desde N evaluaciones completadas (incluida la
+    # propia): con 1 o 2 la "industria" sería casi tu propio puntaje. 1 = mostrar siempre.
+    COMPARATIVA_MIN_MUESTRAS: int = 3
+    # Recalcular el benchmark al completar cada evaluación (además del cron diario de las
+    # 02:00 UTC). Sin esto la comparativa no aparece hasta el día siguiente.
+    BENCHMARK_AL_COMPLETAR: bool = True
+
+    # ------------------------------------------------ Envío del informe por correo
+    #   smtp       -> se envía por SMTP_* (producción)
+    #   archivo    -> se guarda el .eml en STORAGE_DIR/correos (desarrollo, sin servidor de correo)
+    #   desactivado-> el endpoint responde 503 CORREO_NO_DISPONIBLE
+    CORREO_MODO: Literal["smtp", "archivo", "desactivado"] = "archivo"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USUARIO: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_STARTTLS: bool = True           # 587 + STARTTLS; con SMTP_SSL=true usa 465 directo
+    SMTP_SSL: bool = False
+    SMTP_TIMEOUT_S: float = 20.0
+    CORREO_REMITENTE: str = "ComplianceIA <no-responder@complianceia.cl>"
+    # Envíos del informe por evaluación y por IP en el día (contra abuso del correo).
+    INFORME_CORREOS_DIA_EVALUACION: int = 3
+    INFORME_CORREOS_DIA_IP: int = 10
+
     # ------------------------------------------------ T-06: plazos de conservación
     # Ley 21.719 (principio de proporcionalidad): los datos personales se conservan
     # solo el tiempo necesario para su finalidad. Vencido el plazo, el worker
@@ -141,6 +169,12 @@ class Settings(BaseSettings):
             raise ValueError("TURNSTILE_SECRET_KEY es obligatoria con APP_ENV=production (HU-19).")
         if self.APP_ENV == "production" and (not self.BFF_SHARED_SECRET or len(self.BFF_SHARED_SECRET) < 32):
             raise ValueError("BFF_SHARED_SECRET (mínimo 32 caracteres) es obligatorio con APP_ENV=production (HU-19).")
+        if self.APP_ENV == "production" and self.CORREO_MODO == "archivo":
+            raise ValueError("CORREO_MODO=archivo es solo para desarrollo: usa smtp o desactivado en producción.")
+        if self.CORREO_MODO == "smtp" and not self.SMTP_HOST:
+            raise ValueError("CORREO_MODO=smtp requiere SMTP_HOST.")
+        if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
+            raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),
         # para no bloquear alembic ni la API, que no la necesitan.
         return self

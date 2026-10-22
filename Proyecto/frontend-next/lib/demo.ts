@@ -4,8 +4,15 @@
  * así el modo demo ejercita exactamente la misma lógica.
  */
 import { construirPanel } from "./adaptadores";
+import { NIVELES_FORMATIVOS, nivelPorPuntaje } from "./planFormativo";
+import { PESO_SEVERIDAD } from "./severidad";
 import type {
   BrechaCatalogoApi,
+  DimensionPlanApi,
+  ModuloPlanApi,
+  NivelFormativo,
+  PlanFormativoApi,
+  RutaPlanApi,
   ComparativaApi,
   ControlApi,
   EvaluacionApi,
@@ -98,6 +105,9 @@ export function panelDemo(evaluacionId: number): PanelVista {
   const comparativa: ComparativaApi = {
     evaluacion_id: id,
     rubro_id: 3,
+    meta_puntaje: 75,
+    meta_nivel: "gestionado",
+    muestras_minimas: 3,
     comparativas: filas.map(([dominio, puntaje, , prom]) => ({
       dominio,
       tu_puntaje: puntaje,
@@ -108,6 +118,10 @@ export function panelDemo(evaluacionId: number): PanelVista {
       minimo_industria: 12,
       muestras: 27,
       diferencia_vs_promedio: Math.round((puntaje - prom) * 100) / 100,
+      referencia_suficiente: true,
+      meta: 75,
+      diferencia_vs_meta: Math.round((puntaje - 75) * 100) / 100,
+      cumple_meta: puntaje >= 75,
     })),
   };
 
@@ -145,4 +159,92 @@ export function panelDemo(evaluacionId: number): PanelVista {
   ];
 
   return construirPanel({ resumen, comparativa, respuestas, catalogo: CATALOGO, controles: CONTROLES });
+}
+
+/* ---------------------------------------------------------------- HU-12 (demo) */
+const OBJETIVO_NIVEL: Record<NivelFormativo, string> = {
+  Inicial: "Instalar las bases: que todo el personal conozca las obligaciones y aplique los controles mínimos.",
+  Intermedio: "Aplicar los controles de forma consistente, con responsables, registros y evidencias que resistan una auditoría.",
+  Avanzado: "Sostener la mejora continua: medir, auditar y resolver los casos complejos de la dimensión.",
+};
+const HORAS: Record<NivelFormativo, number> = { Inicial: 4, Intermedio: 8, Avanzado: 12 };
+
+function rutaDemo(dominio: string, nivel: NivelFormativo, id: number): RutaPlanApi {
+  return {
+    id,
+    nombre: `${dominio} - ${nivel}`,
+    dominio,
+    nivel,
+    objetivo: `${nivel === "Inicial" ? "Conocer" : nivel === "Intermedio" ? "Aplicar" : "Liderar"} las prácticas de ${dominio.toLowerCase()} que exige la Ley 21.719 en el uso de IA.`,
+    objetivos_especificos: [
+      "Identificar las obligaciones que aplican al área.",
+      "Aplicar el control en un caso real de la empresa.",
+      "Registrar la evidencia de cumplimiento.",
+    ],
+    contenidos: ["Marco normativo", "Casos prácticos", "Evidencias y registros"],
+    horas: HORAS[nivel],
+    modalidad: nivel === "Inicial" ? "E-learning autoguiado" : "Taller práctico",
+    publico_objetivo: nivel === "Inicial" ? "Todo el personal" : "Responsables de área",
+  };
+}
+
+/** Plan del modo demo: misma regla que el backend (analisis.construir_plan), con el catálogo demo. */
+export function planDemo(evaluacionId: number): PlanFormativoApi {
+  const panel = panelDemo(evaluacionId);
+  const dims = new Map<string, DimensionPlanApi>();
+  panel.dominios.forEach((d) => {
+    const nivel = nivelPorPuntaje(d.puntaje);
+    dims.set(d.nombre, {
+      dominio_id: d.id, dominio: d.nombre, puntaje: d.puntaje, nivel_madurez: d.nivel, nivel_asignado: nivel,
+      objetivo_nivel: OBJETIVO_NIVEL[nivel], brechas: 0, horas: 0, modulos: [],
+    });
+  });
+  const ids = new Map<string, number>();
+  const idDe = (nombre: string) => ids.get(nombre) ?? (ids.set(nombre, ids.size + 1), ids.size);
+  const modulos = new Map<string, [DimensionPlanApi, ModuloPlanApi]>();
+  const sinRuta: PlanFormativoApi["brechas_sin_ruta"] = [];
+  for (const b of panel.brechas) {
+    const dimB = dims.get(b.dominio);
+    if (dimB) dimB.brechas += 1;
+    const cubierta = { codigo: b.codigo, control_codigo: b.controlCodigo, dominio: b.dominio, severidad: b.severidad, estado: b.estado, prioridad: b.prioridad };
+    if (!b.rutaFormativa) {
+      sinRuta.push(cubierta);
+      continue;
+    }
+    const [dom, niv] = b.rutaFormativa.split(" - ") as [string, NivelFormativo];
+    const dim = dims.get(dom) ?? dimB;
+    if (!dim) continue;
+    if (!modulos.has(b.rutaFormativa)) {
+      modulos.set(b.rutaFormativa, [dim, { nivel: niv, motivo: "brechas", prioridad: b.severidad, ruta: rutaDemo(dom, niv, idDe(b.rutaFormativa)), brechas: [] }]);
+    }
+    const [, m] = modulos.get(b.rutaFormativa)!;
+    m.brechas.push(cubierta);
+    if (m.prioridad !== "Complementario" && PESO_SEVERIDAD[b.severidad] < PESO_SEVERIDAD[m.prioridad]) m.prioridad = b.severidad;
+  }
+  for (const dim of dims.values()) {
+    const nombre = `${dim.dominio} - ${dim.nivel_asignado}`;
+    if (!modulos.has(nombre)) {
+      modulos.set(nombre, [dim, { nivel: dim.nivel_asignado, motivo: "nivel", prioridad: "Complementario", ruta: rutaDemo(dim.dominio, dim.nivel_asignado, idDe(nombre)), brechas: [] }]);
+    }
+  }
+  for (const [dim, m] of modulos.values()) dim.modulos.push(m);
+  const lista = [...dims.values()].sort((a, b) => a.dominio.localeCompare(b.dominio, "es"));
+  for (const d of lista) {
+    d.modulos.sort((a, b) => NIVELES_FORMATIVOS.indexOf(a.nivel) - NIVELES_FORMATIVOS.indexOf(b.nivel));
+    d.horas = d.modulos.reduce((s, m) => s + (m.ruta.horas ?? 0), 0);
+  }
+  const mapeadas = panel.brechas.length - sinRuta.length;
+  return {
+    evaluacion_id: panel.evaluacionId,
+    resumen: {
+      dimensiones: lista.length,
+      modulos: lista.reduce((s, d) => s + d.modulos.length, 0),
+      horas: lista.reduce((s, d) => s + d.horas, 0),
+      brechas_total: panel.brechas.length,
+      brechas_mapeadas: mapeadas,
+      cobertura_mapeo: panel.brechas.length ? Math.round((1000 * mapeadas) / panel.brechas.length) / 10 : 100,
+    },
+    brechas_sin_ruta: sinRuta,
+    dimensiones: lista,
+  };
 }

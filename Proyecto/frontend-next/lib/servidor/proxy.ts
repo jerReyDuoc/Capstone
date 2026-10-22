@@ -18,6 +18,12 @@ interface Regla {
   conEvaluacion?: boolean;
   /** Subida de archivos (multipart): otro límite de tamaño y de tiempo. */
   archivo?: boolean;
+  /** El backend necesita la IP del cliente (límites por IP). */
+  conIp?: boolean;
+  /** Respuesta binaria (PDF): se reenvía tal cual, con su Content-Disposition. */
+  binario?: boolean;
+  /** Tiempo máximo de espera del backend (ms). */
+  timeoutMs?: number;
 }
 
 const REGLAS: Regla[] = [
@@ -25,6 +31,10 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^evaluaciones\/(\d+)$/, conEvaluacion: true },
   { metodo: "GET", patron: /^evaluaciones\/(\d+)\/(filtro|controles-aplicables|progreso|respuestas|resumen|comparativa)$/, conEvaluacion: true },
   { metodo: "POST", patron: /^evaluaciones\/(\d+)\/(filtro|cerrar|completar)$/, conEvaluacion: true },
+  // HU-12: plan formativo e informe (PDF descargable y por correo)
+  { metodo: "GET", patron: /^evaluaciones\/(\d+)\/plan-formativo$/, conEvaluacion: true },
+  { metodo: "GET", patron: /^evaluaciones\/(\d+)\/informe\/pdf$/, conEvaluacion: true, binario: true, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^evaluaciones\/(\d+)\/informe\/enviar$/, conEvaluacion: true, conIp: true, timeoutMs: 45_000 },
   { metodo: "POST", patron: /^respuestas$/ },
   { metodo: "GET", patron: /^respuestas\/\d+$/ },
   { metodo: "PUT", patron: /^respuestas\/\d+$/ },
@@ -44,7 +54,7 @@ const REGLAS: Regla[] = [
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
 
 export type Autorizacion =
-  | { ok: true; ruta: string; archivo: boolean }
+  | { ok: true; ruta: string; archivo: boolean; conIp: boolean; binario: boolean; timeoutMs?: number }
   | { ok: false; status: 404 };
 
 export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSesion: number): Autorizacion {
@@ -60,18 +70,32 @@ export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSes
     if (regla.conEvaluacion && Number(m[1]) !== evaluacionSesion) return { ok: false, status: 404 };
     // FastAPI define POST /api/respuestas/ con barra final
     const destino = ruta === "respuestas" ? "respuestas/" : ruta;
-    return { ok: true, ruta: destino, archivo: Boolean(regla.archivo) };
+    return {
+      ok: true,
+      ruta: destino,
+      archivo: Boolean(regla.archivo),
+      conIp: Boolean(regla.conIp || regla.archivo),
+      binario: Boolean(regla.binario),
+      timeoutMs: regla.timeoutMs,
+    };
   }
   return { ok: false, status: 404 };
 }
 
-/** Parámetros de consulta permitidos (paginación y filtros del listado de respuestas). */
-const QUERY_PERMITIDOS = new Set(["page", "size", "estado_final", "fuente"]);
+/**
+ * Parámetros de consulta permitidos y su largo máximo: paginación y filtros del listado de
+ * respuestas, y los filtros de brechas del informe PDF (HU-11/HU-12).
+ */
+const QUERY_PERMITIDOS = new Map<string, number>([
+  ["page", 40], ["size", 40], ["estado_final", 40], ["fuente", 40],
+  ["severidad", 80], ["dominio", 80], ["estado", 30], ["q", 80],
+]);
 
 export function filtrarQuery(params: URLSearchParams): string {
   const limpios = new URLSearchParams();
   params.forEach((valor, clave) => {
-    if (QUERY_PERMITIDOS.has(clave) && valor.length <= 40) limpios.append(clave, valor);
+    const max = QUERY_PERMITIDOS.get(clave);
+    if (max != null && valor.length <= max) limpios.append(clave, valor);
   });
   const texto = limpios.toString();
   return texto ? `?${texto}` : "";

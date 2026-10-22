@@ -3,9 +3,9 @@
  *
  * - CSV: para llevar el listado a un dashboard externo (Power BI, Looker Studio, Excel).
  *   Separador ";" y BOM UTF-8 para que Excel en es-CL lo abra con tildes y columnas bien.
- * - PDF: se genera con el diálogo de impresión del navegador ("Guardar como PDF") sobre una
- *   versión del informe diseñada para papel (ver @media print en globals.css). Así el PDF
- *   lleva texto real y seleccionable, sin agregar dependencias al proyecto.
+ * - PDF: lo genera el servidor (GET …/informe/pdf, ver lib/api.ts → descargarInformePdf) y se
+ *   descarga directo. La versión para imprimir (@media print en globals.css) queda como
+ *   respaldo del modo demo y para quien use Ctrl+P.
  */
 import type { BrechaVista, EstadoBrecha } from "./types";
 
@@ -66,6 +66,18 @@ export function descargarTexto(contenido: string, nombre: string, tipo = "text/c
   a.click();
   a.remove();
   // Se libera después del clic para que Safari alcance a iniciar la descarga.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Descarga un Blob (p. ej. el PDF del servidor) con el nombre dado. */
+export function descargarBlob(blob: Blob, nombre: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 

@@ -1,24 +1,28 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { formatoDiferencia, formatoPuntaje, NIVELES } from "@/lib/madurez";
+import { formatoDiferencia, formatoDiferenciaMeta, formatoPuntaje, NIVELES } from "@/lib/madurez";
 import type { DominioVista } from "@/lib/types";
 import { ChartFrame, posicionEnContenedor, Tooltip, type TooltipState } from "./ChartFrame";
 
 const W = 600;
 const FILA = 64;
-const M = { top: 16, right: 56, bottom: 40, left: 168 };
+const M = { top: 30, right: 56, bottom: 40, left: 168 };
 
 /**
- * Barras horizontales agrupadas: tu empresa vs. promedio de la industria
- * por dominio, con las bandas de nivel de madurez de fondo.
+ * Barras horizontales por dominio: tu empresa frente a la META de cumplimiento (línea de
+ * puntos vertical) y, si hay muestras suficientes, el promedio del rubro (barra punteada).
+ * Bandas de nivel de madurez de fondo.
  */
 export function BarrasDominio({
   dominios,
   onSeleccionar,
+  notaIndustria,
 }: {
   dominios: DominioVista[];
   onSeleccionar?: (d: DominioVista) => void;
+  /** Por qué no aparece el promedio del rubro (se muestra si no hay benchmark). */
+  notaIndustria?: string;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<TooltipState>(null);
@@ -34,12 +38,19 @@ export function BarrasDominio({
     { desde: 75, hasta: 100, n: "optimizado" as const },
   ];
 
+  const meta = dominios[0]?.meta ?? 75;
+  const bajoMeta = dominios.filter((d) => d.diferenciaMeta < 0);
   const bajo = dominios.filter((d) => d.diferencia != null && d.diferencia < 0);
-  const resumen = !hayIndustria
-    ? "Aún no hay benchmark del rubro para comparar."
+  const frasesMeta =
+    bajoMeta.length === 0
+      ? `Todos los dominios alcanzan la meta de ${formatoPuntaje(meta)}.`
+      : `${bajoMeta.length} de ${dominios.length} bajo la meta de ${formatoPuntaje(meta)}: ${bajoMeta.map((d) => d.nombre).join(", ")}.`;
+  const frasesIndustria = !hayIndustria
+    ? notaIndustria ?? "Aún no hay promedio del rubro para comparar."
     : bajo.length === 0
-      ? "Todos los dominios están sobre el promedio de la industria."
-      : `${bajo.length} de ${dominios.length} dominios bajo el promedio de la industria: ${bajo.map((d) => d.nombre).join(", ")}.`;
+      ? "Todos sobre el promedio del rubro."
+      : `${bajo.length} bajo el promedio del rubro.`;
+  const resumen = `${frasesMeta} ${frasesIndustria}`;
 
   const tabla = (
     <div className="table-wrap">
@@ -49,8 +60,10 @@ export function BarrasDominio({
           <tr>
             <th scope="col">Dominio</th>
             <th scope="col" className="num">Tu empresa</th>
-            <th scope="col" className="num">Industria</th>
-            <th scope="col">Comparación</th>
+            <th scope="col" className="num">Meta</th>
+            <th scope="col">Frente a la meta</th>
+            <th scope="col" className="num">Rubro</th>
+            <th scope="col">Frente al rubro</th>
           </tr>
         </thead>
         <tbody>
@@ -58,6 +71,8 @@ export function BarrasDominio({
             <tr key={d.nombre}>
               <th scope="row">{d.nombre}</th>
               <td className="num">{formatoPuntaje(d.puntaje)}</td>
+              <td className="num">{formatoPuntaje(d.meta)}</td>
+              <td>{formatoDiferenciaMeta(d.diferenciaMeta)}</td>
               <td className="num">{formatoPuntaje(d.promedioIndustria)}</td>
               <td>{formatoDiferencia(d.diferencia)}</td>
             </tr>
@@ -69,8 +84,12 @@ export function BarrasDominio({
 
   return (
     <ChartFrame
-      titulo="Comparativa con la industria"
-      subtitulo="Barra sólida: tu empresa · barra punteada: promedio del rubro"
+      titulo="Comparativa: meta y rubro"
+      subtitulo={
+        hayIndustria
+          ? "Barra sólida: tu empresa · línea de puntos: meta · barra punteada: promedio del rubro"
+          : "Barra sólida: tu empresa · línea de puntos: meta de cumplimiento"
+      }
       resumen={resumen}
       tabla={tabla}
     >
@@ -103,6 +122,23 @@ export function BarrasDominio({
           </g>
         ))}
 
+        {/* Meta de cumplimiento: lo que debería alcanzar cada dimensión */}
+        <g aria-hidden="true">
+          <line
+            x1={x(meta)}
+            x2={x(meta)}
+            y1={M.top - 8}
+            y2={H - M.bottom}
+            stroke="var(--serie-meta)"
+            strokeWidth={2}
+            strokeDasharray="1 5"
+            strokeLinecap="round"
+          />
+          <text x={x(meta)} y={M.top - 14} textAnchor="middle" style={{ fill: "var(--serie-meta)", fontSize: 12, fontWeight: 700 }}>
+            Meta {formatoPuntaje(meta)}
+          </text>
+        </g>
+
         {dominios.map((d, i) => {
           const y0 = M.top + i * FILA + 12;
           const mostrar = () => {
@@ -112,7 +148,8 @@ export function BarrasDominio({
               titulo: d.nombre,
               filas: [
                 ["Tu empresa", formatoPuntaje(d.puntaje)],
-                ["Industria", formatoPuntaje(d.promedioIndustria)],
+                ["Meta", formatoPuntaje(d.meta)],
+                ["Rubro", d.promedioIndustria != null ? formatoPuntaje(d.promedioIndustria) : "Sin referencia"],
                 ["Controles", String(d.controles)],
               ],
             });
@@ -123,7 +160,7 @@ export function BarrasDominio({
               className="bar"
               tabIndex={0}
               role={onSeleccionar ? "button" : "img"}
-              aria-label={`${d.nombre}: tu empresa ${formatoPuntaje(d.puntaje)}, industria ${formatoPuntaje(d.promedioIndustria)}. ${formatoDiferencia(d.diferencia)}.`}
+              aria-label={`${d.nombre}: tu empresa ${formatoPuntaje(d.puntaje)}. ${formatoDiferenciaMeta(d.diferenciaMeta)}.${d.promedioIndustria != null ? ` Rubro ${formatoPuntaje(d.promedioIndustria)}, ${formatoDiferencia(d.diferencia)}.` : ""}`}
               onMouseEnter={mostrar}
               onFocus={mostrar}
               onBlur={() => setTip(null)}

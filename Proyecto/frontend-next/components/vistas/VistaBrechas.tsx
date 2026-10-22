@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { InformeBrechas } from "@/components/brechas/InformeBrechas";
 import { MatrizPriorizacion } from "@/components/brechas/MatrizPriorizacion";
 import { TarjetasSeveridad } from "@/components/brechas/TarjetasSeveridad";
+import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeEstado, BadgeSeveridad, EstadoPanel } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
 import { useVistasFijadas } from "@/hooks/useVistasFijadas";
 import { ordenarBrechas } from "@/lib/adaptadores";
-import { brechasACsv, descargarTexto, imprimirComoPdf, nombreArchivo } from "@/lib/exportar";
+import { brechasACsv, descargarTexto, nombreArchivo } from "@/lib/exportar";
 import {
   describirFiltros,
   filtrarBrechas,
@@ -56,7 +56,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const filtros: FiltrosBrechas = { ...filtrosUrl, texto };
   const [orden, setOrden] = useState<Orden>("prioridad");
   const [aviso, setAviso] = useState("");
-  const [emitido, setEmitido] = useState(() => new Date());
+  const [emitido] = useState(() => new Date()); // fecha del informe para imprimir (respaldo del modo demo)
 
   // Referencias a la URL vigente: el retardo de la búsqueda no debe usar filtros viejos.
   const ultimaUrl = useRef({ params, filtrosUrl });
@@ -129,12 +129,6 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const ariaSort = (o: Orden) => (orden === o ? "ascending" : "none");
   const sinClasificar = panel.brechasPorSeveridad["Sin clasificar"];
 
-  const exportarPdf = () => {
-    const ahora = new Date();
-    flushSync(() => setEmitido(ahora)); // la fecha del informe es la del momento de exportar
-    setAviso(`Abrimos la impresión: elige “Guardar como PDF” para descargar ${filtradas.length} brechas.`);
-    imprimirComoPdf(nombreArchivo(panel.evaluacionId, ahora));
-  };
   const exportarCsv = () => {
     descargarTexto(brechasACsv(filtradas), `${nombreArchivo(panel.evaluacionId)}.csv`);
     setAviso(`Descargamos ${filtradas.length} brechas en CSV, listo para Excel, Power BI o Looker Studio.`);
@@ -265,10 +259,12 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                 <Icon name="tabla" />
                 Exportar CSV
               </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={exportarPdf} disabled={filtradas.length === 0}>
-                <Icon name="pdf" />
-                Exportar PDF
-              </button>
+              <AccionesInforme
+                evaluacionId={panel.evaluacionId}
+                filtros={filtros}
+                deshabilitado={filtradas.length === 0}
+                onAviso={setAviso}
+              />
             </div>
           </div>
 

@@ -30,6 +30,10 @@ const PATHS = {
   tabla: "M4 5h16v14H4V5Zm0 5h16M4 15h16M10 5v14",
   fijar: "M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6Zm3 11v6",
   cerrar: "M6 6l12 12M18 6 6 18",
+  // HU-12
+  correo: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Zm-.5 1 8.5 6 8.5-6",
+  diana: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+  birrete: "M2 9l10-5 10 5-10 5L2 9Zm4 2v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 9v6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.alcance import alcance_evaluacion
+from app.core.config import settings
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
 from app.application.use_cases.completar_evaluacion import CompletarEvaluacionUseCase
@@ -13,6 +16,8 @@ from app.domain.models.benchmark import Benchmark
 from app.domain.models.rubro import Rubro
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/evaluaciones", tags=["reportes"])
 
@@ -43,9 +48,29 @@ async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(ge
     benchmark. (`POST /cerrar` sigue siendo el recálculo/vista previa sin cerrar.)
     """
     try:
-        return await CompletarEvaluacionUseCase(db).execute(evaluacion_id)
+        resultado = await CompletarEvaluacionUseCase(db).execute(evaluacion_id)
     except RespuestaRechazadaError as e:
         raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
+    if settings.BENCHMARK_AL_COMPLETAR:
+        await _recalcular_benchmark(db)
+    return resultado
+
+
+async def _recalcular_benchmark(db: AsyncSession) -> None:
+    """
+    La comparativa con la industria sale de la tabla benchmark, que antes solo se
+    recalculaba en el cron de las 02:00 UTC: quien completaba la encuesta no veía la
+    comparativa hasta el día siguiente. Se recalcula al completar (la evaluación ya quedó
+    completada y confirmada por el caso de uso) y, si falla, /completar responde igual:
+    el cron diario lo repara.
+    """
+    from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+
+    try:
+        await UpdateBenchmarkUseCase(db).execute()
+    except Exception:  # noqa: BLE001
+        await db.rollback()
+        logger.exception("[benchmark] no se pudo recalcular al completar; lo hará el cron diario")
 
 
 @router.get("/{evaluacion_id}/resumen", dependencies=[Depends(alcance_evaluacion)])
@@ -129,18 +154,20 @@ async def get_benchmark(
 @router.get("/{evaluacion_id}/comparativa", dependencies=[Depends(alcance_evaluacion)])
 async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
     """
-    Compara el resumen de una evaluación contra el benchmark de su rubro.
+    Compara el resumen de una evaluación con:
+      - la META de cumplimiento (META_CUMPLIMIENTO_PUNTAJE): lo que debería alcanzar cada
+        dimensión. Siempre está, aunque no haya benchmark ni rubro.
+      - el promedio de su RUBRO (benchmark), solo si hay COMPARATIVA_MIN_MUESTRAS o más
+        evaluaciones completadas; si no, promedio_industria = null y `muestras` dice cuántas hay.
     """
-    # 1. Obtener la evaluación y su rubro
     evaluacion = await db.get(Evaluacion, evaluacion_id)
-    if not evaluacion or not evaluacion.usuario_temporal_id:
+    if not evaluacion:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
-    usuario = await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id)
-    if not usuario or not usuario.rubro_id:
-        raise HTTPException(status_code=400, detail="La evaluación no tiene rubro asociado")
+    usuario = (await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id)
+               if evaluacion.usuario_temporal_id else None)
+    rubro_id = usuario.rubro_id if usuario else None
 
-    # 2. Obtener resúmenes de la evaluación
     resumenes_result = await db.execute(
         select(Resumen, Dominio)
         .join(Dominio, Resumen.dominio_id == Dominio.id)
@@ -151,32 +178,40 @@ async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)
     if not resumenes:
         raise HTTPException(status_code=404, detail="Genera el resumen primero con POST /cerrar")
 
-    # 3. Obtener benchmarks del rubro
-    benchmarks_result = await db.execute(
-        select(Benchmark).where(Benchmark.rubro_id == usuario.rubro_id)
-    )
-    benchmarks = {b.dominio_id: b for b in benchmarks_result.scalars().all()}
+    benchmarks = {}
+    if rubro_id is not None:
+        benchmarks_result = await db.execute(select(Benchmark).where(Benchmark.rubro_id == rubro_id))
+        benchmarks = {b.dominio_id: b for b in benchmarks_result.scalars().all()}
 
-    # 4. Combinar
+    meta = settings.META_CUMPLIMIENTO_PUNTAJE
+    minimo = settings.COMPARATIVA_MIN_MUESTRAS
     comparativas = []
     for resumen, dominio in resumenes:
         bm = benchmarks.get(dominio.id)
+        muestras = (bm.total_evaluaciones or 0) if bm else 0
+        suficiente = bm is not None and muestras >= minimo
+        puntaje = resumen.puntaje_obtenido
         comparativas.append({
             "dominio": dominio.nombre_dominio,
-            "tu_puntaje": resumen.puntaje_obtenido,
+            "tu_puntaje": puntaje,
             "tu_nivel": resumen.nivel_madurez,
-            "promedio_industria": bm.promedio_puntaje if bm else None,
-            "mediana_industria": bm.mediana_puntaje if bm else None,
-            "maximo_industria": bm.puntaje_maximo if bm else None,
-            "minimo_industria": bm.puntaje_minimo if bm else None,
-            "muestras": bm.total_evaluaciones if bm else 0,
-            "diferencia_vs_promedio": round(
-                (resumen.puntaje_obtenido or 0) - (bm.promedio_puntaje or 0), 2
-            ) if bm else None,
+            "promedio_industria": bm.promedio_puntaje if suficiente else None,
+            "mediana_industria": bm.mediana_puntaje if suficiente else None,
+            "maximo_industria": bm.puntaje_maximo if suficiente else None,
+            "minimo_industria": bm.puntaje_minimo if suficiente else None,
+            "muestras": muestras,
+            "referencia_suficiente": suficiente,
+            "diferencia_vs_promedio": round((puntaje or 0) - (bm.promedio_puntaje or 0), 2) if suficiente else None,
+            "meta": meta,
+            "diferencia_vs_meta": round((puntaje or 0) - meta, 2),
+            "cumple_meta": (puntaje or 0) >= meta,
         })
 
     return {
         "evaluacion_id": evaluacion_id,
-        "rubro_id": usuario.rubro_id,
+        "rubro_id": rubro_id,
+        "meta_puntaje": meta,
+        "meta_nivel": nivel_madurez(meta),
+        "muestras_minimas": minimo,
         "comparativas": comparativas,
     }

@@ -22,3 +22,9 @@ class CatalogoBrechas(Base):
         "RutaFormativa",
         lazy="selectin",
     )
+
+    @property
+    def ruta_formativa(self) -> "RutaFormativa | None":
+        """Alias que leen los schemas (BrechaResponse.ruta_formativa). Sin él la API
+        devolvía siempre ruta_formativa = null y el panel no mostraba la ruta."""
+        return self.ruta_formativa_rel

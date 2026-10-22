@@ -9,6 +9,7 @@ const ITEMS: { ruta: string; etiqueta: string; icono: IconName }[] = [
   { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico" },
   { ruta: "/panel/dominios", etiqueta: "Dominios", icono: "dominios" },
   { ruta: "/panel/brechas", etiqueta: "Brechas", icono: "brechas" },
+  { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
 ];
 
 export function Sidebar() {

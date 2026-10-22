@@ -91,9 +91,9 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
       cuerpo,
       contentType,
       token,
-      // La IP solo la usa el backend para el límite de evidencias por IP
-      ip: permiso.archivo ? ipCliente(req.headers) : undefined,
-      timeoutMs: permiso.archivo ? 60_000 : 15_000,
+      // La IP solo la usa el backend para los límites por IP (evidencias, correos del informe)
+      ip: permiso.conIp ? ipCliente(req.headers) : undefined,
+      timeoutMs: permiso.timeoutMs ?? (permiso.archivo ? 60_000 : 15_000),
     });
   } catch (e) {
     if (e instanceof BackendNoDisponibleError) return sinBackend();
@@ -101,6 +101,21 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
   }
 
   if (!res.ok) return errorDesdeBackend(res);
+  if (permiso.binario) {
+    // HU-12: el PDF pasa tal cual (res.text() corrompería los bytes)
+    const tipo = res.headers.get("content-type") ?? "";
+    if (!tipo.startsWith("application/pdf")) return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un PDF." });
+    const disposicion = res.headers.get("content-disposition");
+    return new NextResponse(await res.arrayBuffer(), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),
+      },
+    });
+  }
   if (res.status === 204) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   return new NextResponse(await res.text(), {
     status: res.status,

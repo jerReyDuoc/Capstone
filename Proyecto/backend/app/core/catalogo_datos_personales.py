@@ -89,7 +89,10 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # ------------------------------------------------------------ catálogos y agregados
     "dominio": _sin_dp("id", "nombre_dominio"),
     "rubro": _sin_dp("id", "nombre_rubro"),
-    "ruta_formativa": _sin_dp("id", "nombre"),
+    "ruta_formativa": _sin_dp(
+        "id", "nombre", "dominio_id", "nivel", "objetivo", "objetivos_especificos", "contenidos",
+        "horas", "modalidad", "publico_objetivo",
+    ),
     "preguntas_filtro": _sin_dp("id_pregunta", "codigo", "orden", "pregunta", "descripcion", "activa"),
     "catalogo_brechas": _sin_dp(
         "id_brecha", "codigo_brecha", "categoria", "comportamiento_detectado", "criticidad",

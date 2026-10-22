@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { formatoDiferencia, formatoPuntaje, NIVELES } from "@/lib/madurez";
+import { formatoDiferencia, formatoDiferenciaMeta, formatoPuntaje, NIVELES } from "@/lib/madurez";
 import type { DominioVista } from "@/lib/types";
 import { ChartFrame, posicionEnContenedor, Tooltip, type TooltipState } from "./ChartFrame";
 
@@ -12,11 +12,11 @@ const CY = H / 2 + 6;
 const R = 168;
 const ANILLOS = [25, 50, 75, 100];
 
-type Serie = "empresa" | "industria";
+type Serie = "empresa" | "industria" | "meta";
 
 /**
- * Radar de madurez por dominio (0-100) con la serie "promedio de la industria"
- * superpuesta. Interactivo: hover/foco muestra detalle, Enter abre el dominio,
+ * Radar de madurez por dominio (0-100) con la META de cumplimiento (lo que debería
+ * alcanzar cada dimensión) y, si hay muestras suficientes, el promedio del rubro. Interactivo: hover/foco muestra detalle, Enter abre el dominio,
  * las leyendas activan/desactivan cada serie.
  */
 export function RadarMadurez({
@@ -29,7 +29,10 @@ export function RadarMadurez({
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<TooltipState>(null);
   const hayIndustria = dominios.some((d) => d.promedioIndustria != null);
-  const [visibles, setVisibles] = useState<Record<Serie, boolean>>({ empresa: true, industria: true });
+  const [visibles, setVisibles] = useState<Record<Serie, boolean>>({ empresa: true, industria: true, meta: true });
+  const hayMeta = dominios.length > 0;
+  const meta = dominios[0]?.meta ?? 75;
+  const bajoMeta = dominios.filter((d) => d.diferenciaMeta < 0);
 
   const n = dominios.length;
   const angulo = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
@@ -49,10 +52,12 @@ export function RadarMadurez({
   const resumen =
     n === 0
       ? "Sin dominios evaluados."
-      : `Mayor madurez en ${mejor.nombre} (${formatoPuntaje(mejor.puntaje)}) y menor en ${peor.nombre} (${formatoPuntaje(peor.puntaje)}), en escala de 0 a 100.`;
+      : `Mayor madurez en ${mejor.nombre} (${formatoPuntaje(mejor.puntaje)}) y menor en ${peor.nombre} (${formatoPuntaje(peor.puntaje)}), en escala de 0 a 100. ${
+          bajoMeta.length === 0 ? `Todas las dimensiones alcanzan la meta de ${formatoPuntaje(meta)}.` : `${bajoMeta.length} de ${n} bajo la meta de ${formatoPuntaje(meta)}.`
+        }`;
 
   const mostrar = (d: DominioVista, i: number, serie: Serie) => {
-    const v = serie === "empresa" ? d.puntaje : d.promedioIndustria ?? 0;
+    const v = serie === "empresa" ? d.puntaje : serie === "meta" ? d.meta : d.promedioIndustria ?? 0;
     const [px, py] = punto(i, v);
     const { x, y } = posicionEnContenedor(svgRef.current, px, py);
     setTip({
@@ -62,6 +67,7 @@ export function RadarMadurez({
       filas: [
         ["Tu empresa", formatoPuntaje(d.puntaje)],
         ["Nivel", NIVELES[d.nivel].etiqueta],
+        ["Meta", `${formatoPuntaje(d.meta)} (${d.diferenciaMeta >= 0 ? "cumple" : `faltan ${formatoPuntaje(-d.diferenciaMeta)}`})`],
         ...(d.promedioIndustria != null
           ? ([
               ["Industria", formatoPuntaje(d.promedioIndustria)],
@@ -74,7 +80,7 @@ export function RadarMadurez({
 
   const etiquetaPunto = (d: DominioVista, serie: Serie) =>
     serie === "empresa"
-      ? `${d.nombre}: tu empresa ${formatoPuntaje(d.puntaje)} de 100, nivel ${NIVELES[d.nivel].etiqueta}.${d.promedioIndustria != null ? ` Industria ${formatoPuntaje(d.promedioIndustria)}, ${formatoDiferencia(d.diferencia)}.` : ""}${onSeleccionar ? " Presiona Enter para ver el detalle." : ""}`
+      ? `${d.nombre}: tu empresa ${formatoPuntaje(d.puntaje)} de 100, nivel ${NIVELES[d.nivel].etiqueta}. ${formatoDiferenciaMeta(d.diferenciaMeta)}.${d.promedioIndustria != null ? ` Industria ${formatoPuntaje(d.promedioIndustria)}, ${formatoDiferencia(d.diferencia)}.` : ""}${onSeleccionar ? " Presiona Enter para ver el detalle." : ""}`
       : `${d.nombre}: promedio de la industria ${formatoPuntaje(d.promedioIndustria)} de 100.`;
 
   const leyenda = (
@@ -88,6 +94,17 @@ export function RadarMadurez({
         <span className="chip-swatch" style={{ background: "var(--serie-empresa)" }} />
         Tu empresa
       </button>
+      {hayMeta ? (
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={visibles.meta}
+          onClick={() => setVisibles((v) => ({ ...v, meta: !v.meta }))}
+        >
+          <span className="chip-swatch" style={{ background: "transparent", border: "2px dotted var(--serie-meta)" }} />
+          Meta ({formatoPuntaje(meta)})
+        </button>
+      ) : null}
       {hayIndustria ? (
         <button
           type="button"
@@ -114,6 +131,7 @@ export function RadarMadurez({
             <th scope="col">Dominio</th>
             <th scope="col" className="num">Tu empresa</th>
             <th scope="col">Nivel</th>
+            <th scope="col" className="num">Meta</th>
             {hayIndustria ? <th scope="col" className="num">Industria</th> : null}
             {hayIndustria ? <th scope="col" className="num">Diferencia</th> : null}
           </tr>
@@ -124,6 +142,7 @@ export function RadarMadurez({
               <th scope="row">{d.nombre}</th>
               <td className="num">{formatoPuntaje(d.puntaje)}</td>
               <td>{NIVELES[d.nivel].etiqueta}</td>
+              <td className="num">{formatoPuntaje(d.meta)}</td>
               {hayIndustria ? <td className="num">{formatoPuntaje(d.promedioIndustria)}</td> : null}
               {hayIndustria ? (
                 <td className="num">{d.diferencia != null ? `${d.diferencia > 0 ? "+" : ""}${formatoPuntaje(d.diferencia)}` : "—"}</td>
@@ -138,7 +157,7 @@ export function RadarMadurez({
   return (
     <ChartFrame
       titulo="Madurez por dominio"
-      subtitulo="Puntaje 0–100 frente al promedio de tu rubro"
+      subtitulo={hayIndustria ? "Puntaje 0–100 frente a la meta y al promedio de tu rubro" : "Puntaje 0–100 frente a la meta de cumplimiento"}
       resumen={resumen}
       acciones={leyenda}
       tabla={tabla}
@@ -201,6 +220,18 @@ export function RadarMadurez({
             );
           })}
 
+          {/* Meta de cumplimiento: anillo de puntos (forma distinta de la industria, WCAG 1.4.1) */}
+          {hayMeta && visibles.meta ? (
+            <polygon
+              points={poligono(dominios.map((d) => d.meta))}
+              fill="none"
+              stroke="var(--serie-meta)"
+              strokeWidth={2}
+              strokeDasharray="1 6"
+              strokeLinecap="round"
+              aria-hidden="true"
+            />
+          ) : null}
           {/* Serie industria (punteada: no depende solo del color, WCAG 1.4.1) */}
           {hayIndustria && visibles.industria ? (
             <polygon

@@ -1,7 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState } from "react";
 import { VistasFijadas } from "@/components/brechas/VistasFijadas";
+import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
 import { BarrasDominio } from "@/components/charts/BarrasDominio";
 import { RadarMadurez } from "@/components/charts/RadarMadurez";
@@ -10,12 +13,14 @@ import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
 import { formatoPuntaje, NIVELES } from "@/lib/madurez";
+import { notaIndustria } from "@/lib/adaptadores";
 import { slug } from "@/lib/slug";
 import { ResumenBrechas } from "./ResumenBrechas";
 
 export function VistaDiagnostico() {
   const router = useRouter();
-  const { href } = usePanel();
+  const { href, evaluacionId, estado } = usePanel();
+  const [aviso, setAviso] = useState("");
 
   return (
     <>
@@ -23,7 +28,14 @@ export function VistaDiagnostico() {
         eyebrow="Cumplimiento y protección de datos"
         titulo="Diagnóstico"
         subtitulo="Visión ejecutiva de la madurez en gobernanza de IA de tu empresa y de las brechas que requieren acción."
-      />
+      >
+        {evaluacionId && estado.tipo === "listo" ? (
+          <AccionesInforme evaluacionId={evaluacionId} onAviso={setAviso} tamano="md" />
+        ) : null}
+      </PageHeader>
+      <p className="aviso-accion" role="status" aria-live="polite" hidden={!aviso}>
+        {aviso}
+      </p>
 
       <EstadoPanel>
         {(p) => {
@@ -94,6 +106,7 @@ export function VistaDiagnostico() {
                 <div className="card col-6 md-col-12">
                   <BarrasDominio
                     dominios={p.dominios}
+                    notaIndustria={notaIndustria(p) ?? undefined}
                     onSeleccionar={(d) => router.push(`${href("/panel/dominios")}#${slug(d.nombre)}`)}
                   />
                 </div>
@@ -106,8 +119,9 @@ export function VistaDiagnostico() {
                 <Icon name="info" />
                 <span>
                   <strong>De la señal a la decisión.</strong> Empieza por las brechas críticas: cada una trae la acción
-                  sugerida y la ruta formativa para cerrarla. Desde Brechas puedes fijar aquí un listado filtrado o
-                  exportarlo a PDF y CSV.
+                  sugerida y la ruta formativa para cerrarla. En{" "}
+                  <Link href={href("/panel/capacitacion")}>Capacitación</Link> verás el plan de estudio por dimensión, y
+                  con «Enviar por correo» guardas una copia del informe en tu bandeja.
                 </span>
               </p>
             </>

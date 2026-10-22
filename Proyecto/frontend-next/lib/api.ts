@@ -1,5 +1,6 @@
 import { construirPanel } from "./adaptadores";
-import { DEMO_EVALUACIONES, panelDemo } from "./demo";
+import { DEMO_EVALUACIONES, panelDemo, planDemo } from "./demo";
+import { filtrosAParams, type FiltrosBrechas } from "./filtrosBrechas";
 import type {
   BrechaCatalogoApi,
   ComparativaApi,
@@ -7,6 +8,7 @@ import type {
   EvaluacionApi,
   Paginado,
   PanelVista,
+  PlanFormativoApi,
   RespuestaApi,
   ResumenApi,
 } from "./types";
@@ -34,9 +36,15 @@ export class ApiError extends Error {
 }
 
 async function getJson<T>(ruta: string, signal?: AbortSignal): Promise<T> {
+  const res = await pedir(ruta, { headers: { Accept: "application/json" }, signal });
+  return res.json() as Promise<T>;
+}
+
+/** fetch con los mensajes de error de la API (FastAPI { detail } o BFF { error }). */
+async function pedir(ruta: string, init: RequestInit): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(ruta, { headers: { Accept: "application/json" }, signal, cache: "no-store" });
+    res = await fetch(ruta, { cache: "no-store", ...init });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     throw new ApiError("No pudimos conectar con el servidor. Revisa que la API esté en línea.", 0);
@@ -56,7 +64,7 @@ async function getJson<T>(ruta: string, signal?: AbortSignal): Promise<T> {
         : (detalle as { mensaje?: string } | undefined)?.mensaje ?? `Error ${res.status} al consultar ${ruta}`;
     throw new ApiError(msg, res.status, (detalle as { codigo?: string } | undefined)?.codigo);
   }
-  return res.json() as Promise<T>;
+  return res;
 }
 
 /** Recorre todas las páginas (size máx. 100 en el backend). */
@@ -115,4 +123,72 @@ export async function cargarPanel(evaluacionId: number, signal?: AbortSignal, ba
   ]);
 
   return construirPanel({ resumen, comparativa, respuestas, catalogo, controles });
+}
+
+/* ------------------------------------------------------------------
+ * HU-12 · Plan formativo e informe (PDF descargable y por correo)
+ * ------------------------------------------------------------------ */
+
+export async function cargarPlanFormativo(
+  evaluacionId: number,
+  signal?: AbortSignal,
+  base: BaseApi = "/api",
+): Promise<PlanFormativoApi> {
+  if (MODO_DEMO) return planDemo(evaluacionId);
+  return getJson<PlanFormativoApi>(`${base}/evaluaciones/${evaluacionId}/plan-formativo`, signal);
+}
+
+const consulta = (filtros?: FiltrosBrechas) => {
+  const q = new URLSearchParams(filtros ? filtrosAParams(filtros) : {}).toString();
+  return q ? `?${q}` : "";
+};
+
+/** Nombre que propone el servidor en Content-Disposition, o uno de respaldo. */
+export function nombreDesdeDisposicion(cabecera: string | null, respaldo: string): string {
+  const m = /filename="?([^";]+)"?/i.exec(cabecera ?? "");
+  const nombre = m?.[1]?.trim();
+  return nombre && /^[\w.-]+\.pdf$/i.test(nombre) ? nombre : respaldo;
+}
+
+/**
+ * Descarga el informe en PDF generado por el servidor (el mismo que se envía por correo).
+ * Con filtros, el listado de brechas del PDF es el filtrado.
+ */
+export async function descargarInformePdf(
+  evaluacionId: number,
+  filtros?: FiltrosBrechas,
+  base: BaseApi = "/api",
+): Promise<{ blob: Blob; nombre: string }> {
+  const res = await pedir(`${base}/evaluaciones/${evaluacionId}/informe/pdf${consulta(filtros)}`, {
+    headers: { Accept: "application/pdf" },
+  });
+  const blob = await res.blob();
+  return { blob, nombre: nombreDesdeDisposicion(res.headers.get("content-disposition"), `informe_evaluacion-${evaluacionId}.pdf`) };
+}
+
+export interface EnvioInforme {
+  enviado: boolean;
+  /** Correo enmascarado (j***z@empresa.cl). */
+  destino: string;
+  /** "archivo" = entorno de desarrollo: el correo se guardó en el servidor, no salió. */
+  modo: "smtp" | "archivo";
+}
+
+export async function enviarInformePorCorreo(
+  evaluacionId: number,
+  datos: { email?: string; recordar?: boolean; filtros?: FiltrosBrechas },
+  base: BaseApi = "/api",
+): Promise<EnvioInforme> {
+  if (MODO_DEMO) throw new ApiError("En modo demo no se envían correos. Conecta el backend para probarlo.", 0);
+  const cuerpo = {
+    email: datos.email?.trim() || null,
+    recordar: Boolean(datos.recordar),
+    ...(datos.filtros ? filtrosAParams(datos.filtros) : {}),
+  };
+  const res = await pedir(`${base}/evaluaciones/${evaluacionId}/informe/enviar`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  });
+  return res.json() as Promise<EnvioInforme>;
 }

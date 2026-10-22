@@ -50,6 +50,13 @@ class RutaFormativaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     nombre: str | None
+    # HU-12: catálogo formativo (opcionales: las rutas antiguas solo tienen nombre)
+    dominio_id: int | None = None
+    nivel: str | None = None
+    objetivo: str | None = None
+    horas: int | None = None
+    modalidad: str | None = None
+    publico_objetivo: str | None = None
 
 
 class BrechaResponse(BaseModel):

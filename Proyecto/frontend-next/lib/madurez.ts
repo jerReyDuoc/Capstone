@@ -64,3 +64,12 @@ export function formatoDiferencia(n: number | null): string {
   const abs = formatoPuntaje(Math.abs(n));
   return n > 0 ? `+${abs} pts sobre el promedio` : `−${abs} pts bajo el promedio`;
 }
+
+/** Meta por defecto si el backend no la envía (igual a META_CUMPLIMIENTO_PUNTAJE). */
+export const META_POR_DEFECTO = 75;
+
+/** "Cumple la meta (+4)" · "Faltan 12 pts para la meta". */
+export function formatoDiferenciaMeta(n: number): string {
+  if (n >= 0) return n === 0 ? "Justo en la meta" : `Cumple la meta (+${formatoPuntaje(n)})`;
+  return `Faltan ${formatoPuntaje(Math.abs(n))} pts para la meta`;
+}

@@ -109,11 +109,11 @@ describe("sesión · cookie y token", () => {
 
 describe("proxy · lista blanca y aislamiento (criterio 2)", () => {
   it("permite las rutas del encuestado solo para su evaluación", () => {
-    expect(autorizarRuta("GET", ["evaluaciones", "12", "progreso"], 12)).toEqual({ ok: true, ruta: "evaluaciones/12/progreso", archivo: false });
+    expect(autorizarRuta("GET", ["evaluaciones", "12", "progreso"], 12)).toMatchObject({ ok: true, ruta: "evaluaciones/12/progreso", archivo: false });
     expect(autorizarRuta("GET", ["evaluaciones", "13", "progreso"], 12)).toEqual({ ok: false, status: 404 });
     expect(autorizarRuta("POST", ["evaluaciones", "12", "completar"], 12).ok).toBe(true);
-    expect(autorizarRuta("POST", ["respuestas"], 12)).toEqual({ ok: true, ruta: "respuestas/", archivo: false });
-    expect(autorizarRuta("POST", ["respuestas", "5", "evidencias"], 12)).toEqual({ ok: true, ruta: "respuestas/5/evidencias", archivo: true });
+    expect(autorizarRuta("POST", ["respuestas"], 12)).toMatchObject({ ok: true, ruta: "respuestas/", archivo: false });
+    expect(autorizarRuta("POST", ["respuestas", "5", "evidencias"], 12)).toMatchObject({ ok: true, ruta: "respuestas/5/evidencias", archivo: true });
     expect(autorizarRuta("GET", ["encuesta-publica", "limites"], 12).ok).toBe(true);
   });
 
