@@ -91,7 +91,7 @@ class SolicitudARCOP(Base):
     id: Mapped[int] = mapped_column("id_solicitud", Integer, primary_key=True)
     tipo: Mapped[str] = mapped_column("tipo", String(20), nullable=False)
     estado: Mapped[str] = mapped_column("estado", String(25), nullable=False, index=True)
-    # HU-06: excepción documentada (CAMBIOS_HU06.md). Puede traer datos personales que
+    # HU-06: excepción documentada (Extras/Cambios/backend/CAMBIOS_HU06.md). Puede traer datos personales que
     # se necesitan para atender el derecho, así que se guarda CIFRADA, no con etiquetas.
     descripcion: Mapped[str] = mapped_column("descripcion", TextoCifrado, nullable=False)
 

@@ -8,7 +8,7 @@ Nunca imprime datos personales, solo conteos.
     docker compose exec worker python scripts/retencion_datos.py
     docker compose exec worker python scripts/retencion_datos.py --aplicar
 
-Los plazos salen de RETENCION_* (backend/.env). Para probar sin tocar el .env:
+Los plazos salen de RETENCION_* (Proyecto/.env). Para probar sin tocar el .env:
     docker compose exec -e RETENCION_DATOS_TITULAR_DIAS=365 worker python scripts/retencion_datos.py
 
 Respaldar antes de --aplicar: la anonimización no se deshace.

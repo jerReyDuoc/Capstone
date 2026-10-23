@@ -22,7 +22,7 @@ Entradas sembradas con PII:
   5. solicitud ARCOP de rectificación: descripción, comentario del admin, información
      aportada por el titular y respuesta final (excepción: cifrados, no etiquetados)
 
-Excepción documentada (CAMBIOS_HU06.md): los textos ARCOP NO se etiquetan porque se
+Excepción documentada (Extras/Cambios/backend/CAMBIOS_HU06.md): los textos ARCOP NO se etiquetan porque se
 necesitan para atender el derecho; se verifica que en la BD estén cifrados y que la
 API se los siga mostrando legibles al admin y al titular.
 """

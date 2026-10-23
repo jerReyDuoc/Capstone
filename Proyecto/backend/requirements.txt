@@ -7,11 +7,9 @@ alembic==1.14.0
 pydantic==2.14.0
 pydantic-settings==2.6.0
 python-multipart==0.0.12
-langchain-core==0.3.20
 arq==0.26.1
 redis==5.2.0
 aiofiles==24.1.0
-langchain-groq==0.2.0
 groq==0.37.1        # SDK oficial: lo usa groq_provider.py (salida estructurada nativa)
 
 # Capa anti prompt-injection y motor NER (app/infrastructure/security)

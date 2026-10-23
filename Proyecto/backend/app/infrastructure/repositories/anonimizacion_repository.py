@@ -1,31 +1,3 @@
-"""
-Anonimización de los datos personales de un titular (supresión ARCOP aprobada).
-
-NO hace commit: el caso de uso la ejecuta dentro de la MISMA transacción que la
-resolución de la solicitud, así o se aplica todo o nada.
-
-Dos titulares posibles:
-  - invitado (usuario_temporal): todas sus evaluaciones y solicitudes.
-  - encuestado anónimo (encuesta pública): una evaluación y sus solicitudes.
-
-Qué se borra / qué se conserva (decisión del equipo, ver CAMBIOS_ARCOP.md):
-  usuario_temporal      invitado: email y validacion_invitacion -> NULL;
-                        encuestado público: su email opcional (HU-19) -> NULL (T-06);
-                        fecha_anonimizacion = ahora. Se conserva Rubro_id (benchmark).
-  evaluacion            clave_acceso_hash -> NULL (el encuestado pierde el acceso).
-  respuestas            justificacion_usuario -> NULL. Se conservan clasificaciones.
-  evidencias            nombre, ruta, hash, datos extraídos, justificación del LLM y
-                        errores -> vacíos. Los ARCHIVOS se borran del disco después
-                        del commit. Se conservan estado, clasificación y confianza.
-  sanitizaciones        mapa_cifrado y entidades (huellas HMAC) -> NULL.
-                        Se conservan conteos por tipo.
-  eventos_seguridad     extracto y hash del texto -> vacíos.
-  solicitudes_arcop     descripción del titular -> "[anonimizado]"; comentarios que
-                        escribió el titular en el historial -> NULL. Se conservan
-                        tipo, estados, fechas y la respuesta del admin (prueba de
-                        que el derecho se atendió).
-  Sin cambios           respuestas_filtro, resumen, llamadas_llm (sin texto personal).
-"""
 from datetime import datetime
 
 from sqlalchemy import select, update

@@ -2,25 +2,26 @@
 #
 #     docker compose up -d --build
 #
-#   web       http://localhost:3000/panel  (panel Next.js, HU-13)
-#   frontend  http://localhost:8088        (prototipo HTML con nginx + proxy de /api)
+#   web       http://localhost:3000        (frontend Next.js: landing, encuesta y panel)
 #   api       http://localhost:8000/docs   (FastAPI)
 #   worker    procesa evidencias (capa de Políticas e IA: spaCy + Groq)
 #   migrate   aplica "alembic upgrade head" y termina
 #   db        PostgreSQL 16   -> localhost:5433 (para DBeaver/psql y las pruebas en vivo)
 #   redis     cola de ARQ     -> localhost:6379
 #
-# Requisito: backend/.env con GROQ_API_KEY y ENTITY_MAP_KEY (ver backend/.env.example).
-# Las URLs de BD, Redis y STORAGE_DIR de ese .env se IGNORAN aquí: se reemplazan
-# por los nombres de servicio de Docker (sección "environment" de abajo).
+# Requisito: UN SOLO archivo de configuración, Proyecto/.env (junto a este archivo),
+# copiado de .env.example y con GROQ_API_KEY, ENTITY_MAP_KEY y AUTH_SECRET. Compose lo usa
+# dos veces: para los ${...} de este archivo (puertos, POSTGRES_*, secretos del web) y como
+# env_file de api/worker/migrate. Las URLs de BD, Redis y STORAGE_DIR de ese .env se
+# IGNORAN aquí: se reemplazan por los nombres de servicio de Docker ("environment" abajo).
 #
 # PUERTOS EN WINDOWS: Hyper-V/WSL reserva rangos de puertos al azar y entonces Docker
 # falla con "bind: An attempt was made to access a socket in a way forbidden by its
 # access permissions" (pasaba con el 8080). Cada puerto del host se puede cambiar sin
-# editar este archivo, con un archivo .env junto a él (Proyecto/.env), por ejemplo:
+# editar este archivo, en el mismo Proyecto/.env, por ejemplo:
 #
-#     FRONTEND_PORT=8095
 #     WEB_PORT=3001
+#     API_PORT=8001
 #
 # Para ver los rangos reservados en tu PC (PowerShell):
 #     netsh interface ipv4 show excludedportrange protocol=tcp
@@ -29,13 +30,13 @@ x-backend: &backend
   build: ./backend
   image: complianceai-backend:latest
   env_file:
-    - ./backend/.env
+    - ./.env
   environment:
     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
     DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
     REDIS_URL: redis://redis:6379
     STORAGE_DIR: /data/storage
-    # HU-19: mismo secreto que el servicio web (Proyecto/.env). Vacío = la API no exige el BFF.
+    # HU-19: mismo secreto que el servicio web. Vacío = la API no exige el BFF.
     BFF_SHARED_SECRET: ${BFF_SHARED_SECRET:-}
 
 services:
@@ -107,19 +108,8 @@ services:
       redis:
         condition: service_healthy
 
-  frontend:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8088}:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html:ro
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      api:
-        condition: service_healthy
-
-  # Panel web en Next.js (HU-13). Requiere la carpeta Proyecto/frontend-next/.
+  # Frontend en Next.js (landing HU-19, cuestionario y panel). Carpeta Proyecto/frontend-next/.
+  # El prototipo HTML (antiguo servicio "frontend" en :8088) quedó en Extras/frontend-prototipo/.
   # Next reenvía /api/* al servicio "api" por la red interna de Docker.
   web:
     build:

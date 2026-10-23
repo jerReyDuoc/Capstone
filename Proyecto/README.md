@@ -8,8 +8,8 @@
 | **Marcos normativos** | Ley N.º 21.719 (Chile), ISO/IEC 42001, NIST AI RMF 100-1, NIST AI 600-1, OWASP Top 10 for LLM |
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
-| **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · LangChain + Groq · spaCy · Next.js 15 + React 19 (panel) · Docker Compose · nginx · HTML/JS estático (prototipo) |
-| **Última actualización** | 22-oct-2026 (HU-12: planes de estudio por dimensión · comparativa con meta y rubro al completar · informe PDF descargable y **envío por correo**) |
+| **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
+| **Última actualización** | 22-oct-2026 (HU-20: confidencialidad del diagnóstico · limpieza: un solo `.env`, prototipo y documentos de cambios a `Extras/`) |
 
 ---
 
@@ -82,19 +82,19 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
-| PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `backend/CAMBIOS_HU06.md` |
-| Minimización de datos y plazos de conservación (T-06) | ✅ Hecho | Inventario de las 171 columnas (26 con datos personales, en 9 tablas) con finalidad, base de licitud y plazo; auditoría de solo lectura sobre la BD real (DER, matriz, escaneo de contenido); anonimización por plazo vencido (cron diario, plazos pendientes del PO). Ver `backend/CAMBIOS_T06.md` |
+| PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `Extras/Cambios/backend/CAMBIOS_HU06.md` |
+| Minimización de datos y plazos de conservación (T-06) | ✅ Hecho | Inventario de las 171 columnas (26 con datos personales, en 9 tablas) con finalidad, base de licitud y plazo; auditoría de solo lectura sobre la BD real (DER, matriz, escaneo de contenido); anonimización por plazo vencido (cron diario, plazos pendientes del PO). Ver `Extras/Cambios/backend/CAMBIOS_T06.md` |
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado **al completar cada evaluación** y por cron diario; la comparativa trae siempre la **meta de cumplimiento** (75) y el promedio del rubro solo con ≥ 3 evaluaciones (ver [5.7](#57-benchmark-sectorial-y-meta-de-cumplimiento)) |
-| Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `CAMBIOS_HU12.md` |
+| Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `Extras/Cambios/CAMBIOS_HU12.md` |
 | Informe PDF y envío por correo | ✅ Hecho | El servidor genera el PDF (resultado, comparativa, brechas priorizadas y plan formativo): se **descarga directo** desde el panel (ya no abre la impresión) y se **envía por correo** como adjunto (SMTP, p. ej. Gmail). Ver [5.11](#511-informe-pdf-y-envío-por-correo) y la guía `frontend-next/docs/Guia_envio_informe_por_correo.pdf` |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
-| Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 7 servicios; puertos del host configurables por `.env` (ver 12.1) |
+| Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios; un solo `Proyecto/.env` para todo, con los puertos del host configurables (ver 12.1) |
 | Suite de pruebas (pytest) | ✅ Hecho | 133 funciones de prueba (212 casos) + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
 | Panel web (HU-13, HU-11, HU-12) | ✅ Hecho | `frontend-next/` (Next.js 15 + React 19): diagnóstico, dominios, brechas priorizadas por severidad (HU-11) y capacitación (HU-12), con radar y barras interactivos, meta de cumplimiento, descarga del informe PDF y envío por correo; conectado a la API real; responsivo ≥ 1024 px y WCAG 2.1 AA. Ver [sección 10.1](#101-panel-web-hu-13-hu-11-hu-12) |
-| Resto del frontend (backoffice de matriz y árbol) | 🟡 Demo estática | Cuestionario (HU-01/02), landing (HU-19), informe y formación ya están en `frontend-next/`; el backoffice sigue en el prototipo `frontend/` con API **simulada** en `localStorage` |
+| Resto del frontend (backoffice de matriz y árbol) | 🟡 Demo estática | Cuestionario (HU-01/02), landing (HU-19), informe y formación ya están en `frontend-next/`; el backoffice solo existía en el prototipo HTML (API **simulada** en `localStorage`), archivado en `Extras/frontend-prototipo/` |
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
-| Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `backend/CAMBIOS_HU20.md` |
+| Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `Extras/Cambios/backend/CAMBIOS_HU20.md` |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
 | Pipeline CI/CD y staging | 🔴 Pendiente | Sprint 4 |
 
@@ -110,9 +110,7 @@ El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deud
 flowchart LR
     U[Usuario<br/>navegador] -->|:3000| P[web<br/>Next.js 15]
     P -->|/api/* proxy| A
-    U -->|:8088| N[frontend<br/>nginx 1.27 · prototipo]
-    N -->|HTML/JS estático| U
-    N -->|/api/* proxy| A[api<br/>FastAPI + uvicorn :8000]
+    P -->|BFF /bff/api/* + Bearer| A[api<br/>FastAPI + uvicorn :8000]
     A -->|SQL async| DB[(db<br/>PostgreSQL 16)]
     A -->|encola job| R[(redis<br/>Redis 7)]
     A -->|guarda archivo| S[[volumen storage]]
@@ -125,15 +123,14 @@ flowchart LR
 
 | Servicio Docker | Imagen | Puerto (solo `127.0.0.1`) | Función |
 |---|---|---|---|
-| `web` | `complianceai-web` | 3000 | Panel en Next.js (`frontend-next/`); reenvía `/api` al servicio `api` (mismo origen, sin CORS) |
-| `frontend` | `nginx:1.27-alpine` | 8088 | Prototipo: sirve `frontend/` y reenvía `/api` y `/health` al backend. Límite de subida 20 MB |
+| `web` | `complianceai-web` | 3000 | Frontend en Next.js (`frontend-next/`): landing, cuestionario y panel; reenvía `/api` al servicio `api` (mismo origen, sin CORS) |
 | `api` | `complianceai-backend` | 8000 | FastAPI (`/docs` para Swagger) |
 | `worker` | `complianceai-backend` | — | ARQ: valida evidencias y recalcula el benchmark (cron 02:00 UTC) |
 | `migrate` | `complianceai-backend` | — | `alembic upgrade head` y termina |
 | `db` | `postgres:16` | 5433 | Base de datos `complaince_db` |
 | `redis` | `redis:7-alpine` | 6379 | Cola de trabajos de ARQ |
 
-Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` → `web` y `frontend`. Cada puerto del host se puede cambiar con variables (`WEB_PORT`, `FRONTEND_PORT`, `API_PORT`, `DB_PORT`, `REDIS_PORT`) en `Proyecto/.env`. La API y el worker comparten el volumen `storage` (evidencias). La imagen del backend es única (multi-stage, Python 3.13-slim, usuario sin privilegios) e incluye spaCy con el modelo `es_core_news_md`.
+Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` → `web`. Toda la configuración vive en un solo archivo, `Proyecto/.env` (plantilla `Proyecto/.env.example`), y ahí mismo se cambia cada puerto del host (`WEB_PORT`, `API_PORT`, `DB_PORT`, `REDIS_PORT`). El prototipo HTML que corría en `:8088` quedó archivado en `Extras/frontend-prototipo/`. La API y el worker comparten el volumen `storage` (evidencias). La imagen del backend es única (multi-stage, Python 3.13-slim, usuario sin privilegios) e incluye spaCy con el modelo `es_core_news_md`.
 
 ### Clean Architecture
 
@@ -172,13 +169,15 @@ Capstone/
 ├── Documentos/                     # Entregables académicos por fase e integrante
 │   ├── Fase 1/                     # Guía, formativa, bitácora CPCITT, presentación, autoevaluaciones
 │   └── Fase 2/                     # Diarios de reflexión
-├── Extras/
+├── Extras/                         # Evidencia y documentación de apoyo (no se ejecuta). Ver Extras/README.md
+│   ├── Cambios/                    # Documentos CAMBIOS_*.md de cada HU/tarea (backend/, frontend/, HU-12)
+│   ├── Evidencias/                 # Reportes de latencia, capturas e informes de ejemplo
+│   ├── frontend-prototipo/         # Prototipo HTML/JS original (con su nginx.conf), reemplazado por frontend-next
 │   └── Guia_ComplianceAI_PromptInjection.docx.pdf
 └── Proyecto/
     ├── README.md                   # ← este documento
-    ├── CAMBIOS_HU12.md             # HU-12 + comparativa + PDF/correo: archivos, cómo aplicarlo y checklist
-    ├── docker-compose.yml          # Sistema completo (7 servicios)
-    ├── docker/nginx.conf           # Prototipo estático + proxy /api
+    ├── .env.example                # Plantilla del ÚNICO .env (compose, backend y frontend)
+    ├── docker-compose.yml          # Sistema completo (6 servicios)
     ├── frontend-next/              # Panel web Next.js (HU-13, ver sección 10.1)
     │   ├── app/                    # /panel, /panel/dominios, /panel/brechas, /panel/capacitacion (HU-12),
     │   │                           # landing y cuestionario (/, /comenzar, /encuesta, /retomar), bff/ + globals.css
@@ -187,29 +186,18 @@ Capstone/
     │   ├── hooks/                  # usePanel, usePlanFormativo (HU-12), useCuestionario, …
     │   ├── lib/                    # Tipos de la API, adaptadores, cliente HTTP, severidad, planFormativo, datos demo
     │   ├── tests/                  # vitest (adaptadores, HU-11, cuestionario, encuesta, HU-12)
-    │   ├── docs/                   # Handoffs, ACCESIBILIDAD.md, capturas/, Guia_envio_informe_por_correo.pdf
+    │   ├── docs/                   # ACCESIBILIDAD.md
     │   └── Dockerfile              # Build standalone (node 22)
-    ├── frontend/                   # Prototipo estático (ver sección 10.2)
-    │   ├── *.html                  # 14 páginas
-    │   ├── css/styles.css
-    │   └── js/                     # data.js, logica.js, store.js, ui.js, pdf-informe.js
     └── backend/
         ├── Dockerfile              # Imagen única para migrate, api y worker
         ├── requirements.txt
-        ├── .env.example            # Plantilla de configuración (copiar a .env)
-        ├── env.example             # Variante con valores para Docker local (ver deuda #12)
         ├── alembic.ini
-        ├── CAMBIOS_ARCOP.md        # Detalle funcional de la historia de usuario ARCOP
-        ├── CAMBIOS_T04.md          # T-04: optimización del motor NER (resultados y decisiones)
-        ├── CAMBIOS_T06.md          # T-06: auditoría de minimización de datos (hallazgos y decisiones)
-        ├── reporte_latencia_live_c10.md
-        ├── evidencia.txt / evidencia_maliciosa.txt   # Archivos de ejemplo para pruebas manuales
         ├── migrations/versions/    # 18 migraciones Alembic
         ├── scripts/benchmark_ner.py  # Benchmark y profiling del motor NER (T-04)
         ├── scripts/auditoria_minimizacion.py  # T-06: DER, matriz y escaneo de la BD (solo lectura)
         ├── scripts/retencion_datos.py         # T-06: plazos de conservación (simulación / --aplicar)
         ├── scripts/sql/t06_rol_auditor.sql    # T-06: rol de solo lectura para auditar
-        ├── tests/                  # Suite pytest (ver sección 14)
+        ├── tests/                  # Suite pytest (ver sección 14); data/evidencias_ejemplo/ para pruebas manuales
         └── app/
             ├── main.py             # App FastAPI, routers y pool ARQ
             ├── core/
@@ -423,7 +411,7 @@ stateDiagram-v2
 - Cada solicitud tiene un **código de seguimiento único** (`ARC-XXXX-XXXX`); el estado se consulta sin login en `GET /api/arcop/seguimiento/{codigo}`, sin datos personales.
 - **Plazos legales por defecto (Ley 21.719):** respuesta en 30 días corridos, prórroga única de 30 días con motivo, bloqueo temporal en 2 días hábiles (configurables con `ARCOP_PLAZO_*`). Se informa `plazo_vencido` y el filtro `?vencidas=true`.
 - El titular puede ser un **invitado** o un **encuestado anónimo** de la encuesta pública (entra con la clave de su evaluación).
-- Detalle completo, tabla de anonimización y decisiones pendientes: [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md).
+- Detalle completo, tabla de anonimización y decisiones pendientes: [`Extras/Cambios/backend/CAMBIOS_ARCOP.md`](../Extras/Cambios/backend/CAMBIOS_ARCOP.md).
 
 ### 5.9 Autenticación y roles
 
@@ -581,15 +569,15 @@ docker compose exec worker python scripts/auditoria_minimizacion.py --url "postg
 docker compose cp worker:/tmp/t06 ./auditoria_t06
 ```
 
-Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a las 03:00 UTC con las mismas reglas de una supresión ARCOP: se borran correos, textos, archivos y huellas, y se conservan los puntajes. Detalle en [`backend/CAMBIOS_T06.md`](backend/CAMBIOS_T06.md).
+Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a las 03:00 UTC con las mismas reglas de una supresión ARCOP: se borran correos, textos, archivos y huellas, y se conservan los puntajes. Detalle en [`Extras/Cambios/backend/CAMBIOS_T06.md`](../Extras/Cambios/backend/CAMBIOS_T06.md).
 
 ---
 
 ## 7. Endpoints de la API
 
-Base: `http://localhost:8000` (o a través del proxy del panel en `http://localhost:3000` y del prototipo en `http://localhost:8088`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion`.
+Base: `http://localhost:8000` (o a través del proxy del frontend en `http://localhost:3000`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion`.
 
-**HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/test_hu20_autorizacion.py`; detalle en `backend/CAMBIOS_HU20.md`.
+**HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/test_hu20_autorizacion.py`; detalle en `Extras/Cambios/backend/CAMBIOS_HU20.md`.
 
 ### Sistema
 
@@ -715,7 +703,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 
 **Motor NER** (`infrastructure/security/ner_sanitizer.py`, versión 1.1.0): híbrido reglas + spaCy `es_core_news_md`. Detecta primero todos los spans, fusiona solapados y reemplaza en una sola pasada, lo que permite devolver el mapa (tipo, valor, inicio, fin) para auditoría. Etiquetas: `[RUT_ANON]` (con validación de dígito verificador), `[NOMBRE_ANON]`, `[CORREO_ANON]` (incluye ofuscaciones tipo "arroba"/"punto"), `[TEL_ANON]`, `[DIRECCION_ANON]`, `[DATO_CODIFICADO_ANON]` (Base64/Hex/Binario/Base32 hasta 3 niveles). El worker no arranca si falta el modelo de spaCy.
 
-**Rendimiento (T-04, < 2,0 s por página):** el motor procesa una página de 3.000 caracteres en **25 ms (p95)** dentro del Docker del proyecto. Para eso: (1) carga solo el componente `ner` del modelo (mismas entidades, ~45 % menos de CPU); (2) la segunda pasada para nombres en MAYÚSCULAS solo revisa ventanas alrededor de nombres de 2 o más palabras, no el documento entero; (3) un único modelo por proceso, compartido con `seguridad.py`; (4) el modelo se precarga al iniciar el worker y la API; (5) la anonimización corre en un hilo (`asyncio.to_thread`) para no bloquear el event loop. En precisión, las referencias normativas ("Ley 21.719", "artículo 14") ya no se toman como direcciones, los cargos ("Presidenta del Directorio") se recortan de los nombres, y se anonimizan correos con tildes, "cargo + nombre" marcados como organización y direcciones tipo "Los Leones 456". Se evaluó ONNX y no se adoptó: el cuello de botella no era la inferencia. Detalle y mediciones en [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md).
+**Rendimiento (T-04, < 2,0 s por página):** el motor procesa una página de 3.000 caracteres en **25 ms (p95)** dentro del Docker del proyecto. Para eso: (1) carga solo el componente `ner` del modelo (mismas entidades, ~45 % menos de CPU); (2) la segunda pasada para nombres en MAYÚSCULAS solo revisa ventanas alrededor de nombres de 2 o más palabras, no el documento entero; (3) un único modelo por proceso, compartido con `seguridad.py`; (4) el modelo se precarga al iniciar el worker y la API; (5) la anonimización corre en un hilo (`asyncio.to_thread`) para no bloquear el event loop. En precisión, las referencias normativas ("Ley 21.719", "artículo 14") ya no se toman como direcciones, los cargos ("Presidenta del Directorio") se recortan de los nombres, y se anonimizan correos con tildes, "cargo + nombre" marcados como organización y direcciones tipo "Los Leones 456". Se evaluó ONNX y no se adoptó: el cuello de botella no era la inferencia. Detalle y mediciones en [`Extras/Cambios/backend/CAMBIOS_T04.md`](../Extras/Cambios/backend/CAMBIOS_T04.md).
 
 **Cifrado:** Fernet con `ENTITY_MAP_KEY`; las entidades además llevan una huella HMAC que permite buscar coincidencias sin descifrar. Guarda la clave fuera del repositorio: sin ella los mapas ya guardados no se pueden descifrar.
 
@@ -758,33 +746,12 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 - **Datos:** consume `GET /api/evaluaciones`, `/{id}/resumen`, `/{id}/comparativa` (opcional), `/{id}/respuestas`, `/{id}/plan-formativo`, `/{id}/informe/pdf`, `POST /{id}/informe/enviar`, `GET /api/brechas` y `/api/controles`. El encuestado de la landing pasa por el BFF (`/bff/api/*`), que solo deja su propia evaluación. Una evaluación sin resumen (sin `POST /cerrar` o `/completar`) muestra un aviso en vez de los gráficos.
 - **Reglas:** brecha = respuesta con estado vigente `no_cumplido` (misma regla que `Respuesta.sincronizar_brecha`, HU-02); las parciales se cuentan aparte. Niveles con los mismos cortes del backend (25/50/75).
 - **Criterios de aceptación:** responsivo ≥ 1024 px (barra lateral compacta entre 1024 y 1279 px); gráficos de radar y barras interactivos con mouse y teclado (tooltip, Enter filtra o abre el detalle, vista de tabla); WCAG 2.1 AA (contraste ≥ 5,7:1 en texto, foco visible, zoom 200 %, alternativas en texto). Paleta y tipografía del sitio TherionLabs.
-- **Documentación:** `frontend-next/README.md`, `docs/HU-13_HANDOFF.md` (tokens, layout, componentes, casos borde) y `docs/ACCESIBILIDAD.md` (auditoría).
+- **Documentación:** `frontend-next/README.md`, `Extras/Cambios/frontend/HU-13_HANDOFF.md` (tokens, layout, componentes, casos borde) y `docs/ACCESIBILIDAD.md` (auditoría).
 - **Modo demo** sin backend: `cd frontend-next && npm install && NEXT_PUBLIC_DEMO=1 npm run dev`.
 
-### 10.2 Prototipo estático
+### 10.2 Prototipo estático (archivado)
 
-**Estado:** demo estática navegable, servida por nginx en `http://localhost:8088`. El panel principal ya está reemplazado por `frontend-next/`; el resto de las páginas se migrará. **Todavía no consume el backend**: `js/store.js` implementa una "API" simulada (Promises sobre `localStorage`) con la misma forma que tendrá el cliente real basado en `fetch`, y `js/data.js` contiene la matriz, el árbol de aplicabilidad, módulos formativos, evaluaciones precargadas y el panel sectorial de ejemplo.
-
-**Cuentas de la demo** (cualquier contraseña): `nuevo@therionlabs.cl` (referente sin diagnóstico), `completo@therionlabs.cl` (referente con diagnóstico cerrado), `admin@therionlabs.cl` (`admin_therion`).
-
-| Página | Función | Rol |
-|---|---|---|
-| `index.html` | Entrada / redirección según sesión | — |
-| `login.html` | Ingreso | — |
-| `dashboard.html` | Panel principal: estado del diagnóstico y brechas prioritarias | ambos |
-| `diagnostico.html` | Inicio del autodiagnóstico | referente |
-| `cuestionario.html` | Preguntas de compuerta y de control, carga de evidencias | referente |
-| `resumen.html` | Diagnóstico cerrado: resumen de madurez | referente |
-| `informe.html` | Informe de madurez por dimensión y brechas priorizadas; exporta PDF (jsPDF) | referente |
-| `formacion-mapa.html` | Mapa formativo por dimensión y nivel | referente |
-| `formacion-modulo.html` | Contenido de un módulo formativo | referente |
-| `formacion-progreso.html` | Progreso de formación | referente |
-| `panel-sectorial.html` | Benchmark por rubro | ambos |
-| `panel-metodologia.html` | Metodología de evaluación | ambos |
-| `admin-matriz.html` | Backoffice: edición de la matriz de controles | admin_therion |
-| `admin-arbol.html` | Backoffice: árbol de aplicabilidad | admin_therion |
-
-Diferencias con el backend que hay que resolver al integrar (ver deuda #3): estados abreviados (`parcial`, `no`, `na`, `revision`), `revision` pondera 50 en la demo y 0 en el backend, y la escala de niveles de la demo (*Riesgo bajo/moderado/alto*, *Adecuado/Parcial*) no coincide con la del backend (*inicial … optimizado*).
+El prototipo HTML/JS original (14 páginas con una API simulada en `localStorage`, servidas por nginx en `:8088`) ya no forma parte del sistema: se movió a `Extras/frontend-prototipo/` como evidencia del diseño inicial. Todo el frontend vigente está en `frontend-next/`. Lo que solo existía allí y falta migrar es el **backoffice de matriz y árbol de aplicabilidad** (deuda #11). Para verlo de nuevo, ver `Extras/frontend-prototipo/README.md`.
 
 ---
 
@@ -816,11 +783,11 @@ Cada control tiene su brecha `ERR-<prefijo>-<n>` (40 en total). La fuente de ver
 
 Solo se necesita **Docker Desktop** (en Windows, con WSL 2). No hace falta Python ni spaCy en la máquina.
 
-**1. Crear `backend/.env`** desde la plantilla y completar las claves:
+**1. Crear `Proyecto/.env`** (el **único** archivo de configuración: lo usan docker compose, el backend y el frontend) desde la plantilla y completar las claves:
 
 ```powershell
 cd Proyecto
-copy backend\.env.example backend\.env
+copy .env.example .env
 ```
 
 | Variable | Cómo obtenerla |
@@ -839,19 +806,18 @@ docker compose up -d --build
 
 La primera vez tarda varios minutos (descarga imágenes, instala spaCy con su modelo y compila el panel Next.js).
 
-**Puertos en Windows:** Hyper-V/WSL reserva rangos de puertos y Docker puede fallar con `bind: An attempt was made to access a socket in a way forbidden by its access permissions` (pasó con el 8080). Cualquier puerto del host se cambia sin editar el compose, creando `Proyecto/.env`:
+**Puertos en Windows:** Hyper-V/WSL reserva rangos de puertos y Docker puede fallar con `bind: An attempt was made to access a socket in a way forbidden by its access permissions` (pasó con el 8080). Cualquier puerto del host se cambia sin editar el compose, en el mismo `Proyecto/.env`:
 
 ```
 WEB_PORT=3001
-FRONTEND_PORT=8095
+API_PORT=8001
 ```
 
 Para ver los rangos reservados: `netsh interface ipv4 show excludedportrange protocol=tcp`.
 
 | URL | Qué es |
 |---|---|
-| http://localhost:3000/panel | Panel web (HU-13) |
-| http://localhost:8088 | Prototipo estático (demo) |
+| http://localhost:3000 | Frontend: landing, encuesta (`/comenzar`, `/retomar`) y panel (`/panel`) |
 | http://localhost:8000/docs | Swagger de la API |
 | `localhost:5433` | PostgreSQL (`postgres` / `1234`, BD `complaince_db`) — solo desarrollo |
 | `localhost:6379` | Redis |
@@ -865,7 +831,7 @@ docker compose exec api python -m app.core.crear_admin --email admin@therionlabs
 **4. Envío del informe por correo** (opcional). Sin configurar, el backend queda en `CORREO_MODO=archivo`: el botón funciona pero el correo se guarda en `/data/storage/correos` y el panel avisa «Entorno de desarrollo…». Para que llegue de verdad (guía paso a paso en `frontend-next/docs/Guia_envio_informe_por_correo.pdf`):
 
 1. En la cuenta Gmail remitente activa la verificación en 2 pasos y crea una **contraseña de aplicación** en `myaccount.google.com/apppasswords` (16 caracteres; no es la contraseña normal y no vence: todo el equipo puede usar la misma).
-2. Agrega al final de `backend/.env`:
+2. Descomenta y completa en `Proyecto/.env` la sección «Informe por correo»:
 
    ```
    CORREO_MODO=smtp
@@ -897,7 +863,7 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1          # si PowerShell lo bloquea: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 pip install --upgrade pip
 pip install -r requirements.txt      # incluye spaCy y el wheel de es_core_news_md 3.8.0
-copy env.example .env                # valores para 127.0.0.1:5433 / complaince_db; agrega AUTH_SECRET
+# la configuración sale de Proyecto/.env (sus DATABASE_URL apuntan a 127.0.0.1:5433)
 alembic upgrade head
 
 # Terminal 1
@@ -932,12 +898,12 @@ Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json
 
 # 3. Cumplido + evidencia (procesada por el worker)
 $r = Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json" -Body '{"evaluacion_id":1,"matriz_control_id":1,"estado_clasificacion":"cumplido","justificacion":"Politica aprobada."}'
-curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/evidencia.txt"
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencias_ejemplo/evidencia.txt"
 Start-Sleep 10
 Invoke-RestMethod "$api/respuestas/$($r.id_respuesta)" | ConvertTo-Json -Depth 5
 
 # 4. Evidencia maliciosa -> bloqueo preventivo y evento de seguridad
-curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/evidencia_maliciosa.txt"
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencias_ejemplo/evidencia_maliciosa.txt"
 Invoke-RestMethod "$api/seguridad/eventos"
 
 # 5. Cerrar y ver reporte
@@ -946,7 +912,7 @@ Invoke-RestMethod "$api/evaluaciones/1/comparativa"
 Invoke-RestMethod "$api/ia/metricas"
 ```
 
-El recorrido ARCOP (login, titular, solicitudes) está en [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md#probar-a-mano-docker-powershell-desde-proyecto).
+El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backend/CAMBIOS_ARCOP.md`](../Extras/Cambios/backend/CAMBIOS_ARCOP.md#probar-a-mano-docker-powershell-desde-proyecto).
 
 ---
 
@@ -987,7 +953,7 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`backend/CAMBIOS_ARCO
 | `SMTP_TIMEOUT_S` | `20` | Tiempo máximo de conexión SMTP |
 | `CORREO_REMITENTE` | `ComplianceIA <no-responder@complianceia.cl>` | Remitente; con Gmail debe ser la misma cuenta de `SMTP_USUARIO` |
 | `INFORME_CORREOS_DIA_EVALUACION` / `INFORME_CORREOS_DIA_IP` | `3` / `10` | Envíos del informe permitidos por día |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `postgres` / `1234` / `complaince_db` | Solo `docker-compose.yml` (variables del shell o `Proyecto/.env`) |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `postgres` / `1234` / `complaince_db` | `Proyecto/.env` (solo los usa `docker-compose.yml`) |
 
 ---
 
@@ -1009,10 +975,12 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
 | `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
 | `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |
-| `test_defectos_api.py` | 1 | Variante anterior de la prueba de latencia (ver deuda #12) |
 | `test_hu06_anonimizacion.py` | 20 | HU-06: etiquetas fijas, fail-closed, archivo cifrado y reemplazado por el texto anonimizado, mapa irreversible, textos ARCOP cifrados |
 | `test_hu06_regresion_pii.py` | 1 | HU-06 C3: siembra PII por todas las entradas y verifica que no aparece en ninguna tabla (lectura en crudo), en disco, en los logs ni en lo enviado al LLM |
 | `test_hu12_plan_formativo.py` | 32 | HU-12: severidad igual al panel, mapeo brecha → ruta, niveles y objetivos, agrupación por dimensión, PDF válido; API: plan, comparativa con meta y benchmark al completar, descarga del PDF, envío por correo (modo archivo y límite diario), correo desactivado y `ruta_formativa` en `/api/brechas` |
+| `test_hu19_encuesta_publica.py` | 19 | HU-19: encuesta pública sin invitación, aislamiento entre encuestados, retomar con clave, límites por IP, CAPTCHA, cuota de IA y benchmark |
+| `test_t06_minimizacion.py` | 15 | T-06: inventario de datos personales, plazos de conservación y validaciones de producción |
+| `test_hu20_autorizacion.py` | 15 (75 casos) | HU-20: matriz de autorización **por endpoint** (6 actores), solo-admin, rutas públicas y una prueba que falla si aparece una ruta sin clasificar |
 | `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
 
 Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba), `_corpus_ner.py` (corpus sintético etiquetado para medir el NER).
@@ -1044,8 +1012,8 @@ docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE
 
 - **T-04 · Motor NER (15-oct-2026, Docker, 8 núcleos):** página de 3.000 caracteres en 25,1 ms (p95; límite 2.000 ms), evidencia de 8.000 caracteres en 66,6 ms (p95). Precisión 0,988 y cobertura de PII 100 % sobre 40 páginas etiquetadas. Suite completa: 212 aprobadas, 1 omitida (prueba en vivo).
 - **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre (**corregidos en T-04**, motor v1.1.0).
-- **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumplía `GET controles-aplicables` (p95 542,7 ms). Detalle en [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md).
-- **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). **Latencia live oficial (16-oct-2026, Docker, concurrencia 10): 12/12 endpoints cumplen**; `GET controles-aplicables` p95 24,1 ms (antes 542,7 ms). Detalle en [`backend/reporte_latencia_live_hu01.md`](backend/reporte_latencia_live_hu01.md) y [`backend/CAMBIOS_HU01.md`](backend/CAMBIOS_HU01.md).
+- **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumplía `GET controles-aplicables` (p95 542,7 ms). Detalle en [`reporte_latencia_live_c10.md`](../Extras/Evidencias/reporte_latencia_live_c10.md).
+- **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). **Latencia live oficial (16-oct-2026, Docker, concurrencia 10): 12/12 endpoints cumplen**; `GET controles-aplicables` p95 24,1 ms (antes 542,7 ms). Detalle en [`Extras/Evidencias/reporte_latencia_live_hu01.md`](../Extras/Evidencias/reporte_latencia_live_hu01.md) y [`Extras/Cambios/backend/CAMBIOS_HU01.md`](../Extras/Cambios/backend/CAMBIOS_HU01.md).
 
 ---
 
@@ -1071,8 +1039,8 @@ alembic revision --autogenerate -m "descripcion"                   # nueva migra
 
 | Problema | Causa probable | Solución |
 |---|---|---|
-| Puerto 3000, 5433, 6379, 8000 u 8088 en uso | Servicios locales fuera de Docker | Detener el uvicorn/worker/Redis/PostgreSQL/Next local, o cambiar el puerto en `Proyecto/.env` |
-| `bind: An attempt was made to access a socket in a way forbidden…` | Puerto reservado por Hyper-V/WSL (Windows) | Cambiar el puerto en `Proyecto/.env` (`WEB_PORT`, `FRONTEND_PORT`, …); ver 12.1 |
+| Puerto 3000, 5433, 6379 u 8000 en uso | Servicios locales fuera de Docker | Detener el uvicorn/worker/Redis/PostgreSQL/Next local, o cambiar el puerto en `Proyecto/.env` |
+| `bind: An attempt was made to access a socket in a way forbidden…` | Puerto reservado por Hyper-V/WSL (Windows) | Cambiar el puerto en `Proyecto/.env` (`WEB_PORT`, `API_PORT`, …); ver 12.1 |
 | El panel muestra "Esta evaluación todavía no tiene resultados" | La evaluación no tiene resumen | Completar el cuestionario o llamar `POST /api/evaluaciones/{id}/cerrar` |
 | `worker` se reinicia en bucle | Falta `ENTITY_MAP_KEY` o `GROQ_API_KEY`, o el modelo de spaCy | `docker compose logs worker` |
 | `migrate` falla | Error de migración o BD no disponible | `docker compose logs migrate` |
@@ -1101,8 +1069,8 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | # | Ítem | Impacto | Propuesta |
 |---|---|---|---|
 | 1 | **No hay endpoints para crear invitaciones (`usuario_temporal`) ni evaluaciones** | El flujo completo depende de SQL manual | `POST /api/invitaciones` (admin) con código aleatorio y `POST /api/evaluaciones` (referente) |
-| 2 | **Solo `/api/arcop` y `/api/auth/me` exigen token**: respuestas, evidencias, revisión, métricas, eventos de seguridad y reportes son públicos y no verifican que la evaluación pertenezca al usuario | Exposición de datos entre organizaciones | Aplicar `requerir_rol` y control de propiedad en todos los routers |
-| 3 | **Frontend parcialmente integrado:** el panel (HU-13) ya consume la API real en `frontend-next/`, pero cuestionario, informe, formación y backoffice siguen en el prototipo con `store.js` simulado y reglas distintas (`revision` 50 vs 0; escalas de nivel distintas) | Las demás pantallas no reflejan los resultados reales | Migrar esas páginas a `frontend-next/` reutilizando `lib/api.ts` y `lib/madurez.ts` (niveles del backend) |
+| 2 | ~~Solo `/api/arcop` y `/api/auth/me` exigen token~~ **Resuelto en HU-20:** todas las rutas de datos exigen el token del dueño o de un admin, con prueba de autorización por endpoint | — | El panel interno del frontend necesita el login del admin |
+| 3 | **Frontend parcialmente integrado:** el panel (HU-13) ya consume la API real en `frontend-next/`, pero cuestionario, informe, formación y backoffice existían solo en el prototipo archivado (`Extras/frontend-prototipo/`, con `store.js` simulado y reglas distintas: `revision` 50 vs 0; escalas de nivel distintas) | Las demás pantallas no reflejan los resultados reales | Migrar esas páginas a `frontend-next/` reutilizando `lib/api.ts` y `lib/madurez.ts` (niveles del backend) |
 | 4 | ~~Benchmark siempre vacío~~ **Resuelto:** `POST /completar` marca la evaluación como `completada` y recalcula el benchmark (HU-12) | — | Pendiente decidir si se permite reabrir una evaluación completada |
 | 5 | ~~Falta `backend/.dockerignore`~~ **Resuelto (15-oct):** `backend/download` renombrado a `backend/.dockerignore`; el `.env` y el `venv` ya no entran en la imagen | — | — |
 
@@ -1110,11 +1078,11 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 
 | # | Ítem | Propuesta |
 |---|---|---|
-| 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo nginx, 20 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
+| 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo el BFF de Next, 12 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
 | 7 | ~~`GET /evaluaciones/{id}/controles-aplicables` p95 542 ms~~ **Resuelto en HU-01** (consulta única + caché del catálogo): p95 24,1 ms en la medición live del 16-oct | — |
 | 8 | NER: los falsos positivos "la Ley 21" y "Presidenta del Directorio" se corrigieron en T-04. Queda abierto: textos **completamente en mayúsculas** con frases largas, donde spaCy puede no aislar el nombre | Regla adicional para texto 100 % en mayúsculas; ampliar `ner_gold.jsonl` con casos reales anonimizados |
 | 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
-| 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `CAMBIOS_ARCOP.md` |
+| 10 | Decisiones ARCOP abiertas: plazos y qué pasa al vencer, código de invitación, límite de intentos de login, verificación de identidad, duplicados | Definir con el PO; detalle en `Extras/Cambios/backend/CAMBIOS_ARCOP.md` |
 | 18 | Decisiones HU-12 a validar con el PO: meta de cumplimiento (75), mínimo de 3 evaluaciones para mostrar el promedio del rubro, cortes de nivel del plan (50/75) y contenido de las 12 rutas (objetivos, horas, modalidad) | Revisarlos con el equipo; se ajustan por `.env` o en la tabla `ruta_formativa` |
 | 11 | Sin CRUD de administración de matriz y árbol en el backend (solo en la demo) ni versionado de controles | Endpoints admin + migración de versionado |
 
@@ -1122,7 +1090,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 
 | # | Ítem |
 |---|---|
-| 12 | Limpieza: `.env.example` y `env.example` desalineados (el segundo no tiene `AUTH_*`); `test_defectos_api.py` parece una versión anterior de `test_latencia_api.py`; `domain/ports/document_validator_port.py` importa un módulo inexistente (`schemas.validation`) y no se usa; migración vacía `b25cc4eed4b0` |
+| 12 | ~~Limpieza de archivos sobrantes~~ **Resuelto (22-oct):** un solo `.env`, sin `test_defectos_api.py` ni `document_validator_port.py`, sin `langchain-*` en `requirements.txt`. Se conserva la migración vacía `b25cc4eed4b0` porque está en medio de la cadena de Alembic (borrarla rompe las BD ya migradas) |
 | 13 | `seguridad.py` se sincroniza a mano con el repo ComplianceAI-Prompt-Injection: riesgo de divergencia (evaluar paquete compartido o submódulo). Además, su regex de correo no acepta tildes (`matías.díaz@…` queda en parte visible en los extractos de eventos de seguridad): corregirla allá, como se hizo en `ner_sanitizer.py` |
 | 14 | Fechas de respuestas/evidencias en `Date` (sin hora): limita la trazabilidad fina |
 | 15 | Credenciales por defecto de PostgreSQL (`postgres`/`1234`) en el compose: aceptables solo en desarrollo |
@@ -1135,19 +1103,21 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 
 | Documento | Contenido |
 |---|---|
-| [`backend/CAMBIOS_ARCOP.md`](backend/CAMBIOS_ARCOP.md) | Historia de usuario ARCOP: archivos, acceso, anonimización, plazos, endpoints y decisiones pendientes |
-| [`backend/reporte_latencia_live_c10.md`](backend/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
-| [`backend/CAMBIOS_HU06.md`](backend/CAMBIOS_HU06.md) | HU-06: anonimización antes de persistir, decisiones del PO, excepción ARCOP y migración de datos existentes |
-| [`backend/CAMBIOS_T04.md`](backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
-| [`CAMBIOS_HU12.md`](CAMBIOS_HU12.md) | HU-12, arreglo de la comparativa y PDF/correo: archivos, cómo aplicarlo, verificación y decisiones para el PO |
+| [`Extras/Cambios/backend/CAMBIOS_ARCOP.md`](../Extras/Cambios/backend/CAMBIOS_ARCOP.md) | Historia de usuario ARCOP: archivos, acceso, anonimización, plazos, endpoints y decisiones pendientes |
+| [`reporte_latencia_live_c10.md`](../Extras/Evidencias/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
+| [`Extras/Cambios/backend/CAMBIOS_HU06.md`](../Extras/Cambios/backend/CAMBIOS_HU06.md) | HU-06: anonimización antes de persistir, decisiones del PO, excepción ARCOP y migración de datos existentes |
+| [`Extras/Cambios/backend/CAMBIOS_T04.md`](../Extras/Cambios/backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
+| [`Extras/Cambios/CAMBIOS_HU12.md`](../Extras/Cambios/CAMBIOS_HU12.md) | HU-12, arreglo de la comparativa y PDF/correo: archivos, cómo aplicarlo, verificación y decisiones para el PO |
 | `frontend-next/docs/Guia_envio_informe_por_correo.pdf` | Guía para el equipo: configurar Gmail SMTP, el `.env`, el antivirus y solucionar errores del envío por correo |
-| [`frontend-next/CAMBIOS_HU13.md`](frontend-next/CAMBIOS_HU13.md) | HU-13: qué se agregó, cómo aplicarlo y qué se verificó |
-| [`frontend-next/docs/HU-13_HANDOFF.md`](frontend-next/docs/HU-13_HANDOFF.md) | Especificación de diseño del panel: criterios de aceptación, tokens, layout, componentes y casos borde |
+| [`CAMBIOS_HU13.md`](../Extras/Cambios/frontend/CAMBIOS_HU13.md) | HU-13: qué se agregó, cómo aplicarlo y qué se verificó |
+| [`HU-13_HANDOFF.md`](../Extras/Cambios/frontend/HU-13_HANDOFF.md) | Especificación de diseño del panel: criterios de aceptación, tokens, layout, componentes y casos borde |
 | [`frontend-next/docs/ACCESIBILIDAD.md`](frontend-next/docs/ACCESIBILIDAD.md) | Auditoría WCAG 2.1 AA del panel |
 | `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
 | `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |
 | `../Documentos/Fase 1/`, `../Documentos/Fase 2/` | Guía del estudiante, evaluaciones formativas, autoevaluaciones y diarios de reflexión por integrante |
 | `../Extras/Guia_ComplianceAI_PromptInjection.docx.pdf` | Guía del módulo anti prompt-injection |
+| [`../Extras/README.md`](../Extras/README.md) | Qué hay en `Extras/` (documentos de cambios por HU, evidencias y prototipo archivado) y la regla para los documentos nuevos |
+| [`CAMBIOS_HU20.md`](../Extras/Cambios/backend/CAMBIOS_HU20.md) | HU-20: matriz de autorización, interruptor de desarrollo y ajustes a las pruebas |
 
 ---
 

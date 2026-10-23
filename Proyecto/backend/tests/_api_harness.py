@@ -18,20 +18,19 @@ En modo LIVE, además:
     DESPUÉS de la sesión. Solo toca las evaluaciones LATENCIA_EVALUACION_ID y
     LATENCIA_EVALUACION_NA_ID (por defecto 9001 y 9002).
     La URL se toma de LATENCIA_DATABASE_URL o, si no existe, de DATABASE_URL en
-    backend/.env.
+    Proyecto/.env.
 
 HU-20: las rutas de evaluaciones, respuestas, evidencias y reportes exigen token.
 `cliente_api()` envía por defecto el token de un admin (rol="admin"); `rol="referente"`
 usa el del usuario temporal 1 (dueño de las evaluaciones sembradas) y `rol=None` no envía
 ninguno (pruebas que manejan sus propios tokens o prueban el 401). En modo LIVE el token de
-admin se toma de QA_TOKEN_ADMIN (ver CAMBIOS_HU20.md).
+admin se toma de QA_TOKEN_ADMIN (ver Extras/Cambios/backend/CAMBIOS_HU20.md).
 
 Este archivo no contiene tests (no empieza con test_).
 """
 import os
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
-from pathlib import Path
 
 import httpx
 import pytest
@@ -52,8 +51,6 @@ EVAL_NA_ID = int(os.getenv("LATENCIA_EVALUACION_NA_ID", _EVAL_NA_DEF))
 
 PREPARAR_BD = MODO == "live" and os.getenv("LATENCIA_PREPARAR_BD", "1") == "1"
 CONSERVAR_DATOS = os.getenv("LATENCIA_CONSERVAR_DATOS") == "1"
-
-BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 # Credenciales del administrador sembrado en modo en proceso (solo pruebas)
 ADMIN_EMAIL = "admin@example.com"
@@ -117,7 +114,9 @@ def _url_postgres() -> str:
     """URL para asyncpg (sin el '+asyncpg' de SQLAlchemy)."""
     url = os.getenv("LATENCIA_DATABASE_URL")
     if not url:
-        env_file = BACKEND_DIR / ".env"
+        from app.core.config import ENV_PROYECTO
+
+        env_file = ENV_PROYECTO
         if env_file.exists():
             for linea in env_file.read_text(encoding="utf-8").splitlines():
                 linea = linea.strip()
@@ -127,7 +126,7 @@ def _url_postgres() -> str:
     if not url:
         pytest.fail(
             "Modo live con LATENCIA_PREPARAR_BD=1: no encontré la URL de PostgreSQL. "
-            "Define LATENCIA_DATABASE_URL o DATABASE_URL en backend/.env "
+            "Define LATENCIA_DATABASE_URL o DATABASE_URL en Proyecto/.env "
             "(o usa LATENCIA_PREPARAR_BD=0 y crea las evaluaciones a mano).",
             pytrace=False,
         )

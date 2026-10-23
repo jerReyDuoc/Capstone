@@ -17,7 +17,7 @@ Preparación (4 terminales, desde Proyecto/backend con el venv activado):
                   pytest tests/test_live_capa_ia.py -v -s
      cmd:         set LIVE_BASE_URL=http://127.0.0.1:8000 && pytest tests/test_live_capa_ia.py -v -s
 
-El .env de backend/ debe tener GROQ_API_KEY válida, SANITIZER_ENABLED=true y
+El .env del proyecto (Proyecto/.env) debe tener GROQ_API_KEY válida, SANITIZER_ENABLED=true y
 ENTITY_MAP_KEY. La prueba lee DATABASE_URL y ENTITY_MAP_KEY desde ese .env (o desde
 LIVE_DATABASE_URL / LIVE_ENTITY_MAP_KEY si los defines).
 
@@ -58,9 +58,11 @@ ESTADOS_FINALES = {"validated", "rejected", "error"}
 
 # ---------------------------------------------------------------- configuración real
 def _desde_env_file(clave: str) -> str | None:
-    """Lee backend/.env (el mismo que usan la API y el worker). No se usa os.environ
+    """Lee Proyecto/.env (el mismo que usan la API y el worker). No se usa os.environ
     porque conftest.py define valores de prueba para DATABASE_URL y ENTITY_MAP_KEY."""
-    archivo = BACKEND_DIR / ".env"
+    from app.core.config import ENV_PROYECTO
+
+    archivo = ENV_PROYECTO
     if not archivo.exists():
         return None
     for linea in archivo.read_text(encoding="utf-8").splitlines():
@@ -73,7 +75,7 @@ def _desde_env_file(clave: str) -> str | None:
 def _config(clave: str) -> str:
     valor = os.getenv(f"LIVE_{clave}") or _desde_env_file(clave)
     if not valor:
-        pytest.fail(f"Falta {clave}: defínelo en backend/.env o como LIVE_{clave}.", pytrace=False)
+        pytest.fail(f"Falta {clave}: defínelo en Proyecto/.env o como LIVE_{clave}.", pytrace=False)
     return valor
 
 

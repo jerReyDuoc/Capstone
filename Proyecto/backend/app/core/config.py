@@ -1,6 +1,13 @@
+from pathlib import Path
 from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Un solo .env para todo el proyecto: Proyecto/.env (junto al docker-compose.yml). En Docker
+# no existe dentro de la imagen: compose lo entrega como variables (env_file), que tienen
+# prioridad sobre el archivo. Fuera de Docker (pytest/uvicorn locales) se lee directo.
+ENV_PROYECTO = Path(__file__).resolve().parents[3] / ".env"
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -136,7 +143,7 @@ class Settings(BaseSettings):
     # solo el tiempo necesario para su finalidad. Vencido el plazo, el worker
     # (cron diario) los anonimiza con las mismas reglas que una supresión ARCOP:
     # se borran correos, textos, archivos y huellas y se conservan los puntajes.
-    # Vacío = regla desactivada (el PO debe fijar los valores; ver CAMBIOS_T06.md).
+    # Vacío = regla desactivada (el PO debe fijar los valores; ver Extras/Cambios/backend/CAMBIOS_T06.md).
     #   Titulares: días DESPUÉS de vencer el acceso (usuario_temporal.fecha_expiracion).
     RETENCION_DATOS_TITULAR_DIAS: int | None = None
     #   Solicitudes ARCOP: días después del cierre; quedan tipo, estados, fechas e historial.
@@ -144,7 +151,9 @@ class Settings(BaseSettings):
     #   Eventos de seguridad: días después del evento, solo si ya fue revisado.
     RETENCION_EVENTOS_SEGURIDAD_DIAS: int | None = None
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # extra="ignore": el .env único también trae variables del compose y del frontend
+    # (puertos, POSTGRES_*, API_URL, TURNSTILE_SITE_KEY...) que no son de la API.
+    model_config = SettingsConfigDict(env_file=ENV_PROYECTO, env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
     def _validar_capa_ia(self):

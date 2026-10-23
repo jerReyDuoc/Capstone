@@ -1,7 +1,10 @@
 .env
-.env
-backend/.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
 backend/venv/
+backend/.venv/
 backend/storage/
 __pycache__/
 *.pyc

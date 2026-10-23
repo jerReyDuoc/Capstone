@@ -16,7 +16,7 @@ Generar una clave:
     python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
 Rotar ENTITY_MAP_KEY deja ilegibles los textos ARCOP y los archivos aún no procesados
-cifrados con la clave anterior: rotarla exige recifrarlos (ver CAMBIOS_HU06.md).
+cifrados con la clave anterior: rotarla exige recifrarlos (ver Extras/Cambios/backend/CAMBIOS_HU06.md).
 """
 import base64
 import hashlib

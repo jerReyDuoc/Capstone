@@ -1,17 +1,14 @@
 # ComplianceAI · Panel web (HU-13)
 
-Frontend en **Next.js 15 + React 19 + TypeScript** que reemplaza al prototipo HTML de `Proyecto/frontend`.
+Frontend en **Next.js 15 + React 19 + TypeScript**. Reemplazó al prototipo HTML, que quedó como evidencia en `Extras/frontend-prototipo/`.
 Muestra la madurez en gobernanza de IA por dominio (radar y barras), el resumen de brechas priorizadas y una
 navegación pensada para computadores y tablets (≥ 1024 px), con la paleta del sitio TherionLabs.
-
-La carpeta va en `Proyecto/frontend-next/`. El prototipo actual no se toca: ambos pueden convivir mientras se migra.
 
 ## Puesta en marcha
 
 ```bash
 cd Proyecto/frontend-next
-cp .env.example .env.local      # API_URL=http://localhost:8000
-npm install
+npm install                     # la configuración sale de Proyecto/.env (un solo .env para todo)
 npm run dev                     # http://localhost:3000/panel
 ```
 
@@ -25,8 +22,7 @@ El `docker-compose.yml` de `Proyecto/` ya trae el servicio `web`. Desde `Proyect
 docker compose up -d --build
 ```
 
-El panel queda en http://localhost:3000/panel (puerto configurable con `WEB_PORT` en `Proyecto/.env`). Next reenvía `/api/*` al servicio `api`, así que no hace falta CORS
-(igual que el nginx del prototipo).
+El panel queda en http://localhost:3000/panel (puerto configurable con `WEB_PORT` en `Proyecto/.env`). Next reenvía `/api/*` al servicio `api`, así que no hace falta CORS.
 
 ### Pruebas
 
@@ -47,7 +43,7 @@ npm run build
 | `/aviso-legal` | Texto del aviso legal (HU-04) |
 
 El navegador habla con el BFF (`/bff/*`), que guarda el token en una cookie httpOnly y lo agrega como Bearer
-hacia FastAPI. Detalles, variables y checklist en `CAMBIOS_HU19.md`.
+hacia FastAPI. Detalles, variables y checklist en `Extras/Cambios/frontend/CAMBIOS_HU19.md` (raíz del repositorio).
 
 ## Rutas del panel
 
@@ -88,4 +84,4 @@ docs/                handoff de diseño, auditoría WCAG y capturas
 ```
 
 Los gráficos son SVG propios en vez de una librería para controlar por completo teclado, lectores de pantalla y la
-paleta, y para no sumar dependencias. Ver `docs/HU-13_HANDOFF.md` y `docs/ACCESIBILIDAD.md`.
+paleta, y para no sumar dependencias. Ver `docs/ACCESIBILIDAD.md` y el handoff histórico en `Extras/Cambios/frontend/HU-13_HANDOFF.md`.
