@@ -357,7 +357,7 @@ def test_h1_por_la_api_encuestado_deja_email_pide_supresion_y_el_email_se_borra(
     admin = {"Authorization": f"Bearer {auth.emitir_token(1, 'admin_therion', secreto=secreto)}"}
 
     async def _main():
-        async with cliente_api() as c:
+        async with cliente_api(rol=None) as c:
             r = await c.post("/api/encuesta-publica/iniciar", json={
                 "rubro_id": 1, "aviso_legal": {"version": settings.AVISO_LEGAL_VERSION, "aceptado": True},
                 "captcha_token": "token-de-prueba"})

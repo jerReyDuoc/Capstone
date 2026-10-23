@@ -37,7 +37,7 @@ Se aplica a todas las rutas de evaluaciones, filtro, reportes, respuestas y evid
 | admin | todas | todas |
 | encuestado (sub = id de evaluación) | solo la suya; otra → 404 | ninguna (404) |
 | referente | ninguna (404) | solo las de su usuario temporal |
-| sin token | 401 | igual que antes, salvo `EXIGIR_TOKEN_EVALUACIONES=true` (interruptor de HU-20) |
+| sin token | 401 | 401 desde HU-20 (`EXIGIR_TOKEN_EVALUACIONES=true` por defecto; ver `CAMBIOS_HU20.md`) |
 
 Lo ajeno responde 404 y no 403, para no confirmar ids correlativos. Un token mal formado responde 401 (no se trata como anónimo). El encuestado no puede usar `PATCH /respuestas/{id}/revision` (403), y `GET /api/evaluaciones` nunca lista evaluaciones públicas a quien no sea admin. Además, el usuario temporal de la encuesta pública no puede entrar como `referente` con su email opcional.
 

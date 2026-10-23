@@ -25,6 +25,9 @@ Datos: usa una evaluación dedicada (LIVE_EVALUACION_ID, por defecto 9101). Al I
 borra lo que haya quedado de corridas anteriores de esa evaluación; al final deja
 los datos en la BD para que puedas revisarlos (LIVE_LIMPIAR_AL_FINAL=1 los borra).
 Costo: 1 llamada a Groq por corrida.
+
+HU-20: la API exige token. Define QA_TOKEN_ADMIN con el token de un admin activo
+(python -m app.core.autenticacion --usuario <id admin> --rol admin_therion).
 """
 import asyncio
 import json
@@ -178,7 +181,10 @@ async def _live():
     t0 = (datetime.now(timezone.utc) - timedelta(seconds=2)).replace(tzinfo=None)
 
     try:
-        async with httpx.AsyncClient(base_url=BASE_URL, timeout=30) as client:
+        # HU-20: las rutas exigen token; la prueba en vivo actúa como admin (QA_TOKEN_ADMIN)
+        token = os.getenv("QA_TOKEN_ADMIN")
+        cabeceras = {"Authorization": f"Bearer {token}"} if token else {}
+        async with httpx.AsyncClient(base_url=BASE_URL, timeout=30, headers=cabeceras) as client:
             api = API(client)
             await api.verificar()
             await bd.preparar()

@@ -94,7 +94,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Panel web (HU-13, HU-11, HU-12) | ✅ Hecho | `frontend-next/` (Next.js 15 + React 19): diagnóstico, dominios, brechas priorizadas por severidad (HU-11) y capacitación (HU-12), con radar y barras interactivos, meta de cumplimiento, descarga del informe PDF y envío por correo; conectado a la API real; responsivo ≥ 1024 px y WCAG 2.1 AA. Ver [sección 10.1](#101-panel-web-hu-13-hu-11-hu-12) |
 | Resto del frontend (backoffice de matriz y árbol) | 🟡 Demo estática | Cuestionario (HU-01/02), landing (HU-19), informe y formación ya están en `frontend-next/`; el backoffice sigue en el prototipo `frontend/` con API **simulada** en `localStorage` |
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
-| Autenticación en todos los endpoints | 🔴 Pendiente | Solo `/api/arcop` y `/api/auth/me` exigen token |
+| Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `backend/CAMBIOS_HU20.md` |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
 | Pipeline CI/CD y staging | 🔴 Pendiente | Sprint 4 |
 
@@ -587,7 +587,9 @@ Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a 
 
 ## 7. Endpoints de la API
 
-Base: `http://localhost:8000` (o a través del proxy del panel en `http://localhost:3000` y del prototipo en `http://localhost:8088`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 🛡️ `admin_therion`.
+Base: `http://localhost:8000` (o a través del proxy del panel en `http://localhost:3000` y del prototipo en `http://localhost:8088`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion`.
+
+**HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/test_hu20_autorizacion.py`; detalle en `backend/CAMBIOS_HU20.md`.
 
 ### Sistema
 
@@ -621,21 +623,22 @@ Base: `http://localhost:8000` (o a través del proxy del panel en `http://localh
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| GET | `/api/evaluaciones?page=&size=&estado_progreso=` | 🔓 | Lista paginada |
-| GET | `/api/evaluaciones/{id}` | 🔓 | Detalle |
-| GET | `/api/evaluaciones/{id}/respuestas?page=&size=&estado_final=&fuente=` | 🔓 | Respuestas paginadas (filtra por clasificación final o fuente) |
-| GET | `/api/evaluaciones/{id}/filtro` | 🔓 | Preguntas F1–F7, respuestas guardadas y cantidad de controles aplicables |
-| POST | `/api/evaluaciones/{id}/filtro` | 🔓 | `{"respuestas":[{"codigo":"F1","respuesta":true}, …]}` (las 7) → controles aplicables |
-| GET | `/api/evaluaciones/{id}/controles-aplicables` | 🔓 | Controles que aplican (400 si el filtro no está completo). El catálogo sale de una caché en memoria (TTL 5 min) |
-| GET | `/api/evaluaciones/{id}/progreso` | 🔓 | Progreso del cuestionario para reanudar: `etapa` (`filtro`/`cuestionario`/`completo`/`cerrada`), respondidos / aplicables, `por_dimension`, `siguiente_control`, `pendientes`, `respondidos` |
-| POST | `/api/evaluaciones/{id}/cerrar` | 🔓 | Genera resumen por dominio, puntaje y nivel general (vista previa: **no** cierra la evaluación, se puede repetir) |
-| POST | `/api/evaluaciones/{id}/completar` | 🔓 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `REVISION_SIN_EVIDENCIA` (control en `requiere_revision` sin evidencia), `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
-| GET | `/api/evaluaciones/{id}/resumen` | 🔓 | Resumen guardado (404 si no se ha cerrado) |
-| GET | `/api/evaluaciones/{id}/comparativa` | 🔓 | Resumen vs. **meta de cumplimiento** (siempre) y benchmark del rubro (solo con ≥ `COMPARATIVA_MIN_MUESTRAS`); trae `meta_puntaje`, `diferencia_vs_meta`, `cumple_meta`, `referencia_suficiente`, `muestras` |
-| GET | `/api/evaluaciones/{id}/plan-formativo` | 🔓 | HU-12: plan de estudio por dimensión (nivel asignado, objetivo, módulos y brechas que cubren); 404 `SIN_RESULTADOS` si no hay resumen |
-| GET | `/api/evaluaciones/{id}/informe/pdf?severidad=&dominio=&estado=&q=` | 🔓 | Informe en PDF para descargar (resultado, comparativa, brechas, plan formativo) |
-| POST | `/api/evaluaciones/{id}/informe/enviar` | 🔓 | `{email?, recordar?, severidad?, …}` → envía el mismo PDF por correo; 422 `EMAIL_REQUERIDO`/`EMAIL_INVALIDO`, 429 `LIMITE_CORREOS`, 502 `CORREO_FALLIDO`, 503 `CORREO_NO_DISPONIBLE` |
-| GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔓 | Benchmark por rubro × dominio |
+| GET | `/api/evaluaciones?page=&size=&estado_progreso=` | 🔑 | Lista paginada: el admin ve todas; el encuestado solo la suya y el referente solo las de su invitación |
+| GET | `/api/evaluaciones/{id}` | 📋 | Detalle |
+| GET | `/api/evaluaciones/{id}/respuestas?page=&size=&estado_final=&fuente=` | 📋 | Respuestas paginadas (filtra por clasificación final o fuente) |
+| GET | `/api/evaluaciones/{id}/filtro` | 📋 | Preguntas F1–F7, respuestas guardadas y cantidad de controles aplicables |
+| POST | `/api/evaluaciones/{id}/filtro` | 📋 | `{"respuestas":[{"codigo":"F1","respuesta":true}, …]}` (las 7) → controles aplicables |
+| GET | `/api/evaluaciones/{id}/controles-aplicables` | 📋 | Controles que aplican (400 si el filtro no está completo). El catálogo sale de una caché en memoria (TTL 5 min) |
+| GET | `/api/evaluaciones/{id}/progreso` | 📋 | Progreso del cuestionario para reanudar: `etapa` (`filtro`/`cuestionario`/`completo`/`cerrada`), respondidos / aplicables, `por_dimension`, `siguiente_control`, `pendientes`, `respondidos` |
+| POST | `/api/evaluaciones/{id}/cerrar` | 📋 | Genera resumen por dominio, puntaje y nivel general (vista previa: **no** cierra la evaluación, se puede repetir) |
+| POST | `/api/evaluaciones/{id}/completar` | 📋 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `REVISION_SIN_EVIDENCIA` (control en `requiere_revision` sin evidencia), `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
+| GET | `/api/evaluaciones/{id}/resumen` | 📋 | Resumen guardado (404 si no se ha cerrado) |
+| GET | `/api/evaluaciones/{id}/comparativa` | 📋 | Resumen vs. **meta de cumplimiento** (siempre) y benchmark del rubro (solo con ≥ `COMPARATIVA_MIN_MUESTRAS`); trae `meta_puntaje`, `diferencia_vs_meta`, `cumple_meta`, `referencia_suficiente`, `muestras` |
+| GET | `/api/evaluaciones/{id}/plan-formativo` | 📋 | HU-12: plan de estudio por dimensión (nivel asignado, objetivo, módulos y brechas que cubren); 404 `SIN_RESULTADOS` si no hay resumen |
+| GET | `/api/evaluaciones/{id}/informe/pdf?severidad=&dominio=&estado=&q=` | 📋 | Informe en PDF para descargar (resultado, comparativa, brechas, plan formativo) |
+| POST | `/api/evaluaciones/{id}/informe/enviar` | 📋 | `{email?, recordar?, severidad?, …}` → envía el mismo PDF por correo; 422 `EMAIL_REQUERIDO`/`EMAIL_INVALIDO`, 429 `LIMITE_CORREOS`, 502 `CORREO_FALLIDO`, 503 `CORREO_NO_DISPONIBLE` |
+| GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔑 | Benchmark por rubro × dominio (datos agregados) |
+| PATCH | `/api/evaluaciones/{id}/prueba` | 🛡️ | `{es_prueba}` — excluye/incluye la evaluación del benchmark (HU-19) |
 
 Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size, pages}`.
 
@@ -643,20 +646,20 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| POST | `/api/respuestas/` | 🔓 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` (1 de 5 estados) → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 400 estado inválido, 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `JUSTIFICACION_OBLIGATORIA`, `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
-| PUT | `/api/respuestas/{id}` | 🔓 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
-| GET | `/api/respuestas/{id}` | 🔓 | Respuesta con clasificación final, fuente, confianza y evidencias |
-| PATCH | `/api/respuestas/{id}/revision` | 🔓 | `{clasificacion_revisada}` — revisión humana; acepta `cumplido`, `parcialmente_cumplido`, `no_cumplido` o `no_aplica` (no `requiere_revision`). Asigna la brecha si queda `no_cumplido` y la quita en otro caso |
-| POST | `/api/respuestas/{id}/evidencias` | 🔓 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío; 409 `EVALUACION_CERRADA` si la evaluación está completada/cerrada |
-| GET | `/api/evidencias/{id}` | 🔓 | Estado de validación y resultado del LLM |
+| POST | `/api/respuestas/` | 📋 | `{evaluacion_id, matriz_control_id, estado_clasificacion, justificacion}` (1 de 5 estados) → **upsert**: 201 si crea, 200 si el control ya estaba respondido; cuerpo `{id_respuesta, creada, actualizada}`. 400 estado inválido, 404 evaluación/control inexistente, 409 evaluación cerrada o filtro pendiente, 422 `JUSTIFICACION_OBLIGATORIA`, `CONTROL_NO_APLICABLE` o `PROMPT_INJECTION` |
+| PUT | `/api/respuestas/{id}` | 📋 | `{estado_clasificacion, justificacion}` — modifica una respuesta existente (mismas validaciones) |
+| GET | `/api/respuestas/{id}` | 📋 | Respuesta con clasificación final, fuente, confianza y evidencias |
+| PATCH | `/api/respuestas/{id}/revision` | 🛡️ | `{clasificacion_revisada}` — revisión humana; acepta `cumplido`, `parcialmente_cumplido`, `no_cumplido` o `no_aplica` (no `requiere_revision`). Asigna la brecha si queda `no_cumplido` y la quita en otro caso |
+| POST | `/api/respuestas/{id}/evidencias` | 📋 | `multipart/form-data` campo `file` → 202 (procesamiento asíncrono); 400 si la respuesta no es `cumplido`/`parcialmente_cumplido` o el archivo está vacío; 409 `EVALUACION_CERRADA` si la evaluación está completada/cerrada |
+| GET | `/api/evidencias/{id}` | 📋 | Estado de validación y resultado del LLM |
 
 ### Capa de IA y seguridad
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| GET | `/api/ia/metricas?desde=&hasta=&tarea=&modelo=` | 🔓 | `operacion_modelo` (tasa de error global y por tipo, latencia p50/p95, tokens, costo), `precision_modelo` (LLM vs. revisión humana: accuracy, P/R/F1, matriz de confusión) y `sanitizacion` (entidades por tipo, fallos, truncados) |
-| GET | `/api/seguridad/eventos?solo_pendientes=&limit=` | 🔓 | Bandeja de intentos de prompt injection |
-| PATCH | `/api/seguridad/eventos/{id}/revisado` | 🔓 | Marca un evento como revisado |
+| GET | `/api/ia/metricas?desde=&hasta=&tarea=&modelo=` | 🛡️ | `operacion_modelo` (tasa de error global y por tipo, latencia p50/p95, tokens, costo), `precision_modelo` (LLM vs. revisión humana: accuracy, P/R/F1, matriz de confusión) y `sanitizacion` (entidades por tipo, fallos, truncados) |
+| GET | `/api/seguridad/eventos?solo_pendientes=&limit=` | 🛡️ | Bandeja de intentos de prompt injection |
+| PATCH | `/api/seguridad/eventos/{id}/revisado` | 🛡️ | Marca un evento como revisado |
 
 ### Derechos ARCOP — `/api/arcop`
 
@@ -680,7 +683,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | 400 | — (texto) | Validación de negocio |
 | 401 | `NO_AUTENTICADO`, `TOKEN_INVALIDO`, `CREDENCIALES_INVALIDAS`, `USUARIO_DESHABILITADO` | Autenticación |
 | 403 | `NO_AUTORIZADO` | Rol insuficiente |
-| 404 | — | Recurso no encontrado |
+| 404 | `EVALUACION_NO_ENCONTRADA` u otro | Recurso no encontrado o de otra organización (HU-20) |
 | 409 | `TRANSICION_INVALIDA` (incluye `estado_actual` y `permitidas`) | Cambio de estado ARCOP no permitido |
 | 422 | `PROMPT_INJECTION` | Justificación bloqueada |
 | 503 | `AUTH_NO_CONFIGURADA` | Falta `AUTH_SECRET` |

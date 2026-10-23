@@ -160,7 +160,9 @@ async def entorno(monkeypatch, storage_dir: Path):
     app.state.arq = h.FakeArq()
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     try:
-        async with httpx.AsyncClient(transport=transport, base_url="http://hu06") as c:
+        # HU-20: el cuestionario lo responde el referente dueño de la evaluación sembrada
+        async with httpx.AsyncClient(transport=transport, base_url="http://hu06",
+                                     headers=h.encabezados_qa("referente")) as c:
             yield c, engine, espia, tasks, desc
     finally:
         app.dependency_overrides.pop(get_db, None)

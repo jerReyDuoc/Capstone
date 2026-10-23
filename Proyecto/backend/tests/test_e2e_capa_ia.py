@@ -169,6 +169,8 @@ async def entorno(monkeypatch, sanitizer_enabled=True):
     monkeypatch.setattr(settings, "SANITIZER_ENABLED", sanitizer_enabled)
     monkeypatch.setattr(settings, "LLM_PRECIO_ENTRADA_USD_1M", 0.10)
     monkeypatch.setattr(settings, "LLM_PRECIO_SALIDA_USD_1M", 0.50)
+    if not settings.AUTH_SECRET:  # HU-20: el admin firma sus llamadas
+        monkeypatch.setattr(settings, "AUTH_SECRET", h.SECRETO_QA)
 
     async def _get_db():
         async with Session() as s:
@@ -178,7 +180,9 @@ async def entorno(monkeypatch, sanitizer_enabled=True):
     app.state.arq = h.FakeArq()
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     try:
-        async with httpx.AsyncClient(transport=transport, base_url="http://e2e") as c:
+        # HU-20: el flujo lo recorre un admin (revisión humana y métricas son solo suyas)
+        async with httpx.AsyncClient(transport=transport, base_url="http://e2e",
+                                     headers=h.encabezados_qa("admin")) as c:
             # HU-01: solo se responden controles aplicables según el filtro F1–F7
             r = await c.post(f"/api/evaluaciones/{h.EVAL_ID}/filtro", json=h.body_filtro(True))
             assert r.status_code == 200, r.text

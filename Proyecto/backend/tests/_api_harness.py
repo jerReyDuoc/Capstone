@@ -20,10 +20,16 @@ En modo LIVE, además:
     La URL se toma de LATENCIA_DATABASE_URL o, si no existe, de DATABASE_URL en
     backend/.env.
 
+HU-20: las rutas de evaluaciones, respuestas, evidencias y reportes exigen token.
+`cliente_api()` envía por defecto el token de un admin (rol="admin"); `rol="referente"`
+usa el del usuario temporal 1 (dueño de las evaluaciones sembradas) y `rol=None` no envía
+ninguno (pruebas que manejan sus propios tokens o prueban el 401). En modo LIVE el token de
+admin se toma de QA_TOKEN_ADMIN (ver CAMBIOS_HU20.md).
+
 Este archivo no contiene tests (no empieza con test_).
 """
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -52,6 +58,49 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 # Credenciales del administrador sembrado en modo en proceso (solo pruebas)
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "clave-admin-solo-pruebas"
+ADMIN_ID = 1
+REFERENTE_ID = 1  # usuario temporal dueño de EVAL_ID y EVAL_NA_ID
+
+# HU-20: secreto de firma de tokens SOLO para pruebas en proceso, cuando el entorno no
+# define AUTH_SECRET (en Docker suele venir del .env y se usa ese).
+SECRETO_QA = "secreto-qa-solo-pruebas-en-proceso-0123456789"
+QA_TOKEN_ADMIN_LIVE = os.getenv("QA_TOKEN_ADMIN") or None
+
+
+def token_qa(rol: str = "admin") -> str:
+    """Token firmado con el AUTH_SECRET vigente (en proceso). rol: admin | referente."""
+    from app.core.autenticacion import Rol, emitir_token
+
+    if rol == "admin":
+        return emitir_token(ADMIN_ID, Rol.ADMIN_THERION.value)
+    if rol == "referente":
+        return emitir_token(REFERENTE_ID, Rol.REFERENTE.value)
+    raise ValueError(f"rol de prueba desconocido: {rol}")
+
+
+def encabezados_qa(rol: str | None = "admin") -> dict:
+    """{'Authorization': 'Bearer ...'} para el rol pedido ({} si rol es None)."""
+    if rol is None:
+        return {}
+    if MODO == "live":
+        if rol != "admin":
+            raise ValueError("En modo live solo hay token de admin (QA_TOKEN_ADMIN).")
+        return {"Authorization": f"Bearer {QA_TOKEN_ADMIN_LIVE}"} if QA_TOKEN_ADMIN_LIVE else {}
+    return {"Authorization": f"Bearer {token_qa(rol)}"}
+
+
+@contextmanager
+def secreto_qa():
+    """Garantiza un AUTH_SECRET durante la prueba en proceso y deja el valor previo al salir."""
+    from app.core.config import settings
+
+    previo = settings.AUTH_SECRET
+    if not previo:
+        settings.AUTH_SECRET = SECRETO_QA
+    try:
+        yield
+    finally:
+        settings.AUTH_SECRET = previo
 
 
 class FakeArq:
@@ -196,12 +245,18 @@ async def _sembrar(Session):
 
 
 @asynccontextmanager
-async def cliente_api():
-    """Entrega un httpx.AsyncClient listo, en el modo que corresponda."""
+async def cliente_api(rol: str | None = "admin"):
+    """
+    Entrega un httpx.AsyncClient listo, en el modo que corresponda.
+
+    rol: token que se envía por defecto en cada petición (HU-20). "admin" (por defecto),
+    "referente" o None (sin token). Un `headers=` en la petición lo reemplaza.
+    """
     if MODO == "live":
         await verificar_servidor()
         limites = httpx.Limits(max_connections=200, max_keepalive_connections=50)
-        async with httpx.AsyncClient(base_url=BASE_URL_LIVE, timeout=30, limits=limites) as c:
+        async with httpx.AsyncClient(base_url=BASE_URL_LIVE, timeout=30, limits=limites,
+                                     headers=encabezados_qa(rol)) as c:
             yield c
         return
 
@@ -229,8 +284,10 @@ async def cliente_api():
     app.state.arq = FakeArq()  # ASGITransport no ejecuta el lifespan (Redis)
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     try:
-        async with httpx.AsyncClient(transport=transport, base_url="http://qa") as c:
-            yield c
+        with secreto_qa():
+            async with httpx.AsyncClient(transport=transport, base_url="http://qa",
+                                         headers=encabezados_qa(rol)) as c:
+                yield c
     finally:
         app.dependency_overrides.pop(get_db, None)
         await engine.dispose()

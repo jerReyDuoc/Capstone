@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import alcance_evaluacion
+from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion
 from app.core.config import settings
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
@@ -114,7 +114,7 @@ async def get_resumen(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
         "dominios": dominios,
     }
 
-@router.get("/benchmark")
+@router.get("/benchmark", dependencies=[Depends(actor_de_evaluaciones)])
 async def get_benchmark(
     rubro_id: int | None = None,
     db: AsyncSession = Depends(get_db),
@@ -122,6 +122,9 @@ async def get_benchmark(
     """
     Devuelve los promedios del mercado por rubro y dominio.
     Si no se especifica rubro_id, devuelve todos.
+
+    HU-20: datos agregados (sin evaluaciones individuales), pero es un reporte: exige el
+    token de un encuestado, referente o admin.
     """
     query = (
         select(Benchmark, Rubro, Dominio)

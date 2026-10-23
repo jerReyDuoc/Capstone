@@ -1,29 +1,32 @@
 """
-Alcance de las rutas de evaluaciones (HU-19 criterio 2 y primera parte de HU-20).
+Alcance de las rutas de evaluaciones (HU-19 criterio 2 y HU-20).
 
-Regla: quien entra por la encuesta pública solo ve y modifica SU evaluación.
+HU-20: las respuestas, evidencias y reportes de una organización solo los ven ella misma
+(su encuestado o su referente) y los administradores de Therion Labs.
 
   | Quién                        | Evaluación pública         | Evaluación por invitación          |
   |------------------------------|----------------------------|------------------------------------|
   | admin_therion                | todas                      | todas                              |
   | encuestado (sub = eval id)   | solo la suya (otra -> 404) | ninguna (404)                      |
   | referente (sub = usuario id) | ninguna (404)              | solo las suyas (otra -> 404)       |
-  | sin token                    | 401                        | permitido mientras                 |
-  |                              |                            | EXIGIR_TOKEN_EVALUACIONES=false    |
+  | sin token                    | 401                        | 401 (EXIGIR_TOKEN_EVALUACIONES,    |
+  |                              |                            | true por defecto; false solo dev)  |
 
 Se responde 404 (no 403) a lo ajeno para no confirmar que el id existe; los ids son
-correlativos y un 403 permitiría enumerarlos.
+correlativos y un 403 permitiría enumerarlos. Sin token se responde 401 siempre, exista o
+no la evaluación, por la misma razón.
 
-Las evaluaciones por invitación siguen abiertas sin token para no romper el panel
-HU-13 ni las pruebas mientras HU-20 no agregue el login del referente; el interruptor
-EXIGIR_TOKEN_EVALUACIONES las cierra.
+Lo que es solo de Therion Labs (métricas de IA, eventos de seguridad, revisión humana,
+marcar evaluaciones de prueba) usa `solo_admin`: 401 sin token y 403 con otro rol.
+Catálogos, controles, la landing (encuesta pública) y el aviso legal siguen públicos.
+La matriz completa de cada endpoint está en tests/test_hu20_autorizacion.py.
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, Rol, obtener_actor
+from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
@@ -39,7 +42,8 @@ _NO_ENCONTRADA = HTTPException(
 def _exige_token() -> HTTPException:
     return HTTPException(
         status_code=401,
-        detail={"codigo": "NO_AUTENTICADO", "mensaje": "Esta evaluación requiere la sesión de su encuestado."},
+        detail={"codigo": "NO_AUTENTICADO",
+                "mensaje": "Requiere la sesión del encuestado o de un administrador (Authorization: Bearer ...)."},
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -52,6 +56,21 @@ async def actor_opcional(
     if credenciales is None or not credenciales.credentials:
         return None
     return await obtener_actor(credenciales, db)
+
+
+async def actor_de_evaluaciones(actor: Actor | None = Depends(actor_opcional)) -> Actor | None:
+    """
+    Para rutas de evaluaciones sin id (listado, benchmark): exige token salvo que
+    EXIGIR_TOKEN_EVALUACIONES=false (solo desarrollo). Devuelve el actor (o None) para
+    que la ruta filtre lo que le corresponde ver.
+    """
+    if actor is None and settings.EXIGIR_TOKEN_EVALUACIONES:
+        raise _exige_token()
+    return actor
+
+
+# HU-20: todo lo que es solo de Therion Labs (401 sin token, 403 con otro rol)
+solo_admin = requerir_rol(Rol.ADMIN_THERION)
 
 
 async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id: int) -> None:
@@ -85,6 +104,16 @@ async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id
         raise _exige_token()
 
 
+def _sin_evaluacion(actor: Actor | None) -> None:
+    """Respuesta/evidencia inexistente: sin token 401 (no revela si existe), ajeno 404."""
+    if actor is None:
+        if settings.EXIGIR_TOKEN_EVALUACIONES:
+            raise _exige_token()
+        return
+    if not actor.es_admin:
+        raise _NO_ENCONTRADA
+
+
 # ------------------------------------------------------------ dependencias por tipo de ruta
 async def alcance_evaluacion(
     evaluacion_id: int,
@@ -105,8 +134,8 @@ async def alcance_respuesta(
     evaluacion_id = await db.scalar(select(Respuesta.evaluacion_id).where(Respuesta.id == respuesta_id))
     if evaluacion_id is not None:
         await verificar_alcance(db, actor, evaluacion_id)
-    elif actor is not None and not actor.es_admin:
-        raise _NO_ENCONTRADA
+    else:
+        _sin_evaluacion(actor)
     return actor
 
 
@@ -125,6 +154,6 @@ async def alcance_evidencia(
     )
     if evaluacion_id is not None:
         await verificar_alcance(db, actor, evaluacion_id)
-    elif actor is not None and not actor.es_admin:
-        raise _NO_ENCONTRADA
+    else:
+        _sin_evaluacion(actor)
     return actor

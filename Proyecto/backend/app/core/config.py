@@ -97,9 +97,11 @@ class Settings(BaseSettings):
     LLM_CUOTA_DIARIA_EVALUACION: int = 40
     LLM_CUOTA_DIARIA_GLOBAL: int = 2000
     ZONA_HORARIA_CUOTAS: str = "America/Santiago"
-    # HU-20 (interruptor): true = las rutas de evaluaciones exigen token también en las
-    # evaluaciones por invitación. Las de la encuesta pública lo exigen SIEMPRE.
-    EXIGIR_TOKEN_EVALUACIONES: bool = False
+    # HU-20: las rutas de evaluaciones, respuestas, evidencias y reportes exigen el token
+    # del encuestado/referente o de un admin (true, por defecto). false = SOLO DESARROLLO:
+    # deja abiertas sin token las evaluaciones POR INVITACIÓN (p. ej. el modo interno del
+    # panel prototipo). Las de la encuesta pública lo exigen siempre. Prohibido en production.
+    EXIGIR_TOKEN_EVALUACIONES: bool = True
 
     # ------------------------------------------------ Comparativa e informes (HU-12/HU-13)
     # "Lo que debería cumplir": puntaje de referencia por dimensión que se muestra junto al
@@ -169,6 +171,11 @@ class Settings(BaseSettings):
             raise ValueError("TURNSTILE_SECRET_KEY es obligatoria con APP_ENV=production (HU-19).")
         if self.APP_ENV == "production" and (not self.BFF_SHARED_SECRET or len(self.BFF_SHARED_SECRET) < 32):
             raise ValueError("BFF_SHARED_SECRET (mínimo 32 caracteres) es obligatorio con APP_ENV=production (HU-19).")
+        if self.APP_ENV == "production" and not self.EXIGIR_TOKEN_EVALUACIONES:
+            raise ValueError(
+                "EXIGIR_TOKEN_EVALUACIONES=false está prohibido con APP_ENV=production "
+                "(HU-20: las respuestas, evidencias y reportes son confidenciales)."
+            )
         if self.APP_ENV == "production" and self.CORREO_MODO == "archivo":
             raise ValueError("CORREO_MODO=archivo es solo para desarrollo: usa smtp o desactivado en producción.")
         if self.CORREO_MODO == "smtp" and not self.SMTP_HOST:

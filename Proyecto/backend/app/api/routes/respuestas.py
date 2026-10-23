@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import actor_opcional, alcance_respuesta, verificar_alcance
+from app.core.alcance import actor_opcional, alcance_respuesta, solo_admin, verificar_alcance
 from app.core.autenticacion import Actor
 from app.core.database import get_db
 from app.application.use_cases.create_respuesta import (
@@ -158,17 +158,15 @@ async def revisar_respuesta(
     respuesta_id: int,
     payload: RevisionRequest,
     db: AsyncSession = Depends(get_db),
-    actor: Actor | None = Depends(alcance_respuesta),
+    _admin: Actor = Depends(solo_admin),
 ):
     """
     Revisión humana del Oficial de Cumplimiento. Fija la clasificación final y
     sirve como verdad de referencia para medir la precisión del LLM (/api/ia/metricas).
+
+    HU-20: solo administradores de Therion Labs (401 sin token, 403 para el encuestado
+    o el referente, que nunca revisan su propio diagnóstico).
     """
-    if actor is not None and actor.es_encuestado:
-        # La revisión es del Oficial de Cumplimiento, nunca del propio encuestado
-        raise HTTPException(status_code=403, detail={
-            "codigo": "SIN_PERMISO", "mensaje": "La revisión humana no está disponible para el encuestado.",
-        })
     valores = EstadoClasificacion.resolutivos()
     if payload.clasificacion_revisada not in valores:
         raise HTTPException(

@@ -15,6 +15,10 @@ os.environ.setdefault("GROQ_API_KEY", "gsk_test")
 os.environ.setdefault("APP_ENV", "test")
 # Clave Fernet SOLO para pruebas (no usar en ningún .env real)
 os.environ.setdefault("ENTITY_MAP_KEY", "dGVzdC1rZXktc29sby1wYXJhLXB5dGVzdC0xMjM0NTY=")
+# HU-20: las pruebas corren SIEMPRE con la autorización de producción, aunque el .env de
+# desarrollo (que docker compose pasa como variables) tenga EXIGIR_TOKEN_EVALUACIONES=false
+# para probar el frontend. Se fuerza (no setdefault) antes de importar app.core.config.
+os.environ["EXIGIR_TOKEN_EVALUACIONES"] = "true"
 
 # Las pruebas de API en proceso suben archivos: que no ensucien ./storage
 import tempfile  # noqa: E402

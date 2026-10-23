@@ -3,10 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.alcance import solo_admin
 from app.core.database import get_db
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 
-router = APIRouter(prefix="/api/seguridad", tags=["seguridad"])
+# HU-20: la bandeja de eventos de seguridad es solo para administradores de Therion Labs
+router = APIRouter(prefix="/api/seguridad", tags=["seguridad"], dependencies=[Depends(solo_admin)])
 
 
 class EventoSeguridadResponse(BaseModel):

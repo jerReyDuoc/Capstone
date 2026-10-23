@@ -76,7 +76,7 @@ def _correr(escenario):
     pytest.importorskip("aiosqlite")
 
     async def _f():
-        async with cliente_api() as c:
+        async with cliente_api(rol=None) as c:
             await escenario(c)
     asyncio.run(_f())
 
@@ -368,12 +368,13 @@ async def _llevar_a_en_proceso(c, sid):
 
 
 def test_supresion_resuelta_anonimiza_datos_del_titular():
+    # HU-20: los datos y su verificación los maneja un admin (el titular pierde el acceso)
     async def esc(c):
         # Datos personales del titular 1: una respuesta con justificación y una evidencia
         # (HU-01: antes de responder hay que completar el filtro de aplicabilidad)
-        r = await c.post("/api/evaluaciones/1/filtro", json=body_filtro(True))
+        r = await c.post("/api/evaluaciones/1/filtro", json=body_filtro(True), headers=ADMIN())
         assert r.status_code == 200, r.text
-        r = await c.post("/api/respuestas/", json={
+        r = await c.post("/api/respuestas/", headers=ADMIN(), json={
             "evaluacion_id": 1, "matriz_control_id": 1, "estado_clasificacion": "cumplido",
             "justificacion": "Política aprobada por Juan Pérez, gerente de TI.",
         })
@@ -382,7 +383,7 @@ def test_supresion_resuelta_anonimiza_datos_del_titular():
         nombre = "evidencia_supresion_arcop_qa.txt"
         antes = set(os.listdir(settings.STORAGE_DIR))
         r = await c.post(f"/api/respuestas/{rid}/evidencias",
-                         files={"file": (nombre, b"Politica firmada por Juan Perez", "text/plain")})
+                         files={"file": (nombre, b"Politica firmada por Juan Perez", "text/plain")}, headers=ADMIN())
         assert r.status_code == 202, r.text
         # HU-06: en disco el nombre es un UUID (sin el nombre original) y el contenido va cifrado
         nuevos = set(os.listdir(settings.STORAGE_DIR)) - antes
@@ -402,7 +403,7 @@ def test_supresion_resuelta_anonimiza_datos_del_titular():
         assert "evidencias=1" in s["historial"][-1]["comentario"]
 
         # textos y archivos borrados; clasificaciones conservadas
-        resp = (await c.get(f"/api/respuestas/{rid}")).json()
+        resp = (await c.get(f"/api/respuestas/{rid}", headers=ADMIN())).json()
         assert resp["justificacion_usuario"] is None
         assert resp["estado_clasificacion"] == "cumplido"
         assert resp["evidencias"][0]["nombre_archivo"] == "[anonimizado]"
@@ -688,14 +689,14 @@ def test_supresion_del_encuestado_anonimiza_solo_su_evaluacion():
     async def esc(c):
         # datos personales en las dos evaluaciones
         for ev in (1, EVAL_NA_ID):
-            assert (await c.post(f"/api/evaluaciones/{ev}/filtro", json=body_filtro(True))).status_code == 200
-            r = await c.post("/api/respuestas/", json={
+            assert (await c.post(f"/api/evaluaciones/{ev}/filtro", json=body_filtro(True), headers=ADMIN())).status_code == 200
+            r = await c.post("/api/respuestas/", headers=ADMIN(), json={
                 "evaluacion_id": ev, "matriz_control_id": 1, "estado_clasificacion": "no_cumplido",
                 "justificacion": "Responsable: Juan Pérez, encargado de TI.",
             })
             assert r.status_code == 201, r.text
         resp_por_eval = {
-            ev: (await c.get(f"/api/evaluaciones/{ev}/respuestas")).json()["items"][0]["id_respuesta"]
+            ev: (await c.get(f"/api/evaluaciones/{ev}/respuestas", headers=ADMIN())).json()["items"][0]["id_respuesta"]
             for ev in (1, EVAL_NA_ID)
         }
 
@@ -714,8 +715,8 @@ def test_supresion_del_encuestado_anonimiza_solo_su_evaluacion():
         assert "usuario_temporal" not in s["historial"][-1]["comentario"]
 
         # textos de SU evaluación borrados; la otra evaluación intacta
-        r_enc = (await c.get(f"/api/respuestas/{resp_por_eval[EVAL_NA_ID]}")).json()
-        r_otra = (await c.get(f"/api/respuestas/{resp_por_eval[1]}")).json()
+        r_enc = (await c.get(f"/api/respuestas/{resp_por_eval[EVAL_NA_ID]}", headers=ADMIN())).json()
+        r_otra = (await c.get(f"/api/respuestas/{resp_por_eval[1]}", headers=ADMIN())).json()
         assert r_enc["justificacion_usuario"] is None and r_enc["estado_clasificacion"] == "no_cumplido"
         assert r_otra["justificacion_usuario"] is not None
 

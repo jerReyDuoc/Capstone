@@ -4,9 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import actor_opcional, alcance_evaluacion
-from app.core.autenticacion import Actor, Rol, requerir_rol
-from app.core.config import settings
+from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion, solo_admin
+from app.core.autenticacion import Actor, Rol
 from app.core.database import get_db
 from app.application.schemas.api_schemas import (
     EvaluacionResumenResponse,
@@ -25,7 +24,7 @@ async def list_evaluaciones(
     size: int = Query(20, ge=1, le=100, description="Registros por página (máx 100)"),
     estado_progreso: str | None = Query(None, description="Filtrar por estado"),
     db: AsyncSession = Depends(get_db),
-    actor: Actor | None = Depends(actor_opcional),
+    actor: Actor | None = Depends(actor_de_evaluaciones),
 ):
     """
     Lista evaluaciones con paginación.
@@ -39,12 +38,10 @@ async def list_evaluaciones(
         query = query.where(Evaluacion.estado_progreso == estado_progreso)
         count_query = count_query.where(Evaluacion.estado_progreso == estado_progreso)
 
-    # HU-19: las evaluaciones de la encuesta pública solo las lista un admin; un
-    # encuestado ve solo la suya y un referente solo las de su invitación.
+    # HU-19/HU-20: sin token -> 401 (actor_de_evaluaciones). Las de la encuesta pública
+    # solo las lista un admin; un encuestado ve solo la suya y un referente solo las de su
+    # invitación. Sin token solo se llega aquí con EXIGIR_TOKEN_EVALUACIONES=false (dev).
     if actor is None:
-        if settings.EXIGIR_TOKEN_EVALUACIONES:
-            raise HTTPException(status_code=401, detail={"codigo": "NO_AUTENTICADO", "mensaje": "Falta el token."},
-                                headers={"WWW-Authenticate": "Bearer"})
         filtro = Evaluacion.origen != ORIGEN_PUBLICA
     elif actor.es_encuestado:
         filtro = Evaluacion.id == actor.id
@@ -151,7 +148,7 @@ class MarcarPruebaRequest(BaseModel):
 async def marcar_prueba(
     evaluacion_id: int,
     payload: MarcarPruebaRequest,
-    actor: Actor = Depends(requerir_rol(Rol.ADMIN_THERION)),
+    actor: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """

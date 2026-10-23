@@ -12,7 +12,9 @@ import asyncio
 
 import pytest
 
-from _api_harness import DOMINIOS, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api  # noqa: E402
+from _api_harness import (  # noqa: E402
+    DOMINIOS, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api, encabezados_qa,
+)
 from app.core import autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
@@ -43,7 +45,7 @@ def _entorno(monkeypatch):
 
 def _correr(escenario):
     async def _main():
-        async with cliente_api() as c:
+        async with cliente_api(rol=None) as c:
             await escenario(c)
     asyncio.run(_main())
 
@@ -138,11 +140,13 @@ def test_token_solo_da_acceso_a_su_propia_evaluacion():
                      f"/api/evaluaciones/{ib}/respuestas", f"/api/evaluaciones/{ib}/filtro"):
             r = await c.get(ruta, headers=ha)
             assert r.status_code == 404, (ruta, r.text)
-        # Sin token, una evaluación pública no se ve (ni se lista)
+        # Sin token, una evaluación pública no se ve ni se lista (HU-20: el listado exige token)
         r = await c.get(f"/api/evaluaciones/{ia}")
         assert r.status_code == 401
-        lista = (await c.get("/api/evaluaciones?page=1&size=100")).json()["items"]
-        assert {ia, ib}.isdisjoint({e["id"] for e in lista})
+        assert (await c.get("/api/evaluaciones?page=1&size=100")).status_code == 401
+        # El referente (invitación) tampoco lista las de la encuesta pública
+        lista = (await c.get("/api/evaluaciones?page=1&size=100", headers=encabezados_qa("referente"))).json()
+        assert {ia, ib}.isdisjoint({e["id"] for e in lista["items"]})
         # El encuestado solo se lista a sí mismo
         propia = (await c.get("/api/evaluaciones?page=1&size=100", headers=hb)).json()
         assert [e["id"] for e in propia["items"]] == [ib] and propia["total"] == 1
@@ -156,9 +160,11 @@ def test_token_solo_da_acceso_a_su_propia_evaluacion():
     _correr(esc)
 
 
-def test_las_evaluaciones_por_invitacion_siguen_igual_sin_token():
+def test_las_evaluaciones_por_invitacion_exigen_token_de_su_referente():
     async def esc(c):
-        assert (await c.get("/api/evaluaciones/1")).status_code == 200
+        # HU-20: sin token ya no se ven (antes de HU-20 quedaban abiertas)
+        assert (await c.get("/api/evaluaciones/1")).status_code == 401
+        assert (await c.get("/api/evaluaciones/1", headers=encabezados_qa("referente"))).status_code == 200
         a = await _iniciar(c)
         r = await c.get("/api/evaluaciones/1", headers=_bearer(a["access_token"]))
         assert r.status_code == 404  # el encuestado no ve evaluaciones ajenas por invitación
@@ -353,13 +359,14 @@ def test_las_evaluaciones_por_invitacion_no_tienen_cuota(monkeypatch):
     monkeypatch.setattr(settings, "LLM_CUOTA_DIARIA_EVALUACION", 1)
 
     async def esc(c):
-        assert (await c.post("/api/evaluaciones/1/filtro", json=body_filtro(True))).status_code == 200
-        r = await c.post("/api/respuestas/", json={
+        hr = encabezados_qa("referente")  # HU-20: el referente dueño de la evaluación 1
+        assert (await c.post("/api/evaluaciones/1/filtro", json=body_filtro(True), headers=hr)).status_code == 200
+        r = await c.post("/api/respuestas/", headers=hr, json={
             "evaluacion_id": 1, "matriz_control_id": ID_CONTROL["GOB-001"],
             "estado_clasificacion": "cumplido", "justificacion": JUST})
         rid = r.json()["id_respuesta"]
         for _ in range(2):
-            assert (await _subir(c, rid, {})).status_code == 202
+            assert (await _subir(c, rid, hr)).status_code == 202
     _correr(esc)
 
 

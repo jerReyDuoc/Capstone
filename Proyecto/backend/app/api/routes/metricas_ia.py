@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.obtener_metricas_ia import ObtenerMetricasIAUseCase
+from app.core.alcance import solo_admin
 from app.core.config import settings
 from app.core.database import get_db
 
-router = APIRouter(prefix="/api/ia", tags=["ia"])
+# HU-20: las métricas de la capa de IA son solo para administradores de Therion Labs
+router = APIRouter(prefix="/api/ia", tags=["ia"], dependencies=[Depends(solo_admin)])
 
 
 @router.get("/metricas")
