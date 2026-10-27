@@ -9,6 +9,7 @@
  * 2. Bloquea el uso directo, a través del rewrite /api/*, de los endpoints que solo debe
  *    usar el BFF: por ahí la IP llegaría como la del contenedor y el token iría al JS.
  * 3. /encuesta sin cookie de sesión → /retomar (sin exponer nada en la URL).
+ *    HU-27: /admin/* sin cookie de administrador → /admin/login.
  * 4. Content-Security-Policy:
  *      - páginas del flujo (/comenzar, /retomar, /encuesta): nonce por petición +
  *        'strict-dynamic', y Turnstile (challenges.cloudflare.com) permitido;
@@ -18,6 +19,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ipCliente } from "@/lib/servidor/peticion";
 import { COOKIE_SESION, sesionDelToken } from "@/lib/servidor/sesion";
+import { COOKIE_ADMIN, sesionAdminDelToken } from "@/lib/servidor/sesionAdmin";
 
 const DEV = process.env.NODE_ENV !== "production";
 const TURNSTILE = "https://challenges.cloudflare.com";
@@ -30,6 +32,10 @@ interface Ventana {
 const VENTANAS: Record<string, Ventana> = {
   "/bff/encuesta/iniciar": { limite: 5, ms: 60_000 },
   "/bff/encuesta/retomar": { limite: 10, ms: 60_000 },
+  // HU-27
+  "/bff/admin/login": { limite: 10, ms: 60_000 },
+  "/bff/activacion/verificar": { limite: 20, ms: 60_000 },
+  "/bff/activacion/activar": { limite: 10, ms: 60_000 },
 };
 const golpes = new Map<string, number[]>();
 const MAX_CLAVES = 10_000;
@@ -81,7 +87,14 @@ function cspBase(): string {
 const RUTAS_FLUJO = ["/comenzar", "/retomar", "/encuesta"];
 const esFlujo = (p: string) => RUTAS_FLUJO.some((r) => p === r || p.startsWith(`${r}/`));
 
-const SOLO_BFF = [/^\/api\/encuesta-publica(\/|$)/, /^\/api\/auth\/encuestado(\/|$)/];
+const SOLO_BFF = [
+  /^\/api\/encuesta-publica(\/|$)/,
+  /^\/api\/auth\/encuestado(\/|$)/,
+  // HU-27: panel interno, login del admin y activación solo por el BFF (cookie httpOnly e IP real)
+  /^\/api\/admin(\/|$)/,
+  /^\/api\/auth\/login$/,
+  /^\/api\/auth\/activacion(\/|$)/,
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -120,6 +133,16 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // 3b. HU-27: el panel interno exige sesión de administrador
+  if ((pathname === "/admin" || pathname.startsWith("/admin/")) && pathname !== "/admin/login") {
+    if (!sesionAdminDelToken(req.cookies.get(COOKIE_ADMIN)?.value)) {
+      const destino = req.nextUrl.clone();
+      destino.pathname = "/admin/login";
+      destino.search = "?motivo=sesion";
+      return NextResponse.redirect(destino);
+    }
+  }
+
   // 4. CSP
   if (esFlujo(pathname)) {
     const nonce = btoa(crypto.randomUUID());
@@ -134,6 +157,7 @@ export function middleware(req: NextRequest) {
   }
   const res = NextResponse.next();
   res.headers.set("Content-Security-Policy", cspBase());
+  if (pathname.startsWith("/admin") || pathname === "/activar") res.headers.set("Cache-Control", "private, no-store");
   return res;
 }
 
