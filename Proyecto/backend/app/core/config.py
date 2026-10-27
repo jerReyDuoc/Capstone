@@ -162,7 +162,29 @@ class Settings(BaseSettings):
     CLIENTE_PASSWORD_MIN: int = 12
     # Versión vigente del texto con que el usuario temporal autoriza el traspaso de su
     # evaluación al pedir contratar (HU-31; el PO aún debe aprobar el texto definitivo).
-    CONSENTIMIENTO_CONTRATACION_VERSION: str = "2026-10-v1"
+    # HU-31 subió la versión porque reescribió el texto (sigue provisorio hasta que lo apruebe el PO).
+    CONSENTIMIENTO_CONTRATACION_VERSION: str = "2026-10-v2"
+
+    # ------------------------------------------------ HU-31: solicitud de contratación
+    # Versión vigente del texto del consentimiento de CONTACTO COMERCIAL (separado del de
+    # traspaso). Si el PO cambia el texto, se sube la versión: el envío con otra versión
+    # se rechaza (409 CONSENTIMIENTO_DESACTUALIZADO) y el formulario muestra el nuevo.
+    CONSENTIMIENTO_CONTACTO_VERSION: str = "2026-10-v1"
+    # Bandeja del equipo comercial de Therion Labs que recibe el aviso de cada solicitud
+    # nueva. Vacío = sin aviso (queda en la bitácora como omitido). El aviso NO lleva
+    # nombre, correo ni teléfono de la persona: solo el número, la empresa y el enlace.
+    CONTRATACION_AVISO_EMAIL: str | None = None
+    # Página de la bandeja del administrador que se enlaza en el aviso.
+    CONTRATACION_BANDEJA_URL: str = "http://localhost:3000/admin/clientes"
+    # Límite contra abuso (HU-31 criterio 3: el mismo que la encuesta pública, HU-19):
+    # intentos por IP en 10 min (ENCUESTA_INTENTOS_IP_10MIN), CAPTCHA y un máximo por IP y
+    # día. Vacío = el mismo valor de ENCUESTA_EVALUACIONES_IP_DIA.
+    CONTRATACION_SOLICITUDES_IP_DIA: int | None = None
+
+    @property
+    def contratacion_solicitudes_ip_dia(self) -> int:
+        valor = self.CONTRATACION_SOLICITUDES_IP_DIA
+        return self.ENCUESTA_EVALUACIONES_IP_DIA if valor is None else valor
 
     # extra="ignore": el .env único también trae variables del compose y del frontend
     # (puertos, POSTGRES_*, API_URL, TURNSTILE_SITE_KEY...) que no son de la API.
@@ -206,6 +228,10 @@ class Settings(BaseSettings):
             raise ValueError("ACTIVACION_TTL_HORAS debe ser mayor que 0.")
         if self.CLIENTE_PASSWORD_MIN < 10:
             raise ValueError("CLIENTE_PASSWORD_MIN no puede ser menor que 10 (HU-27).")
+        if self.CONTRATACION_AVISO_EMAIL and "@" not in self.CONTRATACION_AVISO_EMAIL:
+            raise ValueError("CONTRATACION_AVISO_EMAIL debe ser un correo válido (o vacío).")
+        if self.CONTRATACION_SOLICITUDES_IP_DIA is not None and self.CONTRATACION_SOLICITUDES_IP_DIA < 1:
+            raise ValueError("CONTRATACION_SOLICITUDES_IP_DIA debe ser mayor que 0 (o vacío).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

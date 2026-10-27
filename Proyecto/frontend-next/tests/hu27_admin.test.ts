@@ -91,7 +91,7 @@ describe("formulario de alta", () => {
       evaluacion: { id: 5, completada: true },
     };
     expect(seleccionable(base)).toBe(true);
-    expect(seleccionable({ ...base, estado: "pendiente" })).toBe(false);
+    expect(seleccionable({ ...base, estado: "nueva" })).toBe(false);
     expect(seleccionable({ ...base, autoriza_migracion: false })).toBe(false);
     expect(seleccionable({ ...base, evaluacion: { id: 5, completada: false } })).toBe(false);
     expect(seleccionable({ ...base, empresa_id: 3 })).toBe(false);

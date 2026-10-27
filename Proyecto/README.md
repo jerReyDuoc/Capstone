@@ -668,22 +668,22 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/arcop/solicitudes/{id}/cancelacion` | 👤 | `{motivo?}` |
 | POST | `/api/arcop/solicitudes/{id}/informacion` | 👤 | `{informacion}` → vuelve a `en_revision` |
 
-### Contratación y empresas cliente — HU-27 (con las bases de HU-31 y HU-09)
+### Contratación (HU-31) y empresas cliente (HU-27, con la base de HU-09)
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| GET | `/api/contratacion/consentimiento` | 🔓 | Versión y texto (provisorio) de la autorización de traspaso |
-| POST | `/api/contratacion/solicitudes` | 👤 | El usuario temporal pide contratar para su evaluación completada: `{evaluacion_id, nombre, email, telefono?, razon_social?, autoriza_migracion, consentimiento_version}` |
-| GET | `/api/contratacion/evaluaciones/{id}/solicitud` | 👤 | Estado de su solicitud |
-| GET | `/api/admin/contrataciones?estado=` | 🛡️ | Solicitudes con contacto y resumen de la evaluación |
-| GET / PATCH | `/api/admin/contrataciones/{id}` | 🛡️ | Detalle / `{estado: contratada\|pendiente\|descartada}` |
+| GET | `/api/contratacion/consentimiento` | 🔓 | HU-31: los DOS textos (provisorios) con su versión: `{contacto, migracion}` |
+| POST | `/api/contratacion/solicitudes` | 👤 | HU-31 "Contratar la plataforma": `{evaluacion_id, nombre, cargo, empresa, email, telefono?, consentimiento_contacto: {version, aceptado}, consentimiento_migracion: {version, aceptado}, captcha_token}`. Mismo límite que la encuesta pública (intentos por IP, CAPTCHA y máximo diario por IP); avisa por correo a `CONTRATACION_AVISO_EMAIL` |
+| GET | `/api/contratacion/evaluaciones/{id}/solicitud` | 👤 | Estado de su solicitud (`nueva`, `contactada`, `contratada`, `descartada`) |
+| GET | `/api/admin/contrataciones?estado=` | 🛡️ | Bandeja: solicitudes con contacto, consentimientos, evaluación vinculada y `conteo_por_estado` |
+| GET / PATCH | `/api/admin/contrataciones/{id}` | 🛡️ | Detalle / `{estado: contactada\|contratada\|descartada}` (solo `contratada` habilita la migración) |
 | POST | `/api/admin/empresas` | 🛡️ | Alta en UNA transacción: empresa + usuario definitivo (rol `cliente`) + migración de las solicitudes `contratadas` + enlace de activación por correo |
 | GET | `/api/admin/empresas`, `/api/admin/empresas/{id}` | 🛡️ | Empresas con su usuario y evaluaciones |
 | POST | `/api/admin/empresas/{id}/evaluaciones` | 🛡️ | `{solicitudes_ids}` → asociar más evaluaciones autorizadas |
 | POST | `/api/admin/empresas/{id}/usuario/activacion` | 🛡️ | Reenvía el enlace (revoca el anterior) |
 | GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | Bitácora de auditoría (solo inserción, sin datos personales) |
 
-El rol `cliente` ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`.
+El rol `cliente` ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md` y `CAMBIOS_HU31.md`.
 
 ### Códigos de error
 

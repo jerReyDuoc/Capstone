@@ -2,6 +2,7 @@
  * HU-19 · Mensajes para el visitante a partir del código de error.
  * Cada código dice qué pasó y qué puede hacer (sin culpar ni usar jerga técnica).
  */
+import { ERRORES_CONTRATACION } from "@/lib/contratacion";
 import type { ErrorEncuesta } from "./contratos";
 
 export type AccionError = "reintentar" | "esperar" | "retomar" | "releer-aviso" | "recargar" | "ninguna";
@@ -177,6 +178,19 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     accion: "reintentar",
   },
 };
+
+// HU-31: errores del formulario "Contratar la plataforma" (textos en lib/contratacion.ts)
+const ACCION_CONTRATACION: Record<string, AccionError> = {
+  SOLICITUD_EXISTENTE: "ninguna",
+  CONSENTIMIENTO_DESACTUALIZADO: "ninguna",
+  CONSENTIMIENTO_REQUERIDO: "ninguna",
+  EVALUACION_NO_COMPLETADA: "ninguna",
+  LIMITE_SOLICITUDES: "ninguna",
+  EMAIL_INVALIDO: "ninguna",
+};
+for (const [codigo, texto] of Object.entries(ERRORES_CONTRATACION)) {
+  TEXTOS[codigo] ??= { ...texto, accion: ACCION_CONTRATACION[codigo] ?? "ninguna" };
+}
 
 const GENERICO: Omit<MensajeError, "esperaS"> = {
   titulo: "Algo salió mal",

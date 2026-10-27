@@ -9,6 +9,7 @@ from app.domain.models.evidencia import Evidencia
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.sanitizacion import Sanitizacion
 from app.domain.models.solicitud_arcop import EventoSolicitud, SolicitudARCOP
+from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion, SolicitudContratacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.core.autenticacion import Rol
 
@@ -106,5 +107,18 @@ class AnonimizacionRepository:
         await _upd("solicitudes_arcop", update(SolicitudARCOP)
                    .where(filtro_sols)
                    .values(descripcion=TEXTO_ANONIMIZADO))
+        # HU-31: suprimir los datos también retira el consentimiento de contacto comercial.
+        # Las solicitudes de contratación aún no migradas pierden el contacto y se descartan
+        # (sin contacto no hay a quién llamar, y sin titular no hay evaluación que migrar).
+        filas = (await s.execute(
+            update(SolicitudContratacion)
+            .where(SolicitudContratacion.evaluacion_id.in_(evals),
+                   SolicitudContratacion.estado != EstadoSolicitudContratacion.MIGRADA.value)
+            .values(nombre_contacto=None, cargo_contacto=None, email_contacto=None, telefono_contacto=None,
+                    estado=EstadoSolicitudContratacion.DESCARTADA.value, fecha_actualizacion=ahora)
+            .execution_options(synchronize_session=False)
+        )).rowcount or 0
+        if filas:
+            conteo["solicitudes_contratacion"] = filas
         conteo["archivos"] = len(rutas)
         return conteo, rutas

@@ -3,10 +3,10 @@ HU-27 · Panel interno (HU-28): empresas cliente, usuario definitivo y migració
 
 Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
 
-  Solicitudes de contratación (base HU-31)
-    GET   /api/admin/contrataciones?estado=&page=&size=
+  Bandeja de solicitudes de contratación (HU-31 criterio 3; HU-28 la integra al panel)
+    GET   /api/admin/contrataciones?estado=&page=&size=  incluye conteo_por_estado
     GET   /api/admin/contrataciones/{id}
-    PATCH /api/admin/contrataciones/{id}                  {estado: contratada|pendiente|descartada}
+    PATCH /api/admin/contrataciones/{id}                  {estado: contactada|contratada|descartada}
 
   Empresas cliente (HU-27)
     POST  /api/admin/empresas                             alta: empresa + usuario + migración + enlace
@@ -104,8 +104,18 @@ async def _datos_evaluacion(db: AsyncSession, evaluacion_id: int) -> dict:
 async def _solicitud(db: AsyncSession, s: SolicitudContratacion) -> dict:
     return {
         "id": s.id, "estado": s.estado,
-        "contacto": {"nombre": s.nombre_contacto, "email": s.email_contacto, "telefono": s.telefono_contacto},
+        "contacto": {"nombre": s.nombre_contacto, "cargo": s.cargo_contacto, "email": s.email_contacto,
+                     "telefono": s.telefono_contacto},
         "razon_social_declarada": s.razon_social_declarada,
+        # HU-31 criterio 2: los dos consentimientos, cada uno con su versión y fecha
+        "consentimientos": {
+            "contacto": {"aceptado": s.consentimiento_contacto_version is not None,
+                         "version": s.consentimiento_contacto_version,
+                         "fecha": s.fecha_consentimiento_contacto},
+            "migracion": {"aceptado": bool(s.autoriza_migracion), "version": s.consentimiento_version,
+                          "fecha": s.fecha_autorizacion},
+        },
+        # Campos de HU-27 (se mantienen por compatibilidad con el alta de empresa)
         "autoriza_migracion": s.autoriza_migracion, "consentimiento_version": s.consentimiento_version,
         "fecha_autorizacion": s.fecha_autorizacion, "fecha_creacion": s.fecha_creacion,
         "fecha_actualizacion": s.fecha_actualizacion, "fecha_migracion": s.fecha_migracion,
@@ -147,20 +157,22 @@ def _migradas(migradas: list[EvaluacionMigrada]) -> list[dict]:
     return [m.como_dict() for m in migradas]
 
 
-# ------------------------------------------------------------------ solicitudes (HU-31 base)
+# ------------------------------------------------------------------ bandeja de solicitudes (HU-31)
 @router.get("/contrataciones")
 async def listar_contrataciones(
-    estado: str | None = Query(None, description="pendiente | contratada | migrada | descartada"),
+    estado: str | None = Query(None, description="nueva | contactada | contratada | migrada | descartada"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     _: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    uc = SolicitudesContratacionUseCase(db)
     try:
-        filas, total = await SolicitudesContratacionUseCase(db).listar(estado, page, size)
+        filas, total = await uc.listar(estado, page, size)
     except ContratacionError as e:
         raise _error(e)
-    return {"items": [await _solicitud(db, s) for s in filas], "total": total, "page": page, "size": size}
+    return {"items": [await _solicitud(db, s) for s in filas], "total": total, "page": page, "size": size,
+            "conteo_por_estado": await uc.conteo_por_estado()}
 
 
 @router.get("/contrataciones/{solicitud_id}")
@@ -177,7 +189,7 @@ async def cambiar_estado_contratacion(
     solicitud_id: int, payload: CambiarEstadoRequest,
     actor: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db),
 ):
-    """Marca la solicitud como contratada (acuerdo cerrado), pendiente o descartada."""
+    """Cambia el estado en la bandeja: contactada, contratada (habilita HU-27) o descartada."""
     try:
         s = await SolicitudesContratacionUseCase(db).cambiar_estado(actor, solicitud_id, payload.estado)
     except ContratacionError as e:

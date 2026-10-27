@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import { VistasFijadas } from "@/components/brechas/VistasFijadas";
+import { CtaContratar } from "@/components/contratacion/CtaContratar";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
 import { BarrasDominio } from "@/components/charts/BarrasDominio";
@@ -114,6 +115,9 @@ export function VistaDiagnostico() {
                   <ResumenBrechas brechas={p.brechas} />
                 </div>
               </div>
+
+              {/* HU-31: después de los resultados, el siguiente paso (solo para el encuestado) */}
+              <CtaContratar brechas={p.brechas.length} />
 
               <p className="callout">
                 <Icon name="info" />

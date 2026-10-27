@@ -1,10 +1,13 @@
 """
-HU-27: alta de la empresa cliente y de su usuario definitivo (más la base de HU-31).
+HU-31: solicitud de contratación desde los resultados, y HU-27: alta de la empresa
+cliente y de su usuario definitivo.
 
-Solicitudes de contratación (base mínima de HU-31)
-  - El encuestado (o el referente invitado) la registra al terminar su evaluación,
-    con su contacto y la autorización expresa para traspasar la evaluación.
-  - Un admin la marca 'contratada' cuando se cierra el acuerdo (o 'descartada').
+Solicitudes de contratación (HU-31)
+  - El encuestado (o el referente invitado) la registra desde sus resultados con nombre,
+    cargo, empresa, correo y teléfono opcional, y DOS consentimientos separados (contacto
+    comercial y traspaso de la evaluación), cada uno con su versión y fecha.
+  - Llega a la bandeja del admin como 'nueva'; el admin la pasa a 'contactada',
+    'contratada' o 'descartada'. Solo 'contratada' habilita la migración (HU-27).
 
 Alta (criterios 1, 2 y 3), en UNA transacción:
   empresa -> usuario definitivo (rol único 'cliente', sin contraseña) -> migración de las
@@ -26,6 +29,7 @@ from app.application.informes import correo
 from app.application.use_cases.activacion_cuenta import (
     ResultadoCorreo, emitir_token, enviar_correo_activacion,
 )
+from app.application.use_cases import consentimientos_contratacion
 from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError, MigradorEvaluaciones
 from app.core.autenticacion import Actor, Rol
 from app.core.config import settings
@@ -41,15 +45,25 @@ from app.infrastructure.repositories.bitacora_repository import Accion, Bitacora
 
 E = EstadoSolicitudContratacion
 
-# Transiciones que puede hacer un admin a mano. 'migrada' solo la fija la migración.
+# Transiciones que puede hacer un admin a mano (bandeja HU-31 / HU-28).
+# 'migrada' solo la fija la migración (HU-27); 'descartada' y 'migrada' son finales.
+# 'contratada' -> 'contactada' corrige un "contratada" marcado por error.
 TRANSICIONES = {
-    E.PENDIENTE.value: {E.CONTRATADA.value, E.DESCARTADA.value},
-    E.CONTRATADA.value: {E.PENDIENTE.value, E.DESCARTADA.value},
+    E.NUEVA.value: {E.CONTACTADA.value, E.CONTRATADA.value, E.DESCARTADA.value},
+    E.CONTACTADA.value: {E.CONTRATADA.value, E.DESCARTADA.value},
+    E.CONTRATADA.value: {E.CONTACTADA.value, E.DESCARTADA.value},
     E.MIGRADA.value: set(),
     E.DESCARTADA.value: set(),
 }
 
 _TELEFONO = re.compile(r"^\+?[0-9 ()-]{8,20}$")
+
+
+@dataclass(frozen=True)
+class ConsentimientoDado:
+    """Lo que la persona marcó en el formulario: si aceptó y QUÉ versión del texto vio."""
+    aceptado: bool
+    version: str
 
 
 class ContratacionError(Exception):
@@ -84,7 +98,7 @@ def _email(valor: str | None, campo: str = "email") -> str:
     return email
 
 
-# ======================================================================= HU-31 (base)
+# ======================================================================= HU-31
 class SolicitudesContratacionUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -101,9 +115,14 @@ class SolicitudesContratacionUseCase:
             raise ContratacionError("Evaluación no encontrada.", "EVALUACION_NO_ENCONTRADA", 404)
         return evaluacion
 
-    async def crear(self, actor: Actor, *, evaluacion_id: int, nombre: str, email: str,
-                    telefono: str | None, razon_social: str | None, autoriza_migracion: bool,
-                    consentimiento_version: str | None) -> SolicitudContratacion:
+    async def crear(self, actor: Actor, *, evaluacion_id: int, nombre: str, cargo: str, empresa: str,
+                    email: str, telefono: str | None, consentimiento_contacto: ConsentimientoDado,
+                    consentimiento_migracion: ConsentimientoDado) -> SolicitudContratacion:
+        """
+        Registra la solicitud (criterios 1 y 2). NO envía el aviso a Therion: lo hace quien
+        llama, después del commit (aviso_contratacion.avisar_nueva_solicitud), para que un
+        correo caído no deje sin registrar la solicitud.
+        """
         evaluacion = await self.evaluacion_del_actor(actor, evaluacion_id)
         if not evaluacion.esta_cerrada:
             raise ContratacionError("Termina tu evaluación antes de solicitar la contratación.",
@@ -112,38 +131,70 @@ class SolicitudesContratacionUseCase:
             raise ContratacionError("Esta evaluación ya pertenece a una empresa cliente.", "EVALUACION_YA_MIGRADA", 409)
         if await self.db.scalar(select(SolicitudContratacion.id).where(
                 SolicitudContratacion.evaluacion_id == evaluacion_id)) is not None:
-            raise ContratacionError("Ya registraste una solicitud de contratación para esta evaluación.",
+            raise ContratacionError("Ya enviaste una solicitud para esta evaluación. Therion Labs te contactará.",
                                     "SOLICITUD_EXISTENTE", 409)
-        if autoriza_migracion and consentimiento_version != settings.CONSENTIMIENTO_CONTRATACION_VERSION:
-            raise ContratacionError("El texto de autorización cambió. Vuelve a leerlo y acéptalo.",
-                                    "CONSENTIMIENTO_DESACTUALIZADO", 409,
-                                    version_vigente=settings.CONSENTIMIENTO_CONTRATACION_VERSION)
-        tel = (telefono or "").strip() or None
+
+        # Criterio 2: dos consentimientos separados, cada uno aceptado con la versión vigente
+        textos = consentimientos_contratacion.vigentes()
+        for clave, dado in ((consentimientos_contratacion.CONTACTO, consentimiento_contacto),
+                            (consentimientos_contratacion.MIGRACION, consentimiento_migracion)):
+            if not dado.aceptado:
+                raise ContratacionError(
+                    "Para enviar la solicitud debes aceptar las dos autorizaciones.",
+                    "CONSENTIMIENTO_REQUERIDO", 422, consentimiento=clave)
+            if dado.version != textos[clave].version:
+                raise ContratacionError(
+                    "El texto de una autorización cambió. Léelo de nuevo y acéptalo para continuar.",
+                    "CONSENTIMIENTO_DESACTUALIZADO", 409, consentimiento=clave,
+                    version_vigente=textos[clave].version)
+
+        tel = " ".join((telefono or "").split()) or None
         if tel and not _TELEFONO.match(tel):
-            raise ContratacionError("Revisa el teléfono (ejemplo: +56 9 1234 5678).", "DATOS_INVALIDOS", 422,
-                                    campo="telefono")
+            raise ContratacionError("Revisa el teléfono: usa solo números, espacios o +, por ejemplo +56 9 1234 5678.",
+                                    "DATOS_INVALIDOS", 422, campo="telefono")
+        datos = {
+            "nombre_contacto": _texto(nombre, "nombre", 2, 120),
+            "cargo_contacto": _texto(cargo, "cargo", 2, 80),
+            "razon_social_declarada": _texto(empresa, "empresa", 2, 150),
+            "email_contacto": _email(email),
+        }
         ahora = _ahora()
         solicitud = SolicitudContratacion(
             evaluacion_id=evaluacion_id,
-            nombre_contacto=_texto(nombre, "nombre", 2, 120),
-            email_contacto=_email(email),
             telefono_contacto=tel,
-            razon_social_declarada=_texto(razon_social, "razon_social", 2, 150, obligatorio=False),
-            autoriza_migracion=bool(autoriza_migracion),
-            consentimiento_version=consentimiento_version if autoriza_migracion else None,
-            fecha_autorizacion=ahora if autoriza_migracion else None,
-            estado=E.PENDIENTE.value,
+            consentimiento_contacto_version=consentimiento_contacto.version,
+            fecha_consentimiento_contacto=ahora,
+            autoriza_migracion=True,
+            consentimiento_version=consentimiento_migracion.version,
+            fecha_autorizacion=ahora,
+            estado=E.NUEVA.value,
             fecha_creacion=ahora,
+            **datos,
         )
         self.db.add(solicitud)
-        await self.db.flush()
+        try:
+            await self.db.flush()
+        except IntegrityError:  # doble clic: otra petición registró la misma evaluación a la vez
+            await self.db.rollback()
+            raise ContratacionError("Ya enviaste una solicitud para esta evaluación. Therion Labs te contactará.",
+                                    "SOLICITUD_EXISTENTE", 409)
         self.bitacora.registrar(
             accion=Accion.SOLICITUD_CONTRATACION_CREADA, entidad="solicitud_contratacion",
             entidad_id=solicitud.id, actor=actor, fecha=ahora,
-            detalle={"evaluacion_id": evaluacion_id, "autoriza_migracion": bool(autoriza_migracion)},
+            detalle={"evaluacion_id": evaluacion_id, "autoriza_migracion": True,
+                     "consentimiento_contacto_version": consentimiento_contacto.version,
+                     "consentimiento_migracion_version": consentimiento_migracion.version},
         )
         await self.db.commit()
         return solicitud
+
+    async def conteo_por_estado(self) -> dict[str, int]:
+        """Para las pestañas de la bandeja (HU-31 criterio 3 / HU-28)."""
+        filas = (await self.db.execute(
+            select(SolicitudContratacion.estado, func.count()).group_by(SolicitudContratacion.estado))).all()
+        conteo = {e: 0 for e in E.valores()}
+        conteo.update({estado: n for estado, n in filas})
+        return conteo
 
     async def listar(self, estado: str | None, page: int, size: int) -> tuple[list[SolicitudContratacion], int]:
         filtros = []
@@ -176,7 +227,8 @@ class SolicitudesContratacionUseCase:
         solicitud.fecha_actualizacion = ahora
         if estado == E.DESCARTADA.value:
             # Sin contrato no hay finalidad para conservar el contacto (minimización)
-            solicitud.nombre_contacto = solicitud.email_contacto = solicitud.telefono_contacto = None
+            solicitud.nombre_contacto = solicitud.cargo_contacto = None
+            solicitud.email_contacto = solicitud.telefono_contacto = None
         self.bitacora.registrar(
             accion=Accion.SOLICITUD_CONTRATACION_ESTADO, entidad="solicitud_contratacion",
             entidad_id=solicitud.id, actor=actor, fecha=ahora,

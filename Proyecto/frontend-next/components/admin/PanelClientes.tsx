@@ -3,8 +3,10 @@
 /**
  * HU-27 · Panel interno de Therion Labs.
  *
- *   Solicitudes  — las de contratación (HU-31). Se marcan contratadas y se eligen las que
- *                  pasarán a una empresa (solo contratadas, autorizadas y completadas).
+ *   Solicitudes  — bandeja de solicitudes de contratación (HU-31): llegan como "nueva" y se
+ *                  pasan a contactada, contratada o descartada. Se eligen las que pasarán a
+ *                  una empresa (solo contratadas, autorizadas y completadas). HU-28 la integra
+ *                  al panel interno completo.
  *   Alta         — empresa nueva (razón social, RUT, rubro, contrato) + usuario definitivo
  *                  (nombre, email; rol único cliente), o asociar a una empresa existente.
  *                  Una sola operación en el backend: si algo falla no queda nada a medias.
@@ -17,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { BrandMark } from "@/components/ui/Icon";
 import {
+  ACCIONES_SOLICITUD,
   api,
   comoErrorAdmin,
   ETIQUETA_ESTADO_SOLICITUD,
@@ -35,7 +38,7 @@ import { pedir } from "@/lib/encuesta/cliente";
 import s from "./admin.module.css";
 
 type Pestana = "solicitudes" | "empresas" | "bitacora";
-const FILTROS: (EstadoSolicitud | "todas")[] = ["contratada", "pendiente", "migrada", "descartada", "todas"];
+const FILTROS: (EstadoSolicitud | "todas")[] = ["nueva", "contactada", "contratada", "migrada", "descartada", "todas"];
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const enUnAnio = () => {
@@ -52,8 +55,10 @@ function Estado({ texto, tono }: { texto: string; tono: string }) {
 export function PanelClientes() {
   const router = useRouter();
   const [pestana, setPestana] = useState<Pestana>("solicitudes");
-  const [filtro, setFiltro] = useState<EstadoSolicitud | "todas">("contratada");
+  // HU-31: la bandeja abre en las solicitudes nuevas (las que esperan contacto)
+  const [filtro, setFiltro] = useState<EstadoSolicitud | "todas">("nueva");
   const [solicitudes, setSolicitudes] = useState<Solicitud[] | null>(null);
+  const [conteo, setConteo] = useState<Partial<Record<EstadoSolicitud, number>>>({});
   const [empresas, setEmpresas] = useState<Empresa[] | null>(null);
   const [bitacora, setBitacora] = useState<FilaBitacora[] | null>(null);
   const [rubros, setRubros] = useState<{ id: number; nombre: string }[]>([]);
@@ -77,6 +82,7 @@ export function PanelClientes() {
     try {
       const r = await api.solicitudes(filtro === "todas" ? undefined : filtro);
       setSolicitudes(r.items);
+      setConteo(r.conteo_por_estado ?? {});
     } catch (e) {
       manejarError(e);
     }
@@ -118,6 +124,12 @@ export function PanelClientes() {
   );
 
   async function cambiarEstado(id: number, estado: EstadoSolicitud) {
+    if (
+      estado === "descartada" &&
+      !window.confirm(`¿Descartar la solicitud #${id}? Se borrarán los datos de contacto y no se puede deshacer.`)
+    ) {
+      return;
+    }
     setError(null);
     try {
       await api.cambiarEstado(id, estado);
@@ -213,7 +225,8 @@ export function PanelClientes() {
                 <div>
                   <h2 id="titulo-solicitudes" className="card-title">Solicitudes</h2>
                   <p className="card-sub">
-                    Marca como contratadas las que cerraron acuerdo y elige las evaluaciones que pasarán a la empresa.
+                    Las nuevas esperan contacto. Marca el avance de cada una y, cuando cierren acuerdo, elige las
+                    contratadas que pasarán a la empresa.
                   </p>
                 </div>
                 <div className={s.filtros} role="group" aria-label="Filtrar por estado">
@@ -221,6 +234,13 @@ export function PanelClientes() {
                     <button key={f} type="button" className="chip" aria-pressed={filtro === f}
                             onClick={() => { setFiltro(f); setSeleccion([]); }}>
                       {f === "todas" ? "Todas" : ETIQUETA_ESTADO_SOLICITUD[f].texto}
+                      {f !== "todas" && conteo[f] != null ? (
+                        <span>
+                          {" "}
+                          ({conteo[f]}
+                          <span className="sr-only"> solicitudes</span>)
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -262,7 +282,7 @@ function TablaSolicitudes({
             <th scope="col">Solicitud</th>
             <th scope="col">Contacto</th>
             <th scope="col">Evaluación</th>
-            <th scope="col">Autoriza traspaso</th>
+            <th scope="col">Autorizaciones</th>
             <th scope="col">Estado</th>
             <th scope="col">Acciones</th>
           </tr>
@@ -286,6 +306,7 @@ function TablaSolicitudes({
                 </td>
                 <td>
                   {x.contacto.nombre ?? "—"}
+                  {x.contacto.cargo ? <span className={s.sub}>{x.contacto.cargo}</span> : null}
                   <span className={s.sub}>{x.contacto.email ?? (x.estado === "migrada" ? "Traspasado al usuario definitivo" : "Borrado")}</span>
                   {x.contacto.telefono ? <span className={s.sub}>{x.contacto.telefono}</span> : null}
                 </td>
@@ -296,25 +317,23 @@ function TablaSolicitudes({
                     {x.evaluacion.puntaje_general != null ? ` · ${x.evaluacion.puntaje_general} / 100` : ""}
                   </span>
                 </td>
-                <td>{x.autoriza_migracion ? "Sí" : "No"}</td>
+                <td>
+                  <Autorizaciones s={x} />
+                </td>
                 <td><Estado texto={e.texto} tono={e.tono} /></td>
                 <td>
                   <div className={s.acciones}>
-                    {x.estado === "pendiente" ? (
-                      <button type="button" className="btn btn-primary btn-sm" onClick={() => cambiarEstado(x.id, "contratada")}>
-                        Marcar contratada
+                    {ACCIONES_SOLICITUD[x.estado].map((a) => (
+                      <button
+                        key={a.estado}
+                        type="button"
+                        className={`btn ${a.principal ? "btn-primary" : "btn-ghost"} btn-sm`}
+                        onClick={() => cambiarEstado(x.id, a.estado)}
+                        aria-label={`${a.texto}: solicitud ${x.id}`}
+                      >
+                        {a.texto}
                       </button>
-                    ) : null}
-                    {x.estado === "contratada" ? (
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => cambiarEstado(x.id, "pendiente")}>
-                        Volver a pendiente
-                      </button>
-                    ) : null}
-                    {x.estado === "pendiente" || x.estado === "contratada" ? (
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => cambiarEstado(x.id, "descartada")}>
-                        Descartar
-                      </button>
-                    ) : null}
+                    ))}
                   </div>
                 </td>
               </tr>
@@ -323,6 +342,25 @@ function TablaSolicitudes({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** HU-31 criterio 2: las dos autorizaciones, cada una con su versión y fecha. */
+function Autorizaciones({ s: x }: { s: Solicitud }) {
+  const c = x.consentimientos;
+  if (!c) return <>{x.autoriza_migracion ? "Traspaso: sí" : "Traspaso: no"}</>;
+  const fila = (nombre: string, r: typeof c.contacto) => (
+    <span className={s.sub}>
+      {nombre}: {r.aceptado ? "sí" : "no"}
+      {r.aceptado && r.version ? ` · v${r.version.replace(/^v/, "")}` : ""}
+      {r.aceptado && r.fecha ? ` · ${fecha(r.fecha)}` : ""}
+    </span>
+  );
+  return (
+    <>
+      {fila("Contacto", c.contacto)}
+      {fila("Traspaso", c.migracion)}
+    </>
   );
 }
 

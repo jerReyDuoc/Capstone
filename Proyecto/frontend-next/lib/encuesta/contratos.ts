@@ -187,6 +187,10 @@ export interface ErrorEncuesta {
   reintentarEnS?: number;
   reiniciaEn?: string;
   versionVigente?: string;
+  /** HU-31: campo del formulario que rechazó el backend (p. ej. "telefono"). */
+  campo?: string;
+  /** HU-31: qué consentimiento falta o cambió ("contacto" | "migracion"). */
+  consentimiento?: string;
 }
 
 /**
@@ -204,6 +208,10 @@ export function parseErrorBackend(status: number, cuerpo: unknown, retryAfter?: 
     if (typeof detalle.reintentar_en_s === "number") extra.reintentarEnS = detalle.reintentar_en_s;
     if (esTexto(detalle.reinicia_en, 40)) extra.reiniciaEn = detalle.reinicia_en;
     if (esTexto(detalle.version_vigente, 20)) extra.versionVigente = detalle.version_vigente;
+    if (esTexto(detalle.campo, 40) && /^[a-z_]+$/.test(detalle.campo)) extra.campo = detalle.campo;
+    if (detalle.consentimiento === "contacto" || detalle.consentimiento === "migracion") {
+      extra.consentimiento = detalle.consentimiento;
+    }
   } else if (esTexto(detalle, 500)) {
     mensaje = detalle;
   } else if (Array.isArray(detalle) && status === 422) {

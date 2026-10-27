@@ -179,6 +179,7 @@ class MigradorEvaluaciones:
             solicitud.fecha_migracion = ahora
             solicitud.fecha_actualizacion = ahora
             solicitud.nombre_contacto = None
+            solicitud.cargo_contacto = None
             solicitud.email_contacto = None
             solicitud.telefono_contacto = None
 

@@ -24,6 +24,8 @@ interface Regla {
   binario?: boolean;
   /** Tiempo máximo de espera del backend (ms). */
   timeoutMs?: number;
+  /** El cuerpo JSON lleva evaluacion_id: debe ser el de la sesión. */
+  cuerpoConEvaluacion?: boolean;
 }
 
 const REGLAS: Regla[] = [
@@ -49,12 +51,24 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^arcop\/solicitudes(\/\d+)?$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes\/\d+\/(cancelacion|informacion)$/ },
+  // HU-31: "Contratar la plataforma" desde los resultados (CAPTCHA y límites por IP en el backend)
+  { metodo: "GET", patron: /^contratacion\/consentimiento$/ },
+  { metodo: "GET", patron: /^contratacion\/evaluaciones\/(\d+)\/solicitud$/, conEvaluacion: true },
+  { metodo: "POST", patron: /^contratacion\/solicitudes$/, conIp: true, cuerpoConEvaluacion: true, timeoutMs: 20_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
 
 export type Autorizacion =
-  | { ok: true; ruta: string; archivo: boolean; conIp: boolean; binario: boolean; timeoutMs?: number }
+  | {
+      ok: true;
+      ruta: string;
+      archivo: boolean;
+      conIp: boolean;
+      binario: boolean;
+      timeoutMs?: number;
+      cuerpoConEvaluacion: boolean;
+    }
   | { ok: false; status: 404 };
 
 export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSesion: number): Autorizacion {
@@ -77,6 +91,8 @@ export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSes
       conIp: Boolean(regla.conIp || regla.archivo),
       binario: Boolean(regla.binario),
       timeoutMs: regla.timeoutMs,
+      // POST /respuestas y POST /contratacion/solicitudes llevan evaluacion_id en el cuerpo
+      cuerpoConEvaluacion: Boolean(regla.cuerpoConEvaluacion) || destino === "respuestas/",
     };
   }
   return { ok: false, status: 404 };
@@ -101,7 +117,7 @@ export function filtrarQuery(params: URLSearchParams): string {
   return texto ? `?${texto}` : "";
 }
 
-/** POST /respuestas lleva evaluacion_id en el cuerpo: debe ser la de la sesión. */
+/** POST /respuestas y POST /contratacion/solicitudes llevan evaluacion_id en el cuerpo: debe ser la de la sesión. */
 export function cuerpoRespuestaEsDeLaSesion(cuerpo: unknown, evaluacionSesion: number): boolean {
   return (
     typeof cuerpo === "object" &&

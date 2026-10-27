@@ -1,0 +1,133 @@
+/* =====================================================================
+   HU-31 · "Contratar la plataforma" (CTA en los resultados + formulario)
+   Solo tokens de app/globals.css: los pares texto/fondo ya cumplen WCAG 2.1 AA.
+   ===================================================================== */
+
+/* ---------- CTA en el diagnóstico ---------- */
+.cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-6);
+  align-items: center;
+  padding: var(--sp-6);
+}
+.ctaEyebrow {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.ctaEyebrow svg { width: 16px; height: 16px; }
+.ctaTitulo { margin-top: var(--sp-2); font-size: var(--fs-xl); font-weight: 600; }
+.ctaTexto { margin-top: var(--sp-2); color: var(--text-muted); max-width: 64ch; }
+.ctaAccion { display: grid; gap: var(--sp-2); justify-items: end; text-align: right; }
+.ctaNota { font-size: var(--fs-xs); color: var(--text-subtle); max-width: 28ch; }
+.ctaEstado { display: grid; gap: var(--sp-1); justify-items: end; text-align: right; max-width: 34ch; }
+.ctaEstado p { font-size: var(--fs-sm); color: var(--text-muted); }
+
+.beneficios {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4);
+  margin: var(--sp-5) 0 0; padding: 0; list-style: none;
+}
+.beneficio { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.beneficio svg {
+  flex: none; width: 36px; height: 36px; padding: 8px;
+  border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent);
+}
+.beneficio strong { display: block; font-size: var(--fs-sm); color: var(--text); }
+.beneficio span { display: block; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ---------- Página del formulario ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+.aside { display: grid; gap: var(--sp-5); position: sticky; top: var(--sp-6); }
+.aside .beneficios { grid-template-columns: 1fr; margin-top: var(--sp-4); }
+.pasos { display: grid; gap: var(--sp-4); margin: var(--sp-4) 0 0; padding: 0; list-style: none; counter-reset: paso; }
+.pasos li { display: grid; grid-template-columns: 32px 1fr; gap: var(--sp-3); counter-increment: paso; }
+.pasos li::before {
+  content: counter(paso);
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 50%; border: 1px solid var(--line-control);
+  font-family: var(--font-display); font-weight: 600; color: var(--accent);
+}
+.pasos strong { display: block; font-size: var(--fs-sm); }
+.pasos span { display: block; font-size: var(--fs-sm); color: var(--text-muted); }
+
+.form { display: grid; gap: var(--sp-5); padding: var(--sp-6); }
+.filas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4) var(--sp-5); }
+.filaCompleta { grid-column: 1 / -1; }
+.campo { display: grid; gap: 6px; }
+.etiqueta { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.opcional { font-weight: 400; color: var(--text-muted); }
+.input {
+  width: 100%; min-height: var(--target); padding: 0 var(--sp-4);
+  background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md);
+}
+.input::placeholder { color: var(--text-subtle); opacity: 1; }
+.input:hover { border-color: var(--text-subtle); }
+.input[aria-invalid="true"] { border-color: var(--alto); box-shadow: 0 0 0 1px var(--alto); }
+.ayuda { font-size: var(--fs-xs); color: var(--text-muted); }
+/* Error de campo: icono + texto (no solo color, WCAG 1.4.1) */
+.errorCampo { display: flex; gap: 6px; align-items: flex-start; font-size: var(--fs-sm); color: var(--alto); }
+.errorCampo svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+
+.consentimientos { display: grid; gap: var(--sp-3); margin: 0; padding: 0; border: 0; }
+.consentimientos legend { padding: 0; font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; }
+.consentimientosAyuda { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
+.consentimiento {
+  display: grid; gap: var(--sp-2);
+  padding: var(--sp-4); border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.consentimiento[data-invalido="true"] { border-color: var(--alto); }
+.consentimientoCheck { display: flex; gap: var(--sp-3); align-items: flex-start; cursor: pointer; min-height: var(--target); }
+.consentimientoCheck input { width: 22px; height: 22px; margin: 1px 0 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.consentimientoTitulo { font-weight: 600; }
+.consentimientoTexto { font-size: var(--fs-sm); color: var(--text-muted); padding-left: calc(22px + var(--sp-3)); }
+.version { font-size: var(--fs-xs); color: var(--text-subtle); padding-left: calc(22px + var(--sp-3)); }
+
+/* Resumen de errores arriba del formulario (WCAG 3.3.1): enlaces que llevan al campo */
+.resumen {
+  display: grid; gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-5); border: 1px solid var(--alto); border-radius: var(--radius-md);
+  background: var(--alto-soft);
+}
+.resumen:focus-visible { outline-offset: 2px; }
+.resumen h2 { font-size: var(--fs-md); }
+.resumen ul { margin: 0; padding-left: var(--sp-5); }
+.resumen a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+
+.envio { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; justify-content: space-between; }
+.privacidad { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-xs); color: var(--text-muted); max-width: 46ch; }
+.privacidad svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--accent); }
+.verificacion { font-size: var(--fs-xs); color: var(--text-subtle); }
+
+/* Confirmación / estados */
+.listo { display: grid; gap: var(--sp-4); justify-items: start; padding: var(--sp-8) var(--sp-6); }
+.listo h2:focus { outline: none; }
+.listoIcono {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+}
+.listoIcono svg { width: 24px; height: 24px; }
+.listo p { color: var(--text-muted); max-width: 56ch; }
+.listoAcciones { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+
+@media (max-width: 1279.98px) {
+  .beneficios { grid-template-columns: 1fr; }
+}
+@media (max-width: 1023.98px) {
+  .cta { grid-template-columns: 1fr; }
+  .ctaAccion, .ctaEstado { justify-items: start; text-align: left; }
+  .layout { grid-template-columns: 1fr; }
+  .aside { position: static; }
+}
+@media (max-width: 639.98px) {
+  .filas { grid-template-columns: 1fr; }
+  .form, .cta { padding: var(--sp-5); }
+  .envio .btn { width: 100%; }
+}

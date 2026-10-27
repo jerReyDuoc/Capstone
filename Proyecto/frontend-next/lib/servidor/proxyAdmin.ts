@@ -10,7 +10,7 @@
 export type MetodoAdmin = "GET" | "POST" | "PATCH";
 
 const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
-  // Solicitudes de contratación (base HU-31)
+  // Bandeja de solicitudes de contratación (HU-31)
   { metodo: "GET", patron: /^admin\/contrataciones$/ },
   { metodo: "GET", patron: /^admin\/contrataciones\/\d{1,9}$/ },
   { metodo: "PATCH", patron: /^admin\/contrataciones\/\d{1,9}$/ },
@@ -38,7 +38,7 @@ export function autorizarRutaAdmin(metodo: string, segmentos: string[]): Autoriz
 }
 
 const QUERY_ADMIN = new Map<string, RegExp>([
-  ["estado", /^(pendiente|contratada|migrada|descartada)$/],
+  ["estado", /^(nueva|contactada|contratada|migrada|descartada)$/],
   ["page", /^\d{1,4}$/],
   ["size", /^\d{1,3}$/],
   ["entidad", /^[a-z_]{1,40}$/],

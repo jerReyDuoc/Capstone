@@ -11,7 +11,8 @@
  * 3. /encuesta sin cookie de sesión → /retomar (sin exponer nada en la URL).
  *    HU-27: /admin/* sin cookie de administrador → /admin/login.
  * 4. Content-Security-Policy:
- *      - páginas del flujo (/comenzar, /retomar, /encuesta): nonce por petición +
+ *      - páginas del flujo (/comenzar, /retomar, /encuesta y, desde HU-31, /panel/contratar):
+ *        nonce por petición +
  *        'strict-dynamic', y Turnstile (challenges.cloudflare.com) permitido;
  *      - resto (landing estática, panel): política base sin nonce, porque una página
  *        prerenderizada no puede llevar un nonce distinto en cada petición.
@@ -36,6 +37,9 @@ const VENTANAS: Record<string, Ventana> = {
   "/bff/admin/login": { limite: 10, ms: 60_000 },
   "/bff/activacion/verificar": { limite: 20, ms: 60_000 },
   "/bff/activacion/activar": { limite: 10, ms: 60_000 },
+  // HU-31: el formulario "Contratar la plataforma" (los límites reales, iguales a los de
+  // la encuesta pública, los aplica FastAPI con Redis + CAPTCHA)
+  "/bff/api/contratacion/solicitudes": { limite: 5, ms: 60_000 },
 };
 const golpes = new Map<string, number[]>();
 const MAX_CLAVES = 10_000;
@@ -84,7 +88,8 @@ function cspBase(): string {
   ].join("; ");
 }
 
-const RUTAS_FLUJO = ["/comenzar", "/retomar", "/encuesta"];
+// HU-31: /panel/contratar carga Turnstile, así que necesita la CSP con nonce
+const RUTAS_FLUJO = ["/comenzar", "/retomar", "/encuesta", "/panel/contratar"];
 const esFlujo = (p: string) => RUTAS_FLUJO.some((r) => p === r || p.startsWith(`${r}/`));
 
 const SOLO_BFF = [

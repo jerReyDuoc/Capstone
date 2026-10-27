@@ -140,13 +140,34 @@ async def _evaluacion_completada(c, con_evidencia: bool = True) -> dict:
     return {"ev": ev, "h": h, "clave": datos["clave_acceso"]}
 
 
+def cuerpo_solicitud(evaluacion_id: int, email_contacto: str = "ana.perez@acme.cl", **cambios) -> dict:
+    """Formulario "Contratar la plataforma" (HU-31): datos de contacto y los DOS consentimientos."""
+    cuerpo = {
+        "evaluacion_id": evaluacion_id, "nombre": "Ana Pérez", "cargo": "Gerenta de Cumplimiento",
+        "empresa": "ACME SpA", "email": email_contacto, "telefono": "+56 9 1234 5678",
+        "consentimiento_contacto": {"version": settings.CONSENTIMIENTO_CONTACTO_VERSION, "aceptado": True},
+        "consentimiento_migracion": {"version": settings.CONSENTIMIENTO_CONTRATACION_VERSION, "aceptado": True},
+        "captcha_token": "t",
+    }
+    cuerpo.update(cambios)
+    return cuerpo
+
+
 async def _solicitar(c, e: dict, autoriza: bool = True, email_contacto: str = "ana.perez@acme.cl") -> int:
-    r = await c.post("/api/contratacion/solicitudes", headers=e["h"], json={
-        "evaluacion_id": e["ev"], "nombre": "Ana Pérez", "email": email_contacto, "telefono": "+56 9 1234 5678",
-        "razon_social": "ACME SpA", "autoriza_migracion": autoriza,
-        "consentimiento_version": settings.CONSENTIMIENTO_CONTRATACION_VERSION})
+    r = await c.post("/api/contratacion/solicitudes", headers=e["h"],
+                     json=cuerpo_solicitud(e["ev"], email_contacto))
     assert r.status_code == 201, r.text
-    return r.json()["id"]
+    sid = r.json()["id"]
+    if not autoriza:
+        # HU-31 exige los dos consentimientos al enviar; una fila SIN autorización solo puede
+        # venir de antes de HU-31 (base de HU-27). Se simula para probar que HU-27 no la migra.
+        async def quitar(s):
+            from app.domain.models import SolicitudContratacion
+            fila = await s.get(SolicitudContratacion, sid)
+            fila.autoriza_migracion, fila.consentimiento_version, fila.fecha_autorizacion = False, None, None
+            await s.commit()
+        await _bd(quitar)
+    return sid
 
 
 async def _contratar(c, solicitud_id: int):
@@ -232,12 +253,13 @@ def test_flujo_completo_alta_migracion_activacion_y_acceso_del_cliente():
     async def esc(c):
         e = await _evaluacion_completada(c)
 
-        # HU-31 (base): el encuestado pide contratar y autoriza el traspaso
+        # HU-31: el encuestado pide contratar y autoriza el traspaso
         r = await c.get("/api/contratacion/consentimiento")
-        assert r.status_code == 200 and r.json()["version"] == settings.CONSENTIMIENTO_CONTRATACION_VERSION
+        assert r.status_code == 200
+        assert r.json()["migracion"]["version"] == settings.CONSENTIMIENTO_CONTRATACION_VERSION
         sid = await _solicitar(c, e)
         r = await c.get(f"/api/contratacion/evaluaciones/{e['ev']}/solicitud", headers=e["h"])
-        assert r.status_code == 200 and r.json()["estado"] == "pendiente"
+        assert r.status_code == 200 and r.json()["estado"] == "nueva"
 
         async def foto(s):
             from app.domain.models import Evidencia, Respuesta, Resumen
@@ -251,7 +273,7 @@ def test_flujo_completo_alta_migracion_activacion_y_acceso_del_cliente():
         antes = await _bd(foto)
         plan_antes = (await c.get(f"/api/evaluaciones/{e['ev']}/plan-formativo", headers=e["h"])).json()
 
-        # Pendiente: todavía no se puede migrar (y no queda NADA creado)
+        # Nueva (sin contratar): todavía no se puede migrar (y no queda NADA creado)
         r = await c.post("/api/admin/empresas", json=_alta([sid]), headers=admin())
         assert r.status_code == 409 and _codigo(r) == "SOLICITUD_NO_CONTRATADA", r.text
         assert (await c.get("/api/admin/empresas", headers=admin())).json()["total"] == 0
@@ -292,7 +314,8 @@ def test_flujo_completo_alta_migracion_activacion_y_acceso_del_cliente():
         assert ev.empresa_id == alta["empresa"]["id"] and ev.clave_acceso_hash is None and ev.fecha_migracion
         assert ut.email is None and ut.fecha_anonimizacion is not None
         assert sol.estado == "migrada" and sol.empresa_id == ev.empresa_id
-        assert (sol.nombre_contacto, sol.email_contacto, sol.telefono_contacto) == (None, None, None)
+        assert (sol.nombre_contacto, sol.cargo_contacto, sol.email_contacto, sol.telefono_contacto) == (
+            None, None, None, None)
         assert ud.email == "gerencia@acme.cl" and ud.password_hash is None
         assert await _bd(foto) == antes
 
@@ -360,7 +383,7 @@ def test_si_una_solicitud_no_es_valida_no_se_migra_nada():
         a, b = await _evaluacion_completada(c), await _evaluacion_completada(c, con_evidencia=False)
         sa = await _solicitar(c, a)
         sb = await _solicitar(c, b, email_contacto="otro@acme.cl")
-        await _contratar(c, sa)  # b queda pendiente
+        await _contratar(c, sa)  # b queda nueva (sin contratar)
         r = await c.post("/api/admin/empresas", json=_alta([sa, sb]), headers=admin())
         assert r.status_code == 409 and _codigo(r) == "SOLICITUD_NO_CONTRATADA"
         assert r.json()["detail"]["solicitud_id"] == sb
@@ -418,8 +441,7 @@ def test_la_solicitud_exige_evaluacion_propia_y_completada():
             "captcha_token": "t"})
         nueva = r.json()
         h = _bearer(nueva["access_token"])
-        cuerpo = {"evaluacion_id": nueva["evaluacion_id"], "nombre": "Ana", "email": "a@acme.cl",
-                  "autoriza_migracion": True, "consentimiento_version": settings.CONSENTIMIENTO_CONTRATACION_VERSION}
+        cuerpo = cuerpo_solicitud(nueva["evaluacion_id"], "a@acme.cl")
         r = await c.post("/api/contratacion/solicitudes", json=cuerpo, headers=h)
         assert r.status_code == 409 and _codigo(r) == "EVALUACION_NO_COMPLETADA"
         # ajena -> 404 (no confirma que exista)
@@ -428,7 +450,8 @@ def test_la_solicitud_exige_evaluacion_propia_y_completada():
         assert r.status_code == 404
         # versión del consentimiento desactualizada
         r = await c.post("/api/contratacion/solicitudes", headers=otra["h"],
-                         json={**cuerpo, "evaluacion_id": otra["ev"], "consentimiento_version": "vieja"})
+                         json={**cuerpo, "evaluacion_id": otra["ev"],
+                               "consentimiento_migracion": {"version": "vieja", "aceptado": True}})
         assert r.status_code == 409 and _codigo(r) == "CONSENTIMIENTO_DESACTUALIZADO"
         # el admin no puede pedir contratar por nadie
         r = await c.post("/api/contratacion/solicitudes", json={**cuerpo, "evaluacion_id": otra["ev"]},
@@ -645,7 +668,8 @@ def test_rutas_admin_hu27_solo_admin():
         assert (await c.patch(f"/api/admin/contrataciones/{so}", json={"estado": "descartada"},
                               headers=admin())).status_code == 200
         sol = (await c.get(f"/api/admin/contrataciones/{so}", headers=admin())).json()
-        assert sol["estado"] == "descartada" and sol["contacto"] == {"nombre": None, "email": None, "telefono": None}
+        assert sol["estado"] == "descartada" and sol["contacto"] == {
+            "nombre": None, "cargo": None, "email": None, "telefono": None}
         r = await c.patch(f"/api/admin/contrataciones/{so}", json={"estado": "contratada"}, headers=admin())
         assert r.status_code == 409 and _codigo(r) == "TRANSICION_INVALIDA"
         assert (await c.get(f"/api/admin/empresas/{x['empresa_id']}", headers=admin())).status_code == 200

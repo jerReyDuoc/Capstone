@@ -22,6 +22,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 ACCION_INICIAR = "iniciar_encuesta"
+ACCION_CONTRATACION = "solicitar_contratacion"  # HU-31
 
 
 @dataclass(frozen=True)

@@ -70,7 +70,7 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
       if (texto.length > MAX_BYTES_JSON) {
         return respuestaError(413, { codigo: "CUERPO_DEMASIADO_GRANDE", mensaje: "Contenido demasiado grande." });
       }
-      if (permiso.ruta === "respuestas/") {
+      if (permiso.cuerpoConEvaluacion) {
         let json: unknown = null;
         try {
           json = JSON.parse(texto);

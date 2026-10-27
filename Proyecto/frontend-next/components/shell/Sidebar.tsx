@@ -66,6 +66,19 @@ export function Sidebar() {
                 <span className="nav-label">Mi evaluación</span>
               </Link>
             </li>
+            <li>
+              {/* HU-31 */}
+              <Link
+                href={href("/panel/contratar")}
+                className="nav-link"
+                data-label="Contratar"
+                aria-current={pathname === "/panel/contratar" ? "page" : undefined}
+                prefetch={false}
+              >
+                <Icon name="chispa" />
+                <span className="nav-label">Contratar</span>
+              </Link>
+            </li>
           </ul>
         </nav>
       ) : null}

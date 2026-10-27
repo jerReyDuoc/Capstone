@@ -4,7 +4,8 @@
  */
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
 
-export type EstadoSolicitud = "pendiente" | "contratada" | "migrada" | "descartada";
+/** HU-31: estados de la bandeja. 'migrada' es técnico (lo fija HU-27 al traspasar). */
+export type EstadoSolicitud = "nueva" | "contactada" | "contratada" | "migrada" | "descartada";
 export type EstadoUsuario = "pendiente_activacion" | "activo" | "bloqueado";
 
 export interface EvaluacionResumen {
@@ -20,11 +21,19 @@ export interface EvaluacionResumen {
   fecha_migracion?: string | null;
 }
 
+export interface ConsentimientoRegistrado {
+  aceptado: boolean;
+  version: string | null;
+  fecha: string | null;
+}
+
 export interface Solicitud {
   id: number;
   estado: EstadoSolicitud;
-  contacto: { nombre: string | null; email: string | null; telefono: string | null };
+  contacto: { nombre: string | null; cargo?: string | null; email: string | null; telefono: string | null };
   razon_social_declarada: string | null;
+  /** HU-31 criterio 2: cada consentimiento con su versión y fecha. */
+  consentimientos?: { contacto: ConsentimientoRegistrado; migracion: ConsentimientoRegistrado };
   autoriza_migracion: boolean;
   fecha_creacion: string;
   empresa_id: number | null;
@@ -92,6 +101,8 @@ export interface FilaBitacora {
 export interface Pagina<T> {
   items: T[];
   total: number;
+  /** Solo en la bandeja de solicitudes (HU-31). */
+  conteo_por_estado?: Partial<Record<EstadoSolicitud, number>>;
 }
 
 export interface AltaEntrada {
@@ -194,10 +205,30 @@ export function formatearRut(rut: string): string {
 }
 
 export const ETIQUETA_ESTADO_SOLICITUD: Record<EstadoSolicitud, { texto: string; tono: string }> = {
-  pendiente: { texto: "Pendiente", tono: "medio" },
+  nueva: { texto: "Nueva", tono: "medio" },
+  contactada: { texto: "Contactada", tono: "info" },
   contratada: { texto: "Contratada", tono: "ok" },
-  migrada: { texto: "Migrada", tono: "info" },
+  migrada: { texto: "Contratada · migrada", tono: "ok" },
   descartada: { texto: "Descartada", tono: "alto" },
+};
+
+/** HU-31: qué puede hacer el admin desde cada estado (espejo de TRANSICIONES del backend). */
+export const ACCIONES_SOLICITUD: Record<EstadoSolicitud, { estado: EstadoSolicitud; texto: string; principal?: boolean }[]> = {
+  nueva: [
+    { estado: "contactada", texto: "Marcar contactada", principal: true },
+    { estado: "contratada", texto: "Marcar contratada" },
+    { estado: "descartada", texto: "Descartar" },
+  ],
+  contactada: [
+    { estado: "contratada", texto: "Marcar contratada", principal: true },
+    { estado: "descartada", texto: "Descartar" },
+  ],
+  contratada: [
+    { estado: "contactada", texto: "Volver a contactada" },
+    { estado: "descartada", texto: "Descartar" },
+  ],
+  migrada: [],
+  descartada: [],
 };
 
 export const ETIQUETA_ESTADO_USUARIO: Record<EstadoUsuario, { texto: string; tono: string }> = {

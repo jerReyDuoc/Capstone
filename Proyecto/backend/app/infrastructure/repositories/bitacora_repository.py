@@ -24,6 +24,7 @@ class Accion:
     """Acciones auditadas. HU-09 puede agregar más; no cambiar las existentes."""
     SOLICITUD_CONTRATACION_CREADA = "solicitud_contratacion.creada"
     SOLICITUD_CONTRATACION_ESTADO = "solicitud_contratacion.estado_cambiado"
+    SOLICITUD_CONTRATACION_AVISO = "solicitud_contratacion.aviso_comercial"  # HU-31
     EMPRESA_CREADA = "empresa.creada"
     USUARIO_DEFINITIVO_CREADO = "usuario_definitivo.creado"
     EVALUACION_MIGRADA = "evaluacion.migrada_a_empresa"

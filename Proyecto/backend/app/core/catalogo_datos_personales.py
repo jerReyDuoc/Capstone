@@ -332,6 +332,10 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             CONTACTO, EN_CLARO, finalidad="Que Therion Labs contacte a quien pidió contratar (HU-31)",
             base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
         ),
+        "cargo_contacto": Dato(
+            CONTACTO, EN_CLARO, finalidad="Que Therion Labs sepa con quién habla al contactar (HU-31)",
+            base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
+        ),
         "email_contacto": Dato(
             CONTACTO, EN_CLARO, finalidad="Que Therion Labs contacte a quien pidió contratar (HU-31)",
             base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
@@ -350,6 +354,14 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         ),
         "fecha_autorizacion": Dato(
             METADATO, finalidad="Prueba de cuándo autorizó el traspaso",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+        "consentimiento_contacto_version": Dato(
+            METADATO, finalidad="Prueba de qué texto de contacto comercial aceptó (HU-31)",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+        "fecha_consentimiento_contacto": Dato(
+            METADATO, finalidad="Prueba de cuándo aceptó ser contactado (HU-31)",
             base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
         ),
     },
