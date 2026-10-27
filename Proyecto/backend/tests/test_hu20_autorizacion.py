@@ -309,6 +309,22 @@ RUTAS_SOLO_ADMIN = [
      lambda m: (f"/api/evaluaciones/{m.ev['publica']}/prueba", {"json": {"es_prueba": True}})),
     ("POST", "/api/auth/encuestado/clave",
      lambda m: ("/api/auth/encuestado/clave", {"json": {"evaluacion_id": INVITACION_ID}})),
+    # HU-27: panel interno (listados; el resto de /api/admin está en RUTAS_ADMIN_HU27)
+    ("GET", "/api/admin/contrataciones", lambda m: ("/api/admin/contrataciones", {})),
+    ("GET", "/api/admin/empresas", lambda m: ("/api/admin/empresas", {})),
+    ("GET", "/api/admin/bitacora", lambda m: ("/api/admin/bitacora", {})),
+]
+
+# HU-27: también solo admin, pero necesitan una solicitud o empresa creadas. Sus pruebas de
+# 401 (sin token), 403 (encuestado, referente y cliente) y 2xx (admin) están en
+# tests/test_hu27_empresa_cliente.py::test_rutas_admin_hu27_solo_admin.
+RUTAS_ADMIN_HU27 = [
+    ("GET", "/api/admin/contrataciones/{solicitud_id}"),
+    ("PATCH", "/api/admin/contrataciones/{solicitud_id}"),
+    ("POST", "/api/admin/empresas"),
+    ("GET", "/api/admin/empresas/{empresa_id}"),
+    ("POST", "/api/admin/empresas/{empresa_id}/evaluaciones"),
+    ("POST", "/api/admin/empresas/{empresa_id}/usuario/activacion"),
 ]
 
 
@@ -360,6 +376,7 @@ RUTAS_PUBLICAS = [
     ("POST", "/api/encuesta-publica/iniciar", "/api/encuesta-publica/iniciar", None),  # body abajo
     ("GET", "/api/arcop/catalogo", "/api/arcop/catalogo", {}),
     ("GET", "/api/arcop/seguimiento/{codigo}", "/api/arcop/seguimiento/ARC-0000-0000", {}),
+    ("GET", "/api/contratacion/consentimiento", "/api/contratacion/consentimiento", {}),  # HU-27/31
 ]
 
 
@@ -391,6 +408,10 @@ RUTAS_DE_ACCESO = [
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/titular"),
     ("POST", "/api/auth/encuestado"),
+    # HU-27: login del cliente y enlace de activación (la prueba completa está en test_hu27)
+    ("POST", "/api/auth/cliente"),
+    ("POST", "/api/auth/activacion/verificar"),
+    ("POST", "/api/auth/activacion"),
 ]
 
 
@@ -428,6 +449,11 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("POST", "/api/arcop/solicitudes/{solicitud_id}/cancelacion", "/api/arcop/solicitudes/1/cancelacion", {}),
     ("POST", "/api/arcop/solicitudes/{solicitud_id}/informacion", "/api/arcop/solicitudes/1/informacion",
      {"json": {"informacion": "x" * 30}}),
+    # HU-27/31: el usuario temporal pide contratar (sus roles se prueban en test_hu27)
+    ("POST", "/api/contratacion/solicitudes", "/api/contratacion/solicitudes",
+     {"json": {"evaluacion_id": 1, "nombre": "Ana", "email": "a@b.cl", "autoriza_migracion": True}}),
+    ("GET", "/api/contratacion/evaluaciones/{evaluacion_id}/solicitud",
+     "/api/contratacion/evaluaciones/1/solicitud", {}),
 ]
 
 
@@ -456,6 +482,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | {(m, r) for m, r, _, _ in RUTAS_PUBLICAS}
         | {(m, r) for m, r, _, _ in RUTAS_CON_TOKEN_PROPIO}
         | set(RUTAS_DE_ACCESO)
+        | set(RUTAS_ADMIN_HU27)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"

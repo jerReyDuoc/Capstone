@@ -7,6 +7,7 @@ from arq.connections import RedisSettings
 
 from app.core.config import settings
 from app.api.routes import respuestas, evidencias, catalogos, controles, evaluaciones, filtro, reportes, seguridad, metricas_ia, arcop, auth, encuesta_publica, informes
+from app.api.routes import contratacion, admin_clientes  # HU-27 (+ bases de HU-31 y HU-09)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ app.include_router(arcop.router)
 app.include_router(auth.router)
 app.include_router(encuesta_publica.router)
 app.include_router(informes.router)
+app.include_router(contratacion.router)
+app.include_router(admin_clientes.router)
 
 @app.get("/health")
 async def health():

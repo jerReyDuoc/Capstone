@@ -151,6 +151,19 @@ class Settings(BaseSettings):
     #   Eventos de seguridad: días después del evento, solo si ya fue revisado.
     RETENCION_EVENTOS_SEGURIDAD_DIAS: int | None = None
 
+    # ------------------------------------------------ HU-27: empresa cliente y usuario definitivo
+    # Horas de validez del enlace de activación (un solo uso). Vencido, un admin lo reenvía.
+    ACTIVACION_TTL_HORAS: int = 72
+    # Página del frontend que recibe el enlace. El token va en el FRAGMENTO (#token=...):
+    # el navegador no lo envía al servidor ni queda en logs de acceso ni en el Referer.
+    # En production debe ser https:// (se comprueba al emitir el enlace, antes de guardar nada).
+    ACTIVACION_URL_BASE: str = "http://localhost:3000/activar"
+    # Largo mínimo de la contraseña del usuario definitivo (además: letras y números).
+    CLIENTE_PASSWORD_MIN: int = 12
+    # Versión vigente del texto con que el usuario temporal autoriza el traspaso de su
+    # evaluación al pedir contratar (HU-31; el PO aún debe aprobar el texto definitivo).
+    CONSENTIMIENTO_CONTRATACION_VERSION: str = "2026-10-v1"
+
     # extra="ignore": el .env único también trae variables del compose y del frontend
     # (puertos, POSTGRES_*, API_URL, TURNSTILE_SITE_KEY...) que no son de la API.
     model_config = SettingsConfigDict(env_file=ENV_PROYECTO, env_file_encoding="utf-8", extra="ignore")
@@ -189,6 +202,10 @@ class Settings(BaseSettings):
             raise ValueError("CORREO_MODO=archivo es solo para desarrollo: usa smtp o desactivado en producción.")
         if self.CORREO_MODO == "smtp" and not self.SMTP_HOST:
             raise ValueError("CORREO_MODO=smtp requiere SMTP_HOST.")
+        if self.ACTIVACION_TTL_HORAS < 1:
+            raise ValueError("ACTIVACION_TTL_HORAS debe ser mayor que 0.")
+        if self.CLIENTE_PASSWORD_MIN < 10:
+            raise ValueError("CLIENTE_PASSWORD_MIN no puede ser menor que 10 (HU-27).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

@@ -6,10 +6,13 @@ Emisión de tokens de acceso (ver app/core/autenticacion.py).
              estar expirada ni el usuario anonimizado.
   - Encuestado anónimo (encuesta pública): evaluacion_id + clave de acceso de la
              evaluación (ver clave_acceso_encuestado.py).
+  - Cliente (HU-27): email + contraseña del usuario definitivo, que la definió con su
+             enlace de activación. Exige cuenta activa y contrato de la empresa vigente.
 
 Los errores son deliberadamente genéricos ("credenciales inválidas") para no
 revelar si un email o id existe.
 """
+import asyncio
 import logging
 from datetime import date, datetime, timezone
 
@@ -32,6 +35,10 @@ class CredencialesInvalidasError(Exception):
     pass
 
 
+class ContratoNoVigenteError(Exception):
+    pass
+
+
 def _ahora() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -40,13 +47,14 @@ def _normalizar_email(email: str) -> str:
     return (email or "").strip().lower()
 
 
-def _respuesta(usuario_id: int, rol: Rol) -> dict:
+def _respuesta(usuario_id: int, rol: Rol, **extra) -> dict:
     return {
         "access_token": emitir_token(usuario_id, rol.value),
         "token_type": "bearer",
         "rol": rol.value,
         "usuario_id": usuario_id,
         "expira_en_min": settings.AUTH_TOKEN_TTL_MIN,
+        **extra,
     }
 
 
@@ -109,3 +117,35 @@ class IniciarSesionUseCase:
             logger.warning("Acceso de encuestado fallido (evaluacion=%s)", evaluacion_id)
             raise CredencialesInvalidasError("Credenciales inválidas.")
         return _respuesta(evaluacion.id, Rol.ENCUESTADO)
+
+    async def cliente(self, email: str, password: str) -> dict:
+        """HU-27: login del usuario definitivo (rol cliente)."""
+        from app.domain.models.empresa import Empresa
+        from app.domain.models.usuario_definitivo import UsuarioDefinitivo
+        from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+
+        email = _normalizar_email(email)
+        usuario = await self.db.scalar(
+            select(UsuarioDefinitivo).where(func.lower(UsuarioDefinitivo.email) == email)
+        )
+        if usuario is None or not usuario.password_hash:
+            # Mismo tiempo de respuesta exista o no (y aunque aún no active su cuenta)
+            await asyncio.to_thread(verificar_password_senuelo, password or "")
+            ok = False
+        else:
+            ok = await asyncio.to_thread(verificar_password, password or "", usuario.password_hash) and usuario.activo
+        if not ok:
+            logger.warning("Login de cliente fallido")
+            raise CredencialesInvalidasError("Credenciales inválidas.")
+        empresa = await self.db.get(Empresa, usuario.empresa_id)
+        if empresa is None or not empresa.contrato_vigente():
+            raise ContratoNoVigenteError(
+                "El contrato de tu empresa no está vigente. Contacta a Therion Labs."
+            )
+        usuario.ultimo_acceso = _ahora()
+        BitacoraRepository(self.db).registrar(
+            accion=Accion.CLIENTE_LOGIN, entidad="usuario_definitivo", entidad_id=usuario.id,
+            actor_rol=Rol.CLIENTE.value, actor_id=usuario.id, detalle={"empresa_id": usuario.empresa_id},
+        )
+        await self.db.commit()
+        return _respuesta(usuario.id, Rol.CLIENTE, empresa_id=usuario.empresa_id)

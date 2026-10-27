@@ -1,5 +1,5 @@
-from datetime import date
-from sqlalchemy import Integer, Date, String, Boolean, ForeignKey, false as sa_false
+from datetime import date, datetime
+from sqlalchemy import Integer, Date, DateTime, String, Boolean, ForeignKey, false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -41,6 +41,14 @@ class Evaluacion(Base):
     es_prueba: Mapped[bool] = mapped_column(
         "es_prueba", Boolean, nullable=False, default=False, server_default=sa_false()
     )
+    # HU-27: empresa cliente a la que se migró la evaluación (NULL = sigue siendo del
+    # usuario temporal). Con ella pasan respuestas, evidencias, resumen, plan formativo
+    # e informes, que cuelgan de la evaluación. usuario_temporal_id se conserva (el
+    # usuario temporal queda anonimizado y cerrado) para no perder el rubro del benchmark.
+    empresa_id: Mapped[int | None] = mapped_column(
+        "empresa_id", Integer, ForeignKey("empresa.id"), nullable=True, index=True
+    )
+    fecha_migracion: Mapped[datetime | None] = mapped_column("fecha_migracion", DateTime, nullable=True)
 
     respuestas: Mapped[list["Respuesta"]] = relationship(
         back_populates="evaluacion",

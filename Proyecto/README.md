@@ -420,6 +420,7 @@ stateDiagram-v2
 | `referente` | Usuario temporal (titular de sus datos) | `POST /api/auth/titular` con `{usuario_temporal_id, email}`; requiere invitación vigente y no anonimizada |
 | `encuestado` | Encuestado anónimo de la encuesta pública (titular de sus datos) | `POST /api/auth/encuestado` con `{evaluacion_id, clave}`; la clave se genera por evaluación (`POST /api/auth/encuestado/clave`, admin; luego HU-19) |
 | `admin_therion` | Administrador de Therion Labs (tabla `usuarios_admin`) | `POST /api/auth/login` con `{email, password}` |
+| `cliente` | Usuario definitivo de una empresa cliente (HU-27; uno por empresa, tabla `usuario_definitivo`). Ve las evaluaciones migradas a su empresa | `POST /api/auth/cliente` con `{email, password}`, tras definir su contraseña con el enlace de activación |
 
 - Token bearer firmado con HMAC-SHA256 (`AUTH_SECRET`), vigencia `AUTH_TOKEN_TTL_MIN` (480 min por defecto). Respuesta: `{access_token, token_type, rol, usuario_id, expira_en_min}`.
 - Contraseñas con PBKDF2-SHA256 (600 000 iteraciones); verificación en tiempo constante y hash señuelo para no revelar emails existentes.
@@ -595,6 +596,9 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | POST | `/api/auth/encuestado` | 🔓 | `{evaluacion_id, clave}` → token de encuestado |
 | POST | `/api/auth/encuestado/clave` | 🛡️ | `{evaluacion_id}` → 201 `{clave}` (se muestra una vez; invalida la anterior) |
 | GET | `/api/auth/me` | 🔑 | `{usuario_id, rol}` |
+| POST | `/api/auth/cliente` | 🔓 | HU-27: `{email, password}` → token del rol `cliente` (403 `CONTRATO_NO_VIGENTE` si el contrato terminó) |
+| POST | `/api/auth/activacion/verificar` | 🔓 | HU-27: `{token}` → ¿el enlace sigue válido? (no lo consume) |
+| POST | `/api/auth/activacion` | 🔓 | HU-27: `{token, password}` → define la contraseña; el enlace queda usado (400 `ENLACE_INVALIDO`, 410 `ENLACE_VENCIDO`, 422 `CONTRASENA_DEBIL`) |
 
 ### Catálogos y controles
 
@@ -656,13 +660,30 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/arcop/catalogo` | 🔓 | Tipos, estados, transiciones y plazos configurados |
 | POST | `/api/arcop/solicitudes` | 👤 | `{tipo, descripcion}` → 201, estado `recibida` |
 | GET | `/api/arcop/seguimiento/{codigo}` | 🔓 | Estado y plazos por código de seguimiento (sin datos personales) |
-| GET | `/api/arcop/solicitudes?page=&size=&estado=&tipo=&usuario_temporal_id=&evaluacion_id=&vencidas=` | 🔑 | Titular: solo las suyas. Admin: todas, con filtros |
-| GET | `/api/arcop/solicitudes/{id}` | 🔑 | Detalle e historial (404 si es de otro titular) |
+| GET | `/api/arcop/solicitudes?page=&size=&estado=&tipo=&usuario_temporal_id=&evaluacion_id=&vencidas=` | 👤 🛡️ | Titular: solo las suyas. Admin: todas, con filtros |
+| GET | `/api/arcop/solicitudes/{id}` | 👤 🛡️ | Detalle e historial (404 si es de otro titular) |
 | PATCH | `/api/arcop/solicitudes/{id}/estado` | 🛡️ | `{estado, comentario?}` → `en_revision` / `pendiente_informacion` / `en_proceso` |
 | POST | `/api/arcop/solicitudes/{id}/prorroga` | 🛡️ | `{motivo}` → prórroga única del plazo (+30 días), antes de que venza |
 | POST | `/api/arcop/solicitudes/{id}/resolucion` | 🛡️ | `{resultado: resuelta\|rechazada, respuesta}` |
 | POST | `/api/arcop/solicitudes/{id}/cancelacion` | 👤 | `{motivo?}` |
 | POST | `/api/arcop/solicitudes/{id}/informacion` | 👤 | `{informacion}` → vuelve a `en_revision` |
+
+### Contratación y empresas cliente — HU-27 (con las bases de HU-31 y HU-09)
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/contratacion/consentimiento` | 🔓 | Versión y texto (provisorio) de la autorización de traspaso |
+| POST | `/api/contratacion/solicitudes` | 👤 | El usuario temporal pide contratar para su evaluación completada: `{evaluacion_id, nombre, email, telefono?, razon_social?, autoriza_migracion, consentimiento_version}` |
+| GET | `/api/contratacion/evaluaciones/{id}/solicitud` | 👤 | Estado de su solicitud |
+| GET | `/api/admin/contrataciones?estado=` | 🛡️ | Solicitudes con contacto y resumen de la evaluación |
+| GET / PATCH | `/api/admin/contrataciones/{id}` | 🛡️ | Detalle / `{estado: contratada\|pendiente\|descartada}` |
+| POST | `/api/admin/empresas` | 🛡️ | Alta en UNA transacción: empresa + usuario definitivo (rol `cliente`) + migración de las solicitudes `contratadas` + enlace de activación por correo |
+| GET | `/api/admin/empresas`, `/api/admin/empresas/{id}` | 🛡️ | Empresas con su usuario y evaluaciones |
+| POST | `/api/admin/empresas/{id}/evaluaciones` | 🛡️ | `{solicitudes_ids}` → asociar más evaluaciones autorizadas |
+| POST | `/api/admin/empresas/{id}/usuario/activacion` | 🛡️ | Reenvía el enlace (revoca el anterior) |
+| GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | Bitácora de auditoría (solo inserción, sin datos personales) |
+
+El rol `cliente` ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`.
 
 ### Códigos de error
 

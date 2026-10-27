@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.clave_acceso_encuestado import (
     EvaluacionNoEncontradaError, generar_clave_acceso,
 )
-from app.application.use_cases.iniciar_sesion import CredencialesInvalidasError, IniciarSesionUseCase
+from app.application.use_cases.activacion_cuenta import ActivacionError, ActivarCuentaUseCase
+from app.application.use_cases.iniciar_sesion import (
+    ContratoNoVigenteError, CredencialesInvalidasError, IniciarSesionUseCase,
+)
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
 from app.core.cliente import huella, ip_cliente
 from app.core.config import settings
@@ -32,6 +35,20 @@ class AccesoEncuestadoRequest(BaseModel):
 
 class GenerarClaveRequest(BaseModel):
     evaluacion_id: int
+
+
+class LoginClienteRequest(BaseModel):
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
+
+
+class VerificarActivacionRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+
+
+class ActivarCuentaRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
 
 
 def _exigir_secreto():
@@ -118,6 +135,85 @@ async def generar_clave_encuestado(
     except EvaluacionNoEncontradaError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"evaluacion_id": payload.evaluacion_id, "clave": clave}
+
+
+# ------------------------------------------------------------------ HU-27: cliente
+_CLIENTE_IP_10MIN = 20
+_CLIENTE_EMAIL_15MIN = 10
+_ACTIVACION_IP_10MIN = 30
+
+
+async def _limitar(limitador: Limitador, reglas: list[tuple[str, int, int]], mensaje: str) -> None:
+    try:
+        consumos = [await limitador.consumir(clave, limite, ventana) for clave, limite, ventana in reglas]
+    except LimitadorNoDisponibleError:
+        raise HTTPException(status_code=503, headers={"Retry-After": "60"}, detail={
+            "codigo": "LIMITADOR_NO_DISPONIBLE", "mensaje": "Intenta de nuevo en unos minutos."})
+    bloqueados = [c for c in consumos if not c.permitido]
+    if bloqueados:
+        espera = max(c.reintentar_en_s for c in bloqueados)
+        raise HTTPException(status_code=429, headers={"Retry-After": str(espera)}, detail={
+            "codigo": "DEMASIADOS_INTENTOS", "reintentar_en_s": espera, "mensaje": mensaje})
+
+
+def _error_activacion(e: ActivacionError) -> HTTPException:
+    return HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e), **e.extra})
+
+
+@router.post("/cliente")
+async def login_cliente(
+    payload: LoginClienteRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """HU-27: login del usuario definitivo de una empresa cliente (rol cliente)."""
+    _exigir_secreto()
+    await _limitar(limitador, [
+        (f"cli:ip:{huella(ip_cliente(request))}", _CLIENTE_IP_10MIN, 600),
+        (f"cli:em:{huella(payload.email.strip().lower())}", _CLIENTE_EMAIL_15MIN, 900),
+    ], "Demasiados intentos. Espera unos minutos antes de volver a intentarlo.")
+    try:
+        return await IniciarSesionUseCase(db).cliente(payload.email, payload.password)
+    except CredencialesInvalidasError as e:
+        raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
+    except ContratoNoVigenteError as e:
+        raise HTTPException(status_code=403, detail={"codigo": "CONTRATO_NO_VIGENTE", "mensaje": str(e)})
+
+
+@router.post("/activacion/verificar")
+async def verificar_activacion(
+    payload: VerificarActivacionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """HU-27: comprueba el enlace de activación SIN consumirlo (para mostrar el formulario)."""
+    await _limitar(limitador, [(f"act:ip:{huella(ip_cliente(request))}", _ACTIVACION_IP_10MIN, 600)],
+                   "Demasiados intentos. Espera unos minutos.")
+    try:
+        return await ActivarCuentaUseCase(db).verificar(payload.token.strip())
+    except ActivacionError as e:
+        raise _error_activacion(e)
+
+
+@router.post("/activacion")
+async def activar_cuenta(
+    payload: ActivarCuentaRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """
+    HU-27: el usuario definitivo define su contraseña con el enlace de un solo uso.
+    El enlace queda usado; un segundo intento con el mismo enlace responde 400.
+    """
+    await _limitar(limitador, [(f"act:ip:{huella(ip_cliente(request))}", _ACTIVACION_IP_10MIN, 600)],
+                   "Demasiados intentos. Espera unos minutos.")
+    try:
+        return await ActivarCuentaUseCase(db).activar(payload.token.strip(), payload.password)
+    except ActivacionError as e:
+        raise _error_activacion(e)
 
 
 @router.get("/me")

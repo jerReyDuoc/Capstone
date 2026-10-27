@@ -21,6 +21,18 @@ from app.domain.models.solicitud_arcop import (
     TipoSolicitudARCOP,
     EstadoSolicitudARCOP,
 )
+# HU-27 (con las bases mínimas de HU-31 y HU-09)
+from app.domain.models.empresa import Empresa
+from app.domain.models.usuario_definitivo import (
+    UsuarioDefinitivo,
+    TokenActivacion,
+    EstadoUsuarioDefinitivo,
+)
+from app.domain.models.solicitud_contratacion import (
+    SolicitudContratacion,
+    EstadoSolicitudContratacion,
+)
+from app.domain.models.bitacora_auditoria import BitacoraAuditoria
 
 __all__ = [
     "Dominio",
@@ -48,4 +60,11 @@ __all__ = [
     "EventoSolicitud",
     "TipoSolicitudARCOP",
     "EstadoSolicitudARCOP",
+    "Empresa",
+    "UsuarioDefinitivo",
+    "TokenActivacion",
+    "EstadoUsuarioDefinitivo",
+    "SolicitudContratacion",
+    "EstadoSolicitudContratacion",
+    "BitacoraAuditoria",
 ]

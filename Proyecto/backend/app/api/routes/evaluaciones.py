@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion, solo_admin
+from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion, empresa_del_cliente, solo_admin
 from app.core.autenticacion import Actor, Rol
 from app.core.database import get_db
 from app.application.schemas.api_schemas import (
@@ -47,8 +47,14 @@ async def list_evaluaciones(
         filtro = Evaluacion.id == actor.id
     elif actor.rol == Rol.REFERENTE.value:
         filtro = (Evaluacion.usuario_temporal_id == actor.id) & (Evaluacion.origen != ORIGEN_PUBLICA)
-    else:
+    elif actor.es_cliente:
+        # HU-27: solo las evaluaciones migradas a su empresa
+        empresa_id = await empresa_del_cliente(db, actor)
+        filtro = (Evaluacion.empresa_id == empresa_id) if empresa_id is not None else (Evaluacion.id == -1)
+    elif actor.es_admin:
         filtro = None
+    else:  # rol desconocido: nada (nunca "todo" por omisión)
+        filtro = Evaluacion.id == -1
     if filtro is not None:
         query = query.where(filtro)
         count_query = count_query.where(filtro)

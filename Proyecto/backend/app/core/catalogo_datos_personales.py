@@ -50,6 +50,8 @@ B_OBLIGACION_ARCOP = "Obligación legal: atender los derechos del titular (Ley 2
 B_RESPONSABILIDAD = "Obligación legal: principio de responsabilidad, poder demostrar el cumplimiento (Ley 21.719, art. 3)"
 B_SEGURIDAD = "Interés legítimo: seguridad del sistema y control de acceso"
 B_CONTRATO = "Relación contractual/laboral con el administrador"
+B_CONTRATO_CLIENTE = "Ejecución del contrato del servicio pagado con la empresa cliente (HU-27)"
+B_CONSENTIMIENTO_CONTRATACION = "Consentimiento: el usuario temporal pidió ser contactado para contratar (HU-31)"
 
 # --------------------------------------------------------------------- plazos (config)
 C_TITULAR = "Hasta la supresión ARCOP o RETENCION_DATOS_TITULAR_DIAS después de vencer el acceso"
@@ -57,6 +59,8 @@ C_ARCOP = "RETENCION_ARCOP_CERRADAS_DIAS después del cierre de la solicitud (lu
 C_EVENTOS = "RETENCION_EVENTOS_SEGURIDAD_DIAS después de revisado el evento"
 C_ADMIN = "Mientras la cuenta esté activa"
 C_PRUEBA = "Mientras exista el registro (prueba del consentimiento o de la atención del derecho)"
+C_CLIENTE = "Mientras dure el contrato de la empresa (las reglas de término las fija el PO)"
+C_CONTRATACION = "Hasta migrar la evaluación (se borra al pasar a la empresa) o descartar la solicitud"
 
 
 @dataclass(frozen=True)
@@ -164,7 +168,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # ------------------------------------------------------------ evaluación
     "evaluacion": {
         **_sin_dp("id", "fecha_inicio", "estado_progreso", "Usuario_temporal_id",
-                  "filtro_completado", "fecha_filtro", "origen", "es_prueba"),
+                  "filtro_completado", "fecha_filtro", "origen", "es_prueba",
+                  "empresa_id", "fecha_migracion"),  # HU-27
         "clave_acceso_hash": Dato(
             CREDENCIAL, HASH,
             finalidad="Que el encuestado anónimo retome su evaluación y ejerza sus derechos",
@@ -278,6 +283,84 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             TEXTO_LIBRE, CIFRADO, finalidad="Comunicación entre titular y responsable",
             base=B_OBLIGACION_ARCOP, conservacion=C_ARCOP, escaneo="cifrado",
         ),
+    },
+    # ------------------------------------------------------------ HU-27: clientes del servicio pagado
+    # La empresa es una persona JURÍDICA: razón social y RUT de la empresa no son datos personales.
+    "empresa": _sin_dp(
+        "id", "razon_social", "rut", "rubro_id", "fecha_inicio_contrato", "fecha_termino_contrato",
+        "fecha_creacion", "creada_por_admin_id",
+    ),
+    "usuario_definitivo": {
+        **_sin_dp("id", "empresa_id", "rol", "estado"),
+        "nombre": Dato(
+            CONTACTO, EN_CLARO, finalidad="Identificar al usuario de la empresa cliente en el servicio pagado",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+        "email": Dato(
+            CONTACTO, EN_CLARO,
+            finalidad="Usuario de inicio de sesión y destino del enlace de activación (HU-27)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+        "password_hash": Dato(
+            CREDENCIAL, HASH, finalidad="Verificar la contraseña (PBKDF2-SHA256, nunca en claro ni por correo)",
+            base=B_SEGURIDAD, conservacion=C_CLIENTE,
+        ),
+        "fecha_creacion": Dato(
+            METADATO, finalidad="Trazabilidad de la cuenta", base=B_SEGURIDAD, conservacion=C_CLIENTE,
+        ),
+        "fecha_activacion": Dato(
+            METADATO, finalidad="Prueba de que el propio usuario definió su contraseña",
+            base=B_RESPONSABILIDAD, conservacion=C_CLIENTE,
+        ),
+        "ultimo_acceso": Dato(
+            METADATO, finalidad="Detectar cuentas inactivas o accesos indebidos",
+            base=B_SEGURIDAD, conservacion=C_CLIENTE,
+        ),
+    },
+    "token_activacion": {
+        **_sin_dp("id", "usuario_definitivo_id", "fecha_creacion", "fecha_expiracion", "fecha_uso",
+                  "fecha_revocacion", "creado_por_admin_id"),
+        "token_hash": Dato(
+            CREDENCIAL, HASH, finalidad="Validar el enlace de activación de un solo uso (solo su SHA-256)",
+            base=B_SEGURIDAD, conservacion=C_CLIENTE,
+        ),
+    },
+    "solicitud_contratacion": {
+        **_sin_dp("id", "evaluacion_id", "razon_social_declarada", "estado", "empresa_id",
+                  "fecha_creacion", "fecha_actualizacion", "fecha_migracion"),
+        "nombre_contacto": Dato(
+            CONTACTO, EN_CLARO, finalidad="Que Therion Labs contacte a quien pidió contratar (HU-31)",
+            base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
+        ),
+        "email_contacto": Dato(
+            CONTACTO, EN_CLARO, finalidad="Que Therion Labs contacte a quien pidió contratar (HU-31)",
+            base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
+        ),
+        "telefono_contacto": Dato(
+            CONTACTO, EN_CLARO, finalidad="Que Therion Labs contacte a quien pidió contratar (HU-31)",
+            base=B_CONSENTIMIENTO_CONTRATACION, conservacion=C_CONTRATACION,
+        ),
+        "autoriza_migracion": Dato(
+            METADATO, finalidad="Prueba de la autorización para traspasar la evaluación a la empresa",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+        "consentimiento_version": Dato(
+            METADATO, finalidad="Prueba de qué texto de autorización aceptó",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+        "fecha_autorizacion": Dato(
+            METADATO, finalidad="Prueba de cuándo autorizó el traspaso",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+    },
+    # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).
+    "bitacora_auditoria": {
+        **_sin_dp("id", "fecha", "actor_rol", "accion", "entidad", "entidad_id", "resultado"),
+        "actor_id": Dato(
+            METADATO, finalidad="Trazabilidad: quién ejecutó cada acción (HU-09)",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+        "detalle": Dato(SIN_DP, escaneo="pii"),
     },
 }
 

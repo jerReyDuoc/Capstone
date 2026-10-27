@@ -13,7 +13,7 @@ Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
+from app.core.autenticacion import Actor, Rol, requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
 from app.application.schemas.arcop_schemas import (
@@ -49,6 +49,9 @@ router = APIRouter(prefix="/api/arcop", tags=["arcop"])
 
 solo_titular = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO)
 solo_admin = requerir_rol(Rol.ADMIN_THERION)
+# HU-27: el rol cliente no es titular ARCOP; sin esto su id (usuario_definitivo.id) se
+# confundiría con el de un usuario temporal al filtrar "sus" solicitudes.
+titular_o_admin = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO, Rol.ADMIN_THERION)
 
 
 def _use_case(db: AsyncSession) -> GestionarSolicitudARCOPUseCase:
@@ -182,7 +185,7 @@ async def listar_solicitudes(
     usuario_temporal_id: int | None = Query(None, description="Solo admin_therion: filtrar por titular invitado"),
     evaluacion_id: int | None = Query(None, description="Solo admin_therion: filtrar por evaluación (encuestado)"),
     vencidas: bool = Query(False, description="Solo solicitudes abiertas con algún plazo vencido"),
-    actor: Actor = Depends(obtener_actor),
+    actor: Actor = Depends(titular_o_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -205,7 +208,7 @@ async def listar_solicitudes(
 @router.get("/solicitudes/{solicitud_id}", response_model=SolicitudARCOPDetalleResponse)
 async def obtener_solicitud(
     solicitud_id: int,
-    actor: Actor = Depends(obtener_actor),
+    actor: Actor = Depends(titular_o_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Detalle con historial. Un titular solo ve las suyas (404 para las ajenas)."""

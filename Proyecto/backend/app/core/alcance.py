@@ -9,6 +9,8 @@ HU-20: las respuestas, evidencias y reportes de una organización solo los ven e
   | admin_therion                | todas                      | todas                              |
   | encuestado (sub = eval id)   | solo la suya (otra -> 404) | ninguna (404)                      |
   | referente (sub = usuario id) | ninguna (404)              | solo las suyas (otra -> 404)       |
+  | cliente (HU-27, sub = id del | solo las MIGRADAS a su     | solo las MIGRADAS a su empresa     |
+  |   usuario definitivo)        | empresa (otra -> 404)      | (otra -> 404)                      |
   | sin token                    | 401                        | 401 (EXIGIR_TOKEN_EVALUACIONES,    |
   |                              |                            | true por defecto; false solo dev)  |
 
@@ -73,12 +75,22 @@ async def actor_de_evaluaciones(actor: Actor | None = Depends(actor_opcional)) -
 solo_admin = requerir_rol(Rol.ADMIN_THERION)
 
 
+async def empresa_del_cliente(db: AsyncSession, actor: Actor) -> int | None:
+    """HU-27: empresa del usuario definitivo del token (None si no es cliente)."""
+    if not actor.es_cliente:
+        return None
+    from app.domain.models.usuario_definitivo import UsuarioDefinitivo
+
+    return await db.scalar(select(UsuarioDefinitivo.empresa_id).where(UsuarioDefinitivo.id == actor.id))
+
+
 async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id: int) -> None:
     if actor is not None and actor.es_admin:
         return
     fila = (
         await db.execute(
-            select(Evaluacion.origen, Evaluacion.usuario_temporal_id).where(Evaluacion.id == evaluacion_id)
+            select(Evaluacion.origen, Evaluacion.usuario_temporal_id, Evaluacion.empresa_id)
+            .where(Evaluacion.id == evaluacion_id)
         )
     ).first()
     if fila is None:
@@ -89,7 +101,13 @@ async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id
         if settings.EXIGIR_TOKEN_EVALUACIONES:
             raise _exige_token()
         return
-    origen, usuario_temporal_id = fila
+    origen, usuario_temporal_id, empresa_id = fila
+
+    if actor is not None and actor.es_cliente:
+        # HU-27: el cliente solo ve lo que se migró a SU empresa (lo demás no existe para él).
+        if empresa_id is None or empresa_id != await empresa_del_cliente(db, actor):
+            raise _NO_ENCONTRADA
+        return
 
     if actor is not None and actor.es_encuestado:
         if actor.id != evaluacion_id:
