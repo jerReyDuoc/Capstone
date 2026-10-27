@@ -17,7 +17,13 @@ Cómo se obtiene el token (app/api/routes/auth.py):
   - Cliente:    POST /api/auth/cliente     {email, password}  (HU-27, tras activar la cuenta)
 
 El token es un HMAC-SHA256 firmado con AUTH_SECRET (solo librería estándar):
-    base64url(json {"sub": <id>, "rol": <rol>, "exp": <epoch>}) . base64url(firma)
+    base64url(json {"sub": <id>, "rol": <rol>, "exp": <epoch>[, "sid": <sesión>]}) . base64url(firma)
+
+HU-28: los logins con contraseña (admin y cliente) abren una SESIÓN en la BD
+(sesion_usuario) y el token lleva su `sid`. Cerrar sesión (POST /api/auth/logout) o
+restablecer la contraseña la cierra y el token deja de servir aunque no haya vencido.
+Un token de admin o cliente SIN sid solo puede salir de la CLI de pruebas de abajo
+(o ser anterior a HU-28): sigue valiendo hasta su `exp`.
 
 En cada petición se comprueba además en BD que el usuario siga habilitado
 (admin activo / titular no anonimizado / evaluación con clave vigente / cliente activo con
@@ -63,6 +69,8 @@ class Actor:
     """
     id: int
     rol: str
+    # HU-28: identificador de la sesión (solo en tokens de admin y cliente emitidos al iniciar sesión)
+    sid: str | None = None
 
     @property
     def es_admin(self) -> bool:
@@ -128,7 +136,8 @@ def _firmar(cuerpo: str, secreto: str) -> str:
     return _b64(hmac.new(secreto.encode("utf-8"), cuerpo.encode("ascii"), hashlib.sha256).digest())
 
 
-def emitir_token(usuario_id: int, rol: str, ttl_min: int | None = None, secreto: str | None = None) -> str:
+def emitir_token(usuario_id: int, rol: str, ttl_min: int | None = None, secreto: str | None = None,
+                 sid: str | None = None) -> str:
     secreto = secreto or settings.AUTH_SECRET
     if not secreto:
         raise RuntimeError("AUTH_SECRET no está configurado.")
@@ -136,6 +145,8 @@ def emitir_token(usuario_id: int, rol: str, ttl_min: int | None = None, secreto:
         raise ValueError(f"Rol inválido. Debe ser uno de: {', '.join(Rol.valores())}")
     ttl = ttl_min if ttl_min is not None else settings.AUTH_TOKEN_TTL_MIN
     payload = {"sub": int(usuario_id), "rol": rol, "exp": int(time.time()) + ttl * 60}
+    if sid:
+        payload["sid"] = sid
     cuerpo = _b64(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     return f"{cuerpo}.{_firmar(cuerpo, secreto)}"
 
@@ -150,13 +161,16 @@ def verificar_token(token: str, secreto: str) -> Actor:
     try:
         payload = json.loads(_b64_decode(cuerpo))
         sub, rol, exp = int(payload["sub"]), str(payload["rol"]), int(payload["exp"])
+        sid = payload.get("sid")
+        if sid is not None and (not isinstance(sid, str) or not 16 <= len(sid) <= 64):
+            raise ValueError("sid")
     except (ValueError, KeyError, TypeError):
         raise TokenInvalidoError("Contenido de token inválido")
     if exp < time.time():
         raise TokenInvalidoError("Token expirado")
     if rol not in Rol.valores():
         raise TokenInvalidoError("Rol desconocido")
-    return Actor(id=sub, rol=rol)
+    return Actor(id=sub, rol=rol, sid=sid)
 
 
 # ---------------------------------------------------------------- dependencias FastAPI
@@ -177,6 +191,11 @@ def _no_autorizado(codigo: str, mensaje: str) -> HTTPException:
 
 async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
     # imports locales: evitan ciclos (los modelos importan app.core.database)
+    if actor.sid is not None:
+        # HU-28: sesión cerrada (logout, cambio de contraseña) o vencida -> token sin efecto
+        from app.application.use_cases.sesiones import sesion_vigente
+        if not await sesion_vigente(db, actor):
+            return False
     if actor.es_admin:
         from app.domain.models.usuario_admin import UsuarioAdmin
         admin = await db.get(UsuarioAdmin, actor.id)

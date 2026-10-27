@@ -18,11 +18,13 @@ export const MODO_DEMO = process.env.NEXT_PUBLIC_DEMO === "1";
 /**
  * De dónde salen los datos del panel:
  *   "/api"     → equipo interno (rewrite de Next a FastAPI, como hasta ahora)
+ *   "/bff/cliente/api" → usuario definitivo de una empresa cliente (HU-28): ve las evaluaciones
+ *                migradas a su empresa; el BFF agrega el token de su cookie httpOnly.
  *   "/bff/api" → encuestado de la landing (HU-19): su evaluación es pública y la API exige
  *                su token, que vive en la cookie httpOnly; el BFF lo agrega y solo deja
  *                pasar SU evaluación.
  */
-export type BaseApi = "/api" | "/bff/api";
+export type BaseApi = "/api" | "/bff/api" | "/bff/cliente/api";
 
 /** Error con un mensaje apto para mostrar al usuario y el código HTTP. */
 export class ApiError extends Error {
@@ -79,10 +81,22 @@ async function getTodasLasPaginas<T>(base: string, signal?: AbortSignal): Promis
   return [primera, ...resto].flatMap((p) => p.items);
 }
 
-export async function listarEvaluaciones(signal?: AbortSignal): Promise<EvaluacionApi[]> {
+export async function listarEvaluaciones(signal?: AbortSignal, base: BaseApi = "/api"): Promise<EvaluacionApi[]> {
   if (MODO_DEMO) return DEMO_EVALUACIONES;
-  const pagina = await getJson<Paginado<EvaluacionApi>>("/api/evaluaciones?page=1&size=100", signal);
+  const pagina = await getJson<Paginado<EvaluacionApi>>(`${base}/evaluaciones?page=1&size=100`, signal);
   return pagina.items;
+}
+
+/** HU-28: ¿hay una sesión de usuario definitivo (cliente) en este navegador? */
+export async function sesionCliente(signal?: AbortSignal): Promise<boolean> {
+  if (MODO_DEMO) return false;
+  try {
+    const s = await getJson<{ activa: boolean }>("/bff/cliente/sesion", signal);
+    return s.activa === true;
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw e;
+    return false;
+  }
 }
 
 /** Sesión del encuestado (cookie httpOnly) o null si no hay / no se pudo consultar. */

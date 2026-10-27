@@ -11,7 +11,8 @@
  *                  (nombre, email; rol único cliente), o asociar a una empresa existente.
  *                  Una sola operación en el backend: si algo falla no queda nada a medias.
  *   Empresas     — contrato, estado del usuario y reenvío del enlace de activación.
- *   Bitácora     — lo que quedó registrado (HU-09).
+ *   Evaluaciones — HU-28: todas las evaluaciones, con su estado, puntaje y empresa (si migró).
+ *   Bitácora     — lo que quedó registrado (HU-09), incluidos los inicios de sesión.
  *
  * El admin nunca ve ni define la contraseña: el enlace va solo al correo del usuario.
  */
@@ -29,6 +30,7 @@ import {
   seleccionable,
   type Empresa,
   type ErrorAdmin,
+  type EvaluacionAdmin,
   type EstadoSolicitud,
   type FilaBitacora,
   type ResultadoAlta,
@@ -37,7 +39,7 @@ import {
 import { pedir } from "@/lib/encuesta/cliente";
 import s from "./admin.module.css";
 
-type Pestana = "solicitudes" | "empresas" | "bitacora";
+type Pestana = "solicitudes" | "empresas" | "evaluaciones" | "bitacora";
 const FILTROS: (EstadoSolicitud | "todas")[] = ["nueva", "contactada", "contratada", "migrada", "descartada", "todas"];
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -61,6 +63,8 @@ export function PanelClientes() {
   const [conteo, setConteo] = useState<Partial<Record<EstadoSolicitud, number>>>({});
   const [empresas, setEmpresas] = useState<Empresa[] | null>(null);
   const [bitacora, setBitacora] = useState<FilaBitacora[] | null>(null);
+  const [evaluaciones, setEvaluaciones] = useState<EvaluacionAdmin[] | null>(null);
+  const [filtroEval, setFiltroEval] = useState<"todas" | "en_progreso" | "completada">("todas");
   const [rubros, setRubros] = useState<{ id: number; nombre: string }[]>([]);
   const [seleccion, setSeleccion] = useState<number[]>([]);
   const [error, setError] = useState<ErrorAdmin | null>(null);
@@ -118,6 +122,17 @@ export function PanelClientes() {
     if (pestana === "bitacora") void cargarBitacora();
   }, [pestana, cargarBitacora]);
 
+  const cargarEvaluaciones = useCallback(async () => {
+    try {
+      setEvaluaciones((await api.evaluaciones(filtroEval === "todas" ? undefined : filtroEval)).items);
+    } catch (e) {
+      manejarError(e);
+    }
+  }, [filtroEval, manejarError]);
+  useEffect(() => {
+    if (pestana === "evaluaciones") void cargarEvaluaciones();
+  }, [pestana, cargarEvaluaciones]);
+
   const elegidas = useMemo(
     () => (solicitudes ?? []).filter((x) => seleccion.includes(x.id)),
     [solicitudes, seleccion],
@@ -153,8 +168,9 @@ export function PanelClientes() {
   }
 
   async function salir() {
+    // HU-28: el BFF revoca la sesión en el servidor y luego borra la cookie
     await pedir("/bff/admin/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/admin/login");
+    router.replace("/admin/login?motivo=salida");
   }
 
   function alTerminarAlta(texto: string) {
@@ -181,10 +197,10 @@ export function PanelClientes() {
 
       <main id="contenido" className={s.contenido}>
         <div>
-          <h1 className="page-title">Empresas cliente</h1>
+          <h1 className="page-title">Panel interno</h1>
           <p className="page-sub">
-            Da de alta a la empresa que contrató, crea su usuario definitivo y traspásale la evaluación que hizo como
-            usuario temporal, sin repetir el autodiagnóstico.
+            Gestiona las solicitudes de contratación, da de alta a la empresa que contrató con su usuario definitivo,
+            traspásale la evaluación que hizo como usuario temporal y revisa todas las evaluaciones.
           </p>
         </div>
 
@@ -208,6 +224,7 @@ export function PanelClientes() {
             [
               ["solicitudes", "Solicitudes de contratación"],
               ["empresas", "Empresas"],
+              ["evaluaciones", "Evaluaciones"],
               ["bitacora", "Bitácora"],
             ] as [Pestana, string][]
           ).map(([clave, texto]) => (
@@ -255,6 +272,9 @@ export function PanelClientes() {
         ) : null}
 
         {pestana === "empresas" ? <TablaEmpresas empresas={empresas} reenviar={reenviar} /> : null}
+        {pestana === "evaluaciones" ? (
+          <TablaEvaluaciones filas={evaluaciones} filtro={filtroEval} setFiltro={setFiltroEval} />
+        ) : null}
         {pestana === "bitacora" ? <TablaBitacora filas={bitacora} /> : null}
       </main>
     </div>
@@ -655,6 +675,88 @@ function TablaEmpresas({ empresas, reenviar }: { empresas: Empresa[] | null; ree
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ evaluaciones (HU-28) */
+const FILTROS_EVAL: ["todas" | "en_progreso" | "completada", string][] = [
+  ["todas", "Todas"],
+  ["en_progreso", "En curso"],
+  ["completada", "Completadas"],
+];
+
+function TablaEvaluaciones({
+  filas,
+  filtro,
+  setFiltro,
+}: {
+  filas: EvaluacionAdmin[] | null;
+  filtro: "todas" | "en_progreso" | "completada";
+  setFiltro: (f: "todas" | "en_progreso" | "completada") => void;
+}) {
+  return (
+    <section className="card" aria-labelledby="titulo-evaluaciones">
+      <div className="card-head">
+        <div>
+          <h2 id="titulo-evaluaciones" className="card-title">Evaluaciones</h2>
+          <p className="card-sub">
+            Autodiagnósticos de la encuesta pública y por invitación (sin las marcadas como de prueba). Las traspasadas
+            muestran su empresa cliente.
+          </p>
+        </div>
+        <div className={s.filtros} role="group" aria-label="Filtrar evaluaciones por estado">
+          {FILTROS_EVAL.map(([f, texto]) => (
+            <button key={f} type="button" className="chip" aria-pressed={filtro === f} onClick={() => setFiltro(f)}>
+              {texto}
+            </button>
+          ))}
+        </div>
+      </div>
+      {!filas ? (
+        <p className={s.vacio}>Cargando…</p>
+      ) : !filas.length ? (
+        <p className={s.vacio}>No hay evaluaciones con este filtro.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <caption className="sr-only">Evaluaciones</caption>
+            <thead>
+              <tr>
+                <th scope="col">N.º</th>
+                <th scope="col">Origen</th>
+                <th scope="col">Rubro</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Puntaje general</th>
+                <th scope="col">Empresa cliente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((e) => (
+                <tr key={e.id}>
+                  <td className={s.mono}>{e.id}<span className={s.sub}>Iniciada {fecha(e.fecha_inicio)}</span></td>
+                  <td>{e.origen === "publica" ? "Encuesta pública" : "Invitación"}</td>
+                  <td>{e.rubro ?? "—"}</td>
+                  <td>
+                    <Estado texto={e.completada ? "Completada" : "En curso"} tono={e.completada ? "ok" : "medio"} />
+                  </td>
+                  <td>{e.puntaje_general != null ? `${e.puntaje_general} / 100` : "—"}</td>
+                  <td>
+                    {e.empresa ? (
+                      <>
+                        {e.empresa.razon_social ?? `Empresa #${e.empresa.id}`}
+                        <span className={s.sub}>Traspasada {fecha(e.fecha_migracion)}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

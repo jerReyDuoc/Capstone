@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePanel } from "@/hooks/usePanel";
+import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 
 const ITEMS: { ruta: string; etiqueta: string; icono: IconName }[] = [
@@ -80,6 +81,23 @@ export function Sidebar() {
               </Link>
             </li>
           </ul>
+        </nav>
+      ) : null}
+
+      {modo === "cliente" ? (
+        // HU-28: el usuario definitivo vuelve al espacio de su empresa o cierra su sesión
+        <nav className="nav" aria-label="Mi empresa">
+          <ul className="nav-list">
+            <li>
+              <Link href="/empresa" className="nav-link" data-label="Mi empresa" prefetch={false}>
+                <Icon name="lista" />
+                <span className="nav-label">Mi empresa</span>
+              </Link>
+            </li>
+          </ul>
+          <div style={{ padding: "8px 12px" }}>
+            <BotonCerrarSesion tipo="cliente" />
+          </div>
         </nav>
       ) : null}
 

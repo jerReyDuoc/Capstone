@@ -105,6 +105,20 @@ export interface Pagina<T> {
   conteo_por_estado?: Partial<Record<EstadoSolicitud, number>>;
 }
 
+/** HU-28: fila de GET /api/admin/evaluaciones (sin datos de contacto del encuestado). */
+export interface EvaluacionAdmin {
+  id: number;
+  origen: string;
+  estado_progreso: string | null;
+  completada: boolean;
+  fecha_inicio: string | null;
+  es_prueba: boolean;
+  rubro: string | null;
+  puntaje_general: number | null;
+  empresa: { id: number; razon_social: string | null } | null;
+  fecha_migracion: string | null;
+}
+
 export interface AltaEntrada {
   empresa: {
     razon_social: string;
@@ -134,6 +148,10 @@ export const api = {
   reenviar: (empresaId: number) =>
     pedir<{ activacion: Activacion }>(`${BASE}/admin/empresas/${empresaId}/usuario/activacion`, { method: "POST" }),
   bitacora: () => pedir<Pagina<FilaBitacora>>(`${BASE}/admin/bitacora?size=100`),
+  evaluaciones: (estado?: "en_progreso" | "completada") =>
+    pedir<Pagina<EvaluacionAdmin> & { conteo_por_estado?: Record<string, number> }>(
+      `${BASE}/admin/evaluaciones?size=100${estado ? `&estado=${estado}` : ""}`,
+    ),
   rubros: () => pedir<{ id: number; nombre_rubro: string | null }[]>(`${BASE}/rubros`),
 };
 
@@ -163,6 +181,10 @@ function mensajePorCodigo(codigo: string): string {
   switch (codigo) {
     case "SESION_EXPIRADA":
       return "Tu sesión terminó. Vuelve a iniciar sesión.";
+    case "CREDENCIALES_INVALIDAS":
+      return "Correo o contraseña incorrectos.";
+    case "DEMASIADOS_INTENTOS":
+      return "Demasiados intentos fallidos. Espera unos minutos antes de volver a intentarlo.";
     case "SIN_CONEXION":
       return "No pudimos conectar con el servidor.";
     case "NO_AUTORIZADO":

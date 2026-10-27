@@ -103,3 +103,19 @@ export function guardarCookie(res: NextResponse, token: string, expiraEnS: numbe
 export function borrarCookie(res: NextResponse): void {
   res.cookies.set(COOKIE_SESION, "", opcionesCookie(0));
 }
+
+/**
+ * HU-28: cierra la sesión EN EL SERVIDOR (POST /api/auth/logout), así el token deja de
+ * servir aunque alguien lo hubiera copiado. Es "mejor esfuerzo": si el backend no responde,
+ * quien llama igual borra la cookie y el token vence solo a las AUTH_TOKEN_TTL_MIN.
+ */
+export async function cerrarSesionEnBackend(token: string | undefined, ip?: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await llamarBackend("/api/auth/logout", { metodo: "POST", token, ip, timeoutMs: 5_000 });
+    return res.status === 204 || res.status === 401; // 401: ya estaba cerrada o vencida
+  } catch (e) {
+    if (e instanceof BackendNoDisponibleError) return false;
+    throw e;
+  }
+}

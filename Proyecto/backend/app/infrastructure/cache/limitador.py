@@ -49,6 +49,8 @@ class Limitador(Protocol):
     async def consumir(self, clave: str, limite: int, ventana_s: int) -> Consumo: ...
     async def devolver(self, clave: str) -> None: ...
     async def usados(self, clave: str) -> int: ...
+    async def restante_s(self, clave: str) -> int: ...
+    async def reiniciar(self, clave: str) -> None: ...
 
 
 def _resultado(usados: int, limite: int, ttl: int, ventana_s: int) -> Consumo:
@@ -107,6 +109,21 @@ class LimitadorRedis:
             raise LimitadorNoDisponibleError() from e
         return int(valor or 0)
 
+    async def restante_s(self, clave: str) -> int:
+        """HU-28: segundos que faltan para que la ventana de `clave` se reinicie (0 si no existe)."""
+        try:
+            ttl = await self._cliente().ttl(_PREFIJO + clave)
+        except Exception as e:  # noqa: BLE001
+            raise LimitadorNoDisponibleError() from e
+        return max(0, int(ttl or 0))
+
+    async def reiniciar(self, clave: str) -> None:
+        """HU-28: borra el contador (p. ej. los fallos de una cuenta tras entrar bien)."""
+        try:
+            await self._cliente().delete(_PREFIJO + clave)
+        except Exception:  # noqa: BLE001  (mejor esfuerzo, como devolver)
+            logger.warning("No se pudo reiniciar un contador del limitador")
+
 
 class LimitadorMemoria:
     """Mismo contrato que LimitadorRedis, en memoria del proceso (pruebas / desarrollo)."""
@@ -136,6 +153,13 @@ class LimitadorMemoria:
     async def usados(self, clave: str) -> int:
         fila = self._vigente(clave)
         return fila[0] if fila else 0
+
+    async def restante_s(self, clave: str) -> int:
+        fila = self._vigente(clave)
+        return max(0, int(fila[1] - time.monotonic())) if fila else 0
+
+    async def reiniciar(self, clave: str) -> None:
+        self._datos.pop(clave, None)
 
     def limpiar(self) -> None:
         self._datos.clear()

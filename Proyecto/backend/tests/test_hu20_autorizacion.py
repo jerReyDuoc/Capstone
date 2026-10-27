@@ -313,6 +313,8 @@ RUTAS_SOLO_ADMIN = [
     ("GET", "/api/admin/contrataciones", lambda m: ("/api/admin/contrataciones", {})),
     ("GET", "/api/admin/empresas", lambda m: ("/api/admin/empresas", {})),
     ("GET", "/api/admin/bitacora", lambda m: ("/api/admin/bitacora", {})),
+    # HU-28: evaluaciones del panel interno
+    ("GET", "/api/admin/evaluaciones", lambda m: ("/api/admin/evaluaciones", {})),
 ]
 
 # HU-27: también solo admin, pero necesitan una solicitud o empresa creadas. Sus pruebas de
@@ -412,6 +414,10 @@ RUTAS_DE_ACCESO = [
     ("POST", "/api/auth/cliente"),
     ("POST", "/api/auth/activacion/verificar"),
     ("POST", "/api/auth/activacion"),
+    # HU-28: recuperación de contraseña (la prueba completa está en test_hu28_sesion.py)
+    ("POST", "/api/auth/recuperacion"),
+    ("POST", "/api/auth/recuperacion/verificar"),
+    ("POST", "/api/auth/recuperacion/restablecer"),
 ]
 
 
@@ -454,6 +460,9 @@ RUTAS_CON_TOKEN_PROPIO = [
      {"json": {"evaluacion_id": 1, "nombre": "Ana", "email": "a@b.cl", "autoriza_migracion": True}}),
     ("GET", "/api/contratacion/evaluaciones/{evaluacion_id}/solicitud",
      "/api/contratacion/evaluaciones/1/solicitud", {}),
+    # HU-28: cerrar sesión y espacio de la empresa del cliente (roles en test_hu28_sesion.py)
+    ("POST", "/api/auth/logout", "/api/auth/logout", {}),
+    ("GET", "/api/cliente/empresa", "/api/cliente/empresa", {}),
 ]
 
 

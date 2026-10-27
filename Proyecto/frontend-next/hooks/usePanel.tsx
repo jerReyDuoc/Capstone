@@ -2,7 +2,16 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ApiError, cargarPanel, evaluacionDelEncuestado, listarEvaluaciones, MODO_DEMO, sesionEncuestado, type BaseApi } from "@/lib/api";
+import {
+  ApiError,
+  cargarPanel,
+  evaluacionDelEncuestado,
+  listarEvaluaciones,
+  MODO_DEMO,
+  sesionCliente,
+  sesionEncuestado,
+  type BaseApi,
+} from "@/lib/api";
 import type { EvaluacionApi, PanelVista } from "@/lib/types";
 
 type Estado =
@@ -16,14 +25,25 @@ type Estado =
  * "interno": equipo de TherionLabs (lista todas las evaluaciones, lee /api).
  * "encuestado": quien completó el autodiagnóstico desde la landing (HU-19/20). Ve solo su
  * evaluación y todo se lee por el BFF (/bff/api), que agrega su token.
+ * "cliente": usuario definitivo de una empresa cliente (HU-28). Ve las evaluaciones migradas
+ * a su empresa y todo se lee por /bff/cliente/api (su token vive en otra cookie httpOnly).
  */
-export type ModoPanel = "detectando" | "interno" | "encuestado";
+export type ModoPanel = "detectando" | "interno" | "encuestado" | "cliente";
+
+const BASE_DE: Record<ModoPanel, BaseApi> = {
+  detectando: "/api",
+  interno: "/api",
+  encuestado: "/bff/api",
+  cliente: "/bff/cliente/api",
+};
 
 interface PanelContexto {
   estado: Estado;
   modo: ModoPanel;
   evaluaciones: EvaluacionApi[];
   evaluacionId: number | null;
+  /** De dónde leer los datos según el modo (para componentes que piden algo más: PDF, plan…). */
+  base: BaseApi;
   demo: boolean;
   seleccionarEvaluacion: (id: number) => void;
   recargar: () => void;
@@ -43,14 +63,17 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const [version, setVersion] = useState(0);
   const [modo, setModo] = useState<ModoPanel>("detectando");
-  const base: BaseApi = modo === "encuestado" ? "/bff/api" : "/api";
+  const base = BASE_DE[modo];
 
   // ¿Quien mira es un encuestado con sesión? Si la URL pide otra evaluación, se trata
   // como acceso interno (el BFF igual rechazaría cualquier evaluación que no sea la suya).
+  // HU-28: si no, ¿es el usuario definitivo de una empresa cliente? (ve las de su empresa)
   useEffect(() => {
     const ctrl = new AbortController();
-    sesionEncuestado(ctrl.signal)
-      .then((id) => setModo(id != null && (idUrl == null || idUrl === id) ? "encuestado" : "interno"))
+    Promise.all([sesionEncuestado(ctrl.signal), sesionCliente(ctrl.signal)])
+      .then(([id, cliente]) =>
+        setModo(id != null && (idUrl == null || idUrl === id) ? "encuestado" : cliente ? "cliente" : "interno"),
+      )
       .catch((e) => {
         if (e.name !== "AbortError") setModo("interno");
       });
@@ -72,7 +95,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
         ? sesionEncuestado(ctrl.signal).then(async (id) =>
             id == null ? [] : [await evaluacionDelEncuestado(id, ctrl.signal)],
           )
-        : listarEvaluaciones(ctrl.signal);
+        : listarEvaluaciones(ctrl.signal, base);
     pedido
       .then((lista) => {
         setEvaluaciones(lista);
@@ -82,7 +105,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
         if (e.name !== "AbortError") setEstado({ tipo: "error", mensaje: (e as Error).message });
       });
     return () => ctrl.abort();
-  }, [version, idUrl, modo]);
+  }, [version, idUrl, modo, base]);
 
   useEffect(() => {
     if (evaluacionId == null || modo === "detectando") return;
@@ -127,12 +150,13 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       modo,
       evaluaciones,
       evaluacionId,
+      base,
       demo: MODO_DEMO,
       seleccionarEvaluacion,
       recargar: () => setVersion((v) => v + 1),
       href,
     }),
-    [estado, modo, evaluaciones, evaluacionId, seleccionarEvaluacion, href],
+    [estado, modo, evaluaciones, evaluacionId, base, seleccionarEvaluacion, href],
   );
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

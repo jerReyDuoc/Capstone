@@ -24,6 +24,10 @@ export function EncabezadoPublico({ enlaces = true }: { enlaces?: boolean }) {
             <Link className="btn btn-ghost btn-sm" href="/retomar" prefetch={false}>
               Retomar evaluación
             </Link>
+            {/* HU-28: acceso de las empresas que contrataron el servicio */}
+            <Link className="btn btn-ghost btn-sm" href="/ingresar" prefetch={false}>
+              Clientes
+            </Link>
           </nav>
         ) : null}
       </div>

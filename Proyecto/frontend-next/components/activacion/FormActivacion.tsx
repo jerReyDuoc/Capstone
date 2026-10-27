@@ -94,7 +94,10 @@ export function FormActivacion() {
         <p style={{ marginTop: 12, color: "var(--text-muted)" }}>
           Ya puedes iniciar sesión con tu correo y la contraseña que definiste. El enlace dejó de funcionar.
         </p>
-        <p style={{ marginTop: 16 }}><Link href="/" prefetch={false}>Ir al inicio</Link></p>
+        <p style={{ marginTop: 16 }}>
+          {/* HU-28 */}
+          <Link className="btn btn-primary" href="/ingresar?motivo=activada" prefetch={false}>Iniciar sesión</Link>
+        </p>
       </div>
     );
   }

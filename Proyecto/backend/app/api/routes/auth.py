@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,8 +9,14 @@ from app.application.use_cases.clave_acceso_encuestado import (
 )
 from app.application.use_cases.activacion_cuenta import ActivacionError, ActivarCuentaUseCase
 from app.application.use_cases.iniciar_sesion import (
-    ContratoNoVigenteError, CredencialesInvalidasError, IniciarSesionUseCase,
+    ContratoNoVigenteError, CredencialesInvalidasError, DemasiadosIntentosError, IniciarSesionUseCase,
 )
+from app.application.use_cases.recuperacion_contrasena import (
+    MENSAJE_SOLICITUD, RecuperacionContrasenaUseCase, enviar_en_segundo_plano,
+)
+from app.application.use_cases.sesiones import cerrar_sesion
+from app.domain.models.sesion import MotivoCierre
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
 from app.core.cliente import huella, ip_cliente
 from app.core.config import settings
@@ -19,8 +27,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 class LoginAdminRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
 
 
 class AccesoTitularRequest(BaseModel):
@@ -51,6 +59,20 @@ class ActivarCuentaRequest(BaseModel):
     password: str = Field(..., max_length=200)
 
 
+class SolicitarRecuperacionRequest(BaseModel):
+    tipo: Literal["cliente", "admin"] = "cliente"
+    email: str = Field(..., max_length=200)
+
+
+class VerificarRecuperacionRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+
+
+class RestablecerRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=200)
+
+
 def _exigir_secreto():
     if not settings.AUTH_SECRET:
         raise HTTPException(
@@ -59,14 +81,36 @@ def _exigir_secreto():
         )
 
 
+_LIMITADOR_CAIDO = HTTPException(status_code=503, headers={"Retry-After": "60"}, detail={
+    "codigo": "LIMITADOR_NO_DISPONIBLE", "mensaje": "Intenta de nuevo en unos minutos."})
+
+
+def _demasiados_intentos(e: DemasiadosIntentosError) -> HTTPException:
+    return HTTPException(status_code=429, headers={"Retry-After": str(e.reintentar_en_s)}, detail={
+        "codigo": "DEMASIADOS_INTENTOS", "reintentar_en_s": e.reintentar_en_s, "mensaje": str(e)})
+
+
 @router.post("/login")
-async def login_admin(payload: LoginAdminRequest, db: AsyncSession = Depends(get_db)):
-    """Login del administrador (rol admin_therion). Devuelve el token bearer."""
+async def login_admin(
+    payload: LoginAdminRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """
+    Login del administrador (rol admin_therion). Devuelve el token bearer (con sesión, HU-28).
+    HU-28: intentos fallidos limitados por cuenta e IP (429) y cada intento en la bitácora.
+    """
     _exigir_secreto()
     try:
-        return await IniciarSesionUseCase(db).admin(payload.email, payload.password)
+        return await IniciarSesionUseCase(db).admin(payload.email, payload.password, limitador,
+                                                    ip_cliente(request))
     except CredencialesInvalidasError as e:
         raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
+    except DemasiadosIntentosError as e:
+        raise _demasiados_intentos(e)
+    except LimitadorNoDisponibleError:
+        raise _LIMITADOR_CAIDO
 
 
 @router.post("/titular")
@@ -138,8 +182,6 @@ async def generar_clave_encuestado(
 
 
 # ------------------------------------------------------------------ HU-27: cliente
-_CLIENTE_IP_10MIN = 20
-_CLIENTE_EMAIL_15MIN = 10
 _ACTIVACION_IP_10MIN = 30
 
 
@@ -167,18 +209,23 @@ async def login_cliente(
     db: AsyncSession = Depends(get_db),
     limitador: Limitador = Depends(obtener_limitador),
 ):
-    """HU-27: login del usuario definitivo de una empresa cliente (rol cliente)."""
+    """
+    HU-27: login del usuario definitivo de una empresa cliente (rol cliente).
+    HU-28: abre una sesión revocable; intentos fallidos limitados por cuenta e IP (429);
+    cada intento en la bitácora.
+    """
     _exigir_secreto()
-    await _limitar(limitador, [
-        (f"cli:ip:{huella(ip_cliente(request))}", _CLIENTE_IP_10MIN, 600),
-        (f"cli:em:{huella(payload.email.strip().lower())}", _CLIENTE_EMAIL_15MIN, 900),
-    ], "Demasiados intentos. Espera unos minutos antes de volver a intentarlo.")
     try:
-        return await IniciarSesionUseCase(db).cliente(payload.email, payload.password)
+        return await IniciarSesionUseCase(db).cliente(payload.email, payload.password, limitador,
+                                                      ip_cliente(request))
     except CredencialesInvalidasError as e:
         raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
     except ContratoNoVigenteError as e:
         raise HTTPException(status_code=403, detail={"codigo": "CONTRATO_NO_VIGENTE", "mensaje": str(e)})
+    except DemasiadosIntentosError as e:
+        raise _demasiados_intentos(e)
+    except LimitadorNoDisponibleError:
+        raise _LIMITADOR_CAIDO
 
 
 @router.post("/activacion/verificar")
@@ -220,3 +267,86 @@ async def activar_cuenta(
 async def quien_soy(actor: Actor = Depends(obtener_actor)):
     """Identidad del token actual (útil para el frontend)."""
     return {"usuario_id": actor.id, "rol": actor.rol}
+
+
+# ------------------------------------------------------------------ HU-28: cierre de sesión
+@router.post("/logout", status_code=204)
+async def cerrar_sesion_actual(actor: Actor = Depends(obtener_actor), db: AsyncSession = Depends(get_db)):
+    """
+    HU-28: cierra la sesión del token (admin o cliente): desde ahora el token responde 401
+    aunque no haya vencido. Con un token sin sesión (encuestado, referente) no hay nada que
+    cerrar en el servidor: el BFF solo borra su cookie.
+    """
+    sesion = await cerrar_sesion(db, actor, MotivoCierre.LOGOUT)
+    if sesion is not None:
+        BitacoraRepository(db).registrar(
+            accion=Accion.SESION_CERRADA, entidad="sesion_usuario", entidad_id=sesion.id, actor=actor,
+            detalle={"motivo": MotivoCierre.LOGOUT},
+        )
+        await db.commit()
+    return Response(status_code=204)
+
+
+# ------------------------------------------------------------------ HU-28: recuperación de contraseña
+@router.post("/recuperacion", status_code=202)
+async def solicitar_recuperacion(
+    payload: SolicitarRecuperacionRequest,
+    request: Request,
+    tareas: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """
+    HU-28: pide el enlace para restablecer la contraseña (tipo cliente o admin).
+    Responde SIEMPRE 202 con el mismo mensaje, exista o no la cuenta; el correo sale en
+    segundo plano después de responder, para que el tiempo tampoco lo revele.
+    """
+    await _limitar(limitador, [
+        (f"rec:ip:{huella(ip_cliente(request))}", settings.RECUPERACION_SOLICITUDES_IP_HORA, 3600),
+    ], "Demasiadas solicitudes. Espera un rato antes de volver a intentarlo.")
+    try:
+        pendiente = await RecuperacionContrasenaUseCase(db).solicitar(payload.tipo, payload.email, limitador)
+    except LimitadorNoDisponibleError:
+        raise _LIMITADOR_CAIDO
+    if pendiente is not None:
+        tareas.add_task(enviar_en_segundo_plano, pendiente)
+    return {"mensaje": MENSAJE_SOLICITUD}
+
+
+@router.post("/recuperacion/verificar")
+async def verificar_recuperacion(
+    payload: VerificarRecuperacionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """HU-28: comprueba el enlace de recuperación SIN consumirlo (para mostrar el formulario)."""
+    await _limitar(limitador, [(f"act:ip:{huella(ip_cliente(request))}", _ACTIVACION_IP_10MIN, 600)],
+                   "Demasiados intentos. Espera unos minutos.")
+    try:
+        return await RecuperacionContrasenaUseCase(db).verificar(payload.token.strip())
+    except ActivacionError as e:
+        raise _error_activacion(e)
+
+
+@router.post("/recuperacion/restablecer")
+async def restablecer_contrasena(
+    payload: RestablecerRequest,
+    request: Request,
+    tareas: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """
+    HU-28: define la contraseña nueva con el enlace (un solo uso). Cierra todas las sesiones
+    abiertas de la cuenta y avisa por correo que la contraseña cambió.
+    """
+    await _limitar(limitador, [(f"act:ip:{huella(ip_cliente(request))}", _ACTIVACION_IP_10MIN, 600)],
+                   "Demasiados intentos. Espera unos minutos.")
+    try:
+        resultado, aviso = await RecuperacionContrasenaUseCase(db).restablecer(
+            payload.token.strip(), payload.password, limitador)
+    except ActivacionError as e:
+        raise _error_activacion(e)
+    tareas.add_task(enviar_en_segundo_plano, aviso)
+    return resultado

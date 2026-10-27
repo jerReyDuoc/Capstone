@@ -61,6 +61,7 @@ C_ADMIN = "Mientras la cuenta esté activa"
 C_PRUEBA = "Mientras exista el registro (prueba del consentimiento o de la atención del derecho)"
 C_CLIENTE = "Mientras dure el contrato de la empresa (las reglas de término las fija el PO)"
 C_CONTRATACION = "Hasta migrar la evaluación (se borra al pasar a la empresa) o descartar la solicitud"
+C_SESION = "Mientras la cuenta exista (el PO fija una depuración de sesiones y enlaces vencidos, HU-28)"
 
 
 @dataclass(frozen=True)
@@ -363,6 +364,37 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         "fecha_consentimiento_contacto": Dato(
             METADATO, finalidad="Prueba de cuándo aceptó ser contactado (HU-31)",
             base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+    },
+    # ------------------------------------------------------------ HU-28: sesiones y recuperación
+    # Una fila por inicio de sesión de un admin o de un usuario definitivo. Del identificador
+    # de sesión solo queda su SHA-256; actor_id liga la fila a la persona.
+    "sesion_usuario": {
+        **_sin_dp("id", "actor_rol", "fecha_expiracion", "motivo_cierre"),
+        "sid_hash": Dato(
+            CREDENCIAL, HASH, finalidad="Validar y revocar la sesión del token (solo su SHA-256, HU-28)",
+            base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+        "actor_id": Dato(
+            METADATO, finalidad="Saber de quién es la sesión para cerrarla (cerrar sesión, cambio de contraseña)",
+            base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+        "fecha_inicio": Dato(
+            METADATO, finalidad="Detectar accesos indebidos", base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+        "fecha_cierre": Dato(
+            METADATO, finalidad="Revocar el token al cerrar sesión", base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+    },
+    "token_recuperacion": {
+        **_sin_dp("id", "actor_rol", "fecha_creacion", "fecha_expiracion", "fecha_uso", "fecha_revocacion"),
+        "actor_id": Dato(
+            METADATO, finalidad="Saber a qué cuenta pertenece el enlace de recuperación (HU-28)",
+            base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+        "token_hash": Dato(
+            CREDENCIAL, HASH, finalidad="Validar el enlace de recuperación de un solo uso (solo su SHA-256)",
+            base=B_SEGURIDAD, conservacion=C_SESION,
         ),
     },
     # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).

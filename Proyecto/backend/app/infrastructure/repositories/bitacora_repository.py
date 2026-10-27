@@ -34,6 +34,15 @@ class Accion:
     ACTIVACION_USADA = "activacion.cuenta_activada"
     ACTIVACION_RECHAZADA = "activacion.rechazada"
     CLIENTE_LOGIN = "cliente.inicio_sesion"
+    # HU-28: inicio y cierre de sesión (admin y cliente) y recuperación de contraseña.
+    # Inicio exitoso del cliente: CLIENTE_LOGIN (HU-27); del admin: ADMIN_LOGIN.
+    ADMIN_LOGIN = "admin.inicio_sesion"
+    LOGIN_FALLIDO = "sesion.inicio_fallido"          # credenciales, contrato no vigente...
+    LOGIN_BLOQUEADO = "sesion.inicio_bloqueado"      # rechazado por exceso de intentos fallidos
+    SESION_CERRADA = "sesion.cierre"
+    RECUPERACION_SOLICITADA = "recuperacion.solicitada"
+    RECUPERACION_USADA = "recuperacion.contrasena_restablecida"
+    RECUPERACION_RECHAZADA = "recuperacion.rechazada"
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

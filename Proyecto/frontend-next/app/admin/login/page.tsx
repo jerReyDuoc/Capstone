@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { FormLoginAdmin } from "@/components/admin/FormLoginAdmin";
 import s from "@/components/admin/admin.module.css";
+import { motivoLogin } from "@/lib/acceso";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Panel interno · Iniciar sesión", robots: { index: false, follow: false } };
@@ -11,7 +12,7 @@ export default async function LoginAdmin({ searchParams }: { searchParams: Promi
   return (
     <main id="contenido" className={s.pagina}>
       <div className={s.login}>
-        <FormLoginAdmin motivo={motivo === "sesion" ? "sesion" : undefined} />
+        <FormLoginAdmin motivo={motivoLogin(motivo)} />
       </div>
     </main>
   );

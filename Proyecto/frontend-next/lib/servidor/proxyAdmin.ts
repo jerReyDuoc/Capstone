@@ -20,6 +20,8 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "GET", patron: /^admin\/empresas\/\d{1,9}$/ },
   { metodo: "POST", patron: /^admin\/empresas\/\d{1,9}\/evaluaciones$/ },
   { metodo: "POST", patron: /^admin\/empresas\/\d{1,9}\/usuario\/activacion$/ },
+  // HU-28: evaluaciones del panel interno
+  { metodo: "GET", patron: /^admin\/evaluaciones$/ },
   // Bitácora (base HU-09)
   { metodo: "GET", patron: /^admin\/bitacora$/ },
   // Catálogo para el formulario
@@ -38,7 +40,11 @@ export function autorizarRutaAdmin(metodo: string, segmentos: string[]): Autoriz
 }
 
 const QUERY_ADMIN = new Map<string, RegExp>([
-  ["estado", /^(nueva|contactada|contratada|migrada|descartada)$/],
+  // estados de la bandeja (HU-31) y de las evaluaciones (HU-28)
+  ["estado", /^(nueva|contactada|contratada|migrada|descartada|en_progreso|completada)$/],
+  ["origen", /^(publica|invitacion)$/],
+  ["empresa_id", /^\d{1,9}$/],
+  ["incluir_prueba", /^(true|false)$/],
   ["page", /^\d{1,4}$/],
   ["size", /^\d{1,3}$/],
   ["entidad", /^[a-z_]{1,40}$/],

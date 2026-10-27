@@ -425,6 +425,9 @@ stateDiagram-v2
 - Token bearer firmado con HMAC-SHA256 (`AUTH_SECRET`), vigencia `AUTH_TOKEN_TTL_MIN` (480 min por defecto). Respuesta: `{access_token, token_type, rol, usuario_id, expira_en_min}`.
 - Contraseñas con PBKDF2-SHA256 (600 000 iteraciones); verificación en tiempo constante y hash señuelo para no revelar emails existentes.
 - En cada petición se comprueba en BD que el admin siga activo o que el titular no esté anonimizado (401 `USUARIO_DESHABILITADO`).
+- HU-28: los logins con contraseña (admin y cliente) abren una **sesión revocable** (`sesion_usuario`); el token lleva su `sid` y `POST /api/auth/logout` o restablecer la contraseña la cierran. Los intentos **fallidos** se limitan por cuenta (`LOGIN_MAX_FALLOS_CUENTA`, 5) y por IP (`LOGIN_MAX_FALLOS_IP`, 20) en ventanas de `LOGIN_VENTANA_FALLOS_MIN` (15) minutos → 429 `DEMASIADOS_INTENTOS`; el contador de la cuenta usa la huella del correo escrito, exista o no. Cada intento (exitoso, fallido o bloqueado) queda en la bitácora.
+- HU-28: recuperación de contraseña por enlace de un solo uso (`/restablecer#token=…`, vence en `RECUPERACION_TTL_MIN`); la respuesta no revela si el correo existe.
+- En el navegador el token nunca es visible: el BFF de Next.js lo guarda en cookies httpOnly (`cai_sesion` del encuestado, `cai_admin` del admin y `cai_cliente` del cliente; `__Host-` en producción).
 - Administradores: `docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl` (contraseña mínima de 12 caracteres; `--desactivar` corta el acceso).
 - Token de prueba solo para desarrollo: `python -m app.core.autenticacion --usuario 1 --rol referente`.
 
@@ -576,7 +579,7 @@ Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a 
 
 ## 7. Endpoints de la API
 
-Base: `http://localhost:8000` (o a través del proxy del frontend en `http://localhost:3000`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion`.
+Base: `http://localhost:8000` (o a través del proxy del frontend en `http://localhost:3000`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion` · 🏢 `cliente` (usuario definitivo, HU-28).
 
 **HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/test_hu20_autorizacion.py`; detalle en `Extras/Cambios/backend/CAMBIOS_HU20.md`.
 
@@ -599,6 +602,10 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | POST | `/api/auth/cliente` | 🔓 | HU-27: `{email, password}` → token del rol `cliente` (403 `CONTRATO_NO_VIGENTE` si el contrato terminó) |
 | POST | `/api/auth/activacion/verificar` | 🔓 | HU-27: `{token}` → ¿el enlace sigue válido? (no lo consume) |
 | POST | `/api/auth/activacion` | 🔓 | HU-27: `{token, password}` → define la contraseña; el enlace queda usado (400 `ENLACE_INVALIDO`, 410 `ENLACE_VENCIDO`, 422 `CONTRASENA_DEBIL`) |
+| POST | `/api/auth/logout` | 🔑 | HU-28: 204; cierra la sesión del token (admin o cliente): desde ese momento el token responde 401 |
+| POST | `/api/auth/recuperacion` | 🔓 | HU-28: `{tipo: cliente\|admin, email}` → SIEMPRE 202 con el mismo mensaje; si la cuenta está activa, envía el enlace (en segundo plano) |
+| POST | `/api/auth/recuperacion/verificar` | 🔓 | HU-28: `{token}` → `{tipo, email (enmascarado), password_min}` sin consumir el enlace |
+| POST | `/api/auth/recuperacion/restablecer` | 🔓 | HU-28: `{token, password}` → contraseña nueva; enlace usado, todas las sesiones de la cuenta cerradas y aviso por correo (400, 410, 422 como la activación) |
 
 ### Catálogos y controles
 
@@ -681,16 +688,19 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/admin/empresas`, `/api/admin/empresas/{id}` | 🛡️ | Empresas con su usuario y evaluaciones |
 | POST | `/api/admin/empresas/{id}/evaluaciones` | 🛡️ | `{solicitudes_ids}` → asociar más evaluaciones autorizadas |
 | POST | `/api/admin/empresas/{id}/usuario/activacion` | 🛡️ | Reenvía el enlace (revoca el anterior) |
+| GET | `/api/admin/evaluaciones?estado=&origen=&empresa_id=` | 🛡️ | HU-28: todas las evaluaciones con rubro, puntaje general y empresa (si migró); sin contacto del encuestado |
 | GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | Bitácora de auditoría (solo inserción, sin datos personales) |
+| GET | `/api/cliente/empresa` | 🏢 | HU-28: espacio del cliente: su empresa, contrato y evaluaciones migradas |
 
-El rol `cliente` ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md` y `CAMBIOS_HU31.md`.
+El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md` y `CAMBIOS_HU28.md`.
 
 ### Códigos de error
 
 | HTTP | Código (`detail.codigo`) | Cuándo |
 |---|---|---|
 | 400 | — (texto) | Validación de negocio |
-| 401 | `NO_AUTENTICADO`, `TOKEN_INVALIDO`, `CREDENCIALES_INVALIDAS`, `USUARIO_DESHABILITADO` | Autenticación |
+| 401 | `NO_AUTENTICADO`, `TOKEN_INVALIDO`, `CREDENCIALES_INVALIDAS`, `USUARIO_DESHABILITADO` | Autenticación (también una sesión cerrada con logout o por cambio de contraseña, HU-28) |
+| 429 | `DEMASIADOS_INTENTOS` (incluye `reintentar_en_s` y `Retry-After`) | HU-28: demasiados inicios de sesión fallidos para esa cuenta o IP |
 | 403 | `NO_AUTORIZADO` | Rol insuficiente |
 | 404 | `EVALUACION_NO_ENCONTRADA` u otro | Recurso no encontrado o de otra organización (HU-20) |
 | 409 | `TRANSICION_INVALIDA` (incluye `estado_actual` y `permitidas`) | Cambio de estado ARCOP no permitido |
@@ -769,6 +779,18 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 - **Criterios de aceptación:** responsivo ≥ 1024 px (barra lateral compacta entre 1024 y 1279 px); gráficos de radar y barras interactivos con mouse y teclado (tooltip, Enter filtra o abre el detalle, vista de tabla); WCAG 2.1 AA (contraste ≥ 5,7:1 en texto, foco visible, zoom 200 %, alternativas en texto). Paleta y tipografía del sitio TherionLabs.
 - **Documentación:** `frontend-next/README.md`, `Extras/Cambios/frontend/HU-13_HANDOFF.md` (tokens, layout, componentes, casos borde) y `docs/ACCESIBILIDAD.md` (auditoría).
 - **Modo demo** sin backend: `cd frontend-next && npm install && NEXT_PUBLIC_DEMO=1 npm run dev`.
+
+**Acceso con email y contraseña (HU-28).** Todo pasa por el BFF de Next.js y el token vive solo en una cookie httpOnly:
+
+| Ruta | Para quién | Contenido |
+|---|---|---|
+| `/ingresar` | Usuario definitivo de una empresa cliente | Inicio de sesión; con sesión vigente lleva directo a `/empresa` |
+| `/empresa` | Usuario definitivo | Espacio de su empresa: contrato y evaluaciones migradas, cada una con **Ver resultados** (abre `/panel` en modo cliente, por `/bff/cliente/api/*`) y **Cerrar sesión**. HU-29 agrega cursos y tutor IA |
+| `/admin/login` → `/admin/clientes` | Administrador de Therion Labs | Panel interno con pestañas **Solicitudes de contratación**, **Empresas**, **Evaluaciones** y **Bitácora**, y **Cerrar sesión** |
+| `/recuperar` (`?tipo=admin`) | Ambos | "¿Olvidaste tu contraseña?": pide el enlace por correo (misma respuesta exista o no la cuenta) |
+| `/restablecer#token=…` | Ambos | Define la contraseña nueva; cierra todas las sesiones abiertas de la cuenta |
+
+Cerrar sesión revoca el token en el servidor (`POST /api/auth/logout`) antes de borrar la cookie. Detalle en `Extras/Cambios/frontend/CAMBIOS_HU28.md`.
 
 ### 10.2 Prototipo estático (archivado)
 

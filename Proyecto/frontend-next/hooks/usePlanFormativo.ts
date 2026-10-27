@@ -16,7 +16,7 @@ export type EstadoPlan =
  * terminó de cargar, así "Actualizar" (que recarga el panel) también recarga el plan.
  */
 export function usePlanFormativo(): EstadoPlan {
-  const { evaluacionId, modo, estado } = usePanel();
+  const { evaluacionId, modo, estado, base } = usePanel();
   const [plan, setPlan] = useState<EstadoPlan>({ tipo: "cargando" });
   const panelListo = estado.tipo === "listo";
 
@@ -24,7 +24,7 @@ export function usePlanFormativo(): EstadoPlan {
     if (evaluacionId == null || modo === "detectando" || !panelListo) return;
     const ctrl = new AbortController();
     setPlan({ tipo: "cargando" });
-    cargarPlanFormativo(evaluacionId, ctrl.signal, modo === "encuestado" ? "/bff/api" : "/api")
+    cargarPlanFormativo(evaluacionId, ctrl.signal, base)
       .then((p) => setPlan({ tipo: "listo", plan: p }))
       .catch((e) => {
         if ((e as Error).name === "AbortError") return;
@@ -39,7 +39,7 @@ export function usePlanFormativo(): EstadoPlan {
         }
       });
     return () => ctrl.abort();
-  }, [evaluacionId, modo, panelListo]);
+  }, [evaluacionId, modo, panelListo, base]);
 
   return plan;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
-import { ApiError, descargarInformePdf, enviarInformePorCorreo, MODO_DEMO, type EnvioInforme } from "@/lib/api";
+import { ApiError, descargarInformePdf, enviarInformePorCorreo, MODO_DEMO, type BaseApi, type EnvioInforme } from "@/lib/api";
 import { descargarBlob, imprimirComoPdf, nombreArchivo } from "@/lib/exportar";
 import type { FiltrosBrechas } from "@/lib/filtrosBrechas";
 
@@ -27,8 +27,7 @@ export function AccionesInforme({
   /** Mensaje para la región aria-live de la página (si no, se muestra aquí). */
   onAviso?: (texto: string) => void;
 }) {
-  const { modo } = usePanel();
-  const base = modo === "encuestado" ? "/bff/api" : "/api";
+  const { modo, base } = usePanel();
   const [descargando, setDescargando] = useState(false);
   const [aviso, setAvisoLocal] = useState("");
   const [abierto, setAbierto] = useState(false);
@@ -112,7 +111,7 @@ function DialogoCorreo({
   evaluacionId: number;
   filtros?: FiltrosBrechas;
   encuestado: boolean;
-  base: "/api" | "/bff/api";
+  base: BaseApi;
   onCerrar: (resultado: EnvioInforme | null) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);

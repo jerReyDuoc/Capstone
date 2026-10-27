@@ -10,6 +10,8 @@
  *    usar el BFF: por ahí la IP llegaría como la del contenedor y el token iría al JS.
  * 3. /encuesta sin cookie de sesión → /retomar (sin exponer nada en la URL).
  *    HU-27: /admin/* sin cookie de administrador → /admin/login.
+ *    HU-28: /empresa sin cookie de cliente → /ingresar; con sesión vigente, /ingresar y
+ *    /admin/login llevan directo al espacio que corresponde.
  * 4. Content-Security-Policy:
  *      - páginas del flujo (/comenzar, /retomar, /encuesta y, desde HU-31, /panel/contratar):
  *        nonce por petición +
@@ -21,6 +23,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ipCliente } from "@/lib/servidor/peticion";
 import { COOKIE_SESION, sesionDelToken } from "@/lib/servidor/sesion";
 import { COOKIE_ADMIN, sesionAdminDelToken } from "@/lib/servidor/sesionAdmin";
+import { COOKIE_CLIENTE, sesionClienteDelToken } from "@/lib/servidor/sesionCliente";
 
 const DEV = process.env.NODE_ENV !== "production";
 const TURNSTILE = "https://challenges.cloudflare.com";
@@ -40,6 +43,12 @@ const VENTANAS: Record<string, Ventana> = {
   // HU-31: el formulario "Contratar la plataforma" (los límites reales, iguales a los de
   // la encuesta pública, los aplica FastAPI con Redis + CAPTCHA)
   "/bff/api/contratacion/solicitudes": { limite: 5, ms: 60_000 },
+  // HU-28: login del cliente y recuperación de contraseña (los límites reales de intentos
+  // FALLIDOS por cuenta e IP los aplica FastAPI con Redis)
+  "/bff/cliente/login": { limite: 10, ms: 60_000 },
+  "/bff/recuperacion/solicitar": { limite: 5, ms: 60_000 },
+  "/bff/recuperacion/verificar": { limite: 20, ms: 60_000 },
+  "/bff/recuperacion/restablecer": { limite: 10, ms: 60_000 },
 };
 const golpes = new Map<string, number[]>();
 const MAX_CLAVES = 10_000;
@@ -99,7 +108,15 @@ const SOLO_BFF = [
   /^\/api\/admin(\/|$)/,
   /^\/api\/auth\/login$/,
   /^\/api\/auth\/activacion(\/|$)/,
+  // HU-28: login del cliente, cierre de sesión, recuperación y espacio de la empresa
+  /^\/api\/auth\/cliente$/,
+  /^\/api\/auth\/logout$/,
+  /^\/api\/auth\/recuperacion(\/|$)/,
+  /^\/api\/cliente(\/|$)/,
 ];
+
+// HU-28: páginas de acceso y del espacio del cliente: nunca en caché compartida
+const SIN_CACHE = ["/activar", "/ingresar", "/recuperar", "/restablecer", "/empresa"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -148,6 +165,30 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  // 3c. HU-28: el espacio de la empresa exige sesión de cliente
+  const cliente = sesionClienteDelToken(req.cookies.get(COOKIE_CLIENTE)?.value);
+  if ((pathname === "/empresa" || pathname.startsWith("/empresa/")) && !cliente) {
+    const destino = req.nextUrl.clone();
+    destino.pathname = "/ingresar";
+    destino.search = "?motivo=sesion";
+    return NextResponse.redirect(destino);
+  }
+  // 3d. HU-28: con sesión vigente, el login lleva directo adentro (salvo que venga a avisar algo)
+  if (!req.nextUrl.searchParams.has("motivo")) {
+    const adentro =
+      pathname === "/ingresar" && cliente
+        ? "/empresa"
+        : pathname === "/admin/login" && sesionAdminDelToken(req.cookies.get(COOKIE_ADMIN)?.value)
+          ? "/admin/clientes"
+          : null;
+    if (adentro) {
+      const destino = req.nextUrl.clone();
+      destino.pathname = adentro;
+      destino.search = "";
+      return NextResponse.redirect(destino);
+    }
+  }
+
   // 4. CSP
   if (esFlujo(pathname)) {
     const nonce = btoa(crypto.randomUUID());
@@ -162,7 +203,9 @@ export function middleware(req: NextRequest) {
   }
   const res = NextResponse.next();
   res.headers.set("Content-Security-Policy", cspBase());
-  if (pathname.startsWith("/admin") || pathname === "/activar") res.headers.set("Cache-Control", "private, no-store");
+  if (pathname.startsWith("/admin") || SIN_CACHE.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+    res.headers.set("Cache-Control", "private, no-store");
+  }
   return res;
 }
 

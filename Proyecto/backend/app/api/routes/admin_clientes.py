@@ -15,6 +15,9 @@ Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
     POST  /api/admin/empresas/{id}/evaluaciones           asociar más evaluaciones autorizadas
     POST  /api/admin/empresas/{id}/usuario/activacion     reenviar el enlace (revoca el anterior)
 
+  Evaluaciones (HU-28: el panel interno lista todas, con su empresa si fue migrada)
+    GET   /api/admin/evaluaciones?estado=&origen=&empresa_id=&page=&size=
+
   Bitácora (base HU-09)
     GET   /api/admin/bitacora?entidad=&entidad_id=&accion=&page=&size=
 
@@ -25,7 +28,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import false as sa_false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.activacion_cuenta import ResultadoCorreo
@@ -261,6 +264,62 @@ async def reenviar_activacion(empresa_id: int, actor: Actor = Depends(solo_admin
     except ContratacionError as err:
         raise _error(err)
     return {"empresa_id": empresa_id, "activacion": _correo(r)}
+
+
+# ------------------------------------------------------------------ evaluaciones (HU-28)
+@router.get("/evaluaciones")
+async def listar_evaluaciones_admin(
+    estado: str | None = Query(None, max_length=20, description="en_progreso | completada | ..."),
+    origen: str | None = Query(None, max_length=20, description="publica | invitacion"),
+    empresa_id: int | None = Query(None, ge=1),
+    incluir_prueba: bool = Query(False, description="Incluir las marcadas como de prueba"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    _: Actor = Depends(solo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    HU-28 criterio 2: evaluaciones del panel interno, con su rubro, puntaje general y la
+    empresa a la que se migraron (si ya contrató). Sin datos de contacto del encuestado.
+    """
+    filtros = []
+    if estado:
+        filtros.append(Evaluacion.estado_progreso == estado)
+    if origen:
+        filtros.append(Evaluacion.origen == origen)
+    if empresa_id is not None:
+        filtros.append(Evaluacion.empresa_id == empresa_id)
+    if not incluir_prueba:
+        filtros.append(Evaluacion.es_prueba == sa_false())
+    total = (await db.execute(select(func.count()).select_from(Evaluacion).where(*filtros))).scalar_one()
+    puntaje = (
+        select(Resumen.evaluacion_id, func.avg(Resumen.puntaje_obtenido).label("puntaje"))
+        .group_by(Resumen.evaluacion_id).subquery()
+    )
+    filas = (await db.execute(
+        select(Evaluacion, Rubro.nombre_rubro, Empresa.razon_social, puntaje.c.puntaje)
+        .outerjoin(UsuarioTemporal, Evaluacion.usuario_temporal_id == UsuarioTemporal.id)
+        .outerjoin(Rubro, UsuarioTemporal.rubro_id == Rubro.id)
+        .outerjoin(Empresa, Evaluacion.empresa_id == Empresa.id)
+        .outerjoin(puntaje, puntaje.c.evaluacion_id == Evaluacion.id)
+        .where(*filtros)
+        .order_by(Evaluacion.id.desc()).offset((page - 1) * size).limit(size)
+    )).all()
+    conteo = dict((await db.execute(
+        select(Evaluacion.estado_progreso, func.count()).where(Evaluacion.es_prueba == sa_false())
+        .group_by(Evaluacion.estado_progreso)
+    )).all())
+    return {
+        "items": [{
+            "id": ev.id, "origen": ev.origen, "estado_progreso": ev.estado_progreso,
+            "completada": ev.esta_cerrada, "fecha_inicio": ev.fecha_inicio, "es_prueba": ev.es_prueba,
+            "rubro": rubro, "puntaje_general": round(p, 1) if p is not None else None,
+            "empresa": {"id": ev.empresa_id, "razon_social": razon} if ev.empresa_id else None,
+            "fecha_migracion": ev.fecha_migracion,
+        } for ev, rubro, razon, p in filas],
+        "total": total, "page": page, "size": size,
+        "conteo_por_estado": {str(k or "sin_estado"): v for k, v in conteo.items()},
+    }
 
 
 # ------------------------------------------------------------------ bitácora (HU-09 base)

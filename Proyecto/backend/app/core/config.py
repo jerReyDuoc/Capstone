@@ -181,6 +181,23 @@ class Settings(BaseSettings):
     # día. Vacío = el mismo valor de ENCUESTA_EVALUACIONES_IP_DIA.
     CONTRATACION_SOLICITUDES_IP_DIA: int | None = None
 
+    # ------------------------------------------------ HU-28: inicio/cierre de sesión y recuperación
+    # Intentos FALLIDOS de inicio de sesión (admin y cliente). Se cuentan por cuenta (huella del
+    # correo, exista o no, para no revelar cuáles existen) y por IP en una ventana fija; al
+    # llegar al máximo se rechaza con 429 hasta que la ventana termine. Entrar bien reinicia el
+    # contador de la cuenta.
+    LOGIN_MAX_FALLOS_CUENTA: int = 5
+    LOGIN_MAX_FALLOS_IP: int = 20
+    LOGIN_VENTANA_FALLOS_MIN: int = 15
+    # Recuperación de contraseña: enlace de un solo uso por correo (token en el fragmento #token=,
+    # como la activación de HU-27). En production con SMTP debe ser https:// (se comprueba al arrancar).
+    RECUPERACION_URL_BASE: str = "http://localhost:3000/restablecer"
+    RECUPERACION_TTL_MIN: int = 30
+    # Correos de recuperación por cuenta y hora (pasado el límite se responde igual, sin enviar)
+    # y peticiones por IP y hora (pasado el límite, 429).
+    RECUPERACION_CORREOS_CUENTA_HORA: int = 3
+    RECUPERACION_SOLICITUDES_IP_HORA: int = 10
+
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
         valor = self.CONTRATACION_SOLICITUDES_IP_DIA
@@ -232,6 +249,15 @@ class Settings(BaseSettings):
             raise ValueError("CONTRATACION_AVISO_EMAIL debe ser un correo válido (o vacío).")
         if self.CONTRATACION_SOLICITUDES_IP_DIA is not None and self.CONTRATACION_SOLICITUDES_IP_DIA < 1:
             raise ValueError("CONTRATACION_SOLICITUDES_IP_DIA debe ser mayor que 0 (o vacío).")
+        for nombre in ("LOGIN_MAX_FALLOS_CUENTA", "LOGIN_MAX_FALLOS_IP", "LOGIN_VENTANA_FALLOS_MIN",
+                       "RECUPERACION_TTL_MIN", "RECUPERACION_CORREOS_CUENTA_HORA",
+                       "RECUPERACION_SOLICITUDES_IP_HORA"):
+            if getattr(self, nombre) < 1:
+                raise ValueError(f"{nombre} debe ser mayor que 0 (HU-28).")
+        if (self.APP_ENV == "production" and self.CORREO_MODO == "smtp"
+                and not self.RECUPERACION_URL_BASE.startswith("https://")):
+            # Al arrancar y no al enviar: un error solo cuando el correo existe revelaría cuáles existen
+            raise ValueError("RECUPERACION_URL_BASE debe usar https:// con APP_ENV=production (HU-28).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),
