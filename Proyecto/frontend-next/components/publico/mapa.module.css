@@ -1,0 +1,118 @@
+/* Portada · lámina del mapa topográfico de gobernanza (MapaGobernanza.tsx). Tokens de app/globals.css. */
+
+/* ---------- la lámina: un objeto con marco, franja de leyenda y escala ---------- */
+.lamina {
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.franja {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-6);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+.titulo { margin: 0; font-size: var(--fs-sm); color: var(--text); font-weight: 600; }
+.simbolos { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); }
+.simbolos li { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--text-muted); }
+.simbolos svg { width: 14px; height: 14px; flex: none; overflow: visible; }
+.simbolos svg[viewBox="0 0 20 14"] { width: 20px; }
+.simboloCurva { fill: none; stroke: var(--accent); stroke-width: 1.4; }
+
+.mapa { display: block; width: 100%; height: auto; overflow: hidden; }
+
+.escala {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--line-strong);
+  font-size: var(--fs-xs); color: var(--text-subtle);
+}
+.regla {
+  flex: 1; max-width: 320px;
+  display: flex; justify-content: space-between;
+  padding-top: 8px;
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(90deg, var(--alto), var(--medio), var(--accent)) 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- trazos ---------- */
+.curva {
+  fill: none;
+  stroke-width: 1.2;
+  /* pathLength=1: la curva mide 1, así el trazado se anima igual sea cual sea su largo */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: trazar 1.8s var(--ease) forwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.fondo .curva { stroke: var(--grid); }
+.cima .curva { stroke: rgba(20, 216, 158, 0.5); }
+.cima .curvaAlta { stroke: var(--accent); stroke-width: 1.8; fill: rgba(20, 216, 158, 0.12); }
+.cimaBrecha .curva { stroke: rgba(242, 96, 92, 0.5); }
+.cimaBrecha .curvaAlta { stroke: var(--alto); stroke-width: 1.8; fill: rgba(242, 96, 92, 0.14); }
+
+.ruta {
+  fill: none;
+  stroke: var(--text-subtle);
+  stroke-width: 1.6;
+  stroke-dasharray: 2 8;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: aparecer 0.8s ease forwards 1.6s;
+}
+
+/* ---------- etiquetas ---------- */
+.etiquetas { opacity: 0; animation: aparecer 0.8s ease forwards 1.9s; }
+.hito { fill: var(--accent); }
+.hitoBrecha { fill: var(--alto); }
+.nombre {
+  fill: var(--text);
+  font-family: var(--font-archivo), var(--font-display);
+  font-variation-settings: "wdth" 112;
+  font-size: 19px; font-weight: 650;
+}
+.cota { fill: var(--text-muted); font-family: var(--font-body); font-size: 14px; font-variant-numeric: tabular-nums; }
+/* halo del color del fondo: el texto se lee aunque pase sobre una curva */
+.nombre, .cota { paint-order: stroke; stroke: var(--bg); stroke-width: 6px; stroke-linejoin: round; }
+
+@keyframes trazar { to { stroke-dashoffset: 0; } }
+@keyframes aparecer { to { opacity: 1; } }
+
+/* Sin animación: todo visible desde el primer cuadro */
+@media (prefers-reduced-motion: reduce) {
+  .curva { animation: none; stroke-dashoffset: 0; }
+  .ruta, .etiquetas { animation: none; opacity: 1; }
+}
+
+/* ---------- pantallas medianas: el lienzo se reduce, las etiquetas crecen en proporción ---------- */
+@media (max-width: 1100px) {
+  .nombre { font-size: 23px; }
+  .cota { font-size: 17px; }
+}
+
+/* ---------- teléfonos: sin etiquetas en el lienzo, se listan debajo ---------- */
+.leyendaMovil { display: none; }
+
+@media (max-width: 680px) {
+  .curva { stroke-width: 2.6; }
+  .cima .curvaAlta, .cimaBrecha .curvaAlta { stroke-width: 3.4; }
+  .ruta { stroke-width: 3; stroke-dasharray: 5 14; }
+  .etiquetas { display: none; }
+  .franja, .escala { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .leyendaMovil {
+    display: grid; gap: 0;
+    margin: 0; padding: 0 var(--sp-4); list-style: none;
+    border-top: 1px solid var(--line-strong);
+  }
+  .leyendaMovil li {
+    display: flex; justify-content: space-between; gap: var(--sp-3);
+    padding: var(--sp-3) 0;
+    font-size: var(--fs-sm);
+  }
+  .leyendaMovil li + li { border-top: 1px solid var(--line); }
+  .leyendaMovil li span:last-child { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .leyendaMovil li[data-brecha] span:last-child { color: var(--alto); }
+}

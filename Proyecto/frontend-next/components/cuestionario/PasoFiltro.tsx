@@ -5,6 +5,10 @@
  *   - F1 = NO  → la organización no usa IA: ningún control aplica y el resto no se pregunta.
  *   - F2..F7 = SÍ suman controles específicos (datos sensibles, terceros, LLM, agentes…).
  * Al final se muestra el resumen y se guarda todo junto (el backend exige las 7).
+ *
+ * Distribución: la pregunta a la izquierda con dos botones grandes (Sí / No, atajos S y N) y,
+ * a la derecha, "Tu cuestionario": cuántos controles aplican hasta ahora y lo ya respondido,
+ * para volver a cualquier pregunta con un clic. En pantallas angostas el resumen va debajo.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
@@ -20,6 +24,11 @@ import {
 import { comoErrorEncuesta } from "@/lib/encuesta/cliente";
 import type { ErrorEncuesta } from "@/lib/encuesta/contratos";
 import s from "./cuestionario.module.css";
+
+const OPCIONES = [
+  { valor: true, etiqueta: "Sí", tecla: "S" },
+  { valor: false, etiqueta: "No", tecla: "N" },
+] as const;
 
 export function PasoFiltro({ c }: { c: Cuestionario }) {
   const { filtro, respuestasFiltro: resp, setRespuestasFiltro, progreso } = c;
@@ -38,24 +47,48 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
     montado.current = true;
   }, [paso]);
 
-  if (!filtro) return null;
   const total = preguntas.length;
   const enResumen = paso >= total;
   const pregunta = enResumen ? null : preguntas[paso];
-  const estimado = controlesEstimados(resp);
-  const yaHabiaRespuestas = (progreso?.controles_respondidos ?? 0) > 0;
 
   function responder(codigo: string, valor: boolean) {
+    if (!filtro) return;
     const nuevas = { ...resp, [codigo]: valor };
     setRespuestasFiltro(nuevas);
     setError(null);
     // Pequeña pausa para que se vea la selección antes de pasar a la siguiente
     window.setTimeout(() => {
-      const visibles = preguntasVisibles(filtro!.preguntas, nuevas);
+      const visibles = preguntasVisibles(filtro.preguntas, nuevas);
       const actual = visibles.findIndex((p) => p.codigo === codigo);
       setPaso(actual + 1);
     }, 180);
   }
+
+  // Atajos S / N (fuera de un campo de texto). Se lee la pregunta vigente desde una ref.
+  const preguntaVigente = useRef(pregunta?.codigo ?? null);
+  preguntaVigente.current = pregunta?.codigo ?? null;
+  const responderVigente = useRef(responder);
+  responderVigente.current = responder;
+  useEffect(() => {
+    function alTeclear(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey || !preguntaVigente.current) return;
+      const destino = e.target as HTMLElement | null;
+      if (destino?.tagName === "TEXTAREA" || destino?.isContentEditable ||
+          (destino?.tagName === "INPUT" && (destino as HTMLInputElement).type !== "radio")) return;
+      const tecla = e.key.toLowerCase();
+      if (tecla === "s" || tecla === "n") {
+        e.preventDefault();
+        responderVigente.current(preguntaVigente.current, tecla === "s");
+      }
+    }
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, []);
+
+  if (!filtro) return null;
+  const estimado = controlesEstimados(resp);
+  const yaHabiaRespuestas = (progreso?.controles_respondidos ?? 0) > 0;
+  const raizRespondida = resp[PREGUNTA_RAIZ] !== undefined;
 
   async function confirmar() {
     setEnviando(true);
@@ -70,138 +103,156 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
 
   return (
     <section className={`card ${s.filtro}`} aria-labelledby="t-filtro">
-      <div className={s.avance}>
-        <div className={s.avanceFila}>
-          <span className="eyebrow" style={{ margin: 0 }}>Contexto de tu organización</span>
-          <span>
-            {enResumen ? "Revisión" : (
-              <>Pregunta <strong>{paso + 1}</strong> de <strong>{total}</strong></>
-            )}
-          </span>
-        </div>
-        <div className="meter" role="progressbar" aria-label="Avance de las preguntas iniciales" aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(paso, total)}>
-          <span style={{ width: `${(Math.min(paso, total) / Math.max(total, 1)) * 100}%` }} />
-        </div>
+      <div className={s.filtroCabecera}>
+        <span className={s.filtroEtapa}>Contexto de tu organización</span>
+        <span className={s.filtroCuenta}>
+          {enResumen ? "Revisión" : <>Pregunta <strong>{paso + 1}</strong> de <strong>{total}</strong></>}
+        </span>
+      </div>
+      {/* Avance segmentado: una marca por pregunta (es una secuencia real) */}
+      <div
+        className={s.segmentos}
+        role="progressbar"
+        aria-label="Avance de las preguntas iniciales"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={Math.min(paso, total)}
+      >
+        {preguntas.map((p, i) => (
+          <span key={p.codigo} data-estado={i < paso ? "hecho" : i === paso ? "actual" : "pendiente"} />
+        ))}
       </div>
 
-      {pregunta ? (
-        <>
-          <div style={{ display: "grid", gap: 8 }}>
-            <h2 id="t-filtro" ref={titulo} tabIndex={-1} className={s.textoPregunta}>
-              {pregunta.pregunta}
-            </h2>
-            {pregunta.descripcion ? (
-              <p id={idAyuda} className={s.ayuda}>{pregunta.descripcion}</p>
-            ) : null}
-          </div>
+      <div className={s.filtroGrid}>
+        <div className={s.filtroPrincipal}>
+          {pregunta ? (
+            <>
+              <div className={s.filtroEnunciado}>
+                <h2 id="t-filtro" ref={titulo} tabIndex={-1} className={s.filtroPregunta}>
+                  {pregunta.pregunta}
+                </h2>
+                {pregunta.descripcion ? <p id={idAyuda} className={s.ayuda}>{pregunta.descripcion}</p> : null}
+              </div>
 
-          <fieldset className={`${s.opciones} ${s.siNo}`} aria-describedby={pregunta.descripcion ? idAyuda : undefined}>
-            <legend className="sr-only">{pregunta.pregunta}</legend>
-            {[
-              { valor: true, etiqueta: "Sí" },
-              { valor: false, etiqueta: "No" },
-            ].map((o) => (
-              <label key={String(o.valor)} className={s.opcion}>
-                <input
-                  type="radio"
-                  name={`filtro-${pregunta.codigo}`}
-                  checked={resp[pregunta.codigo] === o.valor}
-                  onChange={() => responder(pregunta.codigo, o.valor)}
-                />
-                <span className={s.opcionEtiqueta}>{o.etiqueta}</span>
-              </label>
-            ))}
-          </fieldset>
+              <fieldset className={s.siNoGrande} aria-describedby={pregunta.descripcion ? idAyuda : undefined}>
+                <legend className="sr-only">{pregunta.pregunta}</legend>
+                {OPCIONES.map((o) => (
+                  <label key={String(o.valor)} className={s.botonSiNo} data-valor={o.valor ? "si" : "no"}>
+                    <input
+                      type="radio"
+                      name={`filtro-${pregunta.codigo}`}
+                      checked={resp[pregunta.codigo] === o.valor}
+                      onChange={() => responder(pregunta.codigo, o.valor)}
+                    />
+                    <span className={s.botonSiNoTexto}>{o.etiqueta}</span>
+                    <kbd className={s.atajo} aria-hidden="true">{o.tecla}</kbd>
+                  </label>
+                ))}
+              </fieldset>
 
-          <Estimado codigo={pregunta.codigo} estimado={estimado} raizRespondida={resp[PREGUNTA_RAIZ] !== undefined} />
+              <p className={s.consecuencia} aria-live="polite">
+                <Consecuencia codigo={pregunta.codigo} />
+              </p>
 
-          <div className={s.acciones}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p - 1)} disabled={paso === 0}>
-              <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
-              Anterior
-            </button>
-            {resp[pregunta.codigo] !== undefined ? (
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p + 1)}>
-                Siguiente
-                <Icon name="flecha" />
-              </button>
-            ) : null}
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ display: "grid", gap: 8 }}>
-            <h2 id="t-filtro" ref={titulo} tabIndex={-1} className={s.textoPregunta}>
-              {resp[PREGUNTA_RAIZ] === false ? "Tu organización no utiliza IA" : "Revisa tus respuestas"}
-            </h2>
-            <p className={s.ayuda}>
-              {resp[PREGUNTA_RAIZ] === false
-                ? "Con esta respuesta ningún control de la matriz aplica todavía. Si en el futuro incorporan IA, conviene repetir el autodiagnóstico."
-                : "Con estas respuestas armamos un cuestionario a la medida de tu organización. Puedes cambiar cualquiera antes de continuar."}
-            </p>
-          </div>
-
-          <ul className={s.resumenFiltro}>
-            {preguntas.map((p, i) => (
-              <li key={p.codigo}>
-                <span>
-                  <strong>{resp[p.codigo] ? "Sí" : "No"}</strong> · {p.pregunta}
-                </span>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso(i)} aria-label={`Cambiar respuesta: ${p.pregunta}`}>
-                  Cambiar
+              <div className={s.filtroAcciones}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p - 1)} disabled={paso === 0}>
+                  <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
+                  Anterior
                 </button>
-              </li>
-            ))}
-          </ul>
+                {resp[pregunta.codigo] !== undefined ? (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p + 1)}>
+                    Siguiente
+                    <Icon name="flecha" />
+                  </button>
+                ) : null}
+                <span className={s.atajos} aria-hidden="true">
+                  Atajos: <kbd>S</kbd> sí, <kbd>N</kbd> no.
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={s.filtroEnunciado}>
+                <h2 id="t-filtro" ref={titulo} tabIndex={-1} className={s.filtroPregunta}>
+                  {resp[PREGUNTA_RAIZ] === false ? "Tu organización no utiliza IA" : "Revisa tus respuestas"}
+                </h2>
+                <p className={s.ayuda}>
+                  {resp[PREGUNTA_RAIZ] === false
+                    ? "Con esta respuesta ningún control de la matriz aplica todavía. Si en el futuro incorporan IA, conviene repetir el autodiagnóstico."
+                    : "Con estas respuestas armamos un cuestionario a la medida de tu organización. Puedes cambiar cualquiera antes de continuar."}
+                </p>
+              </div>
 
-          <div className={s.estimado} role="status">
-            <span className={s.estimadoValor}>{estimado}</span>
-            <span className={s.estimadoTexto}>
-              {estimado === 0 ? "controles aplican a tu organización." : "controles de la matriz aplican a tu organización. Responderás uno por uno; tu avance se guarda solo."}
+              {yaHabiaRespuestas ? (
+                <p className="callout" role="note">
+                  <Icon name="info" />
+                  <span>
+                    Ya respondiste {progreso?.controles_respondidos} controles. Si cambias estas preguntas, las respuestas de
+                    los controles que dejen de aplicar no contarán en tu resultado.
+                  </span>
+                </p>
+              ) : null}
+
+              {error ? <AvisoError error={error} onReintentar={confirmar} /> : null}
+
+              <div className={s.filtroAcciones}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso(total - 1)}>
+                  <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
+                  Anterior
+                </button>
+                <button type="button" className="btn btn-primary" onClick={confirmar} disabled={enviando} aria-busy={enviando}>
+                  {enviando ? "Guardando…" : estimado === 0 ? "Confirmar" : "Comenzar el cuestionario"}
+                  {!enviando ? <Icon name="flecha" /> : null}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <aside className={s.filtroResumen} aria-label="Tu cuestionario">
+          <div className={s.contador} role="status">
+            <span className={s.contadorValor}>{raizRespondida ? estimado : "—"}</span>
+            <span className={s.contadorTexto}>
+              {raizRespondida
+                ? estimado === 0
+                  ? "controles aplican a tu organización"
+                  : "controles aplican hasta ahora. Responderás uno por uno y tu avance se guarda solo."
+                : "controles aplican: depende de tu primera respuesta"}
             </span>
           </div>
-
-          {yaHabiaRespuestas ? (
-            <p className="callout" role="note">
-              <Icon name="info" />
-              <span>
-                Ya respondiste {progreso?.controles_respondidos} controles. Si cambias estas preguntas, las respuestas de los
-                controles que dejen de aplicar no contarán en tu resultado.
-              </span>
-            </p>
-          ) : null}
-
-          {error ? <AvisoError error={error} onReintentar={confirmar} /> : null}
-
-          <div className={s.acciones}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso(total - 1)}>
-              <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
-              Anterior
-            </button>
-            <button type="button" className="btn btn-primary" onClick={confirmar} disabled={enviando} aria-busy={enviando}>
-              {enviando ? "Guardando…" : estimado === 0 ? "Confirmar" : "Comenzar el cuestionario"}
-              {!enviando ? <Icon name="flecha" /> : null}
-            </button>
-          </div>
-        </>
-      )}
+          {preguntas.some((p) => resp[p.codigo] !== undefined) ? (
+            <ol className={s.respondidas}>
+              {preguntas.map((p, i) =>
+                resp[p.codigo] === undefined ? null : (
+                  <li key={p.codigo}>
+                    <button
+                      type="button"
+                      className={s.respondida}
+                      aria-current={i === paso ? "step" : undefined}
+                      onClick={() => setPaso(i)}
+                      aria-label={`Cambiar respuesta (${resp[p.codigo] ? "Sí" : "No"}): ${p.pregunta}`}
+                    >
+                      <span className={s.respondidaTexto}>{p.pregunta}</span>
+                      <span className={s.respondidaValor} data-valor={resp[p.codigo] ? "si" : "no"}>
+                        {resp[p.codigo] ? "Sí" : "No"}
+                      </span>
+                    </button>
+                  </li>
+                ),
+              )}
+            </ol>
+          ) : (
+            <p className={s.ayuda}>Tus respuestas aparecerán aquí; puedes volver a cualquiera con un clic.</p>
+          )}
+        </aside>
+      </div>
     </section>
   );
 }
 
-function Estimado({ codigo, estimado, raizRespondida }: { codigo: string; estimado: number; raizRespondida: boolean }) {
+function Consecuencia({ codigo }: { codigo: string }) {
   const suma = CONTROLES_POR_FILTRO[codigo];
-  let texto: string;
-  if (codigo === PREGUNTA_RAIZ) texto = "Si respondes No, ningún control aplica y el diagnóstico termina aquí.";
-  else if (suma) texto = `Si respondes Sí, se suman ${suma} controles específicos a tu cuestionario.`;
-  else texto = "";
-  return (
-    <div className={s.estimado} aria-live="polite">
-      <span>
-        <span className={s.estimadoValor}>{raizRespondida ? estimado : "—"}</span>{" "}
-        <span className={s.estimadoTexto}>controles aplican hasta ahora</span>
-      </span>
-      {texto ? <span className={s.estimadoTexto}>{texto}</span> : null}
-    </div>
-  );
+  if (codigo === PREGUNTA_RAIZ) return <>Si respondes <strong>No</strong>, ningún control aplica y el diagnóstico termina aquí.</>;
+  if (suma) return <>Si respondes <strong>Sí</strong>, se suman <strong>{suma}</strong> controles específicos a tu cuestionario.</>;
+  return null;
 }

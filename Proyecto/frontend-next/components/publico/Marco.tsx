@@ -22,7 +22,8 @@ export function EncabezadoPublico({ enlaces = true }: { enlaces?: boolean }) {
             <a className={s.navEnlace} href="/#como-funciona">Cómo funciona</a>
             <a className={s.navEnlace} href="/#privacidad">Privacidad</a>
             <Link className="btn btn-ghost btn-sm" href="/retomar" prefetch={false}>
-              Retomar evaluación
+              {/* un solo nodo de texto: el botón es flex con gap y separaría las dos palabras */}
+              <span>Retomar<span className={s.soloAncho}> evaluación</span></span>
             </Link>
             {/* HU-28: acceso de las empresas que contrataron el servicio */}
             <Link className="btn btn-ghost btn-sm" href="/ingresar" prefetch={false}>

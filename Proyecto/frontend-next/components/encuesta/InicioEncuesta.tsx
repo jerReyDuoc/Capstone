@@ -35,13 +35,16 @@ export function InicioEncuesta() {
   if (estado.tipo !== "activa") return null;
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ display: "grid", gap: 16 }}>
+      {/* Una sola línea con la evaluación, el guardado y los límites del día (el aviso completo
+          aparece solo si se agotan): así el cuestionario empieza más arriba en pantallas bajas. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", alignItems: "center" }}>
         <span className="badge tone-info">Evaluación N.º {estado.evaluacionId}</span>
-        <span className="card-sub" style={{ margin: 0 }}>Tu avance se guarda solo. Puedes cerrar y retomar con tu número y tu clave.</span>
+        <span className="card-sub" style={{ margin: 0 }}>Tu avance se guarda solo; puedes retomar con tu número y tu clave.</span>
+        <div style={{ flex: "1 1 320px", display: "flex", justifyContent: "flex-end" }}>
+          <BannerLimites limites={limites} compacto />
+        </div>
       </div>
-
-      <BannerLimites limites={limites} />
 
       <Cuestionario evaluacionId={estado.evaluacionId} onLimites={() => void refrescar()} />
 

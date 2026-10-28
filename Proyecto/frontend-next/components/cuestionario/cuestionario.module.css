@@ -3,10 +3,17 @@
 /* ---------- distribución: índice a la izquierda (≥ 1024 px), pregunta al centro ---------- */
 .layout { display: grid; gap: var(--sp-6); align-items: start; }
 @media (min-width: 1024px) {
-  .layout { grid-template-columns: 300px minmax(0, 1fr); }
-  .indice { position: sticky; top: var(--sp-6); max-height: calc(100vh - 2 * var(--sp-6)); overflow-y: auto; }
+  .layout { grid-template-columns: 260px minmax(0, 1fr); }
 }
-.columna { display: grid; gap: var(--sp-5); min-width: 0; }
+@media (min-width: 1440px) {
+  .layout { grid-template-columns: 300px minmax(0, 1fr); }
+}
+@media (min-width: 1024px) {
+  /* el índice sí acompaña al scroll, pero bajo el encabezado público (68 px), no tapado por él */
+  .indice { position: sticky; top: 88px; max-height: calc(100vh - 108px); overflow-y: auto; }
+}
+/* contenedor de las container queries de la tarjeta de pregunta (un elemento no puede consultarse a sí mismo) */
+.columna { display: grid; gap: var(--sp-5); min-width: 0; container: pregunta / inline-size; }
 
 /* ---------- barra de avance ---------- */
 .avance { display: grid; gap: var(--sp-2); }
@@ -54,8 +61,18 @@
   .indiceTitulo { display: none; }
 }
 
-/* ---------- tarjeta de pregunta ---------- */
-.pregunta { display: grid; gap: var(--sp-5); }
+/* ---------- tarjeta de pregunta ----------
+   Dos zonas: el planteamiento (pregunta, qué se exige, evidencia esperada) y la respuesta
+   (estado, justificación, evidencia, acciones). Con la tarjeta ancha van lado a lado;
+   angosta, una debajo de la otra. */
+.pregunta { display: grid; gap: var(--sp-6); }
+.planteamiento { display: grid; gap: var(--sp-5); align-content: start; min-width: 0; }
+.respuesta { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
+@container pregunta (min-width: 860px) {
+  .pregunta { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--sp-8); }
+  /* Sin sticky: la pregunta se desplaza junto con la página (no "se mueve" dentro de la tarjeta) */
+  .planteamiento { align-self: start; }
+}
 .cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .codigo {
   font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
@@ -64,7 +81,8 @@
 .dominio { font-size: var(--fs-sm); color: var(--text-muted); }
 .textoPregunta { font-size: clamp(1.2rem, 2.4vw, 1.5rem); font-weight: 600; line-height: 1.35; }
 .contexto { display: grid; gap: var(--sp-3); }
-@media (min-width: 720px) { .contexto { grid-template-columns: 1fr 1fr; } }
+/* una sola tarjeta ancha (sin columnas): los dos datos lado a lado */
+@container pregunta (min-width: 600px) and (max-width: 859px) { .contexto { grid-template-columns: 1fr 1fr; } }
 .dato {
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2);
@@ -105,6 +123,69 @@
 .marca[data-tono="alto"] { background: var(--alto); }
 .marca[data-tono="info"] { background: var(--info); border-radius: 2px; }
 .marca[data-tono="bajo"] { background: var(--text-subtle); }
+
+/* Estado del control: 5 botones compactos en vez de 5 tarjetas altas */
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 196px), 1fr)); gap: var(--sp-2); }
+.chip {
+  position: relative;
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--target); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line-control); border-radius: var(--radius-sm); background: var(--surface-2);
+  cursor: pointer; font-size: var(--fs-sm); font-weight: 600; line-height: 1.25;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.chip:hover { border-color: var(--text-subtle); }
+.chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* el radio nativo queda accesible pero oculto: la tarjeta entera es el control */
+.chip input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+/* min-width: 0 deja que la etiqueta se ajuste (y pase a dos líneas si hace falta) sin empujar
+   el número del atajo fuera del botón, que conserva su ancho (flex: none) */
+.chipEtiqueta { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.atajo {
+  flex: none; min-width: 20px; padding: 0 5px;
+  border: 1px solid var(--line-strong); border-radius: 4px;
+  font-family: var(--font-body); font-size: var(--fs-xs); font-weight: 500; text-align: center;
+  color: var(--text-subtle);
+}
+.chip:has(input:checked) .atajo { border-color: var(--accent); color: var(--accent); }
+.ayudaOpcion {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  min-height: 2.6em; margin-top: var(--sp-3);
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+.ayudaOpcion .marca { transform: translateY(1px); }
+.ayudaOpcion strong { color: var(--text); font-weight: 600; }
+.detalles { display: grid; gap: var(--sp-5); }
+/* al desplazar hasta la justificación, que no quede bajo el encabezado ni bajo la barra fija */
+.campo { scroll-margin-top: 92px; scroll-margin-bottom: 128px; }
+
+/* Barra de acciones siempre visible al pie mientras se responde */
+.respuesta .acciones {
+  position: sticky; bottom: 0; z-index: 2;
+  margin: 0 calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6));
+  padding: var(--sp-4) var(--sp-6);
+  border-top: 1px solid var(--line-strong);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: rgba(10, 16, 14, 0.94);
+  backdrop-filter: blur(8px);
+  margin-top: auto; /* al fondo de la columna aunque la pregunta sea más alta */
+}
+@container pregunta (min-width: 860px) {
+  /* en dos columnas la barra solo ocupa la columna de la respuesta */
+  .respuesta .acciones { margin-left: 0; padding-left: 0; border-radius: 0 0 var(--radius-lg) 0; }
+}
+.atajos { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-subtle); }
+.atajos kbd { padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 4px; font-family: var(--font-body); }
+/* sin teclado físico los atajos no sirven: se ocultan en pantallas táctiles y angostas */
+@media (hover: none), (max-width: 639px) { .atajos, .atajo { display: none; } }
+/* en teléfonos la barra cabe en una fila: "Anterior" queda solo con la flecha (el texto sigue para lectores) */
+@media (max-width: 479px) {
+  .textoAnterior { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .respuesta .acciones { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
+}
+/* el título recibe el foco por código al cambiar de control (lectores de pantalla); no es un control */
+.textoPregunta:focus { outline: none; }
 
 .siNo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .siNo .opcion { grid-template-columns: auto 1fr; align-items: center; min-height: 64px; font-size: var(--fs-lg); }
@@ -156,8 +237,84 @@
 .guardado { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--accent); }
 .guardado svg { width: 16px; height: 16px; }
 
-/* ---------- filtro ---------- */
-.filtro { display: grid; gap: var(--sp-6); }
+/* ---------- filtro (preguntas iniciales) ---------- */
+.filtro { display: grid; gap: var(--sp-5); }
+.filtroCabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.filtroEtapa { font-family: var(--font-display); font-weight: 600; color: var(--accent); }
+.filtroCuenta { font-size: var(--fs-sm); color: var(--text-muted); }
+.filtroCuenta strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.segmentos { display: flex; gap: 6px; margin-top: calc(-1 * var(--sp-2)); }
+.segmentos span { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-3); transition: background-color var(--dur) var(--ease); }
+.segmentos span[data-estado="hecho"] { background: var(--accent-strong); }
+.segmentos span[data-estado="actual"] { background: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+
+.filtroGrid { display: grid; gap: var(--sp-6); align-items: start; }
+@container pregunta (min-width: 860px) {
+  .filtroGrid { grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: var(--sp-8); }
+}
+.filtroPrincipal { display: grid; gap: var(--sp-5); min-width: 0; }
+.filtroEnunciado { display: grid; gap: var(--sp-2); }
+.filtroPregunta {
+  font-size: clamp(1.25rem, 2.6vw, 1.75rem); font-weight: 600; line-height: 1.3; text-wrap: balance;
+  max-width: 34ch;
+}
+.filtroPregunta:focus { outline: none; }
+
+.siNoGrande { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); max-width: 520px; }
+.botonSiNo {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  min-height: 72px; padding: 0 var(--sp-5);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md); background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.botonSiNo:hover { border-color: var(--text-subtle); }
+.botonSiNo input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.botonSiNo:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.botonSiNo:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.botonSiNo:has(input:checked) .atajo { border-color: var(--accent); color: var(--accent); }
+.botonSiNoTexto { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600; }
+.consecuencia { margin: 0; min-height: 1.5em; font-size: var(--fs-sm); color: var(--text-muted); }
+.consecuencia strong { color: var(--text); }
+.filtroAcciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.filtroAcciones .atajos { margin: 0 0 0 auto; }
+.filtroAcciones :global(.btn-primary) { margin-left: auto; }
+
+/* "Tu cuestionario": contador vivo y lo ya respondido */
+.filtroResumen {
+  display: grid; gap: var(--sp-4);
+  padding: var(--sp-5);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2);
+}
+.contador { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-3); align-items: center; }
+.contadorValor {
+  font-family: var(--font-display); font-size: 2.75rem; font-weight: 600; line-height: 1;
+  color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.contadorTexto { font-size: var(--fs-sm); color: var(--text-muted); }
+.respondidas { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; max-height: 320px; overflow-y: auto; }
+.respondida {
+  display: flex; align-items: center; gap: var(--sp-3); width: 100%;
+  min-height: var(--target); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-muted); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer;
+}
+.respondida:hover { background: var(--surface-3); color: var(--text); }
+.respondida:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.respondida[aria-current="step"] { border-color: var(--accent); color: var(--text); }
+.respondidaTexto { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.respondidaValor {
+  flex: none; min-width: 36px; padding: 2px 8px; border-radius: var(--radius-pill);
+  font-size: var(--fs-xs); font-weight: 600; text-align: center;
+  background: var(--surface-3); color: var(--text);
+}
+.respondidaValor[data-valor="si"] { background: var(--accent-soft); color: var(--accent); }
+
+@media (max-width: 479px) {
+  .botonSiNo { min-height: 60px; padding: 0 var(--sp-4); }
+  .filtroAcciones .atajos { display: none; }
+}
 .estimado {
   display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap;
   padding: var(--sp-4) var(--sp-5);
@@ -196,6 +353,17 @@
 .cierre svg { width: 40px; height: 40px; color: var(--accent); }
 .cierre p { color: var(--text-muted); max-width: 54ch; }
 
+/* Pantallas bajas (notebooks de 768 px de alto): todo más compacto para que la respuesta quepa */
+@media (max-height: 820px) {
+  .pregunta { gap: var(--sp-4); }
+  .planteamiento, .respuesta, .detalles { gap: var(--sp-4); }
+  .textoPregunta { font-size: clamp(1.1rem, 2vw, 1.3rem); }
+  .dato { padding: var(--sp-2) var(--sp-3); }
+  .textarea { min-height: 84px; }
+  .evidencia { padding: var(--sp-3) var(--sp-4); gap: var(--sp-2); }
+  .respuesta .acciones { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .item, .opcion { transition: none; }
+  .item, .opcion, .chip, .botonSiNo, .segmentos span { transition: none; }
 }

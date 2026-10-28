@@ -18,12 +18,12 @@ export default async function Encuesta() {
   if (!sesionDelToken(token)) redirect("/retomar?motivo=sesion");
   return (
     <PaginaPublica enlaces={false}>
-      <div className={`${s.contenedor} ${s.flujo}`}>
+      <div className={`${s.contenedorAncho} ${s.flujo}`}>
         <header className={s.flujoCabecera}>
           <h1 className={s.flujoTitulo}>Mi autodiagnóstico</h1>
           <p className={s.flujoBajada}>
-            Responde las preguntas iniciales y luego cada control que aplica a tu organización. Solo tú, con tu clave,
-            puedes ver y editar esta evaluación.
+            Primero unas preguntas sobre tu organización y luego cada control que aplica. Solo tú, con tu clave, puedes
+            ver y editar esta evaluación.
           </p>
         </header>
         <InicioEncuesta />

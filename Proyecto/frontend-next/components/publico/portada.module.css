@@ -1,0 +1,126 @@
+/* =====================================================================
+   Portada (/) · "Mapa de gobernanza"
+   Una sola pieza protagonista (el mapa topográfico, mapa.module.css); el resto
+   se mantiene sobrio: texto, líneas finas y la paleta TherionLabs de globals.css.
+   Titulares en Archivo ancho (--font-archivo, se carga solo en esta página).
+   ===================================================================== */
+
+.portada {
+  --titular: var(--font-archivo), var(--font-display);
+}
+
+.contenedor { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 var(--sp-5); }
+
+/* ---------- héroe ----------
+   Arriba, el título a la izquierda y la bajada con los botones a la derecha (así ocupa poca
+   altura); abajo, la lámina del mapa a todo el ancho, que es la pieza protagonista. */
+.heroe { padding: var(--sp-10) 0 var(--sp-8); }
+@media (min-width: 960px) { .heroe { padding-top: 56px; } }
+
+.heroeTexto { display: grid; gap: var(--sp-5); }
+@media (min-width: 1000px) {
+  .heroeTexto { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 56px; align-items: end; }
+}
+
+.titulo {
+  margin: 0; max-width: 16ch;
+  font-family: var(--titular);
+  font-variation-settings: "wdth" 116;
+  font-weight: 760;
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.heroeLado { display: grid; gap: var(--sp-5); }
+.bajada { margin: 0; max-width: 52ch; font-size: var(--fs-lg); line-height: 1.6; color: var(--text-muted); }
+.acciones { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.btnGrande { min-height: 52px; padding: 0 var(--sp-6); font-size: var(--fs-md); }
+
+.mapa { margin-top: var(--sp-8); }
+
+.garantias {
+  margin: var(--sp-5) 0 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6);
+}
+.garantias li { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); }
+.garantias svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+
+/* Pantallas bajas (notebooks de 768 px): menos aire para que la lámina asome en la primera pantalla */
+@media (min-width: 1000px) and (max-height: 820px) {
+  .heroe { padding-top: var(--sp-8); }
+  .titulo { font-size: clamp(2.2rem, 4vw, 3.4rem); }
+  .mapa { margin-top: var(--sp-6); }
+}
+
+/* ---------- secciones ---------- */
+.seccion { padding: 72px 0; border-top: 1px solid var(--line); }
+.seccionTitulo {
+  font-family: var(--titular);
+  font-variation-settings: "wdth" 108;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.seccionBajada { margin-top: var(--sp-3); color: var(--text-muted); max-width: 60ch; line-height: 1.6; }
+
+/* Cómo funciona: tres paradas de una ruta (es una secuencia real) */
+.ruta {
+  position: relative;
+  margin: var(--sp-10) 0 0; padding: 0; list-style: none;
+  display: grid; gap: var(--sp-8);
+  counter-reset: parada;
+}
+.parada { position: relative; padding-left: 52px; counter-increment: parada; }
+.parada::before {
+  content: counter(parada);
+  position: absolute; left: 0; top: -2px;
+  display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1.5px solid var(--accent); background: var(--bg); color: var(--accent);
+  font-family: var(--titular); font-weight: 700; font-size: var(--fs-md);
+}
+/* tramo punteado entre paradas (vertical en móvil) */
+.parada:not(:last-child)::after {
+  content: ""; position: absolute; left: 17px; top: 40px; bottom: calc(-1 * var(--sp-8) + 4px);
+  border-left: 2px dotted var(--line-control);
+}
+.parada h3 { font-size: var(--fs-lg); }
+.parada p { margin-top: var(--sp-2); color: var(--text-muted); max-width: 42ch; }
+
+@media (min-width: 860px) {
+  .ruta { grid-template-columns: repeat(3, 1fr); gap: var(--sp-8); }
+  .parada { padding-left: 0; padding-top: 56px; }
+  .parada::before { top: 0; }
+  .parada:not(:last-child)::after {
+    left: 44px; right: calc(-1 * var(--sp-8) + 8px); top: 17px; bottom: auto;
+    border-left: 0; border-top: 2px dotted var(--line-control);
+  }
+}
+
+/* Qué evalúa: leyenda del mapa, no tarjetas */
+.evalua { display: grid; gap: var(--sp-8); }
+@media (min-width: 900px) { .evalua { grid-template-columns: 0.8fr 1.2fr; gap: 56px; } }
+.leyenda { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-strong); }
+.leyenda li {
+  display: grid; grid-template-columns: 28px 1fr; gap: var(--sp-1) var(--sp-4);
+  padding: var(--sp-5) 0; border-bottom: 1px solid var(--line-strong);
+}
+.leyenda svg { width: 22px; height: 22px; color: var(--accent); grid-row: span 2; margin-top: 2px; }
+.leyenda h3 { font-size: var(--fs-lg); }
+.leyenda p { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.6; }
+
+/* Privacidad */
+.privacidad { display: grid; gap: var(--sp-8); }
+@media (min-width: 900px) { .privacidad { grid-template-columns: 0.8fr 1.2fr; gap: 56px; align-items: start; } }
+.listaCheck { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--sp-4); }
+.listaCheck li { display: flex; gap: var(--sp-3); align-items: flex-start; color: var(--text-muted); line-height: 1.6; }
+.listaCheck svg { width: 20px; height: 20px; flex: none; color: var(--accent); margin-top: 3px; }
+
+/* Cierre */
+.cierre {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-6);
+  padding: 56px 0 72px; border-top: 1px solid var(--accent);
+}
+.cierre .acciones { margin-top: 0; justify-content: flex-start; }
