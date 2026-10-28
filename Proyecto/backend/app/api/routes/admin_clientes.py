@@ -15,6 +15,12 @@ Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
     POST  /api/admin/empresas/{id}/evaluaciones           asociar más evaluaciones autorizadas
     POST  /api/admin/empresas/{id}/usuario/activacion     reenviar el enlace (revoca el anterior)
 
+  Contrato de la empresa (HU-30; cada cambio en la bitácora)
+    POST  /api/admin/empresas/{id}/contrato/renovacion    {fecha_termino_contrato}
+    POST  /api/admin/empresas/{id}/contrato/suspension    {motivo}
+    POST  /api/admin/empresas/{id}/contrato/reactivacion  levanta la suspensión
+    POST  /api/admin/empresas/{id}/contrato/terminacion   {motivo}; abre el plazo de gracia
+
   Evaluaciones (HU-28: el panel interno lista todas, con su empresa si fue migrada)
     GET   /api/admin/evaluaciones?estado=&origen=&empresa_id=&page=&size=
 
@@ -36,6 +42,7 @@ from app.application.use_cases.contratacion_empresa import (
     ContratacionError, DatosEmpresa, DatosUsuario, EmpresasClienteUseCase, SolicitudesContratacionUseCase,
 )
 from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError
+from app.application.use_cases.gestionar_contrato import ContratoError, GestionarContratoUseCase, contrato_dict
 from app.core.alcance import solo_admin
 from app.core.autenticacion import Actor
 from app.core.database import get_db
@@ -51,7 +58,7 @@ from app.infrastructure.repositories.bitacora_repository import BitacoraReposito
 router = APIRouter(prefix="/api/admin", tags=["admin · empresas cliente (HU-27)"])
 
 
-def _error(e: ContratacionError | MigracionError) -> HTTPException:
+def _error(e: ContratacionError | MigracionError | ContratoError) -> HTTPException:
     return HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e), **e.extra})
 
 
@@ -81,6 +88,15 @@ class AltaEmpresaRequest(BaseModel):
 
 class AsociarRequest(BaseModel):
     solicitudes_ids: list[int] = Field(..., min_length=1, max_length=20)
+
+
+class RenovacionRequest(BaseModel):
+    fecha_termino_contrato: date
+
+
+class MotivoContratoRequest(BaseModel):
+    motivo: str = Field(..., max_length=30, description="no_pago | solicitud_cliente | incumplimiento | "
+                                                          "fin_acuerdo | otro")
 
 
 # ------------------------------------------------------------------ serialización
@@ -132,6 +148,7 @@ def _empresa(e: Empresa) -> dict:
         "id": e.id, "razon_social": e.razon_social, "rut": e.rut, "rubro_id": e.rubro_id,
         "fecha_inicio_contrato": e.fecha_inicio_contrato, "fecha_termino_contrato": e.fecha_termino_contrato,
         "contrato_vigente": e.contrato_vigente(), "fecha_creacion": e.fecha_creacion,
+        "contrato": contrato_dict(e),  # HU-30: estado, situación y plazo de gracia
     }
 
 
@@ -264,6 +281,44 @@ async def reenviar_activacion(empresa_id: int, actor: Actor = Depends(solo_admin
     except ContratacionError as err:
         raise _error(err)
     return {"empresa_id": empresa_id, "activacion": _correo(r)}
+
+
+# ------------------------------------------------------------------ contrato (HU-30)
+async def _contrato(empresa_id: int, operacion) -> dict:
+    try:
+        e = await operacion
+    except ContratoError as err:
+        raise _error(err)
+    return _empresa(e)
+
+
+@router.post("/empresas/{empresa_id}/contrato/renovacion")
+async def renovar_contrato(empresa_id: int, payload: RenovacionRequest,
+                           actor: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
+    """Nueva fecha de término; deja el contrato activo (también levanta una suspensión o una terminación en gracia)."""
+    return await _contrato(empresa_id, GestionarContratoUseCase(db).renovar(
+        actor, empresa_id, payload.fecha_termino_contrato))
+
+
+@router.post("/empresas/{empresa_id}/contrato/suspension")
+async def suspender_contrato(empresa_id: int, payload: MotivoContratoRequest,
+                             actor: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
+    """Corta el servicio pagado sin terminar el contrato."""
+    return await _contrato(empresa_id, GestionarContratoUseCase(db).suspender(actor, empresa_id, payload.motivo))
+
+
+@router.post("/empresas/{empresa_id}/contrato/reactivacion")
+async def reactivar_contrato(empresa_id: int, actor: Actor = Depends(solo_admin),
+                             db: AsyncSession = Depends(get_db)):
+    """Levanta la suspensión (las fechas no cambian)."""
+    return await _contrato(empresa_id, GestionarContratoUseCase(db).reactivar(actor, empresa_id))
+
+
+@router.post("/empresas/{empresa_id}/contrato/terminacion")
+async def terminar_contrato(empresa_id: int, payload: MotivoContratoRequest,
+                            actor: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
+    """Termina el contrato; el usuario puede descargar sus documentos durante el plazo de gracia."""
+    return await _contrato(empresa_id, GestionarContratoUseCase(db).terminar(actor, empresa_id, payload.motivo))
 
 
 # ------------------------------------------------------------------ evaluaciones (HU-28)

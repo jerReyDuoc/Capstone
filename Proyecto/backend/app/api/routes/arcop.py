@@ -5,7 +5,9 @@ Solicitudes de derechos ARCOP del titular de datos personales
 Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.py):
   referente      -> titular invitado (POST /api/auth/titular)
   encuestado     -> titular anónimo de la encuesta pública (POST /api/auth/encuestado)
-                    Ambos crean, consultan, cancelan y aportan información a SUS solicitudes.
+  cliente        -> usuario de una empresa cliente (POST /api/auth/cliente). HU-30: con o sin
+                    contrato vigente, en todo momento.
+                    Los tres crean, consultan, cancelan y aportan información a SUS solicitudes.
   admin_therion  -> administrador (POST /api/auth/login): consulta todas, cambia estados
                     intermedios y registra la resolución. Una supresión resuelta
                     anonimiza los datos del titular.
@@ -47,11 +49,11 @@ from app.infrastructure.storage.local_storage import LocalFileStorage
 
 router = APIRouter(prefix="/api/arcop", tags=["arcop"])
 
-solo_titular = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO)
+# HU-30: el cliente también es titular. El caso de uso distingue a cada titular por su rol,
+# así el id del usuario definitivo nunca se confunde con el de un usuario temporal.
+solo_titular = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO, Rol.CLIENTE)
 solo_admin = requerir_rol(Rol.ADMIN_THERION)
-# HU-27: el rol cliente no es titular ARCOP; sin esto su id (usuario_definitivo.id) se
-# confundiría con el de un usuario temporal al filtrar "sus" solicitudes.
-titular_o_admin = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO, Rol.ADMIN_THERION)
+titular_o_admin = requerir_rol(Rol.REFERENTE, Rol.ENCUESTADO, Rol.CLIENTE, Rol.ADMIN_THERION)
 
 
 def _use_case(db: AsyncSession) -> GestionarSolicitudARCOPUseCase:
@@ -96,6 +98,7 @@ def _resumen(s: SolicitudARCOP) -> SolicitudARCOPResumenResponse:
         estado=s.estado,
         usuario_temporal_id=s.usuario_temporal_id,
         evaluacion_id=s.evaluacion_id,
+        usuario_definitivo_id=s.usuario_definitivo_id,
         fecha_creacion=s.fecha_creacion,
         fecha_actualizacion=s.fecha_actualizacion,
         fecha_cierre=s.fecha_cierre,

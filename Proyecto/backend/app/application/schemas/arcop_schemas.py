@@ -40,6 +40,7 @@ class SolicitudARCOPResumenResponse(BaseModel):
     estado: str
     usuario_temporal_id: int | None      # titular invitado
     evaluacion_id: int | None = None     # titular encuestado anónimo
+    usuario_definitivo_id: int | None = None  # titular usuario de empresa cliente (HU-30)
     fecha_creacion: datetime
     fecha_actualizacion: datetime
     fecha_cierre: datetime | None

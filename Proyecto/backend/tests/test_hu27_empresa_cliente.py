@@ -354,7 +354,9 @@ def test_flujo_completo_alta_migracion_activacion_y_acceso_del_cliente():
         assert [x["id"] for x in lista["items"]] == [e["ev"]]
         # ...pero no lo ajeno ni lo de Therion Labs
         assert (await c.get("/api/evaluaciones/1", headers=hc)).status_code == 404
-        assert (await c.get("/api/arcop/solicitudes", headers=hc)).status_code == 403
+        # HU-30: el cliente es titular ARCOP; solo ve SUS solicitudes (ninguna todavía)
+        r = await c.get("/api/arcop/solicitudes", headers=hc)
+        assert r.status_code == 200 and r.json()["items"] == []
         assert (await c.get("/api/admin/empresas", headers=hc)).status_code == 403
         r = await c.post("/api/respuestas/", headers=hc, json={
             "evaluacion_id": e["ev"], "matriz_control_id": 1, "estado_clasificacion": "cumplido", "justificacion": JUST})
@@ -545,23 +547,29 @@ def test_sin_servidor_de_correo_el_alta_queda_y_el_admin_reenvia(monkeypatch):
     _correr(esc)
 
 
-def test_contrato_terminado_corta_el_acceso_del_cliente():
+def test_contrato_vencido_corta_el_servicio_pero_no_lo_gratuito():
+    """HU-30 reemplaza la regla de HU-27: sin contrato el cliente entra, pero sin servicio pagado."""
     async def esc(c):
         x = await _empresa_creada(c)
         hc = await _activar_y_entrar(c)
         assert (await c.get(f"/api/evaluaciones/{x['ev']}", headers=hc)).status_code == 200
 
-        async def terminar(s):
+        async def vencer(s):
             from app.domain.models import Empresa
             emp = await s.get(Empresa, x["empresa_id"])
             emp.fecha_inicio_contrato = HOY - timedelta(days=60)
             emp.fecha_termino_contrato = HOY - timedelta(days=1)
             await s.commit()
-        await _bd(terminar)
-        r = await c.get(f"/api/evaluaciones/{x['ev']}", headers=hc)
-        assert r.status_code == 401 and _codigo(r) == "USUARIO_DESHABILITADO"
-        r = await c.post("/api/auth/cliente", json={"email": "gerencia@acme.cl", "password": PASSWORD})
+        await _bd(vencer)
+        # lo gratuito sigue (mismo token)
+        assert (await c.get(f"/api/evaluaciones/{x['ev']}", headers=hc)).status_code == 200
+        # el servicio pagado no
+        r = await c.get("/api/cliente/empresa", headers=hc)
         assert r.status_code == 403 and _codigo(r) == "CONTRATO_NO_VIGENTE"
+        assert r.json()["detail"]["situacion"] == "vencido"
+        # y el login responde 200 con la situación del contrato
+        r = await c.post("/api/auth/cliente", json={"email": "gerencia@acme.cl", "password": PASSWORD})
+        assert r.status_code == 200 and r.json()["contrato"]["situacion"] == "vencido"
     _correr(esc)
 
 

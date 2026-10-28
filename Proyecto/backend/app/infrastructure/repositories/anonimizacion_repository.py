@@ -35,6 +35,56 @@ class AnonimizacionRepository:
         filtro_sols = SolicitudARCOP.evaluacion_id == evaluacion_id
         return await self._anonimizar(evals, filtro_sols, ahora, usuario_id=None)
 
+    async def anonimizar_usuario_definitivo(self, usuario_id: int, ahora: datetime) -> tuple[dict, list[str]]:
+        """
+        HU-30: supresión ARCOP del usuario de una empresa cliente (persona natural).
+
+        Se borran SUS datos personales (nombre, correo, contraseña), se cierra la cuenta y sus
+        sesiones y se revocan sus enlaces; también sus textos en las solicitudes ARCOP. NO se
+        tocan la empresa (persona jurídica) ni las evaluaciones migradas a ella: son datos del
+        contrato con la empresa (sus evidencias ya están anonimizadas desde HU-06) y su
+        conservación la deciden la vigencia del contrato (HU-30) y la retención (HU-25).
+        """
+        from app.application.use_cases.sesiones import cerrar_todas
+        from app.domain.models.sesion import MotivoCierre, TokenRecuperacion
+        from app.domain.models.usuario_definitivo import (
+            EstadoUsuarioDefinitivo, TokenActivacion, UsuarioDefinitivo,
+        )
+
+        s = self.session
+        conteo = {}
+
+        async def _upd(nombre, stmt):
+            conteo[nombre] = (await s.execute(stmt.execution_options(synchronize_session=False))).rowcount or 0
+
+        # El correo es NOT NULL y único: queda un marcador irrepetible que no es de nadie
+        # (.invalid está reservado, RFC 2606) y con el que nadie puede iniciar sesión.
+        await _upd("usuario_definitivo", update(UsuarioDefinitivo)
+                   .where(UsuarioDefinitivo.id == usuario_id)
+                   .values(nombre=TEXTO_ANONIMIZADO, email=f"suprimido-{usuario_id}@anonimizado.invalid",
+                           password_hash=None, estado=EstadoUsuarioDefinitivo.BLOQUEADO.value))
+        await _upd("enlaces_activacion", update(TokenActivacion)
+                   .where(TokenActivacion.usuario_definitivo_id == usuario_id,
+                          TokenActivacion.fecha_uso.is_(None), TokenActivacion.fecha_revocacion.is_(None))
+                   .values(fecha_revocacion=ahora))
+        await _upd("enlaces_recuperacion", update(TokenRecuperacion)
+                   .where(TokenRecuperacion.actor_rol == Rol.CLIENTE.value, TokenRecuperacion.actor_id == usuario_id,
+                          TokenRecuperacion.fecha_uso.is_(None), TokenRecuperacion.fecha_revocacion.is_(None))
+                   .values(fecha_revocacion=ahora))
+        conteo["sesiones"] = await cerrar_todas(s, Rol.CLIENTE.value, usuario_id, MotivoCierre.SUPRESION_ARCOP, ahora)
+
+        sols = select(SolicitudARCOP.id).where(SolicitudARCOP.usuario_definitivo_id == usuario_id)
+        await _upd("comentarios_titular", update(EventoSolicitud)
+                   .where(EventoSolicitud.solicitud_id.in_(sols),
+                          EventoSolicitud.actor_rol == Rol.CLIENTE.value,
+                          EventoSolicitud.comentario.is_not(None))
+                   .values(comentario=None))
+        await _upd("solicitudes_arcop", update(SolicitudARCOP)
+                   .where(SolicitudARCOP.usuario_definitivo_id == usuario_id)
+                   .values(descripcion=TEXTO_ANONIMIZADO))
+        conteo["archivos"] = 0
+        return conteo, []
+
     async def _anonimizar(self, evals, filtro_sols, ahora: datetime,
                           usuario_id: int | None) -> tuple[dict, list[str]]:
         """Devuelve (conteo de filas por tabla, rutas de archivos a borrar tras el commit)."""

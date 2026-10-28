@@ -26,6 +26,8 @@ interface Regla {
 const REGLAS: Regla[] = [
   // Espacio de la empresa (HU-28; HU-29 lo amplía)
   { metodo: "GET", patron: /^cliente\/empresa$/ },
+  // HU-30: situación del contrato (responde también sin contrato vigente)
+  { metodo: "GET", patron: /^cliente\/contrato$/ },
   // Evaluaciones migradas: listado y resultados (lectura)
   { metodo: "GET", patron: /^evaluaciones$/ },
   { metodo: "GET", patron: /^evaluaciones\/\d{1,9}$/ },

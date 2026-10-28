@@ -214,6 +214,12 @@ class Settings(BaseSettings):
     # texto se rechaza antes, sin gastar cuota, y se le pide al usuario un PDF con texto).
     EVIDENCIA_MIN_CARACTERES: int = 40
 
+    # ------------------------------------------------ HU-30: vigencia del contrato
+    # Días que el usuario definitivo puede seguir descargando sus documentos después de que
+    # el contrato vence o el admin lo termina. Pasado el plazo, los datos quedan para las
+    # reglas de retención (HU-25). 0 = sin plazo de gracia. Valor provisorio hasta que lo fije el PO.
+    CONTRATO_GRACIA_DIAS: int = 30
+
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
         valor = self.CONTRATACION_SOLICITUDES_IP_DIA
@@ -261,6 +267,8 @@ class Settings(BaseSettings):
             raise ValueError("ACTIVACION_TTL_HORAS debe ser mayor que 0.")
         if self.CLIENTE_PASSWORD_MIN < 10:
             raise ValueError("CLIENTE_PASSWORD_MIN no puede ser menor que 10 (HU-27).")
+        if not 0 <= self.CONTRATO_GRACIA_DIAS <= 365:
+            raise ValueError("CONTRATO_GRACIA_DIAS debe estar entre 0 y 365 (HU-30).")
         if self.CONTRATACION_AVISO_EMAIL and "@" not in self.CONTRATACION_AVISO_EMAIL:
             raise ValueError("CONTRATACION_AVISO_EMAIL debe ser un correo válido (o vacío).")
         if self.CONTRATACION_SOLICITUDES_IP_DIA is not None and self.CONTRATACION_SOLICITUDES_IP_DIA < 1:

@@ -11,6 +11,7 @@ _CHECK_ROL = "actor_rol IN ('admin_therion', 'cliente')"
 class MotivoCierre:
     LOGOUT = "logout"                    # el usuario cerró sesión
     CAMBIO_CONTRASENA = "cambio_password"  # restableció su contraseña: se cierran todas
+    SUPRESION_ARCOP = "supresion_arcop"    # HU-30: se suprimieron los datos del usuario definitivo
 
 
 class SesionUsuario(Base):

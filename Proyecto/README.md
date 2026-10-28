@@ -599,7 +599,7 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | POST | `/api/auth/encuestado` | 🔓 | `{evaluacion_id, clave}` → token de encuestado |
 | POST | `/api/auth/encuestado/clave` | 🛡️ | `{evaluacion_id}` → 201 `{clave}` (se muestra una vez; invalida la anterior) |
 | GET | `/api/auth/me` | 🔑 | `{usuario_id, rol}` |
-| POST | `/api/auth/cliente` | 🔓 | HU-27: `{email, password}` → token del rol `cliente` (403 `CONTRATO_NO_VIGENTE` si el contrato terminó) |
+| POST | `/api/auth/cliente` | 🔓 | HU-27: `{email, password}` → token del rol `cliente`. HU-30: entra también sin contrato vigente; la respuesta trae `contrato` con su situación |
 | POST | `/api/auth/activacion/verificar` | 🔓 | HU-27: `{token}` → ¿el enlace sigue válido? (no lo consume) |
 | POST | `/api/auth/activacion` | 🔓 | HU-27: `{token, password}` → define la contraseña; el enlace queda usado (400 `ENLACE_INVALIDO`, 410 `ENLACE_VENCIDO`, 422 `CONTRASENA_DEBIL`) |
 | POST | `/api/auth/logout` | 🔑 | HU-28: 204; cierra la sesión del token (admin o cliente): desde ese momento el token responde 401 |
@@ -688,9 +688,14 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/admin/empresas`, `/api/admin/empresas/{id}` | 🛡️ | Empresas con su usuario y evaluaciones |
 | POST | `/api/admin/empresas/{id}/evaluaciones` | 🛡️ | `{solicitudes_ids}` → asociar más evaluaciones autorizadas |
 | POST | `/api/admin/empresas/{id}/usuario/activacion` | 🛡️ | Reenvía el enlace (revoca el anterior) |
+| POST | `/api/admin/empresas/{id}/contrato/renovacion` | 🛡️ | HU-30: `{fecha_termino_contrato}` → nueva fecha; deja el contrato activo |
+| POST | `/api/admin/empresas/{id}/contrato/suspension` | 🛡️ | HU-30: `{motivo}` → corta el servicio pagado sin terminar el contrato |
+| POST | `/api/admin/empresas/{id}/contrato/reactivacion` | 🛡️ | HU-30: levanta la suspensión |
+| POST | `/api/admin/empresas/{id}/contrato/terminacion` | 🛡️ | HU-30: `{motivo}` → termina el contrato y abre el plazo de gracia (`CONTRATO_GRACIA_DIAS`) |
 | GET | `/api/admin/evaluaciones?estado=&origen=&empresa_id=` | 🛡️ | HU-28: todas las evaluaciones con rubro, puntaje general y empresa (si migró); sin contacto del encuestado |
 | GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | Bitácora de auditoría (solo inserción, sin datos personales) |
-| GET | `/api/cliente/empresa` | 🏢 | HU-28: espacio del cliente: su empresa, contrato y evaluaciones migradas |
+| GET | `/api/cliente/empresa` | 🏢 | HU-28: espacio del cliente: su empresa, contrato y evaluaciones migradas (HU-30: 403 `CONTRATO_NO_VIGENTE` sin contrato vigente) |
+| GET | `/api/cliente/contrato` | 🏢 | HU-30: situación del contrato, documentos que aún puede descargar y acceso a ARCOP (responde siempre) |
 | GET | `/api/formacion/avance?evaluacion_id=` | 🏢 | HU-26: avance de la empresa por módulo, dimensión y nivel; brechas con la formación hecha |
 | GET | `/api/formacion/modulos/{ruta_id}` | 🏢 | HU-26: lecciones, material de apoyo y actividad de verificación (sin las respuestas correctas) |
 | POST | `/api/formacion/modulos/{ruta_id}/lecciones/{orden}/vista` | 🏢 | HU-26: marca la lección como vista (el primer llamado inicia el módulo) |
@@ -701,7 +706,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/remediacion/respuestas/{id}/evidencias` | 🏢 | HU-17: multipart `file` (PDF/DOCX/TXT) + `estado_declarado` + `justificacion` opcional → 202; el worker re-evalúa y recalcula el puntaje |
 | GET | `/api/remediacion/evidencias/{id}` | 🏢 | HU-17: resultado del análisis y puntaje recalculado |
 
-El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md` y `CAMBIOS_HU28.md`.
+El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 
 ### Códigos de error
 

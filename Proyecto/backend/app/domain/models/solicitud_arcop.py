@@ -70,22 +70,30 @@ def transicion_permitida(actual: str, nuevo: str) -> bool:
     return nuevo in TRANSICIONES_ARCOP.get(actual, set())
 
 
+# Exactamente un titular. Se escribe con CASE (y no con num_nonnulls) para que valga
+# igual en PostgreSQL y en el SQLite de las pruebas.
+CHECK_UN_TITULAR = (
+    '(CASE WHEN "Usuario_temporal_id" IS NULL THEN 0 ELSE 1 END'
+    ' + CASE WHEN "Evaluacion_id" IS NULL THEN 0 ELSE 1 END'
+    ' + CASE WHEN "Usuario_definitivo_id" IS NULL THEN 0 ELSE 1 END) = 1'
+)
+
+
 class SolicitudARCOP(Base):
     """
     Solicitud formal de un titular de datos personales para ejercer un derecho
     ARCOP (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
 
-    El titular es UNO de estos dos (exactamente uno, CHECK en BD):
+    El titular es UNO de estos tres (exactamente uno, CHECK en BD):
       - usuario_temporal_id: usuario invitado (acceso por invitación).
       - evaluacion_id: encuestado anónimo de la encuesta pública (acceso con la
         clave de su evaluación).
+      - usuario_definitivo_id: usuario de una empresa cliente (HU-30: puede ejercer sus
+        derechos en todo momento, con contrato vigente o no).
     """
     __tablename__ = "solicitudes_arcop"
     __table_args__ = (
-        CheckConstraint(
-            '("Usuario_temporal_id" IS NULL) <> ("Evaluacion_id" IS NULL)',
-            name="ck_solicitudes_arcop_un_titular",
-        ),
+        CheckConstraint(CHECK_UN_TITULAR, name="ck_solicitudes_arcop_un_titular"),
     )
 
     id: Mapped[int] = mapped_column("id_solicitud", Integer, primary_key=True)
@@ -111,6 +119,14 @@ class SolicitudARCOP(Base):
         "Evaluacion_id",
         Integer,
         ForeignKey("evaluacion.id"),
+        nullable=True,
+        index=True,
+    )
+    # HU-30: titular usuario definitivo (rol cliente)
+    usuario_definitivo_id: Mapped[int | None] = mapped_column(
+        "Usuario_definitivo_id",
+        Integer,
+        ForeignKey("usuario_definitivo.id"),
         nullable=True,
         index=True,
     )

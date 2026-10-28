@@ -49,7 +49,7 @@ class CredencialesInvalidasError(Exception):
 
 
 class ContratoNoVigenteError(Exception):
-    pass
+    """Ya no se lanza desde HU-30 (el cliente entra sin contrato vigente); se conserva por compatibilidad."""
 
 
 class DemasiadosIntentosError(Exception):
@@ -239,23 +239,21 @@ class IniciarSesionUseCase:
             ok = await asyncio.to_thread(verificar_password, password or "", usuario.password_hash) and usuario.activo
         if not ok:
             await self._fallo(proteccion, "cliente", "usuario_definitivo", usuario.id if usuario else None)
-        # Contraseña correcta: el contador de la cuenta vuelve a cero aunque el contrato no esté vigente
         await proteccion.registrar_exito()
+        # HU-30: sin contrato vigente el cliente SÍ entra (conserva lo gratuito, sus documentos
+        # en el plazo de gracia y sus derechos ARCOP); el servicio pagado responde 403
+        # CONTRATO_NO_VIGENTE. La respuesta trae la situación para que el frontend la muestre.
         empresa = await self.db.get(Empresa, usuario.empresa_id)
-        if empresa is None or not empresa.contrato_vigente():
-            self._auditar_intento("cliente", "usuario_definitivo", usuario.id, "contrato_no_vigente",
-                                  empresa_id=usuario.empresa_id)
-            await self.db.commit()
-            raise ContratoNoVigenteError(
-                "El contrato de tu empresa no está vigente. Contacta a Therion Labs."
-            )
+        vigencia = empresa.vigencia() if empresa else None
         ahora = _ahora()
         token, sesion = await abrir_sesion(self.db, Rol.CLIENTE.value, usuario.id, ahora)
         usuario.ultimo_acceso = ahora
         BitacoraRepository(self.db).registrar(
             accion=Accion.CLIENTE_LOGIN, entidad="usuario_definitivo", entidad_id=usuario.id,
             actor_rol=Rol.CLIENTE.value, actor_id=usuario.id,
-            detalle={"empresa_id": usuario.empresa_id, "sesion_id": sesion.id}, fecha=ahora,
+            detalle={"empresa_id": usuario.empresa_id, "sesion_id": sesion.id,
+                     "situacion_contrato": vigencia.situacion.value if vigencia else None}, fecha=ahora,
         )
         await self.db.commit()
-        return _respuesta(usuario.id, Rol.CLIENTE, token, empresa_id=usuario.empresa_id)
+        return _respuesta(usuario.id, Rol.CLIENTE, token, empresa_id=usuario.empresa_id,
+                          contrato=vigencia.como_dict() if vigencia else None)

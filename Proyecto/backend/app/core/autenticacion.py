@@ -205,13 +205,12 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
         evaluacion = await db.get(Evaluacion, actor.id)
         return bool(evaluacion and evaluacion.clave_acceso_hash)
     if actor.es_cliente:
-        from app.domain.models.empresa import Empresa
+        # HU-30: el contrato ya no decide si el token sirve. Sin contrato vigente el cliente
+        # conserva lo gratuito, sus documentos durante el plazo de gracia y sus derechos
+        # ARCOP; el servicio pagado lo cortan las guardas de app/core/servicio_pagado.py.
         from app.domain.models.usuario_definitivo import UsuarioDefinitivo
         usuario = await db.get(UsuarioDefinitivo, actor.id)
-        if not (usuario and usuario.activo):
-            return False
-        empresa = await db.get(Empresa, usuario.empresa_id)
-        return bool(empresa and empresa.contrato_vigente())
+        return bool(usuario and usuario.activo)
     from app.domain.models.usuario_temporal import UsuarioTemporal
     usuario = await db.get(UsuarioTemporal, actor.id)
     return bool(usuario and usuario.fecha_anonimizacion is None)

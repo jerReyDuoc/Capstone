@@ -59,7 +59,8 @@ C_ARCOP = "RETENCION_ARCOP_CERRADAS_DIAS después del cierre de la solicitud (lu
 C_EVENTOS = "RETENCION_EVENTOS_SEGURIDAD_DIAS después de revisado el evento"
 C_ADMIN = "Mientras la cuenta esté activa"
 C_PRUEBA = "Mientras exista el registro (prueba del consentimiento o de la atención del derecho)"
-C_CLIENTE = "Mientras dure el contrato de la empresa (las reglas de término las fija el PO)"
+C_CLIENTE = ("Mientras dure el contrato de la empresa y CONTRATO_GRACIA_DIAS después de su término "
+             "(HU-30); luego, las reglas de retención (HU-25)")
 C_CONTRATACION = "Hasta migrar la evaluación (se borra al pasar a la empresa) o descartar la solicitud"
 C_SESION = "Mientras la cuenta exista (el PO fija una depuración de sesiones y enlaces vencidos, HU-28)"
 
@@ -267,7 +268,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     },
     # ------------------------------------------------------------ derechos ARCOP
     "solicitudes_arcop": {
-        **_sin_dp("id_solicitud", "tipo", "estado", "Usuario_temporal_id", "Evaluacion_id",
+        **_sin_dp("id_solicitud", "tipo", "estado", "Usuario_temporal_id", "Evaluacion_id", "Usuario_definitivo_id",
                   "fecha_creacion", "fecha_actualizacion", "fecha_cierre", "fecha_limite_respuesta",
                   "fecha_limite_informacion", "fecha_prorroga"),
         "codigo_seguimiento": Dato(
@@ -300,6 +301,9 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     "empresa": _sin_dp(
         "id", "razon_social", "rut", "rubro_id", "fecha_inicio_contrato", "fecha_termino_contrato",
         "fecha_creacion", "creada_por_admin_id",
+        # HU-30: estado del contrato (motivos de una lista cerrada, sin texto libre)
+        "estado_contrato", "fecha_suspension", "motivo_suspension", "fecha_terminacion",
+        "motivo_terminacion", "fecha_actualizacion_contrato",
     ),
     "usuario_definitivo": {
         **_sin_dp("id", "empresa_id", "rol", "estado"),

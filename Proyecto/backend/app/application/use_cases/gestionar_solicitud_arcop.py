@@ -169,6 +169,8 @@ class GestionarSolicitudARCOPUseCase:
             return solicitud.usuario_temporal_id == actor.id
         if actor.rol == Rol.ENCUESTADO.value:
             return solicitud.evaluacion_id == actor.id
+        if actor.rol == Rol.CLIENTE.value:  # HU-30
+            return solicitud.usuario_definitivo_id == actor.id
         return False
 
     async def _obtener_visible(self, actor: Actor, solicitud_id: int,
@@ -211,6 +213,11 @@ class GestionarSolicitudARCOPUseCase:
             if not await self.repo.existe_evaluacion(actor.id):
                 raise OperacionNoPermitidaError("La evaluación del token no existe.")
             dueno = {"evaluacion_id": actor.id}
+        elif actor.es_cliente:
+            # HU-30: el usuario de la empresa cliente ejerce sus derechos con o sin contrato vigente
+            if not await self.repo.existe_usuario_definitivo(actor.id):
+                raise OperacionNoPermitidaError("El usuario del token no existe.")
+            dueno = {"usuario_definitivo_id": actor.id}
         else:
             if not await self.repo.existe_usuario(actor.id):
                 raise OperacionNoPermitidaError("El usuario del token no existe.")
@@ -283,6 +290,8 @@ class GestionarSolicitudARCOPUseCase:
             filtro = {"usuario_temporal_id": usuario_temporal_id, "evaluacion_id": evaluacion_id}
         elif actor.es_encuestado:
             filtro = {"usuario_temporal_id": None, "evaluacion_id": actor.id}
+        elif actor.es_cliente:
+            filtro = {"usuario_temporal_id": None, "evaluacion_id": None, "usuario_definitivo_id": actor.id}
         else:
             filtro = {"usuario_temporal_id": actor.id, "evaluacion_id": None}
         return await self.repo.list(
@@ -356,6 +365,10 @@ class GestionarSolicitudARCOPUseCase:
             if solicitud.usuario_temporal_id is not None:
                 conteo, rutas = await self.anonimizacion_repo.anonimizar_titular(
                     solicitud.usuario_temporal_id, _ahora()
+                )
+            elif solicitud.usuario_definitivo_id is not None:  # HU-30
+                conteo, rutas = await self.anonimizacion_repo.anonimizar_usuario_definitivo(
+                    solicitud.usuario_definitivo_id, _ahora()
                 )
             else:
                 conteo, rutas = await self.anonimizacion_repo.anonimizar_encuestado(

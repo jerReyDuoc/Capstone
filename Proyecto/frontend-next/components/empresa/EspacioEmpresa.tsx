@@ -6,6 +6,10 @@
  * Muestra su empresa, el contrato y las evaluaciones migradas desde el autodiagnóstico. Cada
  * evaluación se abre en el panel de resultados (/panel en modo "cliente", que lee por
  * /bff/cliente/api). HU-29 agrega aquí los cursos y el tutor IA.
+ *
+ * HU-30: sin contrato vigente el backend responde 403 CONTRATO_NO_VIGENTE en este espacio.
+ * Entonces se muestra la situación del contrato (GET /api/cliente/contrato) con lo que sigue
+ * disponible: los resultados e informes (gratuitos) y, durante el plazo de gracia, las constancias.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,10 +17,19 @@ import { useEffect, useState } from "react";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { BrandMark } from "@/components/ui/Icon";
 import { ErrorBff } from "@/lib/encuesta/cliente";
-import { cargarEspacioEmpresa, diasParaTermino, fechaCorta, type EspacioEmpresaApi } from "@/lib/empresa";
+import {
+  cargarContratoCliente, cargarEspacioEmpresa, diasParaTermino, fechaCorta, SIN_SERVICIO,
+  type ContratoClienteApi, type EspacioEmpresaApi,
+} from "@/lib/empresa";
+import { descargarBlob } from "@/lib/exportar";
+import { descargarConstancia } from "@/lib/formacion";
 import s from "@/components/admin/admin.module.css";
 
-type Estado = { tipo: "cargando" } | { tipo: "listo"; datos: EspacioEmpresaApi } | { tipo: "error"; mensaje: string };
+type Estado =
+  | { tipo: "cargando" }
+  | { tipo: "listo"; datos: EspacioEmpresaApi }
+  | { tipo: "sin_servicio"; contrato: ContratoClienteApi }
+  | { tipo: "error"; mensaje: string };
 
 export function EspacioEmpresa() {
   const router = useRouter();
@@ -25,10 +38,18 @@ export function EspacioEmpresa() {
   useEffect(() => {
     cargarEspacioEmpresa()
       .then((datos) => setEstado({ tipo: "listo", datos }))
-      .catch((e) => {
+      .catch(async (e) => {
         if (e instanceof ErrorBff && e.status === 401) {
           router.replace("/ingresar?motivo=sesion");
           return;
+        }
+        if (e instanceof ErrorBff && e.status === 403 && SIN_SERVICIO.has(e.info.codigo)) {
+          try {
+            setEstado({ tipo: "sin_servicio", contrato: await cargarContratoCliente() });
+            return;
+          } catch {
+            /* cae al mensaje genérico */
+          }
         }
         setEstado({ tipo: "error", mensaje: "No pudimos cargar el espacio de tu empresa. Inténtalo de nuevo." });
       });
@@ -45,7 +66,10 @@ export function EspacioEmpresa() {
           <BrandMark aria-hidden="true" />
           <span>
             ComplianceAI
-            <span className={s.marcaSub}>{datos ? datos.empresa.razon_social : "Espacio de tu empresa"}</span>
+            <span className={s.marcaSub}>
+              {datos ? datos.empresa.razon_social
+                : estado.tipo === "sin_servicio" ? estado.contrato.empresa.razon_social : "Espacio de tu empresa"}
+            </span>
           </span>
         </div>
         <BotonCerrarSesion tipo="cliente" />
@@ -56,6 +80,7 @@ export function EspacioEmpresa() {
         {estado.tipo === "error" ? (
           <div className={s.alerta} role="alert"><strong>{estado.mensaje}</strong></div>
         ) : null}
+        {estado.tipo === "sin_servicio" ? <SinServicio datos={estado.contrato} /> : null}
 
         {datos ? (
           <>
@@ -147,5 +172,95 @@ export function EspacioEmpresa() {
         ) : null}
       </main>
     </div>
+  );
+}
+
+
+/** HU-30 · Lo que ve el usuario cuando el servicio pagado de su empresa no está activo. */
+function SinServicio({ datos }: { datos: ContratoClienteApi }) {
+  const [aviso, setAviso] = useState("");
+  const [bajando, setBajando] = useState<number | null>(null);
+  const { contrato, documentos } = datos;
+
+  return (
+    <>
+      <div>
+        <h1 className="page-title">Servicio no disponible</h1>
+        <p className="callout" role="status">{contrato.mensaje}</p>
+      </div>
+
+      <section className="card" aria-labelledby="titulo-gratis">
+        <div className="card-head">
+          <div>
+            <h2 id="titulo-gratis" className="card-title">Resultados de tus evaluaciones</h2>
+            <p className="card-sub">Los resultados, el informe PDF y el plan formativo siguen disponibles.</p>
+          </div>
+        </div>
+        {!documentos.evaluaciones.length ? (
+          <p className={s.vacio}>Tu empresa no tiene evaluaciones asociadas.</p>
+        ) : (
+          <ul style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 0, listStyle: "none" }}>
+            {documentos.evaluaciones.map((ev) => (
+              <li key={ev.id}>
+                <Link className="btn btn-sm" href={`/panel?evaluacion=${ev.id}`} prefetch={false}>
+                  Ver resultados de la evaluación N.º {ev.id}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {contrato.documentos_disponibles ? (
+        <section className="card" aria-labelledby="titulo-documentos">
+          <div className="card-head">
+            <div>
+              <h2 id="titulo-documentos" className="card-title">Tus documentos</h2>
+              <p className="card-sub">
+                {contrato.documentos_disponibles_hasta
+                  ? `Puedes descargarlos hasta el ${fechaCorta(contrato.documentos_disponibles_hasta)}.`
+                  : "Puedes descargarlos mientras se resuelve la situación del contrato."}
+              </p>
+            </div>
+          </div>
+          {!documentos.constancias.length ? (
+            <p className={s.vacio}>No hay constancias de módulos completados.</p>
+          ) : (
+            <ul style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 0, listStyle: "none" }}>
+              {documentos.constancias.map((k) => (
+                <li key={k.ruta_id}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={bajando !== null}
+                    aria-busy={bajando === k.ruta_id}
+                    onClick={async () => {
+                      setBajando(k.ruta_id);
+                      try {
+                        const { blob, nombre } = await descargarConstancia(k.ruta_id);
+                        descargarBlob(blob, nombre);
+                        setAviso(`Descargamos ${nombre}.`);
+                      } catch {
+                        setAviso("No pudimos descargar la constancia. Inténtalo de nuevo.");
+                      } finally {
+                        setBajando(null);
+                      }
+                    }}
+                  >
+                    Constancia: {k.modulo} ({fechaCorta(k.fecha_completado)})
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="sr-only" role="status" aria-live="polite">{aviso}</p>
+        </section>
+      ) : null}
+
+      <p className="card-sub">
+        Tus derechos sobre tus datos personales (acceso, rectificación, supresión, oposición, portabilidad y
+        bloqueo) siguen disponibles en todo momento. Para renovar el servicio, contacta a Therion Labs.
+      </p>
+    </>
   );
 }

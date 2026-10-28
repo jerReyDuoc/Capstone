@@ -51,6 +51,11 @@ class Accion:
     # HU-17: re-evaluación de un control con evidencia nueva (remediación)
     REMEDIACION_EVIDENCIA_SUBIDA = "remediacion.evidencia_subida"
     REMEDIACION_RESULTADO = "remediacion.resultado"
+    # HU-30: vigencia del contrato (detalle: estado/situación/fechas antes y después y el motivo)
+    CONTRATO_RENOVADO = "contrato.renovado"
+    CONTRATO_SUSPENDIDO = "contrato.suspendido"
+    CONTRATO_REACTIVADO = "contrato.reactivado"
+    CONTRATO_TERMINADO = "contrato.terminado"
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

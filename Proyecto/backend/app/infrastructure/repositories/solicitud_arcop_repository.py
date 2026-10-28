@@ -16,6 +16,11 @@ class SolicitudARCOPRepository:
     async def existe_usuario(self, usuario_id: int) -> bool:
         return await self.session.get(UsuarioTemporal, usuario_id) is not None
 
+    async def existe_usuario_definitivo(self, usuario_id: int) -> bool:
+        from app.domain.models.usuario_definitivo import UsuarioDefinitivo
+
+        return await self.session.get(UsuarioDefinitivo, usuario_id) is not None
+
     async def existe_evaluacion(self, evaluacion_id: int) -> bool:
         return await self.session.get(Evaluacion, evaluacion_id) is not None
 
@@ -57,6 +62,7 @@ class SolicitudARCOPRepository:
         evaluacion_id: int | None = None,
         tipo: str | None = None,
         solo_vencidas_al: datetime | None = None,
+        usuario_definitivo_id: int | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[SolicitudARCOP], int]:
@@ -67,6 +73,8 @@ class SolicitudARCOPRepository:
             filtros.append(SolicitudARCOP.usuario_temporal_id == usuario_temporal_id)
         if evaluacion_id is not None:
             filtros.append(SolicitudARCOP.evaluacion_id == evaluacion_id)
+        if usuario_definitivo_id is not None:
+            filtros.append(SolicitudARCOP.usuario_definitivo_id == usuario_definitivo_id)
         if estado:
             filtros.append(SolicitudARCOP.estado == estado)
         if tipo:

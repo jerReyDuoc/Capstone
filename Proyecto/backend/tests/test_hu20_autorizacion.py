@@ -329,6 +329,11 @@ RUTAS_ADMIN_HU27 = [
     ("POST", "/api/admin/empresas/{empresa_id}/usuario/activacion"),
     # HU-26: avance formativo de una empresa (prueba en tests/test_hu26_formacion.py)
     ("GET", "/api/admin/empresas/{empresa_id}/formacion"),
+    # HU-30: vigencia del contrato (roles en tests/test_hu30_contrato.py)
+    ("POST", "/api/admin/empresas/{empresa_id}/contrato/renovacion"),
+    ("POST", "/api/admin/empresas/{empresa_id}/contrato/suspension"),
+    ("POST", "/api/admin/empresas/{empresa_id}/contrato/reactivacion"),
+    ("POST", "/api/admin/empresas/{empresa_id}/contrato/terminacion"),
 ]
 
 
@@ -465,6 +470,8 @@ RUTAS_CON_TOKEN_PROPIO = [
     # HU-28: cerrar sesión y espacio de la empresa del cliente (roles en test_hu28_sesion.py)
     ("POST", "/api/auth/logout", "/api/auth/logout", {}),
     ("GET", "/api/cliente/empresa", "/api/cliente/empresa", {}),
+    # HU-30: situación del contrato del cliente (roles en test_hu30_contrato.py)
+    ("GET", "/api/cliente/contrato", "/api/cliente/contrato", {}),
     # HU-26: recorrido de módulos (solo cliente con servicio activo; roles en test_hu26_formacion.py)
     ("GET", "/api/formacion/avance", "/api/formacion/avance", {}),
     ("GET", "/api/formacion/modulos/{ruta_id}", "/api/formacion/modulos/1", {}),
