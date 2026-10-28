@@ -47,6 +47,10 @@ class Evidencia(Base):
     estado_resultante: Mapped[str | None] = mapped_column("estado_resultante", String(25), nullable=True)
     # HU-17 C2: términos del control encontrados en el texto (verificación local, sin LLM)
     terminos_control: Mapped[dict | None] = mapped_column("terminos_control", JSON, nullable=True)
+    # HU-17 C3: puntaje general de la evaluación antes y después de procesar la remediación
+    # (iguales si el control no mejoró). Sirven para mostrar la evolución sin recalcular.
+    puntaje_previo: Mapped[float | None] = mapped_column("puntaje_previo", Float, nullable=True)
+    puntaje_resultante: Mapped[float | None] = mapped_column("puntaje_resultante", Float, nullable=True)
 
     @property
     def es_remediacion(self) -> bool:

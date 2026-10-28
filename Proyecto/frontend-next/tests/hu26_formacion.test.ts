@@ -16,6 +16,7 @@ import {
   siguienteLeccion,
 } from "@/lib/formacion";
 import {
+  deltaTexto,
   esperaConsulta,
   estadosDeclarables,
   faseEvidencia,
@@ -109,11 +110,21 @@ describe("HU-17 · cerrar brechas con evidencia", () => {
     const mejoro = { ...base, en_proceso: false, mejoro: true, estado_validacion: "validated" as const, estado_resultante: "cumplido" as const };
     expect(faseEvidencia(mejoro)).toBe("mejoro");
     expect(resultadoTexto(mejoro)).toBe("El control pasó de no cumplido a cumplido. Actualizamos tu puntaje.");
+    expect(resultadoTexto({ ...mejoro, puntaje_previo: 48.5, puntaje_resultante: 52.1 }))
+      .toBe("El control pasó de no cumplido a cumplido. Tu puntaje general subió +3,6 pts.");
     const igual = { ...base, en_proceso: false, estado_validacion: "rejected" as const,
       errores_validacion: ["La evidencia no demuestra un avance respecto del estado actual del control."] };
     expect(faseEvidencia(igual)).toBe("sin-cambio");
     expect(resultadoTexto(igual)).toMatch(/no demuestra un avance/);
     expect(faseEvidencia({ ...igual, estado_validacion: "error" })).toBe("error");
+  });
+
+  it("muestra cuánto subió el puntaje", () => {
+    expect(deltaTexto(48.5, 52.1)).toBe("+3,6 pts");
+    expect(deltaTexto(50, 51)).toBe("+1 pt");
+    expect(deltaTexto(50, 50)).toBe("sin cambios");
+    expect(deltaTexto(50, 47.5)).toBe("−2,5 pts");
+    expect(deltaTexto(null, 50)).toBe("");
   });
 
   it("consulta el análisis con espera creciente y se detiene", () => {

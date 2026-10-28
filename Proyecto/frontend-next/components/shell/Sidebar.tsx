@@ -6,13 +6,14 @@ import { usePanel } from "@/hooks/usePanel";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 
-const ITEMS: { ruta: string; etiqueta: string; icono: IconName; soloCliente?: boolean }[] = [
+const ITEMS: { ruta: string; etiqueta: string; icono: IconName; servicio?: boolean }[] = [
   { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico" },
   { ruta: "/panel/dominios", etiqueta: "Dominios", icono: "dominios" },
   { ruta: "/panel/brechas", etiqueta: "Brechas", icono: "brechas" },
   { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
-  // HU-17: re-evaluar controles con evidencia (servicio contratado)
-  { ruta: "/panel/remediacion", etiqueta: "Cerrar brechas", icono: "subir", soloCliente: true },
+  // HU-17: re-evaluar controles con evidencia (servicio contratado). El encuestado también la
+  // ve, con candado: la página le explica que es del servicio y cómo contratarlo.
+  { ruta: "/panel/remediacion", etiqueta: "Cerrar brechas", icono: "subir", servicio: true },
 ];
 
 export function Sidebar() {
@@ -35,7 +36,7 @@ export function Sidebar() {
       <nav className="nav" aria-label="Secciones del panel">
         <p className="nav-heading" id="nav-heading">Gobernanza de IA</p>
         <ul className="nav-list" aria-labelledby="nav-heading">
-          {ITEMS.filter((it) => !it.soloCliente || modo === "cliente").map((it) => {
+          {ITEMS.filter((it) => !it.servicio || modo === "cliente" || modo === "encuestado").map((it) => {
             // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
             const activo = pathname === it.ruta || (it.ruta !== "/panel" && pathname.startsWith(`${it.ruta}/`));
             return (
@@ -48,6 +49,12 @@ export function Sidebar() {
                 >
                   <Icon name={it.icono} />
                   <span className="nav-label">{it.etiqueta}</span>
+                  {it.servicio && modo === "encuestado" ? (
+                    <span className="nav-candado" title="Incluido en el servicio contratado">
+                      <Icon name="candado" />
+                      <span className="sr-only"> (incluido en el servicio contratado)</span>
+                    </span>
+                  ) : null}
                   {it.ruta === "/panel/brechas" && abiertas ? (
                     <span className="nav-count">
                       {abiertas}

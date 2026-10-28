@@ -232,6 +232,7 @@ async def _procesar(m, evidencia_id, clasificacion, confianza):
     from app.application.schemas.evidence_validation import EvidenceValidation
     from app.application.use_cases.generate_resumen import GenerateResumenUseCase
     from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+    from app.application.use_cases.remediacion import puntaje_general_actual
     from app.infrastructure.llm.factory import crear_storage_evidencias
     from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
     from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
@@ -247,6 +248,7 @@ async def _procesar(m, evidencia_id, clasificacion, confianza):
         await ProcessEvidenceUseCase(
             EvidenciaRepository(s), RespuestaRepository(s), crear_storage_evidencias(), LLM(),
             guard=ReglasPromptGuard(), recalcular=lambda ev: GenerateResumenUseCase(s).execute(ev),
+            puntaje_actual=lambda ev: puntaje_general_actual(s, ev),
         ).execute(evidencia_id)
     await m._bd(f)
 
@@ -310,9 +312,14 @@ def test_api_remediacion_actualiza_el_control_y_el_puntaje(entorno):
         assert (d["estado_validacion"], d["estado_resultante"], d["mejoro"]) == ("validated", "cumplido", True)
         assert d["estado_actual"] == "cumplido" and d["puntaje_general"] > puntaje_antes
         assert d["terminos_control"] is not None
+        # El puntaje antes y después queda en la evidencia y el radar se puede redibujar con `dominios`
+        assert d["puntaje_previo"] == puntaje_antes and d["puntaje_resultante"] == d["puntaje_general"]
+        assert d["dominios"] and all("puntaje" in x for x in d["dominios"])
         lista2 = (await c.get(f"/api/remediacion/evaluaciones/{ev}", headers=h)).json()
         assert rid not in {c_["respuesta_id"] for c_ in lista2["controles"]}      # la brecha se cerró
         assert lista2["puntaje_general"] == d["puntaje_general"]
+        assert lista2["controles_mejorados"] == 1 and lista2["puntaje_inicial"] == puntaje_antes
+        assert lista2["evolucion"][0]["antes"] == puntaje_antes and lista2["evolucion"][0]["despues"] == d["puntaje_general"]
         plan = (await c.get(f"/api/evaluaciones/{ev}/plan-formativo", headers=h)).json()
         assert rid not in {b["respuesta_id"] for dm in plan["dimensiones"] for mo in dm["modulos"] for b in mo["brechas"]}
 
@@ -323,6 +330,15 @@ def test_api_remediacion_actualiza_el_control_y_el_puntaje(entorno):
         d2 = (await c.get(f"/api/remediacion/evidencias/{r.json()['id_evidencia']}", headers=h)).json()
         assert (d2["estado_validacion"], d2["estado_actual"], d2["mejoro"]) == ("rejected", "parcialmente_cumplido", False)
         assert d2["puntaje_general"] == d["puntaje_general"]
+        assert d2["puntaje_previo"] == d2["puntaje_resultante"] == d["puntaje_general"]   # sin mejora, sin cambio
+        # El historial del control guarda los intentos anteriores (el último va aparte)
+        r = await c.post(f"/api/remediacion/respuestas/{parcial['respuesta_id']}/evidencias", headers=h,
+                         files={"file": ("otra.txt", TEXTO.encode(), "text/plain")}, data={"estado_declarado": "cumplido"})
+        assert r.status_code == 202, r.text
+        fila = next(x for x in (await c.get(f"/api/remediacion/evaluaciones/{ev}", headers=h)).json()["controles"]
+                    if x["respuesta_id"] == parcial["respuesta_id"])
+        assert fila["ultima_evidencia"]["en_proceso"] is True and len(fila["historial"]) == 1
+        assert fila["historial"][0]["estado_validacion"] == "rejected"
 
         # Un control cumplido ya no admite remediación; un id ajeno/inexistente es 404
         r = await c.post(url, headers=h, files={"file": ("p.txt", TEXTO.encode(), "text/plain")},

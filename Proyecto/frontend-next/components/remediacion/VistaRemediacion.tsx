@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { RadarMadurez } from "@/components/charts/RadarMadurez";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeSeveridad } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
@@ -26,6 +27,7 @@ import {
   ACCEPT,
   cargarRemediacion,
   consultarEvidencia,
+  deltaTexto,
   esperaConsulta,
   ETIQUETA_ESTADO,
   estadosDeclarables,
@@ -45,7 +47,7 @@ type Estado =
   | { tipo: "error"; mensaje: string };
 
 export function VistaRemediacion() {
-  const { evaluacionId, modo, recargar: recargarPanel, href } = usePanel();
+  const { evaluacionId, modo, recargar: recargarPanel, href, estado: panel } = usePanel();
   const params = useSearchParams();
   const enfocar = Number(params.get("control")) || null;
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
@@ -130,11 +132,9 @@ export function VistaRemediacion() {
 
       {datos ? (
         <>
-          <section className="remed-resumen" aria-label="Estado actual">
-            <p>
-              Puntaje general actual <strong className="remed-puntaje">{formatoPuntaje(datos.puntaje_general)}</strong>
-              <span className="remed-de"> / 100</span>
-            </p>
+          <MadurezEnVivo datos={datos} dominios={panel.tipo === "listo" ? panel.panel.dominios : []} />
+
+          <div className="remed-filtro">
             <p className="card-sub">
               {datos.controles.length} {datos.controles.length === 1 ? "control con brecha" : "controles con brecha"} ·{" "}
               {formados} con la formación hecha · PDF, Word o texto de hasta {datos.max_mb} MB
@@ -143,7 +143,7 @@ export function VistaRemediacion() {
               <input type="checkbox" checked={soloFormados} onChange={(e) => setSoloFormados(e.target.checked)} />
               <span>Solo los que ya tienen la formación hecha</span>
             </label>
-          </section>
+          </div>
 
           {datos.controles.length === 0 ? (
             <div className="state" role="status">
@@ -171,6 +171,66 @@ export function VistaRemediacion() {
         </>
       ) : null}
     </>
+  );
+}
+
+/**
+ * HU-17 C3 · Madurez en vivo: el radar y el puntaje general se redibujan apenas una evidencia
+ * mejora un control (la vista recarga el panel al recibir el resultado), con lo que subió desde
+ * la primera remediación y cada mejora en orden.
+ */
+function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: import("@/lib/types").DominioVista[] }) {
+  const inicial = datos.puntaje_inicial ?? datos.puntaje_general;
+  const delta = deltaTexto(inicial, datos.puntaje_general);
+  const subio = datos.puntaje_general > inicial;
+  const [destello, setDestello] = useState(false);
+  const previo = useRef(datos.puntaje_general);
+  useEffect(() => {
+    if (datos.puntaje_general !== previo.current) {
+      previo.current = datos.puntaje_general;
+      setDestello(true);
+      const t = setTimeout(() => setDestello(false), 1600);
+      return () => clearTimeout(t);
+    }
+  }, [datos.puntaje_general]);
+
+  return (
+    <section className="remed-madurez" aria-labelledby="madurez-titulo">
+      <div className="card remed-puntaje-card" data-destello={destello || undefined}>
+        <h2 className="card-title" id="madurez-titulo">Tu madurez ahora</h2>
+        <p className="remed-cifra" aria-live="polite">
+          <strong className="remed-puntaje">{formatoPuntaje(datos.puntaje_general)}</strong>
+          <span className="remed-de"> / 100</span>
+          {subio ? <span className="badge tone-ok remed-delta">{delta}</span> : null}
+        </p>
+        <p className="card-sub">
+          {subio
+            ? `Subió desde ${formatoPuntaje(inicial)} con ${datos.controles_mejorados ?? 0} ${
+                (datos.controles_mejorados ?? 0) === 1 ? "control mejorado" : "controles mejorados"
+              } por evidencia, sin repetir el autodiagnóstico.`
+            : "Cada evidencia que la IA valide actualiza este puntaje y el radar al instante."}
+        </p>
+        {datos.evolucion?.length ? (
+          <ol className="remed-evolucion" aria-label="Mejoras del puntaje por evidencia">
+            {datos.evolucion.map((m, i) => (
+              <li key={i}>
+                <span className="remed-evolucion-paso">
+                  {formatoPuntaje(m.antes)} → <strong>{formatoPuntaje(m.despues)}</strong>
+                </span>
+                <span className="remed-evolucion-delta">{deltaTexto(m.antes, m.despues)}</span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </div>
+      <div className="card remed-radar">
+        {dominios.length ? (
+          <RadarMadurez dominios={dominios} />
+        ) : (
+          <p className="card-sub">El radar aparece cuando el panel termina de cargar.</p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -299,6 +359,23 @@ function ControlRemediacion({
       ) : null}
 
       {evidencia ? <ResultadoEvidencia evidencia={evidencia} /> : null}
+      {c.historial?.length ? (
+        <details className="remed-historial">
+          <summary>
+            {c.historial.length} {c.historial.length === 1 ? "intento anterior" : "intentos anteriores"}
+          </summary>
+          <ul>
+            {c.historial.map((h) => (
+              <li key={h.id_evidencia}>
+                <span className="remed-historial-archivo">{h.nombre_archivo}</span>
+                <span className="card-sub">
+                  {h.fecha_subida ?? ""} · {resultadoTexto(h)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
 
       {!abierto ? (
         <div className="remed-acciones">

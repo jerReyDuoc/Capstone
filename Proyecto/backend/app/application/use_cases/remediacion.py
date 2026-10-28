@@ -51,6 +51,19 @@ _SIN_TERMINAR = (EstadoValidacion.PENDING.value, EstadoValidacion.PROCESSING.val
 MAX_JUSTIFICACION = 2000
 
 
+async def puntaje_general_actual(db: AsyncSession, evaluacion_id: int) -> float | None:
+    """Puntaje general vigente (promedio de los dominios ponderado por controles), como el panel."""
+    from app.domain.models.resumen import Resumen
+
+    filas = (await db.execute(
+        select(Resumen.puntaje_obtenido, Resumen.total_controles_evaluados).where(Resumen.evaluacion_id == evaluacion_id)
+    )).all()
+    total = sum(c or 0 for _, c in filas)
+    if not total:
+        return None
+    return round(sum((p or 0) * (c or 0) for p, c in filas) / total, 2)
+
+
 class RemediacionError(Exception):
     def __init__(self, status: int, codigo: str, mensaje: str, **extra):
         super().__init__(mensaje)
@@ -68,6 +81,8 @@ def evidencia_dict(e: Evidencia) -> dict:
         "fecha_subida": e.fecha_subida.isoformat() if e.fecha_subida else None,
         "fecha_procesada": e.fecha_procesada.isoformat() if e.fecha_procesada else None,
         "en_proceso": e.estado_validacion in _SIN_TERMINAR,
+        "puntaje_previo": e.puntaje_previo,
+        "puntaje_resultante": e.puntaje_resultante,
         "mejoro": bool(e.estado_resultante and e.estado_previo
                        and _RANGO.get(e.estado_resultante, 0) > _RANGO.get(e.estado_previo, 0)),
     }
@@ -104,6 +119,7 @@ class Remediacion:
                 AvanceFormativo.empresa_id == self.empresa.id, AvanceFormativo.estado == EstadoAvance.COMPLETADO.value)
         )).scalars().all())
         ultimas: dict[int, Evidencia] = {}
+        historial: dict[int, list[Evidencia]] = {}
         if abiertas:
             filas = (await self.db.execute(
                 select(Evidencia).where(Evidencia.respuesta_id.in_([r.id for r in abiertas]),
@@ -112,6 +128,7 @@ class Remediacion:
             )).scalars().all()
             for e in filas:
                 ultimas[e.respuesta_id] = e
+                historial.setdefault(e.respuesta_id, []).append(e)
 
         items = []
         for r in abiertas:
@@ -131,12 +148,27 @@ class Remediacion:
                 "ruta": {"id": ruta.id, "nombre": ruta.nombre} if ruta else None,
                 "formacion_completada": bool(ruta and ruta.id in completados),
                 "ultima_evidencia": evidencia_dict(ultima) if ultima else None,
+                # Las anteriores, de la más nueva a la más antigua (máx. 10), para ver qué se intentó
+                "historial": [evidencia_dict(x) for x in reversed(historial.get(r.id, [])[:-1])][:10],
             })
         items.sort(key=lambda x: (not x["formacion_completada"], PESO_SEVERIDAD.get(x["severidad"], 9),
                                   x["control_codigo"] or ""))
+        # Evolución del puntaje por remediaciones (incluye controles ya cerrados, que no están en `controles`)
+        mejoras = (await self.db.execute(
+            select(Evidencia.fecha_procesada, Evidencia.puntaje_previo, Evidencia.puntaje_resultante)
+            .join(Respuesta, Evidencia.respuesta_id == Respuesta.id)
+            .where(Respuesta.evaluacion_id == ev.id, Evidencia.origen == ORIGEN_REMEDIACION,
+                   Evidencia.puntaje_resultante.is_not(None), Evidencia.puntaje_previo.is_not(None),
+                   Evidencia.puntaje_resultante > Evidencia.puntaje_previo)
+            .order_by(Evidencia.id_evidencia)
+        )).all()
+        cerrados = len(mejoras)
         return {
             "evaluacion_id": ev.id,
             "puntaje_general": datos.puntaje_general,
+            "puntaje_inicial": mejoras[0][1] if mejoras else datos.puntaje_general,
+            "evolucion": [{"fecha": f.isoformat() if f else None, "antes": a, "despues": d} for f, a, d in mejoras],
+            "controles_mejorados": cerrados,
             "dominios": [{"dominio": d.nombre, "puntaje": d.puntaje} for d in datos.dominios],
             "controles": items,
             "tipos_admitidos": ["pdf", "docx", "txt"],
@@ -241,4 +273,6 @@ class Remediacion:
             **evidencia_dict(e),
             "estado_actual": respuesta.estado_clasificacion_final or respuesta.estado_clasificacion,
             "puntaje_general": datos.puntaje_general if datos else None,
+            # Para redibujar el radar apenas termina el análisis, sin otra consulta
+            "dominios": [{"dominio": d.nombre, "puntaje": d.puntaje} for d in datos.dominios] if datos else [],
         }

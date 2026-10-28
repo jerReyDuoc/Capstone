@@ -194,7 +194,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         **_sin_dp("id_evidencia", "mime_type", "estado_validacion", "clasificacion_llm", "confianza",
                   "fecha_subida", "fecha_procesada", "Respuestas_id_respuesta",
                   # HU-17: remediación (estados de la matriz y origen de la evidencia)
-                  "origen", "estado_declarado", "estado_previo", "estado_resultante"),
+                  "origen", "estado_declarado", "estado_previo", "estado_resultante",
+                  "puntaje_previo", "puntaje_resultante"),
         # HU-17: palabras del CATÁLOGO del control encontradas en el texto (no copia el texto)
         "terminos_control": Dato(SIN_DP, escaneo="pii"),
         "justificacion_remediacion": Dato(

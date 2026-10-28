@@ -424,9 +424,13 @@ export interface EvidenciaRemediacionApi {
   fecha_procesada: string | null;
   en_proceso: boolean;
   mejoro: boolean;
+  /** Puntaje general antes y después de procesarla (iguales si el control no mejoró). */
+  puntaje_previo?: number | null;
+  puntaje_resultante?: number | null;
   /** Solo en GET /evidencias/{id} */
   estado_actual?: EstadoClasificacion;
   puntaje_general?: number | null;
+  dominios?: { dominio: string; puntaje: number | null }[];
 }
 
 export interface ControlRemediacionApi {
@@ -443,12 +447,18 @@ export interface ControlRemediacionApi {
   ruta: { id: number; nombre: string } | null;
   formacion_completada: boolean;
   ultima_evidencia: EvidenciaRemediacionApi | null;
+  /** Intentos anteriores, del más nuevo al más antiguo. */
+  historial?: EvidenciaRemediacionApi[];
 }
 
 /** GET /api/remediacion/evaluaciones/{id} */
 export interface RemediacionApi {
   evaluacion_id: number;
   puntaje_general: number;
+  /** Puntaje antes de la primera remediación que lo mejoró (o el actual si no hay ninguna). */
+  puntaje_inicial?: number;
+  evolucion?: { fecha: string | null; antes: number; despues: number }[];
+  controles_mejorados?: number;
   dominios: { dominio: string; puntaje: number | null }[];
   controles: ControlRemediacionApi[];
   tipos_admitidos: string[];

@@ -31,7 +31,18 @@ async def process_evidence_task(ctx, evidencia_id: int):
 
         async def recalcular(evaluacion_id: int):
             # HU-17 C3: puntaje global y radar se recalculan con el nuevo estado del control
-            return await GenerateResumenUseCase(session).execute(evaluacion_id)
+            resultado = await GenerateResumenUseCase(session).execute(evaluacion_id)
+            if settings.BENCHMARK_AL_COMPLETAR:
+                # la evaluación ya entra al benchmark de su rubro: se actualiza como al completar
+                try:
+                    await UpdateBenchmarkUseCase(session).execute()
+                except Exception:  # noqa: BLE001 - lo repara el cron de las 02:00
+                    await session.rollback()
+            return resultado
+
+        async def puntaje_actual(evaluacion_id: int):
+            from app.application.use_cases.remediacion import puntaje_general_actual
+            return await puntaje_general_actual(session, evaluacion_id)
 
         async def auditar(evidencia, respuesta):
             BitacoraRepository(session).registrar(
@@ -40,7 +51,8 @@ async def process_evidence_task(ctx, evidencia_id: int):
                 resultado=RESULTADO_OK if evidencia.estado_validacion == "validated" else RESULTADO_RECHAZADO,
                 detalle={"evaluacion_id": respuesta.evaluacion_id if respuesta else None,
                          "estado_previo": evidencia.estado_previo, "estado_resultante": evidencia.estado_resultante,
-                         "estado_validacion": evidencia.estado_validacion},
+                         "estado_validacion": evidencia.estado_validacion,
+                         "puntaje_previo": evidencia.puntaje_previo, "puntaje_resultante": evidencia.puntaje_resultante},
             )
             await session.commit()
 
@@ -50,6 +62,7 @@ async def process_evidence_task(ctx, evidencia_id: int):
             registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(session), guard),
             anonimizador=crear_anonimizador(),
             recalcular=recalcular,
+            puntaje_actual=puntaje_actual,
             auditar=auditar,
         )
         await use_case.execute(evidencia_id)

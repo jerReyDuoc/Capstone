@@ -42,6 +42,7 @@ La extracción de texto también arregla el hallazgo de la revisión del backlog
 
 | Archivo | Cambio |
 |---|---|
+| `migrations/versions/e9b4c2d7a1f6_hu17_puntaje_remediacion.py` | **Nuevo (28-oct).** `evidencias.puntaje_previo` y `puntaje_resultante`. |
 | `migrations/versions/d6e1a4c8f2b5_hu26_hu17_formacion_remediacion.py` | **Nuevo.** Tablas `leccion_formativa`, `pregunta_verificacion`, `avance_formativo`; columnas de remediación en `evidencias`; contenido semilla (48 lecciones y 36 preguntas para las 12 rutas). `down_revision = f3a8d1c6e4b2` (HU-28). Tiene `downgrade`. |
 | `app/domain/models/formacion.py` | **Nuevo.** `LeccionFormativa`, `PreguntaVerificacion`, `AvanceFormativo`, `EstadoAvance`. |
 | `app/domain/models/evidencia.py`, `__init__.py` | `origen`, `estado_declarado`, `justificacion_remediacion`, `estado_previo`, `estado_resultante`, `terminos_control`; registro de los modelos nuevos. |
@@ -80,7 +81,7 @@ La extracción de texto también arregla el hallazgo de la revisión del backlog
 ## Cómo aplicarlo y probarlo en Docker
 
 1. Descomprime el zip **sobre la raíz del repo** (respeta `Proyecto/` y `Extras/`).
-2. `docker compose up -d --build` (api y worker necesitan `pypdf`) y `docker compose exec api alembic upgrade head`. Si tu head no es `f3a8d1c6e4b2`, cambia `down_revision` en la migración nueva.
+2. `docker compose up -d --build` (api y worker necesitan `pypdf`) y `docker compose exec api alembic upgrade head` (aplica `d6e1a4c8f2b5` y `e9b4c2d7a1f6`). Si tu head no es `f3a8d1c6e4b2`, cambia `down_revision` en la migración nueva.
 3. `docker compose exec worker pytest tests -v -rxX`.
 
 Por Swagger, con un cliente ya activado (flujo de HU-27/28): `GET /api/formacion/avance`, abre un módulo, marca sus lecciones, responde la actividad y descarga la constancia; luego compara `GET /api/evaluaciones/{id}/resumen`: no cambió. Para HU-17, `GET /api/remediacion/evaluaciones/{id}`, sube un PDF a un control no cumplido y, cuando el worker termine, consulta `GET /api/remediacion/evidencias/{id}`: si el LLM lo aceptó, el control y el puntaje cambiaron.
@@ -88,6 +89,19 @@ Por Swagger, con un cliente ya activado (flujo de HU-27/28): `GET /api/formacion
 ## Verificación hecha
 
 En este entorno no hay PyPI, pero se armaron FastAPI 0.115, SQLAlchemy 2.0.36, aiosqlite, pydantic-settings, Alembic y el resto desde sus repositorios de GitHub, así que **la suite completa corrió aquí: 576 aprobadas y 9 omitidas, sin fallas** (las omitidas son las de modo live y spaCy real). Las 22 pruebas nuevas corren completas. `test_bordes_na_y_evidencia.py::test_evidencia_muy_larga_se_trunca_antes_del_llm` se ajustó: un texto largo ya no se corta exactamente en el máximo, sino que se reduce a sus pasajes más relevantes sin pasarlo, incluidas las de API en proceso. La migración se probó con Alembic sobre SQLite (los esquemas previos no corren en SQLite, así que se partió del esquema de HU-28 y se hizo stamp): upgrade, downgrade y un segundo upgrade; siembra 48 lecciones y 36 preguntas, y las evidencias existentes quedan con `origen = cuestionario`. **No se probó en PostgreSQL**: corran `alembic upgrade head` y `alembic downgrade -1 && alembic upgrade head` en su Docker antes de subir.
+
+## HU-17 completa: evolución del puntaje, historial y benchmark (28-oct)
+
+Segunda entrega sobre la misma base, para cerrar el criterio 3 de punta a punta:
+
+- **Puntaje antes y después de cada evidencia.** El worker guarda en la evidencia el puntaje general al empezar (`puntaje_previo`) y el que queda tras recalcular (`puntaje_resultante`; igual si el control no mejoró). Va en una **migración aparte**, `e9b4c2d7a1f6`, encima de `d6e1a4c8f2b5`, por si ya la aplicaron.
+- **Evolución.** `GET /api/remediacion/evaluaciones/{id}` trae `puntaje_inicial` (antes de la primera mejora), `evolucion` (cada mejora: antes → después) y `controles_mejorados`, incluidos los controles que ya se cerraron y por eso no salen en la lista.
+- **Historial por control.** Cada control trae `historial` con los intentos anteriores (hasta 10, del más nuevo al más antiguo): qué archivo, cuándo y por qué no cambió el estado.
+- **Radar al instante.** `GET /api/remediacion/evidencias/{id}` trae `dominios` con los puntajes recalculados, para redibujar el radar sin otra consulta.
+- **Benchmark.** Si `BENCHMARK_AL_COMPLETAR=true` (por defecto), una remediación que mejora un control también actualiza el benchmark del rubro, igual que al completar una evaluación; si falla, lo repara el cron de las 02:00.
+- La bitácora del resultado (`remediacion.resultado`) incluye el puntaje antes y después.
+
+Pruebas: `test_api_remediacion_actualiza_el_control_y_el_puntaje` ahora comprueba los puntajes guardados, la evolución, los dominios del detalle y el historial. Suite completa en este entorno: **576 aprobadas, 9 omitidas, sin fallas**; la migración nueva se probó con upgrade, downgrade y upgrade sobre SQLite.
 
 ## Decisiones para validar con el PO
 

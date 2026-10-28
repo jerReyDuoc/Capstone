@@ -84,8 +84,12 @@ export function resultadoTexto(e: EvidenciaRemediacionApi): string {
   switch (faseEvidencia(e)) {
     case "analizando":
       return "Estamos analizando la evidencia. Esto suele tardar menos de un minuto.";
-    case "mejoro":
-      return `El control pasó de ${ETIQUETA_ESTADO[e.estado_previo ?? "no_cumplido"].toLowerCase()} a ${ETIQUETA_ESTADO[e.estado_resultante ?? "cumplido"].toLowerCase()}. Actualizamos tu puntaje.`;
+    case "mejoro": {
+      const delta = deltaTexto(e.puntaje_previo, e.puntaje_resultante);
+      return `El control pasó de ${ETIQUETA_ESTADO[e.estado_previo ?? "no_cumplido"].toLowerCase()} a ${ETIQUETA_ESTADO[e.estado_resultante ?? "cumplido"].toLowerCase()}. ${
+        delta && delta !== "sin cambios" ? `Tu puntaje general subió ${delta}.` : "Actualizamos tu puntaje."
+      }`;
+    }
     case "error":
       return e.errores_validacion[0] ?? "No pudimos analizar el archivo. Vuelve a intentarlo.";
     default:
@@ -100,6 +104,15 @@ export function resultadoTexto(e: EvidenciaRemediacionApi): string {
 export function esperaConsulta(intento: number): number | null {
   if (intento >= 40) return null;
   return Math.min(1500 * 1.25 ** intento, 8000);
+}
+
+/** "+3,6 pts" / "−1 pt" / "sin cambios" (con coma decimal, como el resto del panel). */
+export function deltaTexto(antes: number | null | undefined, despues: number | null | undefined): string {
+  if (antes == null || despues == null) return "";
+  const d = Math.round((despues - antes) * 10) / 10;
+  if (d === 0) return "sin cambios";
+  const n = Math.abs(d).toString().replace(".", ",");
+  return `${d > 0 ? "+" : "−"}${n} ${Math.abs(d) === 1 ? "pt" : "pts"}`;
 }
 
 export function mensajeRemediacion(e: unknown): string {

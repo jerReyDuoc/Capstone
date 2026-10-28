@@ -58,6 +58,7 @@ class ProcessEvidenceUseCase:
         registrar_evento: RegistrarEventoSeguridad | None = None,
         anonimizador: AnonimizadorPII | None = None,
         recalcular: Callable[[int], Awaitable[object]] | None = None,
+        puntaje_actual: Callable[[int], Awaitable[float | None]] | None = None,
         auditar: Callable[[Evidencia, Respuesta | None], Awaitable[None]] | None = None,
     ):
         self.evidencia_repo = evidencia_repo
@@ -71,6 +72,8 @@ class ProcessEvidenceUseCase:
         # HU-17: recalcula el resumen (puntaje y radar) cuando una remediación mejora un control.
         # El worker inyecta GenerateResumenUseCase; recibe el id de la evaluación.
         self.recalcular = recalcular
+        # HU-17: lee el puntaje general vigente (antes y después del recálculo)
+        self.puntaje_actual = puntaje_actual
         # HU-17: registra el resultado de la remediación en la bitácora (HU-09)
         self.auditar = auditar
 
@@ -95,12 +98,18 @@ class ProcessEvidenceUseCase:
         actual = (respuesta.estado_clasificacion_final or respuesta.estado_clasificacion) if respuesta else None
         evidencia.estado_resultante = actual
         await self.evidencia_repo.update(evidencia)
+        antes = await self._leer_puntaje(respuesta.evaluacion_id) if respuesta is not None else None
+        despues = antes
         if respuesta is not None and actual != previo and self.recalcular is not None:
             try:
                 await self.recalcular(respuesta.evaluacion_id)
+                despues = await self._leer_puntaje(respuesta.evaluacion_id)
             except Exception as e:  # noqa: BLE001 - el estado ya quedó; el resumen se puede regenerar
                 logger.error("HU-17: no se pudo recalcular el resumen de la evaluación %s (%s)",
                              respuesta.evaluacion_id, type(e).__name__)
+        if antes is not None or despues is not None:
+            evidencia.puntaje_previo, evidencia.puntaje_resultante = antes, despues
+            await self.evidencia_repo.update(evidencia)
         if self.auditar is not None:
             try:
                 await self.auditar(evidencia, respuesta)
@@ -296,6 +305,14 @@ class ProcessEvidenceUseCase:
             evidencia.errores_validacion = [str(e)]
             evidencia.fecha_procesada = date.today()
             return await self.evidencia_repo.update(evidencia)
+
+    async def _leer_puntaje(self, evaluacion_id: int | None) -> float | None:
+        if self.puntaje_actual is None or evaluacion_id is None:
+            return None
+        try:
+            return await self.puntaje_actual(evaluacion_id)
+        except Exception:  # noqa: BLE001 - es informativo
+            return None
 
     async def _sin_texto(self, evidencia: Evidencia, mensaje: str) -> Evidencia:
         """Archivo sin texto legible: no se gasta una llamada al LLM; la respuesta no cambia."""
