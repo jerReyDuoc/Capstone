@@ -11,6 +11,10 @@ class EstadoValidacion(str, Enum):
     REJECTED = "rejected"
     ERROR = "error"
 
+ORIGEN_CUESTIONARIO = "cuestionario"
+ORIGEN_REMEDIACION = "remediacion"  # HU-17
+
+
 class Evidencia(Base):
     __tablename__ = "evidencias"
 
@@ -29,6 +33,24 @@ class Evidencia(Base):
     errores_validacion: Mapped[list | None] = mapped_column("errores_validacion", JSON, nullable=True)
     fecha_subida: Mapped[date | None] = mapped_column("fecha_subida", Date, nullable=True)
     fecha_procesada: Mapped[date | None] = mapped_column("fecha_procesada", Date, nullable=True)
+
+    # HU-17: de dónde viene la evidencia. "cuestionario" = durante el autodiagnóstico (HU-01/02);
+    # "remediacion" = la empresa cliente la sube después, para re-evaluar un control con brecha.
+    origen: Mapped[str] = mapped_column(
+        "origen", String(15), nullable=False, default=ORIGEN_CUESTIONARIO, server_default=ORIGEN_CUESTIONARIO
+    )
+    # Solo remediación: el estado que la empresa dice haber alcanzado, su justificación
+    # (anonimizada, HU-06), el estado vigente antes de procesar y el que quedó después.
+    estado_declarado: Mapped[str | None] = mapped_column("estado_declarado", String(25), nullable=True)
+    justificacion_remediacion: Mapped[str | None] = mapped_column("justificacion_remediacion", Text, nullable=True)
+    estado_previo: Mapped[str | None] = mapped_column("estado_previo", String(25), nullable=True)
+    estado_resultante: Mapped[str | None] = mapped_column("estado_resultante", String(25), nullable=True)
+    # HU-17 C2: términos del control encontrados en el texto (verificación local, sin LLM)
+    terminos_control: Mapped[dict | None] = mapped_column("terminos_control", JSON, nullable=True)
+
+    @property
+    def es_remediacion(self) -> bool:
+        return self.origen == ORIGEN_REMEDIACION
 
     respuesta_id: Mapped[int] = mapped_column(
         "Respuestas_id_respuesta", Integer,

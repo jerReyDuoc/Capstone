@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { AvanceEmpresa } from "@/components/formacion/AvanceEmpresa";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
+import { useAvanceFormativo } from "@/hooks/useAvanceFormativo";
 import { usePlanFormativo } from "@/hooks/usePlanFormativo";
 import { descargarTexto } from "@/lib/exportar";
+import { accionModulo, ESTADO_MODULO, hrefModulo, hrefRemediacion } from "@/lib/formacion";
 import { formatoPuntaje } from "@/lib/madurez";
 import {
   dimensionPrioritaria,
@@ -23,7 +26,15 @@ import {
 } from "@/lib/planFormativo";
 import { SEVERIDAD_TONO } from "@/lib/severidad";
 import { slug } from "@/lib/slug";
-import type { DimensionPlanApi, ModuloPlanApi, NivelFormativo, PanelVista, PlanFormativoApi } from "@/lib/types";
+import type {
+  AvanceFormativoApi,
+  DimensionPlanApi,
+  ModuloAvanceApi,
+  ModuloPlanApi,
+  NivelFormativo,
+  PanelVista,
+  PlanFormativoApi,
+} from "@/lib/types";
 
 /**
  * HU-12 · Como encargado de capacitación, quiero recibir planes de estudio recomendados
@@ -33,6 +44,11 @@ import type { DimensionPlanApi, ModuloPlanApi, NivelFormativo, PanelVista, PlanF
  *   C1 Mapeo automático brechas → catálogo formativo     franja "Cómo se armó" + "Cierra N brechas"
  *   C2 Niveles (Inicial/Intermedio/Avanzado) con objetivos  guía de niveles, nivel por dimensión y módulo
  *   C3 Panel organizado por dimensión normativa            una sección por dimensión
+ *
+ * HU-26 (usuario definitivo, modo "cliente"): el mismo panel muestra el avance de la empresa
+ * (AvanceEmpresa), el estado de cada módulo con su acción (Empezar / Continuar / Constancia)
+ * y marca las brechas cuya formación ya está hecha. El encuestado ve el plan y un aviso de
+ * que los módulos se recorren con el servicio contratado.
  */
 export function VistaCapacitacion() {
   const { evaluacionId } = usePanel();
@@ -82,7 +98,9 @@ function Plan({ panel, onAviso }: { panel: PanelVista; onAviso: (t: string) => v
 }
 
 function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: PanelVista; onAviso: (t: string) => void }) {
-  const { href } = usePanel();
+  const { href, modo, evaluacionId } = usePanel();
+  const { estado: estadoAvance } = useAvanceFormativo();
+  const avance: AvanceFormativoApi | null = estadoAvance.tipo === "listo" ? estadoAvance.avance : null;
   const [filtros, setFiltros] = useState<FiltrosPlan>(FILTROS_PLAN_VACIOS);
   const r = plan.resumen;
   const prioritaria = dimensionPrioritaria(plan);
@@ -101,6 +119,29 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
 
   return (
     <>
+      {avance ? <AvanceEmpresa avance={avance} evaluacionId={evaluacionId} /> : null}
+      {estadoAvance.tipo === "cargando" ? (
+        <div className="skeleton" style={{ height: 220 }} role="status" aria-label="Cargando el avance de tu empresa" />
+      ) : null}
+      {estadoAvance.tipo === "error" ? (
+        <p className="callout callout-aviso" role="alert">
+          <Icon name="alerta" />
+          <span>
+            <strong>No pudimos cargar el avance de tu empresa.</strong> {estadoAvance.mensaje}
+          </span>
+        </p>
+      ) : null}
+      {modo === "encuestado" ? (
+        <p className="callout">
+          <Icon name="candado" />
+          <span>
+            <strong>Los módulos se recorren con el servicio contratado.</strong> El plan es tuyo y gratis; con la plataforma
+            tu empresa hace cada módulo, registra su avance y obtiene constancias.{" "}
+            <Link href={href("/panel/contratar")}>Ver cómo contratar</Link>
+          </span>
+        </p>
+      ) : null}
+
       <div className="grid">
         <Kpi
           className="col-3 md-col-3 card-glow"
@@ -218,7 +259,14 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
 
       {/* C3: por dimensión normativa */}
       {visibles.map(([d, modulos]) => (
-        <Dimension key={d.dominio} dimension={d} modulos={modulos} hrefBrechas={href("/panel/brechas", { dominio: d.dominio })} panel={panel} />
+        <Dimension
+          key={d.dominio}
+          dimension={d}
+          modulos={modulos}
+          hrefBrechas={href("/panel/brechas", { dominio: d.dominio })}
+          panel={panel}
+          avance={avance}
+        />
       ))}
 
       {plan.brechas_sin_ruta.length ? (
@@ -244,11 +292,13 @@ function Dimension({
   modulos,
   hrefBrechas,
   panel,
+  avance,
 }: {
   dimension: DimensionPlanApi;
   modulos: ModuloPlanApi[];
   hrefBrechas: string;
   panel: PanelVista;
+  avance: AvanceFormativoApi | null;
 }) {
   const id = `cap-${slug(d.dominio)}`;
   const dominioPanel = panel.dominios.find((x) => x.nombre === d.dominio);
@@ -294,7 +344,13 @@ function Dimension({
       ) : (
         <ul className="modulo-grid">
           {modulos.map((m) => (
-            <Modulo key={m.ruta.id} modulo={m} dominio={d.dominio} asignado={d.nivel_asignado} />
+            <Modulo
+              key={m.ruta.id}
+              modulo={m}
+              dominio={d.dominio}
+              asignado={d.nivel_asignado}
+              progreso={avance?.modulos.find((x) => x.ruta_id === m.ruta.id) ?? null}
+            />
           ))}
         </ul>
       )}
@@ -314,9 +370,21 @@ function Dimension({
   );
 }
 
-function Modulo({ modulo: m, dominio, asignado }: { modulo: ModuloPlanApi; dominio: string; asignado: NivelFormativo }) {
+function Modulo({
+  modulo: m,
+  dominio,
+  asignado,
+  progreso,
+}: {
+  modulo: ModuloPlanApi;
+  dominio: string;
+  asignado: NivelFormativo;
+  /** HU-26: avance de la empresa en este módulo (solo el usuario definitivo). */
+  progreso: ModuloAvanceApi | null;
+}) {
   const despues = PASOS.indexOf(m.nivel) > PASOS.indexOf(asignado);
-  const { href } = usePanel();
+  const { href, evaluacionId } = usePanel();
+  const completado = progreso?.estado === "completado";
   const tituloId = `mod-${m.ruta.id}`;
   const urgente = m.motivo === "brechas" && m.prioridad !== "Sin clasificar";
   return (
@@ -400,8 +468,9 @@ function Modulo({ modulo: m, dominio, asignado }: { modulo: ModuloPlanApi; domin
                     <Link
                       href={href("/panel/brechas", { q: b.codigo })}
                       className={`chip-brecha sev-${SEVERIDAD_TONO[b.severidad]}`}
-                      aria-label={`${b.codigo}, severidad ${b.severidad}${b.dominio !== dominio ? `, de ${b.dominio}` : ""}. Ver en el listado de brechas.`}
+                      aria-label={`${b.codigo}, severidad ${b.severidad}${b.dominio !== dominio ? `, de ${b.dominio}` : ""}${completado ? ", formación completada" : ""}. Ver en el listado de brechas.`}
                     >
+                      {completado ? <Icon name="check" className="chip-brecha-check" /> : null}
                       <span className="code">{b.codigo}</span>
                       {b.dominio !== dominio ? <span className="chip-brecha-dom">{b.dominio}</span> : null}
                     </Link>
@@ -412,7 +481,46 @@ function Modulo({ modulo: m, dominio, asignado }: { modulo: ModuloPlanApi; domin
           ) : (
             <p className="card-sub">Base del nivel asignado a la dimensión: refuerza al equipo aunque no haya brechas que lo exijan.</p>
           )}
+          {completado && m.brechas.length ? (
+            <p className="modulo-formado">
+              Formación hecha. Para cerrar {m.brechas.length === 1 ? "esta brecha" : "estas brechas"}, sube evidencia nueva.{" "}
+              <Link href={hrefRemediacion(evaluacionId, m.brechas[0]?.respuesta_id)}>Subir evidencia</Link>
+            </p>
+          ) : null}
         </div>
+
+        {progreso ? (
+          <div className="modulo-progreso" data-estado={progreso.estado}>
+            <div className="modulo-progreso-dato">
+              <span className={`badge tone-${ESTADO_MODULO[progreso.estado].tono}`}>{ESTADO_MODULO[progreso.estado].etiqueta}</span>
+              <span className="modulo-progreso-texto">
+                {completado
+                  ? `Constancia ${progreso.codigo_constancia ?? ""}`.trim()
+                  : `${progreso.lecciones_vistas} de ${progreso.lecciones_total} lecciones`}
+              </span>
+            </div>
+            {!completado ? (
+              <div
+                className="meter"
+                role="progressbar"
+                aria-label={`Lecciones de ${m.ruta.nombre}`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progreso.porcentaje_lecciones)}
+              >
+                <span style={{ width: `${progreso.porcentaje_lecciones}%` }} />
+              </div>
+            ) : null}
+            <Link
+              href={hrefModulo(m.ruta.id, evaluacionId)}
+              className={`btn ${progreso.estado === "completado" ? "btn-ghost" : "btn-primary"} btn-sm modulo-accion`}
+            >
+              {progreso.estado === "no_iniciado" ? <Icon name="play" /> : progreso.estado === "completado" ? <Icon name="constancia" /> : null}
+              {accionModulo(progreso)}
+              <span className="sr-only">: {m.ruta.nombre}</span>
+            </Link>
+          </div>
+        ) : null}
       </article>
     </li>
   );

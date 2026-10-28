@@ -34,6 +34,12 @@ const PATHS = {
   correo: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Zm-.5 1 8.5 6 8.5-6",
   diana: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
   birrete: "M2 9l10-5 10 5-10 5L2 9Zm4 2v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5M22 9v6",
+  // HU-26 / HU-17
+  constancia: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm-3.5 4.8L9.5 14m5 0 1 5.8L12 18l-3.5 1.8M10 9l1.5 1.5L14.5 7.5",
+  subir: "M12 16V5m0 0-4 4m4-4 4 4M5 19h14",
+  play: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-2-12.5v7l6-3.5-6-3.5Z",
+  documento: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M9 13h6M9 17h6",
+  flechaIzq: "M19 12H5m6 6-6-6 6-6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

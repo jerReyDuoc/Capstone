@@ -10,10 +10,12 @@ import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeEstado, BadgeSeveridad, EstadoPanel } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
+import { useAvanceFormativo } from "@/hooks/useAvanceFormativo";
 import { usePanel } from "@/hooks/usePanel";
 import { useVistasFijadas } from "@/hooks/useVistasFijadas";
 import { ordenarBrechas } from "@/lib/adaptadores";
 import { brechasACsv, descargarTexto, nombreArchivo } from "@/lib/exportar";
+import { hrefRemediacion } from "@/lib/formacion";
 import {
   describirFiltros,
   filtrarBrechas,
@@ -45,6 +47,12 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const { href } = usePanel();
+  // HU-26 C3: brechas cuya formación ya está hecha (solo el usuario definitivo)
+  const { estado: avance } = useAvanceFormativo();
+  const formadas = useMemo(
+    () => new Set(avance.tipo === "listo" ? avance.avance.brechas.filter((x) => x.formacion_completada).map((x) => x.respuesta_id) : []),
+    [avance],
+  );
   const { estaFijada, fijar, quitar } = useVistasFijadas(panel.evaluacionId);
   const idBuscar = useId();
   const idDominio = useId();
@@ -392,6 +400,15 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                           <span className="ruta">
                             <Icon name="libro" />
                             {b.rutaFormativa}
+                          </span>
+                        ) : null}
+                        {formadas.has(b.respuestaId) ? (
+                          <span className="ruta ruta-formada">
+                            <Icon name="check" />
+                            Formación hecha ·{" "}
+                            <Link href={hrefRemediacion(panel.evaluacionId, b.respuestaId)}>
+                              subir evidencia<span className="sr-only"> de {b.codigo}</span>
+                            </Link>
                           </span>
                         ) : null}
                       </td>

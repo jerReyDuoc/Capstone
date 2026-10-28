@@ -607,7 +607,9 @@ class TestProcesamientoSinEvidencia:
         _procesar(FakeStorage(texto), validator, guard=False)
         enviado = gw.provider.requests[0].user
         bloque = enviado.split("<evidencia_adjunta>\n", 1)[1].split("\n</evidencia_adjunta>", 1)[0]
-        assert len(bloque) == settings.MAX_CHARS_EVIDENCIA_LLM
+        # HU-17 (RAG local): un texto que no cabe se reduce a sus pasajes más relevantes, sin
+        # pasar nunca del máximo (antes se cortaba exactamente en MAX_CHARS_EVIDENCIA_LLM).
+        assert settings.MAX_CHARS_EVIDENCIA_LLM * 0.8 < len(bloque) <= settings.MAX_CHARS_EVIDENCIA_LLM
 
     def test_justificacion_vacia_no_rompe_el_procesamiento(self):
         validator = FakeValidator()

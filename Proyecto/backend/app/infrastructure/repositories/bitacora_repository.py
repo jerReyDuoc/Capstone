@@ -43,6 +43,14 @@ class Accion:
     RECUPERACION_SOLICITADA = "recuperacion.solicitada"
     RECUPERACION_USADA = "recuperacion.contrasena_restablecida"
     RECUPERACION_RECHAZADA = "recuperacion.rechazada"
+    # HU-26: recorrido de módulos formativos de la empresa cliente
+    FORMACION_MODULO_INICIADO = "formacion.modulo_iniciado"
+    FORMACION_VERIFICACION = "formacion.verificacion_intento"
+    FORMACION_MODULO_COMPLETADO = "formacion.modulo_completado"
+    FORMACION_CONSTANCIA = "formacion.constancia_descargada"
+    # HU-17: re-evaluación de un control con evidencia nueva (remediación)
+    REMEDIACION_EVIDENCIA_SUBIDA = "remediacion.evidencia_subida"
+    REMEDIACION_RESULTADO = "remediacion.resultado"
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

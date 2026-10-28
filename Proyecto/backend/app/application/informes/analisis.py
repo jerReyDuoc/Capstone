@@ -324,6 +324,8 @@ class BrechaCubierta:
     severidad: str
     estado: str
     prioridad: int
+    # HU-17/HU-26: respuesta de la brecha, para enlazarla con su remediación (subir evidencia)
+    respuesta_id: int | None = None
 
 
 @dataclass
@@ -415,7 +417,8 @@ def construir_plan(brechas: list[Brecha], dominios: list[DominioResultado],
     mapeadas = 0
     for b in brechas:
         dimension(b.dominio).brechas_dimension += 1
-        cubierta = BrechaCubierta(b.codigo, b.control_codigo, b.dominio, b.severidad, b.estado, b.prioridad)
+        cubierta = BrechaCubierta(b.codigo, b.control_codigo, b.dominio, b.severidad, b.estado, b.prioridad,
+                                  respuesta_id=b.respuesta_id)
         if b.ruta is None:
             sin_ruta.append(cubierta)
             continue
@@ -466,7 +469,8 @@ def plan_a_dict(plan: PlanFormativo) -> dict:
 
     def cubierta(c: BrechaCubierta) -> dict:
         return {"codigo": c.codigo, "control_codigo": c.control_codigo, "dominio": c.dominio,
-                "severidad": c.severidad, "estado": c.estado, "prioridad": c.prioridad}
+                "severidad": c.severidad, "estado": c.estado, "prioridad": c.prioridad,
+                "respuesta_id": c.respuesta_id}
 
     return {
         "resumen": {

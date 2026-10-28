@@ -327,6 +327,8 @@ RUTAS_ADMIN_HU27 = [
     ("GET", "/api/admin/empresas/{empresa_id}"),
     ("POST", "/api/admin/empresas/{empresa_id}/evaluaciones"),
     ("POST", "/api/admin/empresas/{empresa_id}/usuario/activacion"),
+    # HU-26: avance formativo de una empresa (prueba en tests/test_hu26_formacion.py)
+    ("GET", "/api/admin/empresas/{empresa_id}/formacion"),
 ]
 
 
@@ -463,6 +465,18 @@ RUTAS_CON_TOKEN_PROPIO = [
     # HU-28: cerrar sesión y espacio de la empresa del cliente (roles en test_hu28_sesion.py)
     ("POST", "/api/auth/logout", "/api/auth/logout", {}),
     ("GET", "/api/cliente/empresa", "/api/cliente/empresa", {}),
+    # HU-26: recorrido de módulos (solo cliente con servicio activo; roles en test_hu26_formacion.py)
+    ("GET", "/api/formacion/avance", "/api/formacion/avance", {}),
+    ("GET", "/api/formacion/modulos/{ruta_id}", "/api/formacion/modulos/1", {}),
+    ("POST", "/api/formacion/modulos/{ruta_id}/lecciones/{orden}/vista", "/api/formacion/modulos/1/lecciones/1/vista", {}),
+    ("POST", "/api/formacion/modulos/{ruta_id}/verificacion", "/api/formacion/modulos/1/verificacion",
+     {"json": {"respuestas": {}}}),
+    ("GET", "/api/formacion/modulos/{ruta_id}/constancia", "/api/formacion/modulos/1/constancia", {}),
+    # HU-17: remediación con evidencia (roles en test_hu17_remediacion.py)
+    ("GET", "/api/remediacion/evaluaciones/{evaluacion_id}", "/api/remediacion/evaluaciones/1", {}),
+    ("POST", "/api/remediacion/respuestas/{respuesta_id}/evidencias", "/api/remediacion/respuestas/1/evidencias",
+     {"files": {"file": ("p.txt", EVIDENCIA, "text/plain")}, "data": {"estado_declarado": "cumplido"}}),
+    ("GET", "/api/remediacion/evidencias/{evidencia_id}", "/api/remediacion/evidencias/1", {}),
 ]
 
 

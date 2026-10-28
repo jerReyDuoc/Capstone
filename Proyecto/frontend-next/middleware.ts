@@ -113,6 +113,9 @@ const SOLO_BFF = [
   /^\/api\/auth\/logout$/,
   /^\/api\/auth\/recuperacion(\/|$)/,
   /^\/api\/cliente(\/|$)/,
+  // HU-26 y HU-17: cursos y remediación del cliente (su token vive en la cookie httpOnly)
+  /^\/api\/formacion(\/|$)/,
+  /^\/api\/remediacion(\/|$)/,
 ];
 
 // HU-28: páginas de acceso y del espacio del cliente: nunca en caché compartida

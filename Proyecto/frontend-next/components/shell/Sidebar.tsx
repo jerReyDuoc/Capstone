@@ -6,11 +6,13 @@ import { usePanel } from "@/hooks/usePanel";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 
-const ITEMS: { ruta: string; etiqueta: string; icono: IconName }[] = [
+const ITEMS: { ruta: string; etiqueta: string; icono: IconName; soloCliente?: boolean }[] = [
   { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico" },
   { ruta: "/panel/dominios", etiqueta: "Dominios", icono: "dominios" },
   { ruta: "/panel/brechas", etiqueta: "Brechas", icono: "brechas" },
   { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
+  // HU-17: re-evaluar controles con evidencia (servicio contratado)
+  { ruta: "/panel/remediacion", etiqueta: "Cerrar brechas", icono: "subir", soloCliente: true },
 ];
 
 export function Sidebar() {
@@ -33,8 +35,9 @@ export function Sidebar() {
       <nav className="nav" aria-label="Secciones del panel">
         <p className="nav-heading" id="nav-heading">Gobernanza de IA</p>
         <ul className="nav-list" aria-labelledby="nav-heading">
-          {ITEMS.map((it) => {
-            const activo = pathname === it.ruta;
+          {ITEMS.filter((it) => !it.soloCliente || modo === "cliente").map((it) => {
+            // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
+            const activo = pathname === it.ruta || (it.ruta !== "/panel" && pathname.startsWith(`${it.ruta}/`));
             return (
               <li key={it.ruta}>
                 <Link

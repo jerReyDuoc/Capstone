@@ -35,6 +35,13 @@ from app.domain.models.solicitud_contratacion import (
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria
 # HU-28: sesiones revocables y recuperación de contraseña
 from app.domain.models.sesion import SesionUsuario, TokenRecuperacion
+# HU-26: recorrido de módulos formativos y avance de la empresa
+from app.domain.models.formacion import (
+    AvanceFormativo,
+    EstadoAvance,
+    LeccionFormativa,
+    PreguntaVerificacion,
+)
 
 __all__ = [
     "Dominio",
@@ -71,4 +78,8 @@ __all__ = [
     "BitacoraAuditoria",
     "SesionUsuario",
     "TokenRecuperacion",
+    "AvanceFormativo",
+    "EstadoAvance",
+    "LeccionFormativa",
+    "PreguntaVerificacion",
 ]

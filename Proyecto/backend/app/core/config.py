@@ -198,6 +198,22 @@ class Settings(BaseSettings):
     RECUPERACION_CORREOS_CUENTA_HORA: int = 3
     RECUPERACION_SOLICITUDES_IP_HORA: int = 10
 
+    # ------------------------------------------------ HU-26: recorrido de módulos formativos
+    # Nota mínima (0-100) para aprobar la actividad de verificación y completar el módulo.
+    FORMACION_UMBRAL_APROBACION: float = 70.0
+    # Intentos de la actividad por empresa, módulo y día (corta adivinar las respuestas).
+    FORMACION_INTENTOS_DIA: int = 5
+
+    # ------------------------------------------------ HU-17: evidencias (cuestionario y remediación)
+    # Tamaño máximo de una evidencia. Tipos admitidos: PDF, DOCX y TXT (por contenido, no solo
+    # por extensión; app/application/evidencias/archivos.py). El BFF corta en 12 MB.
+    EVIDENCIA_MAX_MB: int = 10
+    # Evidencias de remediación por empresa y día (cada una consume una llamada al LLM).
+    REMEDIACION_EVIDENCIAS_DIA: int = 20
+    # Mínimo de caracteres legibles para enviar una evidencia al LLM (un PDF escaneado sin
+    # texto se rechaza antes, sin gastar cuota, y se le pide al usuario un PDF con texto).
+    EVIDENCIA_MIN_CARACTERES: int = 40
+
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
         valor = self.CONTRATACION_SOLICITUDES_IP_DIA
@@ -258,6 +274,11 @@ class Settings(BaseSettings):
                 and not self.RECUPERACION_URL_BASE.startswith("https://")):
             # Al arrancar y no al enviar: un error solo cuando el correo existe revelaría cuáles existen
             raise ValueError("RECUPERACION_URL_BASE debe usar https:// con APP_ENV=production (HU-28).")
+        if not 0 < self.FORMACION_UMBRAL_APROBACION <= 100:
+            raise ValueError("FORMACION_UMBRAL_APROBACION debe estar entre 1 y 100 (HU-26).")
+        for nombre in ("FORMACION_INTENTOS_DIA", "EVIDENCIA_MAX_MB", "REMEDIACION_EVIDENCIAS_DIA"):
+            if getattr(self, nombre) < 1:
+                raise ValueError(f"{nombre} debe ser mayor que 0 (HU-26/HU-17).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

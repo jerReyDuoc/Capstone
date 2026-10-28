@@ -21,6 +21,8 @@ es_core_news_md @ https://github.com/explosion/spacy-models/releases/download/es
 cryptography
 # Informe PDF descargable y adjunto por correo (HU-11 / HU-12)
 reportlab>=4.2,<6
+# HU-17: texto de las evidencias PDF antes del NER y del LLM (los DOCX se leen con la librería estándar)
+pypdf>=5,<7
 
 # Tests
 pytest

@@ -267,6 +267,21 @@ async def reenviar_activacion(empresa_id: int, actor: Actor = Depends(solo_admin
 
 
 # ------------------------------------------------------------------ evaluaciones (HU-28)
+@router.get("/empresas/{empresa_id}/formacion")
+async def formacion_empresa(empresa_id: int, evaluacion_id: int | None = Query(None, ge=1),
+                            _: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
+    """HU-26: avance formativo de la empresa (lo mismo que ve el cliente en su panel)."""
+    from app.application.use_cases.formacion_empresa import FormacionError, avance_de_empresa_para_admin
+
+    empresa = await db.get(Empresa, empresa_id)
+    if empresa is None:
+        raise HTTPException(status_code=404, detail={"codigo": "NO_ENCONTRADO", "mensaje": "Empresa no encontrada."})
+    try:
+        return await avance_de_empresa_para_admin(db, empresa, evaluacion_id)
+    except FormacionError as e:
+        raise HTTPException(status_code=e.status, detail={"codigo": e.codigo, "mensaje": e.mensaje})
+
+
 @router.get("/evaluaciones")
 async def listar_evaluaciones_admin(
     estado: str | None = Query(None, max_length=20, description="en_progreso | completada | ..."),

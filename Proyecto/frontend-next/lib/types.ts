@@ -200,6 +200,8 @@ export interface BrechaCubiertaApi {
   severidad: Severidad;
   estado: EstadoBrecha;
   prioridad: number;
+  /** HU-17/HU-26: respuesta de la brecha (enlaza con "subir evidencia"). Backends previos no lo traen. */
+  respuesta_id?: number | null;
 }
 
 export interface ModuloPlanApi {
@@ -235,4 +237,221 @@ export interface PlanFormativoApi {
   };
   brechas_sin_ruta: BrechaCubiertaApi[];
   dimensiones: DimensionPlanApi[];
+}
+
+/* ------------------------------------------------------------------
+ * HU-26 · Recorrido de módulos y avance formativo de la empresa
+ * Fuente: Proyecto/backend/app/api/routes/formacion.py
+ * ------------------------------------------------------------------ */
+
+export type EstadoModulo = "no_iniciado" | "en_curso" | "completado";
+
+export interface ModuloAvanceApi {
+  ruta_id: number;
+  nombre: string;
+  dominio: string;
+  nivel: NivelFormativo;
+  horas: number | null;
+  modalidad: string | null;
+  /** "historial": ya no está en el plan (su brecha se cerró con evidencia) pero la empresa lo hizo. */
+  motivo: "brechas" | "nivel" | "historial";
+  prioridad: Severidad | "Complementario";
+  en_plan: boolean;
+  estado: EstadoModulo;
+  lecciones_total: number;
+  lecciones_vistas: number;
+  porcentaje_lecciones: number;
+  intentos: number;
+  mejor_puntaje: number | null;
+  fecha_inicio: string | null;
+  fecha_completado: string | null;
+  codigo_constancia: string | null;
+  brechas: string[];
+}
+
+export interface GrupoAvanceApi {
+  total: number;
+  completados: number;
+  en_curso: number;
+  porcentaje: number;
+  horas_total: number;
+  horas_completadas: number;
+}
+
+export interface BrechaFormacionApi {
+  codigo: string;
+  respuesta_id: number | null;
+  control_codigo: string | null;
+  dominio: string;
+  severidad: Severidad;
+  estado: EstadoBrecha;
+  prioridad: number;
+  ruta_id: number;
+  modulo: string;
+  formacion_completada: boolean;
+}
+
+/** GET /api/formacion/avance */
+export interface AvanceFormativoApi {
+  evaluacion_id: number;
+  empresa: { id: number; razon_social: string };
+  umbral_aprobacion: number;
+  resumen: {
+    modulos_total: number;
+    iniciados: number;
+    en_curso: number;
+    completados: number;
+    porcentaje: number;
+    horas_total: number;
+    horas_completadas: number;
+    brechas_total: number;
+    brechas_con_formacion: number;
+    porcentaje_brechas_con_formacion: number;
+  };
+  por_dimension: (GrupoAvanceApi & { dominio: string })[];
+  por_nivel: (GrupoAvanceApi & { nivel: NivelFormativo })[];
+  modulos: ModuloAvanceApi[];
+  brechas: BrechaFormacionApi[];
+}
+
+export interface MaterialApoyoApi {
+  tipo: string;
+  titulo: string;
+  descripcion?: string;
+}
+
+export interface LeccionApi {
+  orden: number;
+  titulo: string;
+  resumen: string | null;
+  contenido: string[];
+  material_apoyo: MaterialApoyoApi[];
+  duracion_min: number | null;
+  vista: boolean;
+}
+
+export interface PreguntaActividadApi {
+  id: number;
+  orden: number;
+  enunciado: string;
+  /** `id` es lo que se envía al corregir; el orden en pantalla lo baraja el servidor. */
+  opciones: { id: number; texto: string }[];
+}
+
+export interface AvanceModuloApi {
+  estado: EstadoModulo;
+  lecciones_vistas: number[];
+  intentos: number;
+  mejor_puntaje: number | null;
+  ultimo_puntaje: number | null;
+  fecha_inicio: string | null;
+  fecha_completado: string | null;
+  codigo_constancia: string | null;
+  porcentaje_lecciones: number;
+}
+
+/** GET /api/formacion/modulos/{ruta_id} */
+export interface ModuloRecorridoApi {
+  evaluacion_id: number;
+  ruta: {
+    id: number;
+    nombre: string;
+    dominio: string | null;
+    nivel: NivelFormativo | null;
+    objetivo: string | null;
+    objetivos_especificos: string[];
+    horas: number | null;
+    modalidad: string | null;
+    publico_objetivo: string | null;
+  };
+  en_plan: boolean;
+  motivo: "brechas" | "nivel" | "historial";
+  prioridad: Severidad | "Complementario";
+  brechas: { codigo: string; respuesta_id: number | null; control_codigo: string | null; dominio: string; severidad: Severidad; estado: EstadoBrecha }[];
+  lecciones: LeccionApi[];
+  actividad: {
+    preguntas: PreguntaActividadApi[];
+    umbral_aprobacion: number;
+    intentos_por_dia: number;
+    intentos_restantes_hoy: number | null;
+    disponible: boolean;
+  };
+  avance: AvanceModuloApi;
+  dimension_nivel: NivelFormativo | null;
+}
+
+/** POST /api/formacion/modulos/{ruta_id}/verificacion */
+export interface ResultadoVerificacionApi {
+  aprobado: boolean;
+  puntaje: number;
+  correctas: number;
+  total: number;
+  umbral_aprobacion: number;
+  detalle: { pregunta_id: number; correcta: boolean; explicacion?: string | null }[];
+  sin_responder: number[];
+  intentos_restantes_hoy: number;
+  avance: AvanceModuloApi;
+}
+
+/* ------------------------------------------------------------------
+ * HU-17 · Remediación: re-evaluar un control con evidencia nueva
+ * Fuente: Proyecto/backend/app/api/routes/remediacion.py
+ * ------------------------------------------------------------------ */
+
+export interface TerminosControlApi {
+  terminos: string[];
+  encontrados: string[];
+  faltantes: string[];
+  cobertura: number | null;
+  /** HU-17 C2 · RAG local: presente cuando el documento no cabía completo y se usaron sus pasajes más relevantes. */
+  rag?: { aplicado: boolean; pasajes_total: number | null; pasajes_usados: number | null; pasajes_con_terminos?: number };
+}
+
+export interface EvidenciaRemediacionApi {
+  id_evidencia: number;
+  respuesta_id: number;
+  nombre_archivo: string;
+  estado_validacion: "pending" | "processing" | "validated" | "rejected" | "error";
+  estado_declarado: EstadoClasificacion | null;
+  estado_previo: EstadoClasificacion | null;
+  estado_resultante: EstadoClasificacion | null;
+  clasificacion_llm: EstadoClasificacion | null;
+  confianza: number | null;
+  justificacion_llm: string | null;
+  errores_validacion: string[];
+  terminos_control: TerminosControlApi | null;
+  fecha_subida: string | null;
+  fecha_procesada: string | null;
+  en_proceso: boolean;
+  mejoro: boolean;
+  /** Solo en GET /evidencias/{id} */
+  estado_actual?: EstadoClasificacion;
+  puntaje_general?: number | null;
+}
+
+export interface ControlRemediacionApi {
+  respuesta_id: number;
+  control_codigo: string | null;
+  codigo_brecha: string | null;
+  dominio: string | null;
+  estado: "no_cumplido" | "parcialmente_cumplido" | "requiere_revision";
+  severidad: Severidad;
+  obligacion: string | null;
+  pregunta: string | null;
+  evidencia_esperada: string | null;
+  recomendacion: string | null;
+  ruta: { id: number; nombre: string } | null;
+  formacion_completada: boolean;
+  ultima_evidencia: EvidenciaRemediacionApi | null;
+}
+
+/** GET /api/remediacion/evaluaciones/{id} */
+export interface RemediacionApi {
+  evaluacion_id: number;
+  puntaje_general: number;
+  dominios: { dominio: string; puntaje: number | null }[];
+  controles: ControlRemediacionApi[];
+  tipos_admitidos: string[];
+  max_mb: number;
+  evidencias_por_dia: number;
 }

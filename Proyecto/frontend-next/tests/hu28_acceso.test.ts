@@ -41,7 +41,7 @@ describe("cookie de sesión del cliente", () => {
 describe("proxy del cliente · lista blanca", () => {
   it("deja pasar el espacio de la empresa y las LECTURAS de sus evaluaciones", () => {
     expect(autorizarRutaCliente("GET", ["cliente", "empresa"])).toEqual({
-      ok: true, ruta: "cliente/empresa", binario: false, conIp: false, timeoutMs: undefined,
+      ok: true, ruta: "cliente/empresa", binario: false, conIp: false, archivo: false, timeoutMs: undefined,
     });
     expect(autorizarRutaCliente("GET", ["evaluaciones"]).ok).toBe(true);
     for (const sub of ["respuestas", "resumen", "comparativa", "progreso", "plan-formativo"]) {

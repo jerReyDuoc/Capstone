@@ -192,7 +192,16 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     },
     "evidencias": {
         **_sin_dp("id_evidencia", "mime_type", "estado_validacion", "clasificacion_llm", "confianza",
-                  "fecha_subida", "fecha_procesada", "Respuestas_id_respuesta"),
+                  "fecha_subida", "fecha_procesada", "Respuestas_id_respuesta",
+                  # HU-17: remediación (estados de la matriz y origen de la evidencia)
+                  "origen", "estado_declarado", "estado_previo", "estado_resultante"),
+        # HU-17: palabras del CATÁLOGO del control encontradas en el texto (no copia el texto)
+        "terminos_control": Dato(SIN_DP, escaneo="pii"),
+        "justificacion_remediacion": Dato(
+            TEXTO_LIBRE, ANONIMIZADO,
+            finalidad="Que la empresa explique al LLM cómo cumple ahora el control (HU-17)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
         "storage_path": _N,  # HU-06: nombre en disco = UUID, sin el nombre original
         "nombre_archivo": Dato(
             TEXTO_LIBRE, ANONIMIZADO, finalidad="Que el usuario reconozca qué archivo subió",
@@ -395,6 +404,27 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         "token_hash": Dato(
             CREDENCIAL, HASH, finalidad="Validar el enlace de recuperación de un solo uso (solo su SHA-256)",
             base=B_SEGURIDAD, conservacion=C_SESION,
+        ),
+    },
+    # ------------------------------------------------------------ HU-26: formación de la empresa
+    # Contenido del catálogo formativo (placeholders) y avance de la EMPRESA (persona jurídica).
+    # Los textos/JSON del catálogo los escanea igual la auditoría (no deberían traer PII).
+    "leccion_formativa": {
+        **_sin_dp("id", "ruta_formativa_id", "orden", "titulo", "duracion_min"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("resumen", "contenido", "material_apoyo")},
+    },
+    "pregunta_verificacion": {
+        **_sin_dp("id", "ruta_formativa_id", "orden", "correcta"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("enunciado", "opciones", "explicacion")},
+    },
+    "avance_formativo": {
+        "lecciones_vistas": Dato(SIN_DP, escaneo="pii"),  # lista de números de lección
+        **_sin_dp("id", "empresa_id", "ruta_formativa_id", "evaluacion_id", "estado",
+                  "intentos", "ultimo_puntaje", "mejor_puntaje", "fecha_inicio", "fecha_ultima_actividad",
+                  "fecha_completado", "codigo_constancia"),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber quién registró el avance de la empresa (constancia, HU-26)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
     # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).

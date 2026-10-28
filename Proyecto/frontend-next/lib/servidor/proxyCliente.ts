@@ -19,6 +19,8 @@ interface Regla {
   binario?: boolean;
   conIp?: boolean;
   timeoutMs?: number;
+  /** Subida de archivos (multipart): HU-17. */
+  archivo?: boolean;
 }
 
 const REGLAS: Regla[] = [
@@ -32,21 +34,36 @@ const REGLAS: Regla[] = [
   { metodo: "POST", patron: /^evaluaciones\/\d{1,9}\/informe\/enviar$/, conIp: true, timeoutMs: 45_000 },
   // Catálogos (públicos, sin datos personales)
   { metodo: "GET", patron: /^(brechas|dominios|rubros|rutas-formativas|controles)$/ },
+  // HU-26: recorrido de los módulos del plan formativo y avance de la empresa
+  { metodo: "GET", patron: /^formacion\/avance$/ },
+  { metodo: "GET", patron: /^formacion\/modulos\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^formacion\/modulos\/\d{1,9}\/lecciones\/\d{1,4}\/vista$/ },
+  { metodo: "POST", patron: /^formacion\/modulos\/\d{1,9}\/verificacion$/ },
+  { metodo: "GET", patron: /^formacion\/modulos\/\d{1,9}\/constancia$/, binario: true, timeoutMs: 30_000 },
+  // HU-17: remediación (subir evidencia nueva de un control con brecha)
+  { metodo: "GET", patron: /^remediacion\/evaluaciones\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^remediacion\/respuestas\/\d{1,9}\/evidencias$/, archivo: true, conIp: true, timeoutMs: 60_000 },
+  { metodo: "GET", patron: /^remediacion\/evidencias\/\d{1,9}$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
 
 export type AutorizacionCliente =
-  | { ok: true; ruta: string; binario: boolean; conIp: boolean; timeoutMs?: number }
+  | { ok: true; ruta: string; binario: boolean; conIp: boolean; archivo: boolean; timeoutMs?: number }
   | { ok: false };
 
 export function autorizarRutaCliente(metodo: string, segmentos: string[]): AutorizacionCliente {
-  if (!segmentos.length || segmentos.length > 5 || !segmentos.every((s) => SEGMENTO.test(s))) return { ok: false };
+  if (!segmentos.length || segmentos.length > 6 || !segmentos.every((s) => SEGMENTO.test(s))) return { ok: false };
   const ruta = segmentos.join("/");
   const regla = REGLAS.find((r) => r.metodo === metodo && r.patron.test(ruta));
   return regla
-    ? { ok: true, ruta, binario: Boolean(regla.binario), conIp: Boolean(regla.conIp), timeoutMs: regla.timeoutMs }
+    ? {
+        ok: true, ruta, binario: Boolean(regla.binario), conIp: Boolean(regla.conIp), archivo: Boolean(regla.archivo),
+        timeoutMs: regla.timeoutMs,
+      }
     : { ok: false };
 }
 
 export const MAX_BYTES_JSON_CLIENTE = 16 * 1024;
+/** HU-17: evidencias de remediación (el backend corta en EVIDENCIA_MAX_MB, 10 MB por defecto). */
+export const MAX_BYTES_ARCHIVO_CLIENTE = 12 * 1024 * 1024;

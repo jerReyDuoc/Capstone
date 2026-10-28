@@ -7,13 +7,37 @@ from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion
 from app.domain.ports.file_storage_port import FileStoragePort
 from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
+from app.application.evidencias.archivos import MIME, ArchivoNoAdmitidoError, detectar_tipo
 from app.application.use_cases.create_respuesta import (
     AnonimizacionNoDisponibleError,
     EvaluacionCerradaError,
+    RespuestaRechazadaError,
 )
+from app.core.config import settings
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+
+
+class TipoArchivoNoAdmitidoError(RespuestaRechazadaError):
+    """HU-17 (T-SM-55): solo PDF, DOCX y TXT, comprobados por su contenido."""
+    status_code = 415
+    codigo = "TIPO_NO_ADMITIDO"
+
+
+class ArchivoDemasiadoGrandeError(RespuestaRechazadaError):
+    status_code = 413
+    codigo = "ARCHIVO_DEMASIADO_GRANDE"
+
+
+def validar_archivo(nombre: str | None, contenido: bytes) -> str:
+    """Tamaño máximo y lista blanca de tipos. Devuelve el MIME real del archivo."""
+    if len(contenido) > settings.EVIDENCIA_MAX_MB * 1024 * 1024:
+        raise ArchivoDemasiadoGrandeError(f"El archivo supera el máximo de {settings.EVIDENCIA_MAX_MB} MB.")
+    try:
+        return MIME[detectar_tipo(nombre, contenido)]
+    except ArchivoNoAdmitidoError as e:
+        raise TipoArchivoNoAdmitidoError(str(e)) from e
 
 
 class UploadEvidenceUseCase:
@@ -82,6 +106,9 @@ class UploadEvidenceUseCase:
         content = await file.read()
         if not content:
             raise ValueError("El archivo está vacío")
+
+        # 3a. HU-17: tamaño máximo y solo PDF, DOCX o TXT (por contenido, no solo por extensión)
+        validar_archivo(file.filename, content)
 
         hash_archivo = hashlib.sha256(content).hexdigest()
 

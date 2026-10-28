@@ -4,7 +4,8 @@
  * - Lee el token de la cookie httpOnly del cliente y lo envía como Bearer.
  * - Solo reenvía la lista blanca de lib/servidor/proxyCliente.ts (lo demás → 404).
  * - Todo lo que no es GET exige mismo origen (CSRF) y cuerpo JSON acotado.
- * - El informe PDF pasa como binario, con su Content-Disposition.
+ * - El informe PDF y la constancia (HU-26) pasan como binario, con su Content-Disposition.
+ * - HU-17: la evidencia de remediación pasa como multipart (stream), con límite de tamaño.
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -12,7 +13,7 @@ import { BackendNoDisponibleError, llamarBackend, respuestaError, sinBackend } f
 import { borrarCookieCliente, errorClienteDesdeBackend } from "@/lib/servidor/backendCliente";
 import { esMismoOrigen, ipCliente } from "@/lib/servidor/peticion";
 import { filtrarQuery } from "@/lib/servidor/proxy";
-import { autorizarRutaCliente, MAX_BYTES_JSON_CLIENTE } from "@/lib/servidor/proxyCliente";
+import { autorizarRutaCliente, MAX_BYTES_ARCHIVO_CLIENTE, MAX_BYTES_JSON_CLIENTE } from "@/lib/servidor/proxyCliente";
 import { COOKIE_CLIENTE, sesionClienteDelToken } from "@/lib/servidor/sesionCliente";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,19 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
   if (!permiso.ok) return respuestaError(404, { codigo: "NO_ENCONTRADO", mensaje: "Recurso no encontrado." });
 
   let json: unknown = undefined;
-  if (metodo !== "GET") {
+  let cuerpo: BodyInit | null = null;
+  let contentType: string | null = null;
+  if (metodo !== "GET" && permiso.archivo) {
+    contentType = req.headers.get("content-type");
+    const largo = Number(req.headers.get("content-length") ?? "0");
+    if (!contentType?.startsWith("multipart/form-data")) {
+      return respuestaError(415, { codigo: "TIPO_NO_SOPORTADO", mensaje: "Adjunta el archivo como formulario." });
+    }
+    if (!largo || largo > MAX_BYTES_ARCHIVO_CLIENTE) {
+      return respuestaError(413, { codigo: "ARCHIVO_DEMASIADO_GRANDE", mensaje: "El archivo supera el máximo de 12 MB." });
+    }
+    cuerpo = req.body;
+  } else if (metodo !== "GET") {
     const texto = await req.text();
     if (texto.length > MAX_BYTES_JSON_CLIENTE) {
       return respuestaError(413, { codigo: "CUERPO_DEMASIADO_GRANDE", mensaje: "Contenido demasiado grande." });
@@ -51,7 +64,7 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
   try {
     res = await llamarBackend(`/api/${permiso.ruta}${filtrarQuery(req.nextUrl.searchParams)}`, {
       metodo: metodo as "GET" | "POST",
-      json,
+      ...(permiso.archivo ? { cuerpo, contentType } : { json }),
       token,
       ip: permiso.conIp ? ipCliente(req.headers) : undefined,
       timeoutMs: permiso.timeoutMs ?? 15_000,
