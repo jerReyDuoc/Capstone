@@ -220,6 +220,30 @@ class Settings(BaseSettings):
     # reglas de retención (HU-25). 0 = sin plazo de gracia. Valor provisorio hasta que lo fije el PO.
     CONTRATO_GRACIA_DIAS: int = 30
 
+    # ------------------------------------------------ HU-15: Agente IA Tutor
+    # Mensajes al tutor por empresa y día (se reinicia a medianoche de ZONA_HORARIA_CUOTAS).
+    # Cada mensaje es una llamada al LLM. 0 = sin límite. Decisión del PO (28-oct): 60.
+    TUTOR_MENSAJES_DIA_EMPRESA: int = 60
+    # Ráfaga: mensajes por empresa en 60 s (corta scripts y doble clic). 0 = sin límite.
+    TUTOR_MENSAJES_MINUTO_EMPRESA: int = 6
+    # Largo máximo del mensaje del usuario (caracteres).
+    TUTOR_MAX_CHARS_MENSAJE: int = 2000
+    # Mensajes previos (ya anonimizados) que se envían como historial al LLM.
+    TUTOR_HISTORIAL_MENSAJES: int = 6
+    # Brechas que entran al prompt, por prioridad (acota tokens; el resto se resume).
+    TUTOR_MAX_BRECHAS_CONTEXTO: int = 40
+    # Conversaciones por empresa (las viejas se borran por retención o a mano).
+    TUTOR_MAX_CONVERSACIONES: int = 50
+    # Modelo del tutor. Vacío = LLM_MODEL.
+    TUTOR_MODELO: str | None = None
+    TUTOR_MAX_TOKENS_SALIDA: int = 4096
+    TUTOR_TIMEOUT_S: float = 45.0
+    TUTOR_TEMPERATURA: float = 0.3
+    # Conservación (decisión del PO, 28-oct): las conversaciones sin actividad por más de N
+    # días se BORRAN en el cron diario de retención (además de borrarse con la supresión
+    # ARCOP del usuario definitivo). Vacío = regla desactivada.
+    TUTOR_RETENCION_DIAS: int | None = 30
+
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
         valor = self.CONTRATACION_SOLICITUDES_IP_DIA
@@ -242,7 +266,7 @@ class Settings(BaseSettings):
                 "(T-06: la anonimización es irreversible por decisión del PO en HU-06)."
             )
         for nombre in ("RETENCION_DATOS_TITULAR_DIAS", "RETENCION_ARCOP_CERRADAS_DIAS",
-                       "RETENCION_EVENTOS_SEGURIDAD_DIAS"):
+                       "RETENCION_EVENTOS_SEGURIDAD_DIAS", "TUTOR_RETENCION_DIAS"):
             valor = getattr(self, nombre)
             if valor is not None and valor < 1:
                 raise ValueError(f"{nombre} debe ser un número de días mayor que 0 (o vacío).")
@@ -278,6 +302,17 @@ class Settings(BaseSettings):
                        "RECUPERACION_SOLICITUDES_IP_HORA"):
             if getattr(self, nombre) < 1:
                 raise ValueError(f"{nombre} debe ser mayor que 0 (HU-28).")
+        for nombre in ("TUTOR_MENSAJES_DIA_EMPRESA", "TUTOR_MENSAJES_MINUTO_EMPRESA"):
+            if getattr(self, nombre) < 0:
+                raise ValueError(f"{nombre} no puede ser negativo (HU-15; 0 = sin límite).")
+        for nombre in ("TUTOR_MAX_CHARS_MENSAJE", "TUTOR_MAX_BRECHAS_CONTEXTO", "TUTOR_MAX_CONVERSACIONES",
+                       "TUTOR_MAX_TOKENS_SALIDA"):
+            if getattr(self, nombre) < 1:
+                raise ValueError(f"{nombre} debe ser mayor que 0 (HU-15).")
+        if not 0 <= self.TUTOR_HISTORIAL_MENSAJES <= 30:
+            raise ValueError("TUTOR_HISTORIAL_MENSAJES debe estar entre 0 y 30 (HU-15).")
+        if not 0 <= self.TUTOR_TEMPERATURA <= 1:
+            raise ValueError("TUTOR_TEMPERATURA debe estar entre 0 y 1 (HU-15).")
         if (self.APP_ENV == "production" and self.CORREO_MODO == "smtp"
                 and not self.RECUPERACION_URL_BASE.startswith("https://")):
             # Al arrancar y no al enviar: un error solo cuando el correo existe revelaría cuáles existen

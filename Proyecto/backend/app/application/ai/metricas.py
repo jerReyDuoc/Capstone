@@ -6,6 +6,8 @@ Cálculo de métricas de la capa de IA (funciones puras, sin BD).
 - Precisión del modelo: compara la clasificación del LLM con la revisión humana
   del Oficial de Cumplimiento (accuracy, precisión/recall/F1 por clase, matriz de
   confusión). Sin revisiones no hay precisión: se informa n=0.
+- Tutor IA (HU-15): tipos de respuesta, tasa fuera de alcance, advertencias de la salida
+  (p. ej. brechas citadas fuera del contexto) y mensajes bloqueados por prompt injection.
 - Precisión del motor NER: contra un set etiquetado (gold set). Además de P/R/F1
   por tipo se reporta la "cobertura de PII": % de entidades reales que quedaron
   ocultas bajo CUALQUIER etiqueta. Es la métrica crítica: una entidad no cubierta
@@ -70,6 +72,35 @@ def resumen_operacion(filas: list[FilaLlamada], umbral_confianza: float) -> dict
             "salida": sum(f.tokens_salida or 0 for f in exitosas),
         },
         "costo_estimado_usd": round(sum(f.costo_estimado_usd or 0 for f in exitosas), 6),
+    }
+
+
+# ---------------------------------------------------------------- tutor (HU-15)
+TIPOS_TUTOR = ("explicacion", "plan_accion", "orientacion", "fuera_de_alcance")
+
+
+def resumen_tutor(filas: list[FilaLlamada], tipos: list[str | None], bloqueados: int) -> dict:
+    """`filas` y `tipos` (llamadas_llm.clasificacion) son solo de la tarea tutor, en el mismo orden."""
+    exitosas = [(f, t) for f, t in zip(filas, tipos) if f.exito]
+    por_tipo = {t: 0 for t in TIPOS_TUTOR}
+    adv: dict[str, int] = {}
+    for f, t in exitosas:
+        if t in por_tipo:
+            por_tipo[t] += 1
+        for a in f.advertencias or []:
+            adv[a] = adv.get(a, 0) + 1
+    n = len(exitosas)
+    latencias = [f.latencia_ms for f, _ in exitosas if f.latencia_ms is not None]
+    intentos = len(filas) + bloqueados
+    return {
+        "mensajes_respondidos": n,
+        "mensajes_fallidos": len(filas) - n,
+        "mensajes_bloqueados_inyeccion": bloqueados,
+        "tasa_bloqueo_inyeccion": round(bloqueados / intentos, 4) if intentos else None,
+        "respuestas_por_tipo": por_tipo,
+        "tasa_fuera_de_alcance": round(por_tipo["fuera_de_alcance"] / n, 4) if n else None,
+        "advertencias_por_tipo": dict(sorted(adv.items())),
+        "latencia_ms": {"p50": _percentil(latencias, 0.5), "p95": _percentil(latencias, 0.95)},
     }
 
 

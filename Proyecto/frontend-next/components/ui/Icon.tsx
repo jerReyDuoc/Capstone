@@ -30,6 +30,12 @@ const PATHS = {
   tabla: "M4 5h16v14H4V5Zm0 5h16M4 15h16M10 5v14",
   fijar: "M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6Zm3 11v6",
   cerrar: "M6 6l12 12M18 6 6 18",
+  // HU-15: Agente IA Tutor
+  mensaje: "M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4v-4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm4 5h8M8 13h5",
+  enviar: "M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9",
+  basura: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+  historial: "M3 12a9 9 0 1 0 3-6.7L3 8m0-4v4h4m5-1v5l3 2",
+  mas: "M12 5v14M5 12h14",
   // HU-12
   correo: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Zm-.5 1 8.5 6 8.5-6",
   diana: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",

@@ -15,6 +15,7 @@ class ContextoLlamada:
     evaluacion_id: int | None = None
     respuesta_id: int | None = None
     evidencia_id: int | None = None
+    conversacion_id: int | None = None  # HU-15: conversación del tutor
 
 
 @dataclass

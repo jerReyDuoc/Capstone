@@ -63,6 +63,9 @@ C_CLIENTE = ("Mientras dure el contrato de la empresa y CONTRATO_GRACIA_DIAS des
              "(HU-30); luego, las reglas de retención (HU-25)")
 C_CONTRATACION = "Hasta migrar la evaluación (se borra al pasar a la empresa) o descartar la solicitud"
 C_SESION = "Mientras la cuenta exista (el PO fija una depuración de sesiones y enlaces vencidos, HU-28)"
+C_TUTOR = ("TUTOR_RETENCION_DIAS (30) días sin actividad en la conversación, o hasta la supresión ARCOP "
+           "del usuario definitivo (HU-15); el usuario también la puede borrar")
+B_TUTOR = "Ejecución del contrato del servicio pagado: Agente IA Tutor del panel de formación (HU-15)"
 
 
 @dataclass(frozen=True)
@@ -232,7 +235,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         **_sin_dp("id_llamada", "traza_id", "fecha", "tarea", "proveedor", "modelo", "prompt_version",
                   "exito", "tipo_error", "tokens_entrada", "tokens_salida", "costo_estimado_usd",
                   "latencia_ms", "sanitizado", "entidades_anonimizadas", "clasificacion", "confianza",
-                  "Evaluacion_id", "Respuestas_id_respuesta", "Evidencias_id_evidencia"),
+                  "Evaluacion_id", "Respuestas_id_respuesta", "Evidencias_id_evidencia",
+                  "conversacion_tutor_id"),
         # Mensajes técnicos del proveedor; no deben traer texto del usuario
         "detalle_error": Dato(SIN_DP, escaneo="pii"),
         "advertencias": Dato(SIN_DP, escaneo="pii"),
@@ -431,6 +435,40 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             METADATO, finalidad="Saber quién registró el avance de la empresa (constancia, HU-26)",
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
+    },
+    # ------------------------------------------------------------ HU-15: Agente IA Tutor
+    # Conversación de la EMPRESA con el tutor. Los textos se guardan ANONIMIZADOS (el del
+    # usuario es el que vio el LLM tras el NER; el del tutor se re-anonimiza). Un mensaje
+    # bloqueado por prompt injection no guarda su texto.
+    "conversacion_tutor": {
+        **_sin_dp("id", "empresa_id", "evaluacion_id", "ruta_formativa_id", "nivel", "huella_contexto",
+                  "mensajes_total", "fecha_creacion"),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa abrió la conversación (supresión ARCOP)",
+            base=B_TUTOR, conservacion=C_TUTOR,
+        ),
+        "titulo": Dato(
+            TEXTO_LIBRE, ANONIMIZADO, finalidad="Reconocer la conversación en la lista (inicio del primer mensaje)",
+            base=B_TUTOR, conservacion=C_TUTOR, escaneo="pii",
+        ),
+        "fecha_ultimo_mensaje": Dato(
+            METADATO, finalidad="Calcular la conservación de la conversación (retención R4)",
+            base=B_TUTOR, conservacion=C_TUTOR,
+        ),
+    },
+    "mensaje_tutor": {
+        **_sin_dp("id", "conversacion_tutor_id", "rol", "tipo", "nivel", "bloqueado", "motivo_bloqueo",
+                  "traza_id", "prompt_version", "huella_contexto", "fecha"),
+        "contenido": Dato(
+            TEXTO_LIBRE, ANONIMIZADO,
+            finalidad="Historial de la conversación con el tutor (y contexto de los mensajes siguientes)",
+            base=B_TUTOR, conservacion=C_TUTOR, escaneo="pii",
+        ),
+        "datos": Dato(
+            DERIVADO_IA, ANONIMIZADO, finalidad="Pasos, brechas y referencias de la respuesta del tutor",
+            base=B_TUTOR, conservacion=C_TUTOR, escaneo="pii",
+        ),
+        "advertencias": Dato(SIN_DP, escaneo="pii"),
     },
     # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).
     "bitacora_auditoria": {

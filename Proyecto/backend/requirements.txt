@@ -11,6 +11,10 @@ arq==0.26.1
 redis==5.2.0
 aiofiles==24.1.0
 groq==0.37.1        # SDK oficial: lo usa groq_provider.py (salida estructurada nativa)
+# HU-15: orquestación del agente de IA (skills validar_evidencia y tutor). Solo el grafo:
+# el LLM se sigue llamando con el SDK de Groq a través del AIGateway (no se usa langchain-groq).
+# Trae langchain-core como dependencia.
+langgraph>=1.2,<2
 
 # Capa anti prompt-injection y motor NER (app/infrastructure/security)
 # OBLIGATORIO con SANITIZER_ENABLED=true. Tras instalar:

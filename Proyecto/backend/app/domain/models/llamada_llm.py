@@ -47,3 +47,6 @@ class LlamadaLLM(Base):
     evidencia_id: Mapped[int | None] = mapped_column(
         "Evidencias_id_evidencia", Integer, ForeignKey("evidencias.id_evidencia"), nullable=True
     )
+    # HU-15: conversación del Agente IA Tutor (sin FK: si la conversación se borra por
+    # retención o supresión ARCOP, la métrica, que no tiene texto, se conserva)
+    conversacion_id: Mapped[int | None] = mapped_column("conversacion_tutor_id", Integer, nullable=True, index=True)

@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.ai.metricas import FilaLlamada, precision_clasificacion, resumen_operacion
+from app.application.ai.metricas import FilaLlamada, precision_clasificacion, resumen_operacion, resumen_tutor
+from app.domain.models.evento_seguridad import EventoSeguridad, OrigenEvento
 from app.domain.models.llamada_llm import LlamadaLLM
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.sanitizacion import Sanitizacion
@@ -32,15 +33,13 @@ class ObtenerMetricasIAUseCase:
             q = q.where(LlamadaLLM.modelo == modelo)
         llamadas = list((await self.session.execute(q.order_by(LlamadaLLM.fecha))).scalars().all())
 
-        operacion = resumen_operacion(
-            [FilaLlamada(
-                exito=l.exito, tipo_error=l.tipo_error, latencia_ms=l.latencia_ms,
-                tokens_entrada=l.tokens_entrada, tokens_salida=l.tokens_salida,
-                costo_estimado_usd=l.costo_estimado_usd, confianza=l.confianza,
-                advertencias=l.advertencias, sanitizado=l.sanitizado,
-            ) for l in llamadas],
-            self.umbral,
-        )
+        filas = [FilaLlamada(
+            exito=l.exito, tipo_error=l.tipo_error, latencia_ms=l.latencia_ms,
+            tokens_entrada=l.tokens_entrada, tokens_salida=l.tokens_salida,
+            costo_estimado_usd=l.costo_estimado_usd, confianza=l.confianza,
+            advertencias=l.advertencias, sanitizado=l.sanitizado,
+        ) for l in llamadas]
+        operacion = resumen_operacion(filas, self.umbral)
 
         # Precisión: última clasificación exitosa del LLM por respuesta vs. revisión humana
         ids = {l.respuesta_id for l in llamadas if l.exito and l.respuesta_id and l.clasificacion}
@@ -73,10 +72,24 @@ class ObtenerMetricasIAUseCase:
                 por_tipo[t] = por_tipo.get(t, 0) + n
         fallos = operacion["errores_por_tipo"].get("sanitizacion", {}).get("cantidad", 0)
 
+        # HU-15: tutor (los bloqueos por inyección no llegan al LLM: salen de eventos_seguridad)
+        tutor = None
+        if tarea in (None, "tutor"):
+            qe = select(func.count()).select_from(EventoSeguridad).where(
+                EventoSeguridad.origen == OrigenEvento.TUTOR.value)
+            if desde:
+                qe = qe.where(EventoSeguridad.fecha >= desde)
+            if hasta:
+                qe = qe.where(EventoSeguridad.fecha <= hasta)
+            bloqueados = int((await self.session.execute(qe)).scalar_one() or 0)
+            pares_tutor = [(f, l.clasificacion) for f, l in zip(filas, llamadas) if l.tarea == "tutor"]
+            tutor = resumen_tutor([f for f, _ in pares_tutor], [t for _, t in pares_tutor], bloqueados)
+
         return {
             "periodo": {"desde": desde, "hasta": hasta},
             "operacion_modelo": operacion,
             "precision_modelo": precision_clasificacion(pares),
+            "tutor": tutor,
             "sanitizacion": {
                 "textos_sanitizados": len(sans),
                 "fallos_sanitizacion": fallos,

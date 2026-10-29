@@ -4,6 +4,7 @@ Es el ÚNICO lugar que sabe qué proveedor concreto se usa (LLM_PROVIDER).
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.ai.agente import AgenteIA
 from app.application.ai.anonimizador import AnonimizadorPII
 from app.application.ai.evidence_validator import GatewayEvidenceValidator
 from app.application.ai.gateway import AIGateway, PreciosModelo
@@ -53,14 +54,27 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
             max_chars_justificacion=settings.MAX_CHARS_JUSTIFICACION_LLM,
             max_tokens_salida=settings.LLM_MAX_TOKENS_SALIDA,
             timeout_s=settings.LLM_TIMEOUT_S,
+            # HU-15: tarea tutor
+            max_chars_mensaje_tutor=settings.TUTOR_MAX_CHARS_MENSAJE,
+            max_tokens_tutor=settings.TUTOR_MAX_TOKENS_SALIDA,
+            timeout_tutor_s=settings.TUTOR_TIMEOUT_S,
+            modelo_tutor=settings.TUTOR_MODELO,
+            temperatura_tutor=settings.TUTOR_TEMPERATURA,
         ),
         sanitizer_enabled=settings.SANITIZER_ENABLED,
         precios=PreciosModelo(settings.LLM_PRECIO_ENTRADA_USD_1M, settings.LLM_PRECIO_SALIDA_USD_1M),
     )
 
 
+def crear_agente(sesion_auditoria: AsyncSession) -> AgenteIA:
+    """HU-15: agente de LangGraph con sus skills (validar_evidencia, tutor)."""
+    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    return AgenteIA(crear_gateway(sesion_auditoria), guard=ReglasPromptGuard())
+
+
 def crear_validador_evidencias(sesion_auditoria: AsyncSession) -> GatewayEvidenceValidator:
-    return GatewayEvidenceValidator(crear_gateway(sesion_auditoria))
+    agente = crear_agente(sesion_auditoria)
+    return GatewayEvidenceValidator(agente.gateway, agente)
 
 
 # ---------------------------------------------------------------- HU-06

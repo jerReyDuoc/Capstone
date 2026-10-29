@@ -19,6 +19,10 @@ plazo (config RETENCION_*; vacío = regla desactivada) se aplica:
   R3  Seguridad      eventos de seguridad REVISADOS con más de
                      RETENCION_EVENTOS_SEGURIDAD_DIAS -> extracto NULL (se conserva el
                      hash para agrupar intentos repetidos).
+  R4  Tutor IA       HU-15: conversaciones con el Agente IA Tutor sin mensajes hace más de
+                     TUTOR_RETENCION_DIAS (30 por defecto, decisión del PO del 28-oct) ->
+                     se BORRAN con sus mensajes. Las métricas de llamadas_llm (sin texto) y
+                     la bitácora se conservan.
 
 Cada titular se procesa en su propia transacción (o todo o nada por titular) y los
 archivos se borran después del commit. El resultado y los logs llevan solo conteos.
@@ -66,6 +70,7 @@ class ResultadoRetencion:
     titulares_omitidos_por_arcop_abierta: int = 0
     solicitudes_arcop: int = 0
     eventos_seguridad: int = 0
+    conversaciones_tutor: int = 0
     archivos_borrados: int = 0
     reglas_desactivadas: list[str] = field(default_factory=list)
 
@@ -83,6 +88,7 @@ class AplicarRetencionUseCase:
             "titulares": settings.RETENCION_DATOS_TITULAR_DIAS,
             "arcop": settings.RETENCION_ARCOP_CERRADAS_DIAS,
             "eventos": settings.RETENCION_EVENTOS_SEGURIDAD_DIAS,
+            "tutor": settings.TUTOR_RETENCION_DIAS,
         }
 
     def _limite(self, regla: str) -> date | None:
@@ -92,7 +98,9 @@ class AplicarRetencionUseCase:
     async def execute(self, aplicar: bool = True) -> ResultadoRetencion:
         r = ResultadoRetencion(simulacion=not aplicar)
         for regla, metodo in (("titulares", self._titulares), ("arcop", self._arcop),
-                              ("eventos", self._eventos)):
+                              ("eventos", self._eventos), ("tutor", self._tutor)):
+            if regla == "tutor" and regla not in self.plazos:
+                continue  # R4 es de HU-15: quien pasa sus propios plazos sin ella no la usa
             limite = self._limite(regla)
             if limite is None:
                 r.reglas_desactivadas.append(regla)
@@ -218,4 +226,18 @@ class AplicarRetencionUseCase:
         res = await self.s.execute(update(EventoSeguridad).where(*cond).values(extracto=None)
                                    .execution_options(synchronize_session=False))
         r.eventos_seguridad += res.rowcount or 0
+        await self.s.commit()
+
+    # ------------------------------------------------------------------ R4 (HU-15)
+    async def _tutor(self, limite: date, aplicar: bool, r: ResultadoRetencion) -> None:
+        from app.infrastructure.repositories.tutor_repository import TutorRepository
+
+        repo = TutorRepository(self.s)
+        ids = await repo.inactivas_desde(datetime.combine(limite, datetime.min.time()))
+        if not aplicar:
+            r.conversaciones_tutor += len(ids)
+            return
+        if not ids:
+            return
+        r.conversaciones_tutor += await repo.eliminar_ids(ids)
         await self.s.commit()

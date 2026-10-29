@@ -6,6 +6,7 @@
  * - Todo lo que no es GET exige mismo origen (CSRF) y cuerpo JSON acotado.
  * - El informe PDF y la constancia (HU-26) pasan como binario, con su Content-Disposition.
  * - HU-17: la evidencia de remediación pasa como multipart (stream), con límite de tamaño.
+ * - HU-15: el chat del tutor usa además PATCH (nivel) y DELETE (borrar conversación).
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -63,7 +64,7 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
   let res: Response;
   try {
     res = await llamarBackend(`/api/${permiso.ruta}${filtrarQuery(req.nextUrl.searchParams)}`, {
-      metodo: metodo as "GET" | "POST",
+      metodo: metodo as "GET" | "POST" | "PATCH" | "DELETE",
       ...(permiso.archivo ? { cuerpo, contentType } : { json }),
       token,
       ip: permiso.conIp ? ipCliente(req.headers) : undefined,
@@ -74,6 +75,8 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
     throw e;
   }
   if (!res.ok) return errorClienteDesdeBackend(res);
+  // HU-15: DELETE de una conversación del tutor (204 no admite cuerpo)
+  if (res.status === 204) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 
   if (permiso.binario) {
     const tipo = res.headers.get("content-type") ?? "";
@@ -99,3 +102,5 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
 
 export const GET = manejar;
 export const POST = manejar;
+export const PATCH = manejar; // HU-15: nivel de la conversación del tutor
+export const DELETE = manejar; // HU-15: borrar una conversación del tutor

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AvanceEmpresa } from "@/components/formacion/AvanceEmpresa";
+import { TutorIA } from "@/components/formacion/TutorIA";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
@@ -49,6 +50,9 @@ import type {
  * (AvanceEmpresa), el estado de cada módulo con su acción (Empezar / Continuar / Constancia)
  * y marca las brechas cuya formación ya está hecha. El encuestado ve el plan y un aviso de
  * que los módulos se recorren con el servicio contratado.
+ *
+ * HU-15: el usuario definitivo tiene además el Agente IA Tutor (tarjeta "Hablar con el
+ * tutor"), que conversa sobre todas las brechas de la evaluación vigente de su empresa.
  */
 export function VistaCapacitacion() {
   const { evaluacionId } = usePanel();
@@ -120,6 +124,8 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
   return (
     <>
       {avance ? <AvanceEmpresa avance={avance} evaluacionId={evaluacionId} /> : null}
+      {/* HU-15: Agente IA Tutor con todas las brechas de la evaluación vigente (solo cliente) */}
+      {avance ? <TutorIA variante="tarjeta" /> : null}
       {estadoAvance.tipo === "cargando" ? (
         <div className="skeleton" style={{ height: 220 }} role="status" aria-label="Cargando el avance de tu empresa" />
       ) : null}

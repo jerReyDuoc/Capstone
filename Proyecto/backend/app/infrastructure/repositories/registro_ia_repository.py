@@ -45,6 +45,7 @@ class RegistroIARepository(RegistroIAPort):
             evaluacion_id=r.contexto.evaluacion_id,
             respuesta_id=r.contexto.respuesta_id,
             evidencia_id=r.contexto.evidencia_id,
+            conversacion_id=r.contexto.conversacion_id,
         )
         self.session.add(fila)
         await self._commit()

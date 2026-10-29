@@ -920,6 +920,7 @@ button, select, input { font: inherit; color: inherit; }
 .state-titulo { font-size: var(--fs-xl); }
 .recorrido-cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--sp-5) var(--sp-8); }
 .recorrido-titulos { display: grid; gap: var(--sp-2); max-width: 70ch; }
+.recorrido-tutor { margin-top: var(--sp-1); } /* HU-15: botón del Agente IA Tutor */
 .recorrido-ruta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); color: var(--accent); font-weight: 600; font-size: var(--fs-sm); }
 .recorrido-nombre { font-size: var(--fs-2xl); }
 .recorrido-datos { display: flex; flex-wrap: wrap; gap: var(--sp-5); margin: 0; }

@@ -40,7 +40,8 @@ class AnonimizacionRepository:
         HU-30: supresión ARCOP del usuario de una empresa cliente (persona natural).
 
         Se borran SUS datos personales (nombre, correo, contraseña), se cierra la cuenta y sus
-        sesiones y se revocan sus enlaces; también sus textos en las solicitudes ARCOP. NO se
+        sesiones y se revocan sus enlaces; también sus textos en las solicitudes ARCOP y (HU-15)
+        sus conversaciones con el Agente IA Tutor, que se eliminan con sus mensajes. NO se
         tocan la empresa (persona jurídica) ni las evaluaciones migradas a ella: son datos del
         contrato con la empresa (sus evidencias ya están anonimizadas desde HU-06) y su
         conservación la deciden la vigencia del contrato (HU-30) y la retención (HU-25).
@@ -82,6 +83,9 @@ class AnonimizacionRepository:
         await _upd("solicitudes_arcop", update(SolicitudARCOP)
                    .where(SolicitudARCOP.usuario_definitivo_id == usuario_id)
                    .values(descripcion=TEXTO_ANONIMIZADO))
+        # HU-15 (decisión del PO, 28-oct): sus conversaciones con el tutor se BORRAN
+        from app.infrastructure.repositories.tutor_repository import TutorRepository
+        conteo["conversaciones_tutor"] = await TutorRepository(s).eliminar_de_usuario(usuario_id)
         conteo["archivos"] = 0
         return conteo, []
 

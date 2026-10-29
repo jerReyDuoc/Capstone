@@ -8,6 +8,7 @@ from app.core.database import Base
 class OrigenEvento(str, Enum):
     JUSTIFICACION = "justificacion"
     EVIDENCIA = "evidencia"
+    TUTOR = "tutor"  # HU-15: mensaje al Agente IA Tutor
 
 
 class EventoSeguridad(Base):

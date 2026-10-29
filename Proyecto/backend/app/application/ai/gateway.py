@@ -13,6 +13,10 @@ Pipeline de `ejecutar(tarea, textos, datos, contexto)`:
   6. Validación    -> schema Pydantic (en el proveedor) + reglas post-salida.
   7. Métricas      -> una fila en llamadas_llm por ejecución, con éxito o error.
 
+HU-15: el gateway sigue siendo la ÚNICA salida hacia el LLM. El agente de LangGraph
+(app/application/ai/agente) orquesta las skills (validar_evidencia, tutor) y cada skill
+llama a `ejecutar` con su tarea: las reglas R1-R6 aplican igual a todas.
+
 Reglas de negocio implementadas aquí:
   R1 El texto original nunca se envía al LLM, solo el sanitizado.
   R2 El mapa de entidades se guarda en BD y no se envía al proveedor.
@@ -79,6 +83,9 @@ class ResultadoIA:
     modelo: str
     advertencias: list[str] = field(default_factory=list)
     sanitizado: bool = True
+    # HU-15: los textos no confiables tal como salieron hacia el LLM (ya anonimizados).
+    # El tutor persiste ESTOS textos: en la BD queda exactamente lo que vio el modelo.
+    textos_sanitizados: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -180,7 +187,9 @@ class AIGateway:
             logger.exception("Error inesperado del proveedor LLM (traza=%s)", traza_id)
             raise LLMNoDisponibleError("Error inesperado del servicio de IA.", "desconocido") from e
 
-        advertencias = politica.validar_salida(respuesta.data)
+        # Reglas post-salida: reciben los datos confiables (p. ej. el tutor comprueba que
+        # solo cite brechas del contexto entregado).
+        advertencias = politica.validar_salida(respuesta.data, datos)
 
         # 7. Métrica de éxito -----------------------------------------------
         await self._metrica(
@@ -192,7 +201,7 @@ class AIGateway:
             latencia_ms=respuesta.latencia_ms or _ms(inicio),
             sanitizado=self.sanitizer_enabled,
             entidades=n_entidades,
-            clasificacion=getattr(respuesta.data, "clasificacion", None),
+            clasificacion=politica.etiqueta_metrica(respuesta.data),
             confianza=getattr(respuesta.data, "confianza", None),
             advertencias=advertencias,
         )
@@ -203,6 +212,7 @@ class AIGateway:
             modelo=respuesta.modelo or modelo,
             advertencias=advertencias,
             sanitizado=self.sanitizer_enabled,
+            textos_sanitizados=textos_seguros,
         )
 
     # ---------------------------------------------------------------- helpers

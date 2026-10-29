@@ -5,13 +5,14 @@
  * El cliente entra al espacio de su empresa y, desde ahí, ve los resultados de las
  * evaluaciones migradas con el mismo panel que el encuestado (/panel en modo "cliente").
  * Solo se reenvían esas lecturas (y el envío del informe por correo); todo lo que cambia
- * una evaluación queda fuera: el historial migrado no se reescribe.
+ * una evaluación queda fuera: el historial migrado no se reescribe. HU-15 agrega el chat
+ * con el Agente IA Tutor (sus conversaciones admiten PATCH del nivel y DELETE).
  *
  * La autorización real la hace FastAPI (app/core/alcance.py): el rol cliente solo ve las
  * evaluaciones migradas a SU empresa (404 en cualquier otra).
  */
 
-export type MetodoCliente = "GET" | "POST";
+export type MetodoCliente = "GET" | "POST" | "PATCH" | "DELETE";
 
 interface Regla {
   metodo: MetodoCliente;
@@ -46,6 +47,14 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^remediacion\/evaluaciones\/\d{1,9}$/ },
   { metodo: "POST", patron: /^remediacion\/respuestas\/\d{1,9}\/evidencias$/, archivo: true, conIp: true, timeoutMs: 60_000 },
   { metodo: "GET", patron: /^remediacion\/evidencias\/\d{1,9}$/ },
+  // HU-15: Agente IA Tutor del panel de formación (cada mensaje espera al LLM: hasta 60 s)
+  { metodo: "GET", patron: /^tutor\/contexto$/ },
+  { metodo: "GET", patron: /^tutor\/conversaciones$/ },
+  { metodo: "POST", patron: /^tutor\/conversaciones$/ },
+  { metodo: "GET", patron: /^tutor\/conversaciones\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^tutor\/conversaciones\/\d{1,9}$/ },
+  { metodo: "DELETE", patron: /^tutor\/conversaciones\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^tutor\/conversaciones\/\d{1,9}\/mensajes$/, timeoutMs: 60_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

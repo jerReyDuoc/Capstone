@@ -56,6 +56,12 @@ class Accion:
     CONTRATO_SUSPENDIDO = "contrato.suspendido"
     CONTRATO_REACTIVADO = "contrato.reactivado"
     CONTRATO_TERMINADO = "contrato.terminado"
+    # HU-15: Agente IA Tutor (el detalle nunca lleva el texto de los mensajes)
+    TUTOR_CONVERSACION_CREADA = "tutor.conversacion_creada"
+    TUTOR_MENSAJE = "tutor.mensaje"
+    TUTOR_MENSAJE_BLOQUEADO = "tutor.mensaje_bloqueado"
+    TUTOR_NIVEL_CAMBIADO = "tutor.nivel_cambiado"
+    TUTOR_CONVERSACION_ELIMINADA = "tutor.conversacion_eliminada"
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

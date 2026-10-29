@@ -80,7 +80,8 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Filtro de aplicabilidad (F1–F7) | ✅ Hecho | Árbol de decisión aditivo (22 controles base + 18 condicionales) |
 | Respuestas y reglas de clasificación | ✅ Hecho | Matriz de 5 estados declarables (HU-02): `requiere_revision` la elige el usuario y la resuelve el LLM; justificación obligatoria en parcial y revisión |
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
-| Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana |
+| Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana. HU-15: agente de **LangGraph** que orquesta las skills `validar_evidencia` y `tutor` (el gateway sigue siendo la única salida al LLM) |
+| Agente IA Tutor (HU-15) | ✅ Hecho | Chat en el panel de formación para el usuario definitivo con contrato vigente: explicaciones y planes de acción por nivel (Inicial/Intermedio/Avanzado) sobre las brechas no conformes de la evaluación más reciente de **su** empresa; mensajes anonimizados, cuota diaria por empresa (60), borrado a los 30 días sin actividad y con la supresión ARCOP. Ver [5.12](#512-agente-ia-tutor-hu-15) y `Extras/Cambios/backend/CAMBIOS_HU15.md` |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
 | PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `Extras/Cambios/backend/CAMBIOS_HU06.md` |
 | Minimización de datos y plazos de conservación (T-06) | ✅ Hecho | Inventario de las 171 columnas (26 con datos personales, en 9 tablas) con finalidad, base de licitud y plazo; auditoría de solo lectura sobre la BD real (DER, matriz, escaneo de contenido); anonimización por plazo vencido (cron diario, plazos pendientes del PO). Ver `Extras/Cambios/backend/CAMBIOS_T06.md` |
@@ -447,6 +448,14 @@ Cada módulo trae objetivo general, objetivos específicos, contenidos, horas, m
 - `POST /api/evaluaciones/{id}/informe/enviar` `{email?, recordar?, filtros…}` envía **ese mismo PDF** como adjunto, para que quede en la bandeja si se pierde el archivo. El PDF siempre lo genera el servidor con datos de la BD (no se aceptan archivos del cliente). El encuestado puede omitir el correo (se usa el registrado) o guardarlo con `recordar`. Límite: 3 envíos por evaluación y 10 por IP al día.
 - `CORREO_MODO`: `archivo` (defecto en desarrollo: el `.eml` queda en `STORAGE_DIR/correos`, no sale nada), `smtp` (envío real) o `desactivado`. Configuración en [12.1, paso 4](#121-con-docker-recomendado).
 
+### 5.12 Agente IA Tutor (HU-15)
+
+La capa de IA pasó a ser un **agente de LangGraph** (`application/ai/agente/`). El grafo tiene un nodo `guardia` (prompt injection, antes del LLM y del NER), un router **determinista** que elige la skill según lo que pide el caso de uso, y una skill por tarea: `validar_evidencia` (la evaluación de evidencias de siempre, sin cambios de comportamiento) y `tutor` (con un nodo final que ancla la salida a las brechas del contexto). Cada skill llama al `AIGateway` con su `TareaIA`, así que sanitización, prompt versionado (`tutor/1.1.0`), schema estricto y métricas siguen en un solo lugar. El LLM no tiene herramientas ni toca la BD: el caso de uso `TutorIA` carga el contexto, invoca el agente y persiste.
+
+1. **Contexto aislado:** la empresa sale del token; se usan solo las brechas `no_cumplido` y `parcialmente_cumplido` de la evaluación más reciente con resultados, con datos de catálogo y del control; para las brechas en foco van además la obligación, la evidencia esperada y la fuente normativa real del control, y los antecedentes de la propia empresa (su justificación y su última evidencia, que pasan otra vez por el NER). No van la razón social ni datos de contacto. Se recarga en cada mensaje, así que el tutor ve las mejoras de la remediación (HU-17).
+2. **Nivel:** por defecto el de la ruta (la del módulo desde el que se abrió o la de la brecha más prioritaria); el usuario lo cambia con `PATCH`.
+3. **Chat síncrono** con la respuesta ya validada; texto anonimizado en `mensaje_tutor`; cuota `TUTOR_MENSAJES_DIA_EMPRESA` (60) y ráfaga por minuto; conversaciones de una evaluación anterior quedan de solo lectura.
+
 ---
 
 ## 6. Base de datos
@@ -705,6 +714,10 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/remediacion/evaluaciones/{id}` | 🏢 | HU-17: controles con brecha, su formación y su última evidencia |
 | POST | `/api/remediacion/respuestas/{id}/evidencias` | 🏢 | HU-17: multipart `file` (PDF/DOCX/TXT) + `estado_declarado` + `justificacion` opcional → 202; el worker re-evalúa y recalcula el puntaje |
 | GET | `/api/remediacion/evidencias/{id}` | 🏢 | HU-17: resultado del análisis y puntaje recalculado |
+| GET | `/api/tutor/contexto?ruta_id=` | 🏢 | HU-15: brechas que verá el tutor (evaluación vigente de la empresa), nivel sugerido y cuota |
+| GET / POST | `/api/tutor/conversaciones` | 🏢 | HU-15: lista / abre una conversación `{ruta_id?, nivel?}` |
+| GET / PATCH / DELETE | `/api/tutor/conversaciones/{id}` | 🏢 | HU-15: conversación con mensajes / cambia el nivel `{nivel}` / la borra |
+| POST | `/api/tutor/conversaciones/{id}/mensajes` | 🏢 | HU-15: `{texto}` → respuesta estructurada del tutor (tipo, pasos, brechas citadas, referencias, sugerencias) y la cuota |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 

@@ -42,6 +42,13 @@ from app.domain.models.formacion import (
     LeccionFormativa,
     PreguntaVerificacion,
 )
+# HU-15: conversaciones del Agente IA Tutor
+from app.domain.models.tutor import (
+    ConversacionTutor,
+    MensajeTutor,
+    RolMensajeTutor,
+    TipoMensajeTutor,
+)
 
 __all__ = [
     "Dominio",
@@ -82,4 +89,8 @@ __all__ = [
     "EstadoAvance",
     "LeccionFormativa",
     "PreguntaVerificacion",
+    "ConversacionTutor",
+    "MensajeTutor",
+    "RolMensajeTutor",
+    "TipoMensajeTutor",
 ]

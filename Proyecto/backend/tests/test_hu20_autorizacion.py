@@ -484,6 +484,16 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("POST", "/api/remediacion/respuestas/{respuesta_id}/evidencias", "/api/remediacion/respuestas/1/evidencias",
      {"files": {"file": ("p.txt", EVIDENCIA, "text/plain")}, "data": {"estado_declarado": "cumplido"}}),
     ("GET", "/api/remediacion/evidencias/{evidencia_id}", "/api/remediacion/evidencias/1", {}),
+    # HU-15: Agente IA Tutor (solo cliente con contrato vigente; roles en test_hu15_tutor.py)
+    ("GET", "/api/tutor/contexto", "/api/tutor/contexto", {}),
+    ("GET", "/api/tutor/conversaciones", "/api/tutor/conversaciones", {}),
+    ("POST", "/api/tutor/conversaciones", "/api/tutor/conversaciones", {"json": {}}),
+    ("GET", "/api/tutor/conversaciones/{conversacion_id}", "/api/tutor/conversaciones/1", {}),
+    ("PATCH", "/api/tutor/conversaciones/{conversacion_id}", "/api/tutor/conversaciones/1",
+     {"json": {"nivel": "Inicial"}}),
+    ("DELETE", "/api/tutor/conversaciones/{conversacion_id}", "/api/tutor/conversaciones/1", {}),
+    ("POST", "/api/tutor/conversaciones/{conversacion_id}/mensajes", "/api/tutor/conversaciones/1/mensajes",
+     {"json": {"texto": "hola"}}),
 ]
 
 

@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { BadgeSeveridad } from "@/components/ui/Basicos";
+import { TutorIA } from "@/components/formacion/TutorIA";
 import { usePanel } from "@/hooks/usePanel";
 import { descargarBlob } from "@/lib/exportar";
 import {
@@ -158,6 +159,10 @@ export function RecorridoModulo({ rutaId }: { rutaId: number | null }) {
           </p>
           <h1 className="page-title recorrido-nombre">{m.ruta.nombre}</h1>
           {m.ruta.objetivo ? <p className="page-sub">{m.ruta.objetivo}</p> : null}
+          {/* HU-15: el tutor se abre con este módulo como foco (y su nivel por defecto) */}
+          <div className="recorrido-tutor">
+            <TutorIA rutaId={m.ruta.id} nombreModulo={m.ruta.nombre} variante="boton" />
+          </div>
         </div>
         <dl className="recorrido-datos">
           <div>

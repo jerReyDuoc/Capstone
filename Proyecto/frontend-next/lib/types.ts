@@ -465,3 +465,116 @@ export interface RemediacionApi {
   max_mb: number;
   evidencias_por_dia: number;
 }
+
+/* ------------------------------------------------------------------
+ * HU-15 · Agente IA Tutor (GET/POST /api/tutor/*)
+ * ------------------------------------------------------------------ */
+
+export type TipoMensajeTutor = "pregunta" | "explicacion" | "plan_accion" | "orientacion" | "fuera_de_alcance" | "bloqueado";
+
+/** Brecha del contexto aislado del tutor (solo catálogo y control; sin datos de la empresa). */
+export interface BrechaTutorApi {
+  ref: string;
+  codigo: string;
+  control_codigo: string | null;
+  dominio: string;
+  descripcion: string;
+  severidad: Severidad;
+  estado: "no_cumplido" | "parcialmente_cumplido";
+  accion: string | null;
+  prioridad: number;
+  respuesta_id: number;
+  ruta_id: number | null;
+  ruta_nombre: string | null;
+  ruta_nivel: NivelFormativo | null;
+  formacion_completada: boolean;
+  /** v1.1: framework y artículo reales del control (de la matriz). */
+  fuente_normativa?: string | null;
+}
+
+export interface CuotaTutorApi {
+  usados: number;
+  limite: number | null;
+  restantes: number | null;
+  reinicia_en: string;
+}
+
+/** GET /api/tutor/contexto */
+export interface ContextoTutorApi {
+  evaluacion_id: number;
+  fecha_evaluacion: string | null;
+  puntaje_general: number | null;
+  nivel_madurez: string | null;
+  nivel_sugerido: NivelFormativo;
+  brechas_total: number;
+  brechas_por_estado: Record<string, number>;
+  brechas_por_severidad: Record<string, number>;
+  brechas: BrechaTutorApi[];
+  foco: { ruta_id: number; nombre: string; nivel: NivelFormativo | null } | null;
+  niveles: NivelFormativo[];
+  cuota?: CuotaTutorApi;
+  max_caracteres?: number;
+}
+
+export interface ConversacionTutorApi {
+  id: number;
+  titulo: string | null;
+  nivel: NivelFormativo;
+  evaluacion_id: number;
+  ruta_id: number | null;
+  mensajes_total: number;
+  fecha_creacion: string | null;
+  fecha_ultimo_mensaje: string | null;
+  /** "solo_lectura": es de una evaluación anterior de la empresa. */
+  estado: "activa" | "solo_lectura";
+}
+
+export interface PasoTutorApi {
+  orden: number;
+  accion: string;
+  responsable_sugerido: string | null;
+  evidencia_esperada: string | null;
+}
+
+export interface BrechaCitadaApi {
+  ref: string;
+  codigo: string;
+  dominio: string;
+  severidad: Severidad;
+  estado: string;
+  ruta_id: number | null;
+  respuesta_id: number;
+}
+
+export interface MensajeTutorApi {
+  id: number;
+  rol: "usuario" | "tutor";
+  tipo: TipoMensajeTutor;
+  contenido: string;
+  nivel: NivelFormativo | null;
+  bloqueado: boolean;
+  fecha: string | null;
+  pasos: PasoTutorApi[];
+  brechas: BrechaCitadaApi[];
+  referencias_normativas: string[];
+  sugerencias: string[];
+}
+
+export interface ListaConversacionesApi {
+  evaluacion_vigente: number | null;
+  items: ConversacionTutorApi[];
+}
+
+export interface ConversacionDetalleApi {
+  conversacion: ConversacionTutorApi;
+  mensajes: MensajeTutorApi[];
+  cuota?: CuotaTutorApi;
+}
+
+/** POST /api/tutor/conversaciones/{id}/mensajes */
+export interface RespuestaTutorApi {
+  mensaje_usuario: MensajeTutorApi;
+  respuesta: MensajeTutorApi;
+  conversacion: ConversacionTutorApi;
+  cuota: CuotaTutorApi;
+}

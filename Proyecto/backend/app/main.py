@@ -10,6 +10,7 @@ from app.api.routes import respuestas, evidencias, catalogos, controles, evaluac
 from app.api.routes import contratacion, admin_clientes  # HU-27 (+ bases de HU-31 y HU-09)
 from app.api.routes import cliente  # HU-28: espacio de la empresa del usuario definitivo
 from app.api.routes import formacion, remediacion  # HU-26 (módulos formativos) y HU-17 (remediación)
+from app.api.routes import tutor  # HU-15: Agente IA Tutor del panel de formación
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ app.include_router(admin_clientes.router)
 app.include_router(cliente.router)
 app.include_router(formacion.router)
 app.include_router(remediacion.router)
+app.include_router(tutor.router)
 
 @app.get("/health")
 async def health():
