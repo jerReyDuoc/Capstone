@@ -341,6 +341,12 @@ function Chat({
         </div>
       ) : (
         <form className={s.composer} onSubmit={alEnviar} noValidate>
+          {estado.advertencia ? (
+            <p className={s.advertencia} role="alert">
+              <Icon name="alerta" />
+              {estado.advertencia}
+            </p>
+          ) : null}
           {error ? (
             <p className={s.error} id={idError} role="alert">
               <Icon name="alerta" />

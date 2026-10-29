@@ -26,6 +26,7 @@ Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
 
   Bitácora (base HU-09)
     GET   /api/admin/bitacora?entidad=&entidad_id=&accion=&page=&size=
+    GET   /api/admin/bitacora/verificacion                HU-18: integridad de la cadena de hashes
 
 El admin nunca ve ni define la contraseña del cliente, ni recibe el token de activación:
 el enlace solo va al correo del usuario definitivo.
@@ -408,6 +409,20 @@ async def bitacora(
     return {
         "items": [{"id": f.id, "fecha": f.fecha, "actor_rol": f.actor_rol, "actor_id": f.actor_id,
                    "accion": f.accion, "entidad": f.entidad, "entidad_id": f.entidad_id,
-                   "resultado": f.resultado, "detalle": f.detalle} for f in filas],
+                   "resultado": f.resultado, "detalle": f.detalle, "hash": f.hash} for f in filas],
         "total": total, "page": page, "size": size,
     }
+
+
+@router.get("/bitacora/verificacion")
+async def verificar_bitacora(
+    _: Actor = Depends(solo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    HU-18: verifica la cadena de hashes de la bitácora (registro inmutable). `integra=false`
+    trae la primera fila alterada, borrada o intercalada. Guarda el `ancla` (último id y hash)
+    fuera del sistema para detectar también un borrado de las últimas filas.
+    """
+    from app.infrastructure.repositories.bitacora_cadena import verificar_cadena
+    return await verificar_cadena(db)

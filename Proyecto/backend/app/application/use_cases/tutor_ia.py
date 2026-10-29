@@ -26,20 +26,35 @@ Reglas:
   - Cuota diaria por empresa (TUTOR_MENSAJES_DIA_EMPRESA, 60 por defecto) + ráfaga por
     minuto + cuota global del LLM. Si el servicio de IA falla, la cuota se devuelve.
   - Toda acción queda en la bitácora (HU-09) sin el texto de los mensajes.
+
+HU-18 (el agente cumple los mismos estándares que el sistema exige a las empresas):
+  - El filtro de entrada clasifica el ataque (inyeccion, jailbreak, fuga_prompt,
+    delimitadores, codificado, uso_indebido) y bloquea SIN llamar al NER ni al LLM; mira
+    también los dos mensajes anteriores del usuario (ataques en varios turnos). Un
+    antecedente de la empresa con inyección se omite en vez de bloquear todo.
+  - La salida se valida: si filtra el system prompt (canario) se reemplaza por un rechazo.
+  - TODA interacción queda en la bitácora inmutable (cadena de hashes): mensajes, bloqueos,
+    salidas bloqueadas y también los rechazos (cuota, validación, conversación ajena), con la
+    categoría, las entidades enmascaradas y una huella HMAC del mensaje, nunca su texto.
+  - Abuso reiterado: desde el TUTOR_BLOQUEOS_ADVERTENCIA-ésimo bloqueo (3) en
+    TUTOR_VENTANA_BLOQUEOS_MIN (10) minutos se muestra una advertencia y se alerta al Oficial
+    de Cumplimiento con un evento de seguridad. No bloquea el tutor (decisión del equipo, 28-oct).
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
 from app.application.ai.agente import AgenteIA, SkillIA
+from app.application.ai.agente.salida import RESPUESTA_FUGA, SUGERENCIAS_FUGA
 from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
 from app.application.ai.gateway import CapaIAError
 from app.application.ai.prompts.tutor import texto_antecedentes, turno_historial
 from app.application.schemas.tutor import NivelTutor, TutorRespuesta
 from app.application.tutor.contexto import ContextoTutor, ContextoTutorError, cargar_contexto_tutor
 from app.application.use_cases.limites_encuesta import Reserva, ventana_diaria
+from app.core.cliente import huella
 from app.core.config import settings
-from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
+from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.tutor import ConversacionTutor, MensajeTutor, RolMensajeTutor, TipoMensajeTutor
 from app.domain.ports.registro_ia_port import ContextoLlamada
@@ -54,12 +69,32 @@ RESPUESTA_BLOQUEADO = (
     "Reformula tu pregunta sobre las brechas de tu empresa y con gusto te ayudo."
 )
 SUGERENCIAS_BLOQUEO = ["¿Qué brecha debería cerrar primero?", "Explícame la brecha más crítica de mi evaluación."]
+# HU-18: respuesta fija ante un pedido de fraude u ocultamiento (no se llama al LLM)
+RESPUESTA_ETICA = (
+    "No puedo ayudarte con eso: falsificar o adulterar evidencia, aparentar un cumplimiento que no existe u ocultar "
+    "un incidente va contra la Ley 21.719 y contra la gobernanza que esta plataforma evalúa. Sí puedo ayudarte a "
+    "preparar la evidencia real del control o a entender cómo y cuándo notificar un incidente."
+)
+SUGERENCIAS_ETICA = ["¿Qué evidencia real necesito para este control?", "¿Cómo se notifica un incidente de datos personales?"]
+ADVERTENCIA_ABUSO = (
+    "Hemos bloqueado varios mensajes seguidos que intentaban cambiar las reglas del tutor. El tutor sigue disponible "
+    "para tus brechas de gobernanza; estos intentos quedan registrados y se informan al equipo de Therion Labs."
+)
+
+
+def respuesta_de_bloqueo(categoria: str | None) -> tuple[str, list[str]]:
+    if categoria == "uso_indebido":
+        return RESPUESTA_ETICA, SUGERENCIAS_ETICA
+    if categoria == "fuga_prompt":
+        return RESPUESTA_FUGA, SUGERENCIAS_FUGA
+    return RESPUESTA_BLOQUEADO, SUGERENCIAS_BLOQUEO
 
 
 class TutorError(Exception):
     def __init__(self, status: int, codigo: str, mensaje: str, **extra):
         super().__init__(mensaje)
         self.status, self.codigo, self.mensaje, self.extra = status, codigo, mensaje, extra
+        self.auditado = False  # HU-18: ya quedó en la bitácora (no registrarlo dos veces)
 
 
 def _ahora() -> datetime:
@@ -269,6 +304,22 @@ class TutorIA:
         return await self._anon(r.respuesta) or "", datos
 
     async def enviar(self, conversacion_id: int, texto: str | None) -> dict:
+        """HU-18: cualquier rechazo (validación, cuota, conversación ajena...) también queda auditado."""
+        try:
+            return await self._enviar(conversacion_id, texto)
+        except TutorError as e:
+            if not e.auditado:
+                await self.db.rollback()
+                self.bitacora.registrar(
+                    accion=Accion.TUTOR_MENSAJE, entidad="conversacion_tutor", entidad_id=conversacion_id,
+                    actor=self.cliente.actor, resultado=RESULTADO_RECHAZADO,
+                    detalle={"codigo": e.codigo, "status": e.status, "largo": len(texto or ""),
+                             "huella_mensaje": huella((texto or "").strip()) if texto else None},
+                )
+                await self.db.commit()
+            raise
+
+    async def _enviar(self, conversacion_id: int, texto: str | None) -> dict:
         texto = (texto or "").strip()
         if not texto:
             raise TutorError(422, "MENSAJE_VACIO", "Escribe tu pregunta para el tutor.")
@@ -293,22 +344,29 @@ class TutorIA:
         citadas_antes = next((" ".join(b.get("ref", "") for b in (m.datos or {}).get("brechas", []))
                               for m in reversed(previos) if m.rol == RolMensajeTutor.TUTOR.value), "")
         foco = ctx.brechas_nombradas([texto])[:3] or ctx.brechas_en_foco([citadas_antes])
+        # HU-18: los dos mensajes anteriores del usuario (ya anonimizados) para ataques en varios turnos
+        previos_usuario = [m.contenido for m in previos if m.rol == RolMensajeTutor.USUARIO.value][-2:]
         try:
             salida = await self.agente.ejecutar(
                 SkillIA.TUTOR,
                 textos={"mensaje": texto, "antecedentes": texto_antecedentes(ctx, foco)},
-                datos={"contexto": ctx, "nivel": c.nivel, "historial": historial, "foco": foco},
+                datos={"contexto": ctx, "nivel": c.nivel, "historial": historial, "foco": foco,
+                       "previos_usuario": previos_usuario},
                 contexto=ContextoLlamada(evaluacion_id=ctx.evaluacion_id, conversacion_id=c.id),
             )
         except CapaIAError as e:
             await reserva.devolver()  # no fue culpa del usuario: no gasta su cuota
             self._auditar_rechazo(c, e.tipo_error)
             await self.db.commit()
-            raise TutorError(503, "TUTOR_NO_DISPONIBLE", e.mensaje_usuario, tipo_error=e.tipo_error)
+            err = TutorError(503, "TUTOR_NO_DISPONIBLE", e.mensaje_usuario, tipo_error=e.tipo_error)
+            err.auditado = True
+            raise err
 
         ahora = _ahora()
         if salida.bloqueado:
-            return await self._bloqueado(c, ctx, texto, salida.motivo, ahora)
+            return await self._bloqueado(c, ctx, texto, salida.motivo, salida.regla, ahora)
+        for n in salida.neutralizados:  # antecedente de la empresa con inyección: se omitió
+            await self._evento(n.get("texto") or "", n.get("categoria"), ctx, origen=OrigenEvento.TUTOR_ANTECEDENTE.value)
 
         r: TutorRespuesta = salida.resultado.data
         try:
@@ -318,7 +376,15 @@ class TutorIA:
         except AnonimizacionError as e:
             self._auditar_rechazo(c, "anonimizacion")
             await self.db.commit()
-            raise TutorError(503, "TUTOR_NO_DISPONIBLE", str(e))
+            err = TutorError(503, "TUTOR_NO_DISPONIBLE", str(e))
+            err.auditado = True
+            raise err
+
+        # HU-18: la salida filtró el system prompt -> se mostró un rechazo fijo; es un ataque logrado
+        advertencia = None
+        if salida.salida_bloqueada:
+            await self._evento(texto, "fuga_prompt_salida", ctx)
+            advertencia = await self._contar_bloqueo(c, ctx)
 
         m_usuario = MensajeTutor(
             conversacion_id=c.id, rol=RolMensajeTutor.USUARIO.value, tipo=TipoMensajeTutor.PREGUNTA.value,
@@ -326,22 +392,34 @@ class TutorIA:
             huella_contexto=ctx.huella(), fecha=ahora,
         )
         m_tutor = MensajeTutor(
-            conversacion_id=c.id, rol=RolMensajeTutor.TUTOR.value, tipo=r.tipo.value, contenido=contenido,
-            nivel=c.nivel, datos=datos, bloqueado=False, traza_id=salida.resultado.traza_id,
+            conversacion_id=c.id, rol=RolMensajeTutor.TUTOR.value,
+            tipo=TipoMensajeTutor.BLOQUEADO.value if salida.salida_bloqueada else r.tipo.value, contenido=contenido,
+            nivel=c.nivel, datos=datos, bloqueado=bool(salida.salida_bloqueada),
+            motivo_bloqueo=salida.salida_bloqueada, traza_id=salida.resultado.traza_id,
             prompt_version=salida.resultado.prompt_version, advertencias=salida.advertencias or None,
             huella_contexto=ctx.huella(), fecha=ahora,
         )
         self._registrar_mensajes(c, ctx, pregunta, [m_usuario, m_tutor], ahora)
         self.bitacora.registrar(
-            accion=Accion.TUTOR_MENSAJE, entidad="conversacion_tutor", entidad_id=c.id, actor=self.cliente.actor,
+            accion=Accion.TUTOR_SALIDA_BLOQUEADA if salida.salida_bloqueada else Accion.TUTOR_MENSAJE,
+            entidad="conversacion_tutor", entidad_id=c.id, actor=self.cliente.actor,
+            resultado=RESULTADO_RECHAZADO if salida.salida_bloqueada else RESULTADO_OK,
             detalle={"evaluacion_id": ctx.evaluacion_id, "nivel": c.nivel, "tipo": r.tipo.value,
                      "brechas_referenciadas": len(datos["brechas"]), "pasos": len(datos["pasos"]),
                      "advertencias": salida.advertencias, "traza_id": salida.resultado.traza_id,
-                     "prompt_version": salida.resultado.prompt_version},
+                     "prompt_version": salida.resultado.prompt_version,
+                     # HU-18: NER local y filtro, sin texto
+                     "entidades_anonimizadas": salida.resultado.entidades_anonimizadas,
+                     "antecedentes_omitidos": len(salida.neutralizados),
+                     "salida_bloqueada": salida.salida_bloqueada,
+                     "huella_mensaje": huella(texto)},
         )
         await self.db.commit()
-        return {"mensaje_usuario": mensaje_a_dict(m_usuario), "respuesta": mensaje_a_dict(m_tutor),
-                "conversacion": conversacion_a_dict(c, ctx.evaluacion_id), "cuota": await self.cuota()}
+        respuesta = {"mensaje_usuario": mensaje_a_dict(m_usuario), "respuesta": mensaje_a_dict(m_tutor),
+                     "conversacion": conversacion_a_dict(c, ctx.evaluacion_id), "cuota": await self.cuota()}
+        if advertencia:
+            respuesta["advertencia"] = advertencia
+        return respuesta
 
     def _registrar_mensajes(self, c: ConversacionTutor, ctx: ContextoTutor, titulo_base: str | None,
                             mensajes: list[MensajeTutor], ahora: datetime) -> None:
@@ -354,11 +432,39 @@ class TutorIA:
             t = " ".join(titulo_base.split())
             c.titulo = t if len(t) <= MAX_TITULO else t[:MAX_TITULO - 1].rstrip() + "…"
 
-    async def _bloqueado(self, c: ConversacionTutor, ctx: ContextoTutor, texto: str, motivo: str | None,
-                         ahora: datetime) -> dict:
-        """Prompt injection: no se llamó al LLM. Queda el evento de seguridad (extracto anonimizado)."""
+    async def _evento(self, texto: str, tipo: str | None, ctx: ContextoTutor, origen: str | None = None) -> None:
         if self.registrar_evento is not None:
-            await self.registrar_evento.execute(texto, OrigenEvento.TUTOR.value, evaluacion_id=ctx.evaluacion_id)
+            await self.registrar_evento.execute(texto, origen or OrigenEvento.TUTOR.value,
+                                                evaluacion_id=ctx.evaluacion_id, tipo=tipo or "prompt_injection")
+
+    async def _contar_bloqueo(self, c: ConversacionTutor, ctx: ContextoTutor) -> str | None:
+        """
+        HU-18: cuenta los bloqueos de la empresa en una ventana. Desde el umbral se muestra una
+        advertencia (no se bloquea el tutor) y, al alcanzarlo, se alerta con un evento de seguridad.
+        """
+        umbral = settings.TUTOR_BLOQUEOS_ADVERTENCIA
+        if umbral <= 0 or self.limitador is None:
+            return None
+        consumo = await self.limitador.consumir(f"tutor:bloqueos:{self.empresa.id}", 10**6,
+                                                settings.TUTOR_VENTANA_BLOQUEOS_MIN * 60)
+        if consumo.usados < umbral:
+            return None
+        if consumo.usados == umbral:
+            await self._evento(f"{consumo.usados} mensajes bloqueados en {settings.TUTOR_VENTANA_BLOQUEOS_MIN} min",
+                               "abuso_reiterado", ctx)
+        self.bitacora.registrar(
+            accion=Accion.TUTOR_ADVERTENCIA_ABUSO, entidad="conversacion_tutor", entidad_id=c.id,
+            actor=self.cliente.actor, resultado=RESULTADO_RECHAZADO,
+            detalle={"empresa_id": self.empresa.id, "bloqueos_en_ventana": consumo.usados,
+                     "ventana_min": settings.TUTOR_VENTANA_BLOQUEOS_MIN},
+        )
+        return ADVERTENCIA_ABUSO
+
+    async def _bloqueado(self, c: ConversacionTutor, ctx: ContextoTutor, texto: str, motivo: str | None,
+                         regla: str | None, ahora: datetime) -> dict:
+        """Ataque detectado por el filtro: no se llamó al NER ni al LLM. Queda el evento (extracto anonimizado)."""
+        await self._evento(texto, motivo, ctx)
+        respuesta, sugerencias = respuesta_de_bloqueo(motivo)
         m_usuario = MensajeTutor(
             conversacion_id=c.id, rol=RolMensajeTutor.USUARIO.value, tipo=TipoMensajeTutor.PREGUNTA.value,
             contenido=TEXTO_BLOQUEADO_USUARIO, nivel=c.nivel, bloqueado=True, motivo_bloqueo=motivo,
@@ -366,19 +472,24 @@ class TutorIA:
         )
         m_tutor = MensajeTutor(
             conversacion_id=c.id, rol=RolMensajeTutor.TUTOR.value, tipo=TipoMensajeTutor.BLOQUEADO.value,
-            contenido=RESPUESTA_BLOQUEADO, nivel=c.nivel, bloqueado=True, motivo_bloqueo=motivo,
-            datos={"pasos": [], "brechas": [], "referencias_normativas": [], "sugerencias": SUGERENCIAS_BLOQUEO},
+            contenido=respuesta, nivel=c.nivel, bloqueado=True, motivo_bloqueo=motivo,
+            datos={"pasos": [], "brechas": [], "referencias_normativas": [], "sugerencias": sugerencias},
             huella_contexto=ctx.huella(), fecha=ahora,
         )
         self._registrar_mensajes(c, ctx, None, [m_usuario, m_tutor], ahora)
         self.bitacora.registrar(
             accion=Accion.TUTOR_MENSAJE_BLOQUEADO, entidad="conversacion_tutor", entidad_id=c.id,
             actor=self.cliente.actor, resultado=RESULTADO_RECHAZADO,
-            detalle={"evaluacion_id": ctx.evaluacion_id, "motivo": motivo},
+            detalle={"evaluacion_id": ctx.evaluacion_id, "motivo": motivo, "categoria": motivo, "regla": regla,
+                     "huella_mensaje": huella(texto), "largo": len(texto)},
         )
+        advertencia = await self._contar_bloqueo(c, ctx)
         await self.db.commit()
-        return {"mensaje_usuario": mensaje_a_dict(m_usuario), "respuesta": mensaje_a_dict(m_tutor),
-                "conversacion": conversacion_a_dict(c, ctx.evaluacion_id), "cuota": await self.cuota()}
+        salida = {"mensaje_usuario": mensaje_a_dict(m_usuario), "respuesta": mensaje_a_dict(m_tutor),
+                  "conversacion": conversacion_a_dict(c, ctx.evaluacion_id), "cuota": await self.cuota()}
+        if advertencia:
+            salida["advertencia"] = advertencia
+        return salida
 
     def _auditar_rechazo(self, c: ConversacionTutor, tipo_error: str | None) -> None:
         self.bitacora.registrar(

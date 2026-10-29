@@ -313,6 +313,7 @@ RUTAS_SOLO_ADMIN = [
     ("GET", "/api/admin/contrataciones", lambda m: ("/api/admin/contrataciones", {})),
     ("GET", "/api/admin/empresas", lambda m: ("/api/admin/empresas", {})),
     ("GET", "/api/admin/bitacora", lambda m: ("/api/admin/bitacora", {})),
+    ("GET", "/api/admin/bitacora/verificacion", lambda m: ("/api/admin/bitacora/verificacion", {})),  # HU-18
     # HU-28: evaluaciones del panel interno
     ("GET", "/api/admin/evaluaciones", lambda m: ("/api/admin/evaluaciones", {})),
 ]

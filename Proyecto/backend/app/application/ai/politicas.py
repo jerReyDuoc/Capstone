@@ -93,6 +93,7 @@ def _prompt_tutor(textos: dict[str, str], datos: dict[str, Any]) -> PromptRender
         historial=datos.get("historial"),
         antecedentes=textos.get("antecedentes") or "",
         foco=datos.get("foco"),
+        canario=datos.get("canario"),
     )
 
 
@@ -110,6 +111,10 @@ def _validar_salida_tutor(r: TutorRespuesta, datos: dict[str, Any] | None = None
         adv.append("plan_sin_pasos")
     if not (r.respuesta or "").strip():
         adv.append("respuesta_vacia")
+    # HU-18: fugas del system prompt (canario, frases del prompt), código, enlaces y alcance.
+    # Aquí solo se REGISTRAN en la métrica; el nodo "validar_salida" del agente las aplica.
+    from app.application.ai.agente.salida import problemas
+    adv += problemas(r, (datos or {}).get("canario"), tutor.SYSTEM)
     # v1.1: números de artículo que no están en las fuentes del contexto (el modelo los inventaba)
     if datos and datos.get("contexto") is not None:
         validos = datos["contexto"].articulos_validos

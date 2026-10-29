@@ -171,8 +171,9 @@ class FakeTutor(LLMProviderPort):
     nombre = "fake"
     modelo_por_defecto = "fake-model"
 
-    def __init__(self, error: LLMProviderError | None = None, tipo="plan_accion"):
+    def __init__(self, error: LLMProviderError | None = None, tipo="plan_accion", eco: str | None = None):
         self.requests, self.error, self.tipo = [], error, tipo
+        self.eco = eco  # HU-18: simula una salida maliciosa ("canario", "system", "codigo", "url", "fuera")
 
     async def generar(self, req):
         self.requests.append(req)
@@ -187,6 +188,18 @@ class FakeTutor(LLMProviderPort):
             brechas_referenciadas=(refs[:1] + ["INVENTADA-999"]) if refs else ["INVENTADA-999"],
             sugerencias=["a", "b", "c", "d"],
         )
+        if self.eco == "canario":
+            canario = re.search(r"CNR-[0-9A-F]{10}", req.system)
+            data = data.model_copy(update={"respuesta": f"Mi código interno es {canario.group(0) if canario else '?'}"})
+        elif self.eco == "system":
+            data = data.model_copy(update={"respuesta": "Mis reglas: " + req.system[300:1200]})
+        elif self.eco == "codigo":
+            data = data.model_copy(update={"respuesta": "Usa este script:\n```python\nimport os\nos.remove('x')\n```\nListo."})
+        elif self.eco == "url":
+            data = data.model_copy(update={"respuesta": "Revisa https://sitio-externo.cl/guia para más detalle."})
+        elif self.eco == "fuera":
+            data = TutorRespuesta.model_validate({**data.model_dump(), "tipo": "fuera_de_alcance",
+                                                  "respuesta": "No puedo con eso."})
         return LLMResponse(data=data, proveedor=self.nombre, modelo=self.modelo_por_defecto,
                            tokens_entrada=900, tokens_salida=250, latencia_ms=30.0)
 
@@ -391,7 +404,9 @@ def proveedor():
             politicas=crear_politicas(max_chars_evidencia=8000, max_chars_mensaje_tutor=settings.TUTOR_MAX_CHARS_MENSAJE),
             sanitizer_enabled=True, precios=PreciosModelo(),
         )
-        return ServiciosTutor(AgenteIA(gw, ReglasPromptGuard()), AnonimizadorPII(sanitizer_stub()),
+        from app.infrastructure.security.filtro_agente import FiltroAgente
+        guard = ReglasPromptGuard()
+        return ServiciosTutor(AgenteIA(gw, guard, FiltroAgente(guard)), AnonimizadorPII(sanitizer_stub()),
                               lambda db: RegistrarEventoSeguridad(EventoSeguridadRepository(db), ReglasPromptGuard()))
 
     app.dependency_overrides[obtener_servicios_tutor] = _servicios

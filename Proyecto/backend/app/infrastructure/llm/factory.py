@@ -68,8 +68,10 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
 
 def crear_agente(sesion_auditoria: AsyncSession) -> AgenteIA:
     """HU-15: agente de LangGraph con sus skills (validar_evidencia, tutor)."""
+    from app.infrastructure.security.filtro_agente import FiltroAgente
     from app.infrastructure.security.prompt_guard import ReglasPromptGuard
-    return AgenteIA(crear_gateway(sesion_auditoria), guard=ReglasPromptGuard())
+    guard = ReglasPromptGuard()
+    return AgenteIA(crear_gateway(sesion_auditoria), guard=guard, filtro=FiltroAgente(guard))  # HU-18
 
 
 def crear_validador_evidencias(sesion_auditoria: AsyncSession) -> GatewayEvidenceValidator:

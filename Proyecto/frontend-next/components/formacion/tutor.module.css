@@ -211,6 +211,13 @@
   background: var(--alto-soft); color: var(--text); font-size: var(--fs-sm);
 }
 .error svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--alto); }
+/* HU-18: aviso por bloqueos reiterados (informa, no bloquea el envío) */
+.advertencia {
+  display: flex; gap: var(--sp-2); align-items: flex-start;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm);
+  background: var(--medio-soft); color: var(--text); font-size: var(--fs-sm);
+}
+.advertencia svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--medio); }
 
 .soloLectura {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); align-items: start;

@@ -9,6 +9,7 @@ class OrigenEvento(str, Enum):
     JUSTIFICACION = "justificacion"
     EVIDENCIA = "evidencia"
     TUTOR = "tutor"  # HU-15: mensaje al Agente IA Tutor
+    TUTOR_ANTECEDENTE = "tutor_antecedente"  # HU-18: justificación guardada con inyección (se omitió)
 
 
 class EventoSeguridad(Base):

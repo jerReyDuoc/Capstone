@@ -86,6 +86,8 @@ class ResultadoIA:
     # HU-15: los textos no confiables tal como salieron hacia el LLM (ya anonimizados).
     # El tutor persiste ESTOS textos: en la BD queda exactamente lo que vio el modelo.
     textos_sanitizados: dict[str, str] = field(default_factory=dict)
+    # HU-18: cuántas entidades enmascaró el NER local en esta llamada (para la bitácora)
+    entidades_anonimizadas: int = 0
 
 
 @dataclass(frozen=True)
@@ -213,6 +215,7 @@ class AIGateway:
             advertencias=advertencias,
             sanitizado=self.sanitizer_enabled,
             textos_sanitizados=textos_seguros,
+            entidades_anonimizadas=n_entidades,
         )
 
     # ---------------------------------------------------------------- helpers

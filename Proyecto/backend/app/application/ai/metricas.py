@@ -95,7 +95,7 @@ def resumen_tutor(filas: list[FilaLlamada], tipos: list[str | None], bloqueados:
     return {
         "mensajes_respondidos": n,
         "mensajes_fallidos": len(filas) - n,
-        "mensajes_bloqueados_inyeccion": bloqueados,
+        "mensajes_bloqueados_inyeccion": bloqueados,   # todos los bloqueos del filtro de entrada (HU-18)
         "tasa_bloqueo_inyeccion": round(bloqueados / intentos, 4) if intentos else None,
         "respuestas_por_tipo": por_tipo,
         "tasa_fuera_de_alcance": round(por_tipo["fuera_de_alcance"] / n, 4) if n else None,

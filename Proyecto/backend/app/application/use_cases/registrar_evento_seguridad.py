@@ -29,6 +29,7 @@ class RegistrarEventoSeguridad:
         matriz_control_id: int | None = None,
         respuesta_id: int | None = None,
         evidencia_id: int | None = None,
+        tipo: str = "prompt_injection",
     ) -> EventoSeguridad | None:
         hash_texto = hashlib.sha256((texto or "").encode("utf-8", errors="ignore")).hexdigest()
         try:
@@ -37,13 +38,13 @@ class RegistrarEventoSeguridad:
             extracto = None
 
         logger.warning(
-            "Prompt injection detectada (origen=%s, evaluacion=%s, respuesta=%s, evidencia=%s, hash=%s)",
-            origen, evaluacion_id, respuesta_id, evidencia_id, hash_texto[:12],
+            "Prompt injection detectada (tipo=%s, origen=%s, evaluacion=%s, respuesta=%s, evidencia=%s, hash=%s)",
+            tipo, origen, evaluacion_id, respuesta_id, evidencia_id, hash_texto[:12],
         )
         try:
             return await self.repo.create(EventoSeguridad(
                 fecha=datetime.now(timezone.utc).replace(tzinfo=None),
-                tipo="prompt_injection",
+                tipo=(tipo or "prompt_injection")[:30],  # HU-18: categoría del ataque
                 origen=origen,
                 evaluacion_id=evaluacion_id,
                 matriz_control_id=matriz_control_id,

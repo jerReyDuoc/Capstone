@@ -472,7 +472,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     },
     # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).
     "bitacora_auditoria": {
-        **_sin_dp("id", "fecha", "actor_rol", "accion", "entidad", "entidad_id", "resultado"),
+        **_sin_dp("id", "fecha", "actor_rol", "accion", "entidad", "entidad_id", "resultado",
+                  "hash_anterior", "hash"),  # HU-18: cadena de HMAC (no contiene datos)
         "actor_id": Dato(
             METADATO, finalidad="Trazabilidad: quién ejecutó cada acción (HU-09)",
             base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,

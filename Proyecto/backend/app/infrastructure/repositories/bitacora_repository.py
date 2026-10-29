@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.autenticacion import Actor
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, BitacoraAuditoria
+from app.infrastructure.repositories import bitacora_cadena  # noqa: F401  HU-18: instala la cadena de hashes
 
 # Actor "sistema" (sin token): p. ej. quien abre un enlace de activación.
 ROL_SISTEMA = "sistema"
@@ -62,6 +63,9 @@ class Accion:
     TUTOR_MENSAJE_BLOQUEADO = "tutor.mensaje_bloqueado"
     TUTOR_NIVEL_CAMBIADO = "tutor.nivel_cambiado"
     TUTOR_CONVERSACION_ELIMINADA = "tutor.conversacion_eliminada"
+    # HU-18: gobernanza del agente
+    TUTOR_SALIDA_BLOQUEADA = "tutor.salida_bloqueada"      # la respuesta filtró el system prompt
+    TUTOR_ADVERTENCIA_ABUSO = "tutor.advertencia_abuso"    # bloqueos reiterados de la misma empresa
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

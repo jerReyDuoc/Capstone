@@ -577,4 +577,6 @@ export interface RespuestaTutorApi {
   respuesta: MensajeTutorApi;
   conversacion: ConversacionTutorApi;
   cuota: CuotaTutorApi;
+  /** HU-18: aviso por bloqueos reiterados de la empresa (no bloquea el tutor). */
+  advertencia?: string;
 }

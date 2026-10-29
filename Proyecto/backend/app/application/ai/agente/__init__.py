@@ -1,9 +1,13 @@
 """
 HU-15 · Agente de IA orquestado con LangGraph.
 
-    START ─▶ guardia ─┬─(bloqueado)──────────────────────────────▶ END
-                      ├─(skill = validar_evidencia)─▶ validar_evidencia ─▶ END
-                      └─(skill = tutor)─▶ tutor ─▶ anclar_contexto ─────▶ END
+    START ─▶ guardia ─┬─(bloqueado)─────────────────────────────────────────────▶ END
+                      ├─(skill = validar_evidencia)─▶ validar_evidencia ───────────────▶ END
+                      └─(skill = tutor)─▶ tutor ─▶ validar_salida ─▶ anclar_contexto ─▶ END
+
+  - HU-18: "guardia" usa el filtro de entrada del agente (categorías de ataque, varios
+    turnos, antecedentes neutralizados) y genera el canario; "validar_salida" bloquea la
+    respuesta si filtra el system prompt y limpia código, enlaces y contenido fuera de alcance.
 
   - El router es DETERMINISTA (decisión del PO, 28-oct): la skill la elige el caso de uso,
     no un LLM. No hay llamadas extra para clasificar intenciones.

@@ -75,15 +75,28 @@ class ObtenerMetricasIAUseCase:
         # HU-15: tutor (los bloqueos por inyección no llegan al LLM: salen de eventos_seguridad)
         tutor = None
         if tarea in (None, "tutor"):
-            qe = select(func.count()).select_from(EventoSeguridad).where(
-                EventoSeguridad.origen == OrigenEvento.TUTOR.value)
+            # HU-18: eventos del tutor por categoría (los bloqueos del filtro nunca llegan al LLM)
+            qe = select(EventoSeguridad.tipo, EventoSeguridad.origen, func.count()).where(
+                EventoSeguridad.origen.in_([OrigenEvento.TUTOR.value, OrigenEvento.TUTOR_ANTECEDENTE.value]))
             if desde:
                 qe = qe.where(EventoSeguridad.fecha >= desde)
             if hasta:
                 qe = qe.where(EventoSeguridad.fecha <= hasta)
-            bloqueados = int((await self.session.execute(qe)).scalar_one() or 0)
+            por_categoria: dict[str, int] = {}
+            antecedentes = 0
+            for tipo_ev, origen, n in (await self.session.execute(qe.group_by(EventoSeguridad.tipo, EventoSeguridad.origen))).all():
+                if origen == OrigenEvento.TUTOR_ANTECEDENTE.value:
+                    antecedentes += n
+                else:
+                    por_categoria[tipo_ev] = por_categoria.get(tipo_ev, 0) + n
+            no_mensajes = {"abuso_reiterado", "fuga_prompt_salida"}
+            bloqueados = sum(n for t, n in por_categoria.items() if t not in no_mensajes)
             pares_tutor = [(f, l.clasificacion) for f, l in zip(filas, llamadas) if l.tarea == "tutor"]
             tutor = resumen_tutor([f for f, _ in pares_tutor], [t for _, t in pares_tutor], bloqueados)
+            tutor["eventos_por_categoria"] = dict(sorted(por_categoria.items()))
+            tutor["antecedentes_neutralizados"] = antecedentes
+            tutor["salidas_bloqueadas"] = por_categoria.get("fuga_prompt_salida", 0)
+            tutor["advertencias_abuso"] = por_categoria.get("abuso_reiterado", 0)
 
         return {
             "periodo": {"desde": desde, "hasta": hasta},

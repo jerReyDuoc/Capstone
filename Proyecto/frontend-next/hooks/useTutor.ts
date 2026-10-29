@@ -35,11 +35,13 @@ export interface EstadoTutor {
   cuota: CuotaTutorApi | null;
   enviando: boolean;
   error: string;
+  /** HU-18: aviso del backend tras varios mensajes bloqueados; se limpia con el siguiente envío. */
+  advertencia: string;
 }
 
 const INICIAL: EstadoTutor = {
   fase: "inactivo", contexto: null, conversaciones: [], conversacion: null, mensajes: [],
-  nivel: "Inicial", cuota: null, enviando: false, error: "",
+  nivel: "Inicial", cuota: null, enviando: false, error: "", advertencia: "",
 };
 
 /**
@@ -99,7 +101,7 @@ export function useTutor(rutaId: number | null) {
       if (estado.enviando) return false;
       let conv = estado.conversacion;
       const provisional = mensajeProvisional(texto, estado.nivel);
-      parche({ enviando: true, error: "", mensajes: [...estado.mensajes, provisional] });
+      parche({ enviando: true, error: "", advertencia: "", mensajes: [...estado.mensajes, provisional] });
       try {
         if (!conv) {
           const creada = await crearConversacion(rutaId, estado.nivel);
@@ -115,6 +117,7 @@ export function useTutor(rutaId: number | null) {
           enviando: false,
           conversacion: r.conversacion,
           cuota: r.cuota,
+          advertencia: r.advertencia ?? "",
           mensajes: [...e.mensajes.filter((m) => m.id !== provisional.id), r.mensaje_usuario, r.respuesta],
         }));
         void refrescarLista();
@@ -151,7 +154,7 @@ export function useTutor(rutaId: number | null) {
   const nueva = useCallback(() => {
     enCurso.current?.abort();
     setEstado((e) => ({
-      ...e, conversacion: null, mensajes: [], enviando: false, error: "",
+      ...e, conversacion: null, mensajes: [], enviando: false, error: "", advertencia: "",
       nivel: e.contexto?.nivel_sugerido ?? e.nivel,
     }));
   }, []);

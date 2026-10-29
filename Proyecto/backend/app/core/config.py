@@ -243,6 +243,15 @@ class Settings(BaseSettings):
     # días se BORRAN en el cron diario de retención (además de borrarse con la supresión
     # ARCOP del usuario definitivo). Vacío = regla desactivada.
     TUTOR_RETENCION_DIAS: int | None = 30
+    # HU-18: abuso reiterado. Desde el N-ésimo mensaje bloqueado de una empresa dentro de la
+    # ventana se muestra una advertencia y se alerta al Oficial de Cumplimiento (evento de
+    # seguridad). NO bloquea el tutor (decisión del equipo, 28-oct). 0 = sin advertencia.
+    TUTOR_BLOQUEOS_ADVERTENCIA: int = 3
+    # HU-18: clave del HMAC que encadena la bitácora de auditoría. Vacía = se deriva de
+    # AUTH_SECRET. Si se cambia, las filas anteriores dejan de verificar con la clave nueva:
+    # fíjenla una vez y no la roten sin guardar el ancla de la cadena.
+    BITACORA_CLAVE_HASH: str | None = None
+    TUTOR_VENTANA_BLOQUEOS_MIN: int = 10
 
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
@@ -311,6 +320,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"{nombre} debe ser mayor que 0 (HU-15).")
         if not 0 <= self.TUTOR_HISTORIAL_MENSAJES <= 30:
             raise ValueError("TUTOR_HISTORIAL_MENSAJES debe estar entre 0 y 30 (HU-15).")
+        if self.TUTOR_BLOQUEOS_ADVERTENCIA < 0 or self.TUTOR_VENTANA_BLOQUEOS_MIN < 1:
+            raise ValueError("TUTOR_BLOQUEOS_ADVERTENCIA no puede ser negativo y TUTOR_VENTANA_BLOQUEOS_MIN debe ser > 0 (HU-18).")
         if not 0 <= self.TUTOR_TEMPERATURA <= 1:
             raise ValueError("TUTOR_TEMPERATURA debe estar entre 0 y 1 (HU-15).")
         if (self.APP_ENV == "production" and self.CORREO_MODO == "smtp"
