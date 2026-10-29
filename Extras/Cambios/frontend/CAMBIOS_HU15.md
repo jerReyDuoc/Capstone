@@ -24,6 +24,8 @@ Si el envío falla, el texto vuelve al cuadro para no perderlo y se explica el e
 
 Cada paso de un plan de acción tiene ahora un botón **"Explícame este paso"**. El botón envía una pregunta explícita sobre ese paso, para que el tutor no vuelva a escribir el plan completo. Las sugerencias del tutor aparecen bajo el título "Puedes preguntarme:", porque desde esta versión están redactadas como mensajes del usuario y no como preguntas hacia él. Las referencias normativas se muestran como "Fuente del control", porque ya no las escribe el modelo: son el framework y el artículo reales de la matriz de controles.
 
+**Scroll del panel (v1.1.1).** Con el tutor abierto se veían tres barras de desplazamiento: la de la página, la del diálogo y la de la conversación. Además, al llegar al final de la conversación la rueda seguía desplazando la página de atrás, hasta un espacio en blanco. Ahora mientras el panel está abierto la página no se desplaza, el diálogo nunca tiene barra propia (`overflow: hidden`) y la conversación y el historial usan `overscroll-behavior: contain`. Así queda una sola barra, la de la conversación, y el scroll no se escapa. Se verificó en Chromium a 1366×768.
+
 ## BFF
 
 La lista blanca del proxy del cliente (`lib/servidor/proxyCliente.ts`) suma las siete rutas de `/api/tutor`, y el handler `/bff/cliente/api/[...ruta]` ahora acepta `PATCH` y `DELETE`, con la misma verificación de mismo origen que los `POST`. Un `DELETE` responde 204 sin cuerpo. El envío de un mensaje tiene un tiempo máximo de 60 s, porque espera al LLM, y nunca se reintenta solo: cada intento gasta cuota.

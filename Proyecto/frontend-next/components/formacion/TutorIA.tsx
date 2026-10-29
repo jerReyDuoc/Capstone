@@ -92,6 +92,17 @@ function PanelTutor({ rutaId, onCerrar }: { rutaId: number | null; onCerrar: () 
   const idTitulo = useId();
   const idNivel = useId();
 
+  // Mientras el tutor está abierto la página de atrás no hace scroll ni muestra su barra.
+  // (Sin scrollbar-gutter: en Chrome achica el área del panel fijo y deja una franja vacía.)
+  useEffect(() => {
+    const html = document.documentElement;
+    const antes = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = antes;
+    };
+  }, []);
+
   useEffect(() => {
     // En desarrollo (StrictMode) el efecto corre dos veces: no reabrir un diálogo abierto
     if (ref.current && !ref.current.open) ref.current.showModal();

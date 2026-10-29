@@ -42,6 +42,10 @@
   background: var(--surface);
   color: var(--text);
   box-shadow: -24px 0 64px rgba(0, 0, 0, 0.45);
+  /* Solo hace scroll la conversación: el diálogo nunca (con zoom o escalado de Windows un
+     píxel de más le daba una barra propia) y el scroll no "se escapa" a la página de atrás. */
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 .panel::backdrop { background: rgba(2, 5, 4, 0.62); }
 .panel[open] { animation: entrar var(--dur) var(--ease); }
@@ -49,7 +53,7 @@
 @media (prefers-reduced-motion: reduce) { .panel[open] { animation: none; } }
 @media (min-width: 1440px) { .panel { width: 540px; } }
 
-.marco { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.marco { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 
 .cabeza {
   display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
@@ -101,6 +105,7 @@
   display: flex; flex-direction: column; gap: var(--sp-4);
   padding: var(--sp-5);
   scroll-behavior: smooth;
+  overscroll-behavior: contain; /* al llegar al final no arrastra la página de atrás */
 }
 @media (prefers-reduced-motion: reduce) { .log { scroll-behavior: auto; } }
 
@@ -222,7 +227,7 @@
 }
 .centro svg { color: var(--medio); }
 
-.historial { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-4) var(--sp-5); display: grid; align-content: start; gap: var(--sp-3); }
+.historial { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-4) var(--sp-5); display: grid; align-content: start; gap: var(--sp-3); }
 .historialNota { font-size: var(--fs-xs); color: var(--text-subtle); }
 .historial ul { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
 .historialFila {
