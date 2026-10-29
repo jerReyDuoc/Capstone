@@ -6,18 +6,33 @@
  *   preguntas iniciales F1–F7 → controles aplicables (uno por uno) → revisión → completar
  *                                                                        ↓
  *                                                  /panel?evaluacion=ID (resultados)
+ *
+ * HU-29: el mismo cuestionario responde la reevaluación de una empresa (/empresa/evaluacion/ID)
+ * con `base="/bff/cliente/api"`.
  */
 import Link from "next/link";
 import { AvisoError } from "@/components/inicio/AvisoError";
 import { Icon } from "@/components/ui/Icon";
 import { useCuestionario } from "@/hooks/useCuestionario";
+import { usarBaseCuestionario, type BaseCuestionario } from "@/lib/cuestionario/api";
 import { IndiceControles } from "./IndiceControles";
 import { PasoControl } from "./PasoControl";
 import { PasoFiltro } from "./PasoFiltro";
 import { RevisionFinal } from "./RevisionFinal";
 import s from "./cuestionario.module.css";
 
-export function Cuestionario({ evaluacionId, onLimites }: { evaluacionId: number; onLimites: () => void }) {
+export function Cuestionario({
+  evaluacionId,
+  onLimites,
+  base = "/bff/api",
+}: {
+  evaluacionId: number;
+  onLimites: () => void;
+  /** HU-29: "/bff/cliente/api" cuando responde una reevaluación el usuario definitivo. */
+  base?: BaseCuestionario;
+}) {
+  // Antes de los efectos del hook (que ya llaman a la API): un solo cuestionario por página
+  usarBaseCuestionario(base);
   const c = useCuestionario(evaluacionId);
   const { fase, progreso } = c;
 

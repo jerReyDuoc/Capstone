@@ -191,6 +191,8 @@ export interface ErrorEncuesta {
   campo?: string;
   /** HU-31: qué consentimiento falta o cambió ("contacto" | "migracion"). */
   consentimiento?: string;
+  /** HU-29: 409 EVALUACION_EN_CURSO trae la evaluación abierta para retomarla. */
+  evaluacionId?: number;
 }
 
 /**
@@ -211,6 +213,9 @@ export function parseErrorBackend(status: number, cuerpo: unknown, retryAfter?: 
     if (esTexto(detalle.campo, 40) && /^[a-z_]+$/.test(detalle.campo)) extra.campo = detalle.campo;
     if (detalle.consentimiento === "contacto" || detalle.consentimiento === "migracion") {
       extra.consentimiento = detalle.consentimiento;
+    }
+    if (Number.isInteger(detalle.evaluacion_id) && (detalle.evaluacion_id as number) > 0) {
+      extra.evaluacionId = detalle.evaluacion_id as number;
     }
   } else if (esTexto(detalle, 500)) {
     mensaje = detalle;

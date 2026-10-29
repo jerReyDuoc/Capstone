@@ -18,6 +18,8 @@ Condiciones para completar:
      una evidencia, porque es el LLM quien lo resuelve con ella (sin evidencia
      quedaría en 0 puntos sin que nadie lo revise).
 """
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,6 +123,8 @@ class CompletarEvaluacionUseCase:
         # El estado se fija antes de generar el resumen: GenerateResumenUseCase hace
         # el único commit, así resumen y estado quedan guardados juntos (o ninguno).
         evaluacion.estado_progreso = ESTADO_COMPLETADA
+        # HU-29: fecha del historial de la empresa y de su gráfico de evolución
+        evaluacion.fecha_completado = datetime.now(timezone.utc).replace(tzinfo=None)
         resumen = await GenerateResumenUseCase(self.session).execute(evaluacion_id)
         return {
             **resumen,

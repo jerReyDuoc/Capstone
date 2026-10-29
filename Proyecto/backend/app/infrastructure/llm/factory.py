@@ -100,3 +100,12 @@ def crear_storage_evidencias() -> ArchivoCifradoStorage:
             "print(Fernet.generate_key().decode())\""
         )
     return ArchivoCifradoStorage(LocalFileStorage(), CifradorDatos(settings.ENTITY_MAP_KEY, "evidencias"))
+
+
+def crear_storage_documentos() -> ArchivoCifradoStorage:
+    """HU-29: documentos generados de la empresa (informes PDF, borradores), cifrados en reposo."""
+    if not settings.ENTITY_MAP_KEY:
+        raise ClaveNoConfiguradaError(
+            "ENTITY_MAP_KEY no configurada: los documentos de la empresa se guardan cifrados (HU-29)."
+        )
+    return ArchivoCifradoStorage(LocalFileStorage(), CifradorDatos(settings.ENTITY_MAP_KEY, "documentos"))

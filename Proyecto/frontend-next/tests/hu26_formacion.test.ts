@@ -160,7 +160,8 @@ describe("BFF del cliente · rutas de HU-26 y HU-17", () => {
     expect(autorizarRutaCliente("GET", ["formacion", "modulos", "3", "verificacion"]).ok).toBe(false); // no se leen respuestas
     expect(autorizarRutaCliente("POST", ["formacion", "avance"]).ok).toBe(false);
     expect(autorizarRutaCliente("POST", ["formacion", "modulos", "3", "constancia"]).ok).toBe(false);
-    expect(autorizarRutaCliente("POST", ["respuestas", "40", "evidencias"]).ok).toBe(false); // el cuestionario migrado no se toca
+    // HU-29: la subida al cuestionario pasa (reevaluación); el backend la rechaza en una evaluación cerrada
+    expect(autorizarRutaCliente("POST", ["respuestas", "40", "evidencias", "x"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["remediacion", "evaluaciones", "12", "x"]).ok).toBe(false);
     expect(autorizarRutaCliente("POST", ["formacion", "modulos", "3", "lecciones", "2", "vista", "x"]).ok).toBe(false);
   });

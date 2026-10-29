@@ -7,6 +7,8 @@
  * - El informe PDF y la constancia (HU-26) pasan como binario, con su Content-Disposition.
  * - HU-17: la evidencia de remediación pasa como multipart (stream), con límite de tamaño.
  * - HU-15: el chat del tutor usa además PATCH (nivel) y DELETE (borrar conversación).
+ * - HU-29: reevaluación (cuestionario con la sesión del cliente) y "Mis documentos": descarga de
+ *   PDF, texto o DOCX según la regla, y DELETE de documentos, evidencias y constancias.
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -79,15 +81,17 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
   if (res.status === 204) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 
   if (permiso.binario) {
-    const tipo = res.headers.get("content-type") ?? "";
-    if (!tipo.startsWith("application/pdf")) {
-      return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un PDF." });
+    // HU-29: "Mis documentos" admite además texto (evidencias anonimizadas) y DOCX (borradores)
+    const tipo = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const admitidos: readonly string[] = permiso.tipos ?? ["application/pdf"];
+    if (!admitidos.includes(tipo)) {
+      return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un documento válido." });
     }
     const disposicion = res.headers.get("content-disposition");
     return new NextResponse(await res.arrayBuffer(), {
       status: 200,
       headers: {
-        "Content-Type": "application/pdf",
+        "Content-Type": tipo === "text/plain" ? "text/plain; charset=utf-8" : tipo,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),
@@ -103,4 +107,4 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
 export const GET = manejar;
 export const POST = manejar;
 export const PATCH = manejar; // HU-15: nivel de la conversación del tutor
-export const DELETE = manejar; // HU-15: borrar una conversación del tutor
+export const DELETE = manejar; // HU-15: conversación del tutor · HU-29: documentos

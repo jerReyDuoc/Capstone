@@ -473,6 +473,17 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("GET", "/api/cliente/empresa", "/api/cliente/empresa", {}),
     # HU-30: situación del contrato del cliente (roles en test_hu30_contrato.py)
     ("GET", "/api/cliente/contrato", "/api/cliente/contrato", {}),
+    # HU-29: Mis evaluaciones y Mis documentos (roles en test_hu29_historial_documentos.py)
+    ("GET", "/api/cliente/evaluaciones", "/api/cliente/evaluaciones", {}),
+    ("POST", "/api/cliente/evaluaciones", "/api/cliente/evaluaciones", {}),
+    ("GET", "/api/cliente/documentos", "/api/cliente/documentos", {}),
+    ("POST", "/api/cliente/documentos/informes", "/api/cliente/documentos/informes", {"json": {"evaluacion_id": 1}}),
+    ("GET", "/api/cliente/documentos/{documento_id}/descarga", "/api/cliente/documentos/1/descarga", {}),
+    ("DELETE", "/api/cliente/documentos/{documento_id}", "/api/cliente/documentos/1", {}),
+    ("GET", "/api/cliente/documentos/evidencias/{evidencia_id}/descarga",
+     "/api/cliente/documentos/evidencias/1/descarga", {}),
+    ("DELETE", "/api/cliente/documentos/evidencias/{evidencia_id}", "/api/cliente/documentos/evidencias/1", {}),
+    ("DELETE", "/api/cliente/documentos/constancias/{ruta_id}", "/api/cliente/documentos/constancias/1", {}),
     # HU-26: recorrido de módulos (solo cliente con servicio activo; roles en test_hu26_formacion.py)
     ("GET", "/api/formacion/avance", "/api/formacion/avance", {}),
     ("GET", "/api/formacion/modulos/{ruta_id}", "/api/formacion/modulos/1", {}),

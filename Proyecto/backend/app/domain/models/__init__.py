@@ -42,6 +42,8 @@ from app.domain.models.formacion import (
     LeccionFormativa,
     PreguntaVerificacion,
 )
+# HU-29: documentos generados de la empresa ("Mis documentos")
+from app.domain.models.documento_empresa import DocumentoEmpresa
 # HU-15: conversaciones del Agente IA Tutor
 from app.domain.models.tutor import (
     ConversacionTutor,
@@ -77,6 +79,7 @@ __all__ = [
     "TipoSolicitudARCOP",
     "EstadoSolicitudARCOP",
     "Empresa",
+    "DocumentoEmpresa",
     "UsuarioDefinitivo",
     "TokenActivacion",
     "EstadoUsuarioDefinitivo",

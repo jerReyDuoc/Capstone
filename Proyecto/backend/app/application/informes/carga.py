@@ -135,11 +135,15 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
         ))
 
     usuario = await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id) if evaluacion.usuario_temporal_id else None
-    rubro = await db.get(Rubro, usuario.rubro_id) if usuario and usuario.rubro_id else None
+    # HU-29: el rubro de la empresa cliente manda (la reevaluación no tiene usuario temporal)
+    from app.application.use_cases.historial_empresa import rubro_id_de_evaluacion
+
+    rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
+    rubro = await db.get(Rubro, rubro_id) if rubro_id else None
     bench = {}
-    if usuario and usuario.rubro_id:
+    if rubro_id:
         bench = {b.dominio_id: b for b in (await db.execute(
-            select(Benchmark).where(Benchmark.rubro_id == usuario.rubro_id)
+            select(Benchmark).where(Benchmark.rubro_id == rubro_id)
         )).scalars().all()}
     comparativa = [
         ComparativaDominio(

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion
+from app.core.autenticacion import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
@@ -15,7 +16,6 @@ from app.domain.models.dominio import Dominio
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.rubro import Rubro
 from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.usuario_temporal import UsuarioTemporal
 
 logger = logging.getLogger(__name__)
 
@@ -34,23 +34,30 @@ async def cerrar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_d
 
 @router.post(
     "/{evaluacion_id}/completar",
-    dependencies=[Depends(alcance_evaluacion)],
     responses={
         404: {"description": "Evaluación inexistente"},
         409: {"description": "Ya cerrada, filtro pendiente, cuestionario incompleto o evidencias en validación"},
     },
 )
-async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
+async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_db),
+                               actor: Actor | None = Depends(alcance_evaluacion)):
     """
     Cierre DEFINITIVO de la evaluación: exige el cuestionario completo y sin
     evidencias en validación, genera el resumen y marca `estado_progreso = completada`.
     Desde ahí no admite respuestas, cambios de filtro ni evidencias, y entra al
     benchmark. (`POST /cerrar` sigue siendo el recálculo/vista previa sin cerrar.)
+
+    HU-29: si la evaluación es de una empresa cliente, el cierre queda en la bitácora y su
+    informe PDF se archiva en "Mis documentos" (`documento_id`; null si no se pudo).
     """
     try:
         resultado = await CompletarEvaluacionUseCase(db).execute(evaluacion_id)
     except RespuestaRechazadaError as e:
         raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
+    if await db.scalar(select(Evaluacion.empresa_id).where(Evaluacion.id == evaluacion_id)) is not None:
+        from app.application.use_cases.documentos_empresa import tras_completar
+
+        resultado = {**resultado, "documento_id": await tras_completar(db, evaluacion_id, actor)}
     if settings.BENCHMARK_AL_COMPLETAR:
         await _recalcular_benchmark(db)
     return resultado
@@ -167,9 +174,10 @@ async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)
     if not evaluacion:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
-    usuario = (await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id)
-               if evaluacion.usuario_temporal_id else None)
-    rubro_id = usuario.rubro_id if usuario else None
+    # HU-29: el rubro de la empresa (la reevaluación no tiene usuario temporal)
+    from app.application.use_cases.historial_empresa import rubro_id_de_evaluacion
+
+    rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
 
     resumenes_result = await db.execute(
         select(Resumen, Dominio)

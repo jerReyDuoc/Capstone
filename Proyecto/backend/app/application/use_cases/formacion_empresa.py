@@ -42,7 +42,6 @@ from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance, LeccionFormativa, PreguntaVerificacion
-from app.domain.models.resumen import Resumen
 from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 
 
@@ -71,11 +70,13 @@ async def evaluacion_de_la_empresa(db: AsyncSession, empresa_id: int, evaluacion
         if ev is None or ev.empresa_id != empresa_id:
             raise FormacionError(404, "EVALUACION_NO_ENCONTRADA", "Evaluación no encontrada")
         return ev.id
-    fila = (await db.execute(
-        select(Evaluacion.id)
-        .where(Evaluacion.empresa_id == empresa_id, Evaluacion.id.in_(select(Resumen.evaluacion_id)))
-        .order_by(Evaluacion.fecha_migracion.desc(), Evaluacion.id.desc()).limit(1)
-    )).scalar_one_or_none()
+    # HU-29: la regla única de "la más reciente" (la completada de mayor id; una reevaluación
+    # en curso no reemplaza a la última terminada). Antes se ordenaba por fecha_migracion,
+    # que las reevaluaciones no tienen.
+    from app.application.use_cases.historial_empresa import evaluacion_mas_reciente
+
+    fila = (await evaluacion_mas_reciente(db, empresa_id)
+            or await evaluacion_mas_reciente(db, empresa_id, solo_completadas=False))
     if fila is None:
         raise FormacionError(404, "SIN_PLAN", "Tu empresa aún no tiene una evaluación con plan formativo.")
     return fila
@@ -336,6 +337,10 @@ class FormacionEmpresa:
                 AvanceFormativo.empresa_id == self.empresa.id, AvanceFormativo.ruta_formativa_id == ruta_id
             )
         )).scalar_one_or_none()
+        if a is not None and a.completado and a.fecha_eliminacion_constancia and not a.codigo_constancia:
+            # HU-29: la empresa la eliminó desde "Mis documentos" (el módulo sigue completado)
+            raise FormacionError(404, "CONSTANCIA_ELIMINADA",
+                                 "Eliminaste esta constancia desde Mis documentos; su código quedó anulado.")
         if a is None or not a.completado or not a.codigo_constancia:
             raise FormacionError(404, "CONSTANCIA_NO_DISPONIBLE",
                                  "La constancia se descarga cuando apruebas la actividad de verificación.")

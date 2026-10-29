@@ -11,7 +11,7 @@ from app.application.schemas.api_schemas import (
     EvaluacionResumenResponse,
     RespuestaResumenResponse,
 )
-from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
+from app.domain.models.evaluacion import ORIGEN_EMPRESA, ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.respuesta import Respuesta
 
 
@@ -42,13 +42,13 @@ async def list_evaluaciones(
     # solo las lista un admin; un encuestado ve solo la suya y un referente solo las de su
     # invitación. Sin token solo se llega aquí con EXIGIR_TOKEN_EVALUACIONES=false (dev).
     if actor is None:
-        filtro = Evaluacion.origen != ORIGEN_PUBLICA
+        filtro = Evaluacion.origen.not_in((ORIGEN_PUBLICA, ORIGEN_EMPRESA))
     elif actor.es_encuestado:
         filtro = Evaluacion.id == actor.id
     elif actor.rol == Rol.REFERENTE.value:
         filtro = (Evaluacion.usuario_temporal_id == actor.id) & (Evaluacion.origen != ORIGEN_PUBLICA)
     elif actor.es_cliente:
-        # HU-27: solo las evaluaciones migradas a su empresa
+        # HU-27: solo las evaluaciones de su empresa (migradas y, HU-29, sus reevaluaciones)
         empresa_id = await empresa_del_cliente(db, actor)
         filtro = (Evaluacion.empresa_id == empresa_id) if empresa_id is not None else (Evaluacion.id == -1)
     elif actor.es_admin:

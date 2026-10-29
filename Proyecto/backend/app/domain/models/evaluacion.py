@@ -11,7 +11,10 @@ ESTADOS_CERRADOS = frozenset({"completada", "cerrada"})
 # HU-19: de dónde viene la evaluación. Solo el backend la fija; el frontend nunca la envía.
 ORIGEN_INVITACION = "invitacion"
 ORIGEN_PUBLICA = "publica"
-ORIGENES = frozenset({ORIGEN_INVITACION, ORIGEN_PUBLICA})
+# HU-29: reevaluación que el usuario definitivo inicia desde la cuenta de su empresa. Nace
+# con empresa_id y SIN usuario temporal (no hay encuestado anónimo ni clave de acceso).
+ORIGEN_EMPRESA = "empresa"
+ORIGENES = frozenset({ORIGEN_INVITACION, ORIGEN_PUBLICA, ORIGEN_EMPRESA})
 
 
 class Evaluacion(Base):
@@ -49,6 +52,9 @@ class Evaluacion(Base):
         "empresa_id", Integer, ForeignKey("empresa.id"), nullable=True, index=True
     )
     fecha_migracion: Mapped[datetime | None] = mapped_column("fecha_migracion", DateTime, nullable=True)
+    # HU-29: cuándo se completó (UTC). La fija POST /completar; las anteriores a HU-29 quedan
+    # NULL y el historial usa fecha_inicio como fecha de referencia.
+    fecha_completado: Mapped[datetime | None] = mapped_column("fecha_completado", DateTime, nullable=True)
 
     respuestas: Mapped[list["Respuesta"]] = relationship(
         back_populates="evaluacion",
@@ -58,3 +64,8 @@ class Evaluacion(Base):
     @property
     def esta_cerrada(self) -> bool:
         return self.estado_progreso in ESTADOS_CERRADOS
+
+    @property
+    def es_de_empresa(self) -> bool:
+        """HU-29: la inició el usuario definitivo desde la cuenta (no viene del autodiagnóstico)."""
+        return self.origen == ORIGEN_EMPRESA

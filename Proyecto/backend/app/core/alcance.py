@@ -11,6 +11,8 @@ HU-20: las respuestas, evidencias y reportes de una organización solo los ven e
   | referente (sub = usuario id) | ninguna (404)              | solo las suyas (otra -> 404)       |
   | cliente (HU-27, sub = id del | solo las MIGRADAS a su     | solo las MIGRADAS a su empresa     |
   |   usuario definitivo)        | empresa (otra -> 404)      | (otra -> 404)                      |
+  |                              | HU-29: y sus reevaluaciones (origen 'empresa'), que nacen   |
+  |                              | con empresa_id; sin token -> 401 siempre                    |
   | sin token                    | 401                        | 401 (EXIGIR_TOKEN_EVALUACIONES,    |
   |                              |                            | true por defecto; false solo dev)  |
 
@@ -31,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
-from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
+from app.domain.models.evaluacion import ORIGEN_EMPRESA, ORIGEN_PUBLICA, Evaluacion
 
 _bearer_opcional = HTTPBearer(auto_error=False)
 
@@ -117,8 +119,9 @@ async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id
         if origen == ORIGEN_PUBLICA or usuario_temporal_id != actor.id:
             raise _NO_ENCONTRADA
         return
-    # sin token
-    if origen == ORIGEN_PUBLICA or settings.EXIGIR_TOKEN_EVALUACIONES:
+    # sin token. HU-29: la reevaluación de una empresa exige SIEMPRE la sesión del cliente,
+    # también con EXIGIR_TOKEN_EVALUACIONES=false (es del servicio pagado, como la pública).
+    if origen in (ORIGEN_PUBLICA, ORIGEN_EMPRESA) or settings.EXIGIR_TOKEN_EVALUACIONES:
         raise _exige_token()
 
 

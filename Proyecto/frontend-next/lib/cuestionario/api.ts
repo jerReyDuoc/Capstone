@@ -1,6 +1,10 @@
 /**
  * HU-01 / HU-02 · Llamadas del cuestionario. Todas pasan por el BFF (/bff/api/*): el
  * navegador nunca ve el token y el proxy solo deja pasar la evaluación de la sesión.
+ *
+ * HU-29: el usuario definitivo responde sus reevaluaciones con el mismo cuestionario, pero
+ * por su BFF (/bff/cliente/api/*). <Cuestionario base="/bff/cliente/api"> fija la base con
+ * usarBaseCuestionario() antes de montar sus hijos (hay un solo cuestionario por página).
  * Los errores llegan como ErrorBff con { codigo, mensaje } (ver lib/encuesta/errores.ts).
  */
 import { pedir } from "@/lib/encuesta/cliente";
@@ -16,7 +20,16 @@ import type {
 } from "./modelo";
 import { normalizarJustificacion } from "./modelo";
 
-const base = (id: number) => `/bff/api/evaluaciones/${id}`;
+export type BaseCuestionario = "/bff/api" | "/bff/cliente/api";
+let BASE: BaseCuestionario = "/bff/api";
+
+export function usarBaseCuestionario(base: BaseCuestionario): void {
+  BASE = base;
+}
+
+export const baseCuestionario = (): BaseCuestionario => BASE;
+
+const base = (id: number) => `${BASE}/evaluaciones/${id}`;
 
 export const obtenerFiltro = (id: number) => pedir<EstadoFiltroApi>(`${base(id)}/filtro`);
 
@@ -34,7 +47,7 @@ export const guardarRespuesta = (
   estado: EstadoDeclarado,
   justificacion: string,
 ) =>
-  pedir<RespuestaGuardadaApi>("/bff/api/respuestas", {
+  pedir<RespuestaGuardadaApi>(`${BASE}/respuestas`, {
     method: "POST",
     json: {
       evaluacion_id: evaluacionId,
@@ -44,18 +57,18 @@ export const guardarRespuesta = (
     },
   });
 
-export const obtenerRespuesta = (idRespuesta: number) => pedir<RespuestaDetalleApi>(`/bff/api/respuestas/${idRespuesta}`);
+export const obtenerRespuesta = (idRespuesta: number) => pedir<RespuestaDetalleApi>(`${BASE}/respuestas/${idRespuesta}`);
 
 export function subirEvidencia(idRespuesta: number, archivo: File) {
   const datos = new FormData();
   datos.append("file", archivo, archivo.name);
   return pedir<{ id_evidencia: number; nombre_archivo: string; estado_validacion: string; mensaje: string }>(
-    `/bff/api/respuestas/${idRespuesta}/evidencias`,
+    `${BASE}/respuestas/${idRespuesta}/evidencias`,
     { method: "POST", body: datos },
   );
 }
 
-export const obtenerEvidencia = (idEvidencia: number) => pedir<EvidenciaApi>(`/bff/api/evidencias/${idEvidencia}`);
+export const obtenerEvidencia = (idEvidencia: number) => pedir<EvidenciaApi>(`${BASE}/evidencias/${idEvidencia}`);
 
 export const completarEvaluacion = (id: number) =>
   pedir<{ estado_progreso: string; controles_aplicables: number }>(`${base(id)}/completar`, { method: "POST" });

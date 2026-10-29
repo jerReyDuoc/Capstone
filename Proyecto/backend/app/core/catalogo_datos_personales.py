@@ -174,7 +174,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     "evaluacion": {
         **_sin_dp("id", "fecha_inicio", "estado_progreso", "Usuario_temporal_id",
                   "filtro_completado", "fecha_filtro", "origen", "es_prueba",
-                  "empresa_id", "fecha_migracion"),  # HU-27
+                  "empresa_id", "fecha_migracion",  # HU-27
+                  "fecha_completado"),  # HU-29
         "clave_acceso_hash": Dato(
             CREDENCIAL, HASH,
             finalidad="Que el encuestado anónimo retome su evaluación y ejerza sus derechos",
@@ -199,7 +200,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                   "fecha_subida", "fecha_procesada", "Respuestas_id_respuesta",
                   # HU-17: remediación (estados de la matriz y origen de la evidencia)
                   "origen", "estado_declarado", "estado_previo", "estado_resultante",
-                  "puntaje_previo", "puntaje_resultante"),
+                  "puntaje_previo", "puntaje_resultante",
+                  "fecha_eliminacion"),  # HU-29: el archivo se borró desde "Mis documentos"
         # HU-17: palabras del CATÁLOGO del control encontradas en el texto (no copia el texto)
         "terminos_control": Dato(SIN_DP, escaneo="pii"),
         "justificacion_remediacion": Dato(
@@ -430,9 +432,22 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         "lecciones_vistas": Dato(SIN_DP, escaneo="pii"),  # lista de números de lección
         **_sin_dp("id", "empresa_id", "ruta_formativa_id", "evaluacion_id", "estado",
                   "intentos", "ultimo_puntaje", "mejor_puntaje", "fecha_inicio", "fecha_ultima_actividad",
-                  "fecha_completado", "codigo_constancia"),
+                  "fecha_completado", "codigo_constancia",
+                  "fecha_eliminacion_constancia"),  # HU-29
         "usuario_definitivo_id": Dato(
             METADATO, finalidad="Saber quién registró el avance de la empresa (constancia, HU-26)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    # ------------------------------------------------------------ HU-29: "Mis documentos"
+    # Archivos que el sistema genera para la empresa (informes PDF, borradores HU-16). El
+    # nombre lo arma el sistema; el archivo está cifrado en STORAGE_DIR (nombre UUID).
+    "documento_empresa": {
+        **_sin_dp("id", "empresa_id", "evaluacion_id", "tipo", "storage_path", "mime_type",
+                  "tamano_bytes", "hash_contenido", "fecha_creacion"),
+        "nombre": Dato(SIN_DP, escaneo="pii"),
+        "creado_por_usuario_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa generó el documento (HU-29)",
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },

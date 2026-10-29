@@ -220,6 +220,12 @@ class Settings(BaseSettings):
     # reglas de retención (HU-25). 0 = sin plazo de gracia. Valor provisorio hasta que lo fije el PO.
     CONTRATO_GRACIA_DIAS: int = 30
 
+    # ------------------------------------------------ HU-29: "Mis documentos"
+    # Informes PDF archivados por evaluación (cada uno es una foto del informe al generarlo).
+    DOCUMENTOS_INFORMES_POR_EVALUACION: int = 5
+    # Al completar una reevaluación de la empresa se archiva su informe PDF automáticamente.
+    DOCUMENTOS_ARCHIVAR_AL_COMPLETAR: bool = True
+
     # ------------------------------------------------ HU-15: Agente IA Tutor
     # Mensajes al tutor por empresa y día (se reinicia a medianoche de ZONA_HORARIA_CUOTAS).
     # Cada mensaje es una llamada al LLM. 0 = sin límite. Decisión del PO (28-oct): 60.
@@ -330,9 +336,10 @@ class Settings(BaseSettings):
             raise ValueError("RECUPERACION_URL_BASE debe usar https:// con APP_ENV=production (HU-28).")
         if not 0 < self.FORMACION_UMBRAL_APROBACION <= 100:
             raise ValueError("FORMACION_UMBRAL_APROBACION debe estar entre 1 y 100 (HU-26).")
-        for nombre in ("FORMACION_INTENTOS_DIA", "EVIDENCIA_MAX_MB", "REMEDIACION_EVIDENCIAS_DIA"):
+        for nombre in ("FORMACION_INTENTOS_DIA", "EVIDENCIA_MAX_MB", "REMEDIACION_EVIDENCIAS_DIA",
+                       "DOCUMENTOS_INFORMES_POR_EVALUACION"):
             if getattr(self, nombre) < 1:
-                raise ValueError(f"{nombre} debe ser mayor que 0 (HU-26/HU-17).")
+                raise ValueError(f"{nombre} debe ser mayor que 0 (HU-26/HU-17/HU-29).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

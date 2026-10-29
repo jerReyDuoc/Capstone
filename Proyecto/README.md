@@ -713,6 +713,13 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/admin/bitacora/verificacion` | 🛡️ | HU-18: recalcula la cadena de hashes de la bitácora; devuelve si está íntegra, la primera falla y el último hash (ancla) |
 | GET | `/api/cliente/empresa` | 🏢 | HU-28: espacio del cliente: su empresa, contrato y evaluaciones migradas (HU-30: 403 `CONTRATO_NO_VIGENTE` sin contrato vigente) |
 | GET | `/api/cliente/contrato` | 🏢 | HU-30: situación del contrato, documentos que aún puede descargar y acceso a ARCOP (responde siempre) |
+| GET | `/api/cliente/evaluaciones` | 🏢 | HU-29: "Mis evaluaciones": historial (migradas y reevaluaciones) con fecha, estado, puntaje global, nivel y evolución global y por dimensión; `puede_reevaluar`. Responde también sin contrato vigente |
+| POST | `/api/cliente/evaluaciones` | 🏢 | HU-29: inicia una reevaluación de la empresa (origen `empresa`, sin usuario temporal) → 201 `{evaluacion_id}`; 409 `EVALUACION_EN_CURSO` (trae `evaluacion_id`); 403 `CONTRATO_NO_VIGENTE`. Se responde con las rutas de siempre del cuestionario |
+| GET | `/api/cliente/documentos` | 🏢 | HU-29: "Mis documentos": informes PDF, borradores (HU-16), evidencias y constancias (con contrato vigente, suspendido o en plazo de gracia) |
+| POST | `/api/cliente/documentos/informes` | 🏢 | HU-29: `{evaluacion_id}` → 201; archiva el informe PDF de una evaluación completada (409 `EVALUACION_NO_COMPLETADA`, `LIMITE_INFORMES`) |
+| GET / DELETE | `/api/cliente/documentos/{id}/descarga` · `/api/cliente/documentos/{id}` | 🏢 | HU-29: descargar o eliminar un informe o borrador (204; queda en la bitácora) |
+| GET / DELETE | `/api/cliente/documentos/evidencias/{id}/descarga` · `/api/cliente/documentos/evidencias/{id}` | 🏢 | HU-29: texto anonimizado de la evidencia; eliminar borra el archivo y conserva la clasificación y los puntajes (409 `EVIDENCIA_EN_PROCESO`) |
+| DELETE | `/api/cliente/documentos/constancias/{ruta_id}` | 🏢 | HU-29: anula la constancia del módulo (el módulo sigue completado) |
 | GET | `/api/formacion/avance?evaluacion_id=` | 🏢 | HU-26: avance de la empresa por módulo, dimensión y nivel; brechas con la formación hecha |
 | GET | `/api/formacion/modulos/{ruta_id}` | 🏢 | HU-26: lecciones, material de apoyo y actividad de verificación (sin las respuestas correctas) |
 | POST | `/api/formacion/modulos/{ruta_id}/lecciones/{orden}/vista` | 🏢 | HU-26: marca la lección como vista (el primer llamado inicia el módulo) |
@@ -820,7 +827,8 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | Ruta | Para quién | Contenido |
 |---|---|---|
 | `/ingresar` | Usuario definitivo de una empresa cliente | Inicio de sesión; con sesión vigente lleva directo a `/empresa` |
-| `/empresa` | Usuario definitivo | Espacio de su empresa: contrato y evaluaciones migradas, cada una con **Ver resultados** (abre `/panel` en modo cliente, por `/bff/cliente/api/*`) y **Cerrar sesión**. HU-29 agrega cursos y tutor IA |
+| `/empresa` | Usuario definitivo | Espacio de su empresa: contrato, **Mis evaluaciones** (HU-29: historial con gráfico de evolución global y por dimensión, **Nueva evaluación** y **Guardar informe**; cada una con **Ver resultados** en `/panel` modo cliente) y **Mis documentos** (informes, borradores, evidencias y constancias con descarga y eliminación) |
+| `/empresa/evaluacion/[id]` | Usuario definitivo | HU-29: responde la reevaluación con el cuestionario de siempre, por `/bff/cliente/api/*` |
 | `/panel/capacitacion` (modo cliente) | Usuario definitivo | HU-26: avance de la empresa (por dimensión y nivel) y, en cada módulo, su estado y la acción Empezar / Continuar / Constancia |
 | `/panel/capacitacion/[ruta]` | Usuario definitivo | HU-26: recorrido del módulo (lecciones, material, actividad de verificación y constancia) |
 | `/panel/remediacion` | Usuario definitivo | HU-17: cerrar brechas subiendo evidencia; el puntaje y el radar se actualizan si el control mejora |

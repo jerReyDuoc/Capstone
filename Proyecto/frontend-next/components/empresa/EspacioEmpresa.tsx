@@ -3,15 +3,15 @@
 /**
  * HU-28 criterio 2 · Espacio de la empresa del usuario definitivo (puerta de entrada tras el login).
  *
- * Muestra su empresa, el contrato y las evaluaciones migradas desde el autodiagnóstico. Cada
- * evaluación se abre en el panel de resultados (/panel en modo "cliente", que lee por
- * /bff/cliente/api). HU-29 agrega aquí los cursos y el tutor IA.
+ * Muestra su empresa y el contrato. HU-29: "Mis evaluaciones" (historial con gráfico de
+ * evolución global y por dimensión, y reevaluación desde la cuenta) y "Mis documentos"
+ * (informes PDF, borradores, evidencias y constancias, con descarga y eliminación). Cada
+ * evaluación se abre en el panel de resultados (/panel en modo "cliente", por /bff/cliente/api).
  *
  * HU-30: sin contrato vigente el backend responde 403 CONTRATO_NO_VIGENTE en este espacio.
  * Entonces se muestra la situación del contrato (GET /api/cliente/contrato) con lo que sigue
- * disponible: los resultados e informes (gratuitos) y, durante el plazo de gracia, las constancias.
+ * disponible: el historial y los resultados (gratuitos) y, durante el plazo de gracia, Mis documentos.
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
@@ -21,8 +21,8 @@ import {
   cargarContratoCliente, cargarEspacioEmpresa, diasParaTermino, fechaCorta, SIN_SERVICIO,
   type ContratoClienteApi, type EspacioEmpresaApi,
 } from "@/lib/empresa";
-import { descargarBlob } from "@/lib/exportar";
-import { descargarConstancia } from "@/lib/formacion";
+import { MisDocumentos } from "./MisDocumentos";
+import { MisEvaluaciones } from "./MisEvaluaciones";
 import s from "@/components/admin/admin.module.css";
 
 type Estado =
@@ -34,6 +34,7 @@ type Estado =
 export function EspacioEmpresa() {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
+  const [recargaDocumentos, setRecargaDocumentos] = useState(0);
 
   useEffect(() => {
     cargarEspacioEmpresa()
@@ -87,8 +88,8 @@ export function EspacioEmpresa() {
             <div>
               <h1 className="page-title">Hola, {datos.usuario.nombre.split(" ")[0]}</h1>
               <p className="page-sub">
-                Este es el espacio de <strong>{datos.empresa.razon_social}</strong> en ComplianceAI. Aquí está el
-                historial de su autodiagnóstico y, pronto, los cursos y el tutor IA del servicio contratado.
+                Este es el espacio de <strong>{datos.empresa.razon_social}</strong> en ComplianceAI: el historial de
+                sus evaluaciones y cómo evoluciona su madurez, las reevaluaciones y los documentos de cumplimiento.
               </p>
             </div>
 
@@ -100,54 +101,9 @@ export function EspacioEmpresa() {
               </p>
             ) : null}
 
-            <section className="card" aria-labelledby="titulo-evaluaciones">
-              <div className="card-head">
-                <div>
-                  <h2 id="titulo-evaluaciones" className="card-title">Evaluaciones de tu empresa</h2>
-                  <p className="card-sub">
-                    Las que se traspasaron desde el autodiagnóstico, con sus resultados, brechas, plan formativo e
-                    informe PDF.
-                  </p>
-                </div>
-              </div>
-              {!datos.evaluaciones.length ? (
-                <p className={s.vacio}>Tu empresa aún no tiene evaluaciones asociadas. Therion Labs las traspasará pronto.</p>
-              ) : (
-                <div className="table-wrap">
-                  <table className="table">
-                    <caption className="sr-only">Evaluaciones de la empresa</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Evaluación</th>
-                        <th scope="col">Estado</th>
-                        <th scope="col">Puntaje general</th>
-                        <th scope="col">Traspasada</th>
-                        <th scope="col"><span className="sr-only">Acciones</span></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {datos.evaluaciones.map((ev) => (
-                        <tr key={ev.id}>
-                          <td>N.º {ev.id}<span className={s.sub}>Iniciada {fechaCorta(ev.fecha_inicio)}</span></td>
-                          <td>
-                            <span className={`badge tone-${ev.completada ? "ok" : "medio"}`}>
-                              {ev.completada ? "Completada" : "En curso"}
-                            </span>
-                          </td>
-                          <td>{ev.puntaje_general != null ? `${ev.puntaje_general} / 100` : "—"}</td>
-                          <td>{fechaCorta(ev.fecha_migracion)}</td>
-                          <td>
-                            <Link className="btn btn-primary btn-sm" href={`/panel?evaluacion=${ev.id}`} prefetch={false}>
-                              Ver resultados
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+            {/* HU-29: historial con su evolución y reevaluación, y los documentos de la empresa */}
+            <MisEvaluaciones onDocumentoGuardado={() => setRecargaDocumentos((n) => n + 1)} />
+            <MisDocumentos recarga={recargaDocumentos} />
 
             <section className="card" aria-labelledby="titulo-contrato">
               <div className="card-head">
@@ -178,9 +134,7 @@ export function EspacioEmpresa() {
 
 /** HU-30 · Lo que ve el usuario cuando el servicio pagado de su empresa no está activo. */
 function SinServicio({ datos }: { datos: ContratoClienteApi }) {
-  const [aviso, setAviso] = useState("");
-  const [bajando, setBajando] = useState<number | null>(null);
-  const { contrato, documentos } = datos;
+  const { contrato } = datos;
 
   return (
     <>
@@ -189,73 +143,9 @@ function SinServicio({ datos }: { datos: ContratoClienteApi }) {
         <p className="callout" role="status">{contrato.mensaje}</p>
       </div>
 
-      <section className="card" aria-labelledby="titulo-gratis">
-        <div className="card-head">
-          <div>
-            <h2 id="titulo-gratis" className="card-title">Resultados de tus evaluaciones</h2>
-            <p className="card-sub">Los resultados, el informe PDF y el plan formativo siguen disponibles.</p>
-          </div>
-        </div>
-        {!documentos.evaluaciones.length ? (
-          <p className={s.vacio}>Tu empresa no tiene evaluaciones asociadas.</p>
-        ) : (
-          <ul style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 0, listStyle: "none" }}>
-            {documentos.evaluaciones.map((ev) => (
-              <li key={ev.id}>
-                <Link className="btn btn-sm" href={`/panel?evaluacion=${ev.id}`} prefetch={false}>
-                  Ver resultados de la evaluación N.º {ev.id}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {contrato.documentos_disponibles ? (
-        <section className="card" aria-labelledby="titulo-documentos">
-          <div className="card-head">
-            <div>
-              <h2 id="titulo-documentos" className="card-title">Tus documentos</h2>
-              <p className="card-sub">
-                {contrato.documentos_disponibles_hasta
-                  ? `Puedes descargarlos hasta el ${fechaCorta(contrato.documentos_disponibles_hasta)}.`
-                  : "Puedes descargarlos mientras se resuelve la situación del contrato."}
-              </p>
-            </div>
-          </div>
-          {!documentos.constancias.length ? (
-            <p className={s.vacio}>No hay constancias de módulos completados.</p>
-          ) : (
-            <ul style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 0, listStyle: "none" }}>
-              {documentos.constancias.map((k) => (
-                <li key={k.ruta_id}>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={bajando !== null}
-                    aria-busy={bajando === k.ruta_id}
-                    onClick={async () => {
-                      setBajando(k.ruta_id);
-                      try {
-                        const { blob, nombre } = await descargarConstancia(k.ruta_id);
-                        descargarBlob(blob, nombre);
-                        setAviso(`Descargamos ${nombre}.`);
-                      } catch {
-                        setAviso("No pudimos descargar la constancia. Inténtalo de nuevo.");
-                      } finally {
-                        setBajando(null);
-                      }
-                    }}
-                  >
-                    Constancia: {k.modulo} ({fechaCorta(k.fecha_completado)})
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="sr-only" role="status" aria-live="polite">{aviso}</p>
-        </section>
-      ) : null}
+      {/* HU-29: los resultados son gratuitos (el historial se ve igual); reevaluar exige el servicio */}
+      <MisEvaluaciones />
+      {contrato.documentos_disponibles ? <MisDocumentos /> : null}
 
       <p className="card-sub">
         Tus derechos sobre tus datos personales (acceso, rectificación, supresión, oposición, portabilidad y

@@ -105,6 +105,12 @@ class AvanceFormativo(Base):
     fecha_completado: Mapped[datetime | None] = mapped_column("fecha_completado", DateTime, nullable=True)
     # Código aleatorio impreso en la constancia (CF-XXXX-XXXX); único.
     codigo_constancia: Mapped[str | None] = mapped_column("codigo_constancia", String(20), nullable=True, unique=True)
+    # HU-29: el usuario eliminó la constancia desde "Mis documentos". El módulo sigue
+    # completado (el avance no se pierde), pero el código queda anulado (NULL) y la
+    # constancia ya no se descarga.
+    fecha_eliminacion_constancia: Mapped[datetime | None] = mapped_column(
+        "fecha_eliminacion_constancia", DateTime, nullable=True
+    )
 
     @property
     def completado(self) -> bool:

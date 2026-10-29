@@ -55,9 +55,12 @@ describe("proxy del cliente · lista blanca", () => {
   });
 
   it("no deja reescribir el historial migrado ni llegar a lo de Therion Labs", () => {
-    expect(autorizarRutaCliente("POST", ["respuestas"]).ok).toBe(false);
-    expect(autorizarRutaCliente("POST", ["evaluaciones", "12", "completar"]).ok).toBe(false);
-    expect(autorizarRutaCliente("POST", ["evaluaciones", "12", "filtro"]).ok).toBe(false);
+    // HU-29: POST respuestas, /filtro y /completar ahora pasan (reevaluación con la sesión del
+    // cliente); el historial migrado está completado y el backend rechaza cambios (409).
+    // Siguen fuera: editar con PUT, recalcular con /cerrar y borrar evaluaciones.
+    expect(autorizarRutaCliente("PUT", ["respuestas", "40"]).ok).toBe(false);
+    expect(autorizarRutaCliente("POST", ["evaluaciones", "12", "cerrar"]).ok).toBe(false);
+    expect(autorizarRutaCliente("PATCH", ["evaluaciones", "12", "prueba"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["admin", "empresas"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["arcop", "solicitudes"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["ia", "metricas"]).ok).toBe(false);

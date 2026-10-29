@@ -66,6 +66,12 @@ class Accion:
     # HU-18: gobernanza del agente
     TUTOR_SALIDA_BLOQUEADA = "tutor.salida_bloqueada"      # la respuesta filtró el system prompt
     TUTOR_ADVERTENCIA_ABUSO = "tutor.advertencia_abuso"    # bloqueos reiterados de la misma empresa
+    # HU-29: historial, reevaluación y "Mis documentos" del usuario definitivo
+    EVALUACION_REEVALUACION_INICIADA = "evaluacion.reevaluacion_iniciada"
+    EVALUACION_COMPLETADA_EMPRESA = "evaluacion.completada_empresa"   # reevaluación completada
+    DOCUMENTO_GENERADO = "documento.generado"      # informe PDF archivado (o borrador HU-16)
+    DOCUMENTO_DESCARGADO = "documento.descargado"  # informe, borrador o evidencia
+    DOCUMENTO_ELIMINADO = "documento.eliminado"    # informe, borrador, evidencia o constancia
 
 
 # Claves que nunca pueden ir en `detalle` (datos personales o secretos).

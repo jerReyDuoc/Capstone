@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
-from sqlalchemy import Integer, String, Text, Float, Date, ForeignKey, JSON
+from sqlalchemy import Integer, String, Text, Float, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -52,9 +52,18 @@ class Evidencia(Base):
     puntaje_previo: Mapped[float | None] = mapped_column("puntaje_previo", Float, nullable=True)
     puntaje_resultante: Mapped[float | None] = mapped_column("puntaje_resultante", Float, nullable=True)
 
+    # HU-29: el usuario definitivo eliminó el archivo desde "Mis documentos". Se borra el
+    # archivo del disco y lo que se extrajo de él; quedan los metadatos de la validación
+    # (clasificación, estados y puntajes) para que el historial de madurez siga explicable.
+    fecha_eliminacion: Mapped[datetime | None] = mapped_column("fecha_eliminacion", DateTime, nullable=True)
+
     @property
     def es_remediacion(self) -> bool:
         return self.origen == ORIGEN_REMEDIACION
+
+    @property
+    def eliminada(self) -> bool:
+        return self.fecha_eliminacion is not None
 
     respuesta_id: Mapped[int] = mapped_column(
         "Respuestas_id_respuesta", Integer,
