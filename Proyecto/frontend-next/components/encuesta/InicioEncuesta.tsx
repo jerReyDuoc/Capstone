@@ -36,15 +36,9 @@ export function InicioEncuesta() {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {/* Una sola línea con la evaluación, el guardado y los límites del día (el aviso completo
-          aparece solo si se agotan): así el cuestionario empieza más arriba en pantallas bajas. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", alignItems: "center" }}>
-        <span className="badge tone-info">Evaluación N.º {estado.evaluacionId}</span>
-        <span className="card-sub" style={{ margin: 0 }}>Tu avance se guarda solo; puedes retomar con tu número y tu clave.</span>
-        <div style={{ flex: "1 1 320px", display: "flex", justifyContent: "flex-end" }}>
-          <BannerLimites limites={limites} compacto />
-        </div>
-      </div>
+      {/* Correcciones 29-10: sin número de evaluación, aviso de guardado ni saldo diario (el número
+          y la clave ya se entregaron al iniciar). Solo aparece un aviso si se agota la cuota. */}
+      <BannerLimites limites={limites} />
 
       <Cuestionario evaluacionId={estado.evaluacionId} onLimites={() => void refrescar()} />
 

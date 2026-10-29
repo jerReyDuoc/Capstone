@@ -24,10 +24,10 @@ export function MatrizPriorizacion({ brechas }: { brechas: BrechaVista[] }) {
     <section className="card" aria-labelledby="matriz-titulo" style={{ display: "grid", gap: 12, alignContent: "start" }}>
       <div>
         <h2 className="card-title" id="matriz-titulo">Cómo se prioriza</h2>
-        <p className="card-sub">Impacto del control según el catálogo × qué tan incumplido está</p>
+        <p className="card-sub">Impacto de cada brecha × qué tan incumplida está</p>
       </div>
       <table className="matriz">
-        <caption className="sr-only">Brechas por impacto del control y estado de cumplimiento, con la severidad resultante</caption>
+        <caption className="sr-only">Brechas por impacto y estado de cumplimiento, con la severidad resultante</caption>
         <thead>
           <tr>
             <td aria-hidden="true" style={{ border: 0, background: "transparent" }} />

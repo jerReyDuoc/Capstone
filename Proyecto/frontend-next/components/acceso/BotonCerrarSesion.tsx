@@ -5,11 +5,20 @@
  * El BFF revoca la sesión en el servidor y borra la cookie; luego se vuelve al login.
  */
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { LOGIN_DE, type TipoCuenta } from "@/lib/acceso";
 import { pedir } from "@/lib/encuesta/cliente";
 
-export function BotonCerrarSesion({ tipo, className = "btn btn-ghost btn-sm" }: { tipo: TipoCuenta; className?: string }) {
+export function BotonCerrarSesion({
+  tipo,
+  className = "btn btn-ghost btn-sm",
+  icono,
+}: {
+  tipo: TipoCuenta;
+  className?: string;
+  /** Correcciones 29-10: en la barra lateral se muestra como un ítem más (ícono + etiqueta). */
+  icono?: ReactNode;
+}) {
   const router = useRouter();
   const [saliendo, setSaliendo] = useState(false);
 
@@ -22,8 +31,9 @@ export function BotonCerrarSesion({ tipo, className = "btn btn-ghost btn-sm" }: 
   }
 
   return (
-    <button type="button" className={className} onClick={salir} disabled={saliendo}>
-      {saliendo ? "Cerrando sesión…" : "Cerrar sesión"}
+    <button type="button" className={className} onClick={salir} disabled={saliendo} data-label="Cerrar sesión">
+      {icono}
+      {icono ? <span className="nav-label">{saliendo ? "Cerrando sesión…" : "Cerrar sesión"}</span> : saliendo ? "Cerrando sesión…" : "Cerrar sesión"}
     </button>
   );
 }

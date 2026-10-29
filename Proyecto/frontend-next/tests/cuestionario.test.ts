@@ -187,10 +187,11 @@ describe("BFF · el cuestionario solo usa rutas permitidas", () => {
 });
 
 describe("errores del cuestionario", () => {
-  it("usa el detalle del backend cuando dice qué controles faltan", () => {
+  it("no muestra al usuario los códigos internos que trae el detalle del backend", () => {
     const m = mensajeDeError({ codigo: "CUESTIONARIO_INCOMPLETO", mensaje: "Faltan 2 de 28 controles por responder: DAT-001, GOB-003" });
-    expect(m.titulo).toMatch(/quedan controles/);
-    expect(m.detalle).toMatch(/DAT-001/);
+    expect(m.titulo).toMatch(/quedan preguntas/);
+    expect(m.detalle).not.toMatch(/DAT-001|GOB-003/);
+    expect(`${m.titulo} ${m.detalle}`).not.toMatch(/control/i);
   });
 
   it("prompt injection en la justificación tiene un mensaje propio", () => {

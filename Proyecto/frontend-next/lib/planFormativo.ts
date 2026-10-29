@@ -70,14 +70,14 @@ export function planACsv(plan: PlanFormativoApi, separador = ";"): string {
   const titulos = [
     "Dimensión", "Nivel asignado a la dimensión", "Puntaje dimensión", "Módulo", "Nivel del módulo",
     "Prioridad", "Motivo", "Horas", "Modalidad", "Público objetivo", "Objetivo", "Objetivos específicos",
-    "Brechas que cubre",
+    "Brechas que cubre (prioridad)",
   ];
   const filas = plan.dimensiones.flatMap((d) =>
     d.modulos.map((m) => [
       d.dominio, d.nivel_asignado, d.puntaje, m.ruta.nombre, m.nivel, PRIORIDAD_TEXTO[m.prioridad],
       m.motivo === "brechas" ? "Activado por brechas" : "Base del nivel asignado", m.ruta.horas,
       m.ruta.modalidad, m.ruta.publico_objetivo, m.ruta.objetivo, m.ruta.objetivos_especificos.join(" | "),
-      m.brechas.map((b) => b.codigo).join(", "),
+      m.brechas.map((b) => `#${b.prioridad}`).join(", "),
     ]),
   );
   const lineas = [titulos, ...filas].map((f) => f.map((v) => celdaCsv(v as string | number | null)).join(separador));

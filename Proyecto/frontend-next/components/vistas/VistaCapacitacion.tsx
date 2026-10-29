@@ -280,10 +280,9 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
           <Icon name="alerta" />
           <span>
             <strong>
-              {plan.brechas_sin_ruta.length} {plan.brechas_sin_ruta.length === 1 ? "brecha no tiene" : "brechas no tienen"} ruta en el catálogo:
+              {plan.brechas_sin_ruta.length} {plan.brechas_sin_ruta.length === 1 ? "brecha aún no tiene" : "brechas aún no tienen"} un módulo formativo asociado.
             </strong>{" "}
-            {plan.brechas_sin_ruta.map((b) => b.codigo).join(", ")}. Pide al equipo de cumplimiento asociarles una ruta formativa
-            para que entren al plan.
+            Therion Labs te orientará sobre {plan.brechas_sin_ruta.length === 1 ? "ella" : "ellas"}.
           </span>
         </p>
       ) : null}
@@ -472,12 +471,12 @@ function Modulo({
                 {m.brechas.map((b) => (
                   <li key={`${b.codigo}-${b.prioridad}`}>
                     <Link
-                      href={href("/panel/brechas", { q: b.codigo })}
+                      href={href("/panel/brechas", { q: `#${b.prioridad}` })}
                       className={`chip-brecha sev-${SEVERIDAD_TONO[b.severidad]}`}
-                      aria-label={`${b.codigo}, severidad ${b.severidad}${b.dominio !== dominio ? `, de ${b.dominio}` : ""}${completado ? ", formación completada" : ""}. Ver en el listado de brechas.`}
+                      aria-label={`Brecha ${b.prioridad}, severidad ${b.severidad}${b.dominio !== dominio ? `, de ${b.dominio}` : ""}${completado ? ", formación completada" : ""}. Ver en el listado de brechas.`}
                     >
                       {completado ? <Icon name="check" className="chip-brecha-check" /> : null}
-                      <span className="code">{b.codigo}</span>
+                      <span className="code">#{b.prioridad}</span>
                       {b.dominio !== dominio ? <span className="chip-brecha-dom">{b.dominio}</span> : null}
                     </Link>
                   </li>

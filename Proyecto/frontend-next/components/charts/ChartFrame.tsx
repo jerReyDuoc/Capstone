@@ -15,6 +15,7 @@ export function ChartFrame({
   tabla,
   children,
   pie,
+  resumenVisible = true,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -24,6 +25,11 @@ export function ChartFrame({
   tabla: ReactNode;
   children: ReactNode;
   pie?: ReactNode;
+  /**
+   * Correcciones 29-10: con false el resumen deja de verse bajo el gráfico, pero sigue siendo su
+   * descripción para lectores de pantalla (aria-describedby, WCAG 1.1.1).
+   */
+  resumenVisible?: boolean;
 }) {
   const [verTabla, setVerTabla] = useState(false);
   const idTitulo = useId();
@@ -42,8 +48,8 @@ export function ChartFrame({
 
       {verTabla ? <div id={idTabla}>{tabla}</div> : <div className="chart-wrap">{children}</div>}
 
-      <figcaption className="chart-foot">
-        <span id={idResumen}>{resumen}</span>
+      <figcaption className={resumenVisible ? "chart-foot" : "chart-foot chart-foot-solo"}>
+        <span id={idResumen} className={resumenVisible ? undefined : "sr-only"}>{resumen}</span>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {pie}
           <button

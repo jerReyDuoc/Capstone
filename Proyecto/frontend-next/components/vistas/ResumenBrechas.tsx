@@ -25,7 +25,7 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
       </div>
 
       {top.length === 0 ? (
-        <p className="card-sub">No se detectaron controles incumplidos. Mantén la evidencia actualizada para conservar el nivel.</p>
+        <p className="card-sub">No se detectaron brechas. Mantén la evidencia actualizada para conservar el nivel.</p>
       ) : (
         <ol className="gap-list">
           {top.map((b) => (
@@ -34,7 +34,6 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
                 <span className="code" style={{ marginLeft: 0, color: "var(--text)" }}>#{b.prioridad}</span>
                 <BadgeSeveridad severidad={b.severidad} />
                 <BadgeEstado estado={b.estado} />
-                <span className="code">{b.codigo}</span>
               </div>
               <p>{b.descripcion}</p>
               <p className="gap-meta">

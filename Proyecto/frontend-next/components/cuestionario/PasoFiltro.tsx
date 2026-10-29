@@ -7,20 +7,23 @@
  * Al final se muestra el resumen y se guarda todo junto (el backend exige las 7).
  *
  * Distribución: la pregunta a la izquierda con dos botones grandes (Sí / No, atajos S y N) y,
- * a la derecha, "Tu cuestionario": cuántos controles aplican hasta ahora y lo ya respondido,
- * para volver a cualquier pregunta con un clic. En pantallas angostas el resumen va debajo.
+ * a la derecha, "Tus respuestas", para volver a cualquier pregunta con un clic. En pantallas
+ * angostas el resumen va debajo.
+ *
+ * Correcciones 29-10: ya no se muestra cuántos controles aplican ni qué activa cada respuesta
+ * (es metodología interna): el usuario solo responde sí o no.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
 import { Icon } from "@/components/ui/Icon";
 import type { Cuestionario } from "@/hooks/useCuestionario";
 import {
-  CONTROLES_POR_FILTRO,
   controlesEstimados,
   cuerpoFiltro,
   PREGUNTA_RAIZ,
   preguntasVisibles,
 } from "@/lib/cuestionario/modelo";
+import { ayudaFiltro, preguntas as nPreguntas } from "@/lib/cuestionario/textos";
 import { comoErrorEncuesta } from "@/lib/encuesta/cliente";
 import type { ErrorEncuesta } from "@/lib/encuesta/contratos";
 import s from "./cuestionario.module.css";
@@ -88,7 +91,7 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
   if (!filtro) return null;
   const estimado = controlesEstimados(resp);
   const yaHabiaRespuestas = (progreso?.controles_respondidos ?? 0) > 0;
-  const raizRespondida = resp[PREGUNTA_RAIZ] !== undefined;
+  const ayuda = pregunta ? ayudaFiltro(pregunta.codigo, pregunta.descripcion) : null;
 
   async function confirmar() {
     setEnviando(true);
@@ -131,10 +134,10 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
                 <h2 id="t-filtro" ref={titulo} tabIndex={-1} className={s.filtroPregunta}>
                   {pregunta.pregunta}
                 </h2>
-                {pregunta.descripcion ? <p id={idAyuda} className={s.ayuda}>{pregunta.descripcion}</p> : null}
+                {ayuda ? <p id={idAyuda} className={s.ayuda}>{ayuda}</p> : null}
               </div>
 
-              <fieldset className={s.siNoGrande} aria-describedby={pregunta.descripcion ? idAyuda : undefined}>
+              <fieldset className={s.siNoGrande} aria-describedby={ayuda ? idAyuda : undefined}>
                 <legend className="sr-only">{pregunta.pregunta}</legend>
                 {OPCIONES.map((o) => (
                   <label key={String(o.valor)} className={s.botonSiNo} data-valor={o.valor ? "si" : "no"}>
@@ -149,10 +152,6 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
                   </label>
                 ))}
               </fieldset>
-
-              <p className={s.consecuencia} aria-live="polite">
-                <Consecuencia codigo={pregunta.codigo} />
-              </p>
 
               <div className={s.filtroAcciones}>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p - 1)} disabled={paso === 0}>
@@ -178,7 +177,7 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
                 </h2>
                 <p className={s.ayuda}>
                   {resp[PREGUNTA_RAIZ] === false
-                    ? "Con esta respuesta ningún control de la matriz aplica todavía. Si en el futuro incorporan IA, conviene repetir el autodiagnóstico."
+                    ? "Con esta respuesta no hay más preguntas por ahora. Si en el futuro incorporan IA, conviene repetir el autodiagnóstico."
                     : "Con estas respuestas armamos un cuestionario a la medida de tu organización. Puedes cambiar cualquiera antes de continuar."}
                 </p>
               </div>
@@ -187,8 +186,8 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
                 <p className="callout" role="note">
                   <Icon name="info" />
                   <span>
-                    Ya respondiste {progreso?.controles_respondidos} controles. Si cambias estas preguntas, las respuestas de
-                    los controles que dejen de aplicar no contarán en tu resultado.
+                    Ya respondiste {nPreguntas(progreso?.controles_respondidos ?? 0)}. Si cambias estas respuestas, algunas
+                    preguntas podrían dejar de aplicar y sus respuestas no contarán en tu resultado.
                   </span>
                 </p>
               ) : null}
@@ -209,17 +208,8 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
           )}
         </div>
 
-        <aside className={s.filtroResumen} aria-label="Tu cuestionario">
-          <div className={s.contador} role="status">
-            <span className={s.contadorValor}>{raizRespondida ? estimado : "—"}</span>
-            <span className={s.contadorTexto}>
-              {raizRespondida
-                ? estimado === 0
-                  ? "controles aplican a tu organización"
-                  : "controles aplican hasta ahora. Responderás uno por uno y tu avance se guarda solo."
-                : "controles aplican: depende de tu primera respuesta"}
-            </span>
-          </div>
+        <aside className={s.filtroResumen} aria-label="Tus respuestas">
+          <p className={s.filtroResumenTitulo}>Tus respuestas</p>
           {preguntas.some((p) => resp[p.codigo] !== undefined) ? (
             <ol className={s.respondidas}>
               {preguntas.map((p, i) =>
@@ -248,11 +238,4 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
       </div>
     </section>
   );
-}
-
-function Consecuencia({ codigo }: { codigo: string }) {
-  const suma = CONTROLES_POR_FILTRO[codigo];
-  if (codigo === PREGUNTA_RAIZ) return <>Si respondes <strong>No</strong>, ningún control aplica y el diagnóstico termina aquí.</>;
-  if (suma) return <>Si respondes <strong>Sí</strong>, se suman <strong>{suma}</strong> controles específicos a tu cuestionario.</>;
-  return null;
 }

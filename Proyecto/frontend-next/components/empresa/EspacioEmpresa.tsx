@@ -1,136 +1,99 @@
 "use client";
 
 /**
- * HU-28 criterio 2 · Espacio de la empresa del usuario definitivo (puerta de entrada tras el login).
+ * HU-28 criterio 2 · "Mi empresa": puerta de entrada del usuario definitivo tras el login.
  *
- * Muestra su empresa y el contrato. HU-29: "Mis evaluaciones" (historial con gráfico de
- * evolución global y por dimensión, y reevaluación desde la cuenta) y "Mis documentos"
- * (informes PDF, borradores, evidencias y constancias, con descarga y eliminación). Cada
- * evaluación se abre en el panel de resultados (/panel en modo "cliente", por /bff/cliente/api).
+ * Correcciones 29-10: el espacio se separó en tres páginas con la barra lateral del panel.
+ * Aquí quedan la empresa, su contrato y accesos directos; el historial vive en
+ * /empresa/evaluaciones y los documentos en /empresa/documentos.
  *
- * HU-30: sin contrato vigente el backend responde 403 CONTRATO_NO_VIGENTE en este espacio.
- * Entonces se muestra la situación del contrato (GET /api/cliente/contrato) con lo que sigue
- * disponible: el historial y los resultados (gratuitos) y, durante el plazo de gracia, Mis documentos.
+ * HU-30: sin contrato vigente se muestra la situación del contrato con lo que sigue disponible:
+ * el historial y los resultados (gratuitos) y, durante el plazo de gracia, Mis documentos.
  */
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
-import { BrandMark } from "@/components/ui/Icon";
-import { ErrorBff } from "@/lib/encuesta/cliente";
-import {
-  cargarContratoCliente, cargarEspacioEmpresa, diasParaTermino, fechaCorta, SIN_SERVICIO,
-  type ContratoClienteApi, type EspacioEmpresaApi,
-} from "@/lib/empresa";
-import { MisDocumentos } from "./MisDocumentos";
-import { MisEvaluaciones } from "./MisEvaluaciones";
+import Link from "next/link";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { diasParaTermino, fechaCorta, type ContratoClienteApi } from "@/lib/empresa";
+import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
 import s from "@/components/admin/admin.module.css";
 
-type Estado =
-  | { tipo: "cargando" }
-  | { tipo: "listo"; datos: EspacioEmpresaApi }
-  | { tipo: "sin_servicio"; contrato: ContratoClienteApi }
-  | { tipo: "error"; mensaje: string };
-
 export function EspacioEmpresa() {
-  const router = useRouter();
-  const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
-  const [recargaDocumentos, setRecargaDocumentos] = useState(0);
+  const estado = useEspacioEmpresa();
 
-  useEffect(() => {
-    cargarEspacioEmpresa()
-      .then((datos) => setEstado({ tipo: "listo", datos }))
-      .catch(async (e) => {
-        if (e instanceof ErrorBff && e.status === 401) {
-          router.replace("/ingresar?motivo=sesion");
-          return;
-        }
-        if (e instanceof ErrorBff && e.status === 403 && SIN_SERVICIO.has(e.info.codigo)) {
-          try {
-            setEstado({ tipo: "sin_servicio", contrato: await cargarContratoCliente() });
-            return;
-          } catch {
-            /* cae al mensaje genérico */
-          }
-        }
-        setEstado({ tipo: "error", mensaje: "No pudimos cargar el espacio de tu empresa. Inténtalo de nuevo." });
-      });
-  }, [router]);
+  if (estado.tipo === "cargando") {
+    return <div className="skeleton" style={{ height: 220 }} role="status" aria-label="Cargando el espacio de tu empresa" />;
+  }
+  if (estado.tipo === "error") {
+    return <div className={s.alerta} role="alert"><strong>{estado.mensaje}</strong></div>;
+  }
+  if (estado.tipo === "sin_servicio") return <SinServicio datos={estado.contrato} />;
 
-  const datos = estado.tipo === "listo" ? estado.datos : null;
-  const dias = datos ? diasParaTermino(datos.empresa.fecha_termino_contrato) : null;
+  const { datos } = estado;
+  const dias = diasParaTermino(datos.empresa.fecha_termino_contrato);
 
   return (
-    <div className={s.pagina}>
-      <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      <header className={s.barra}>
-        <div className={s.marca}>
-          <BrandMark aria-hidden="true" />
-          <span>
-            ComplianceAI
-            <span className={s.marcaSub}>
-              {datos ? datos.empresa.razon_social
-                : estado.tipo === "sin_servicio" ? estado.contrato.empresa.razon_social : "Espacio de tu empresa"}
-            </span>
-          </span>
+    <>
+      <header className="page-head">
+        <div>
+          <span className="eyebrow">Mi empresa</span>
+          <h1 className="page-title">Hola, {datos.usuario.nombre.split(" ")[0]}</h1>
+          <p className="page-sub">
+            Este es el espacio de <strong>{datos.empresa.razon_social}</strong> en ComplianceAI.
+          </p>
         </div>
-        <BotonCerrarSesion tipo="cliente" />
       </header>
 
-      <main id="contenido" className={s.contenido} tabIndex={-1}>
-        {estado.tipo === "cargando" ? <p className={s.vacio} role="status">Cargando…</p> : null}
-        {estado.tipo === "error" ? (
-          <div className={s.alerta} role="alert"><strong>{estado.mensaje}</strong></div>
-        ) : null}
-        {estado.tipo === "sin_servicio" ? <SinServicio datos={estado.contrato} /> : null}
+      {dias <= 30 ? (
+        <p className="callout" role="status">
+          {dias >= 0
+            ? `El contrato de tu empresa termina en ${dias} ${dias === 1 ? "día" : "días"} (${fechaCorta(datos.empresa.fecha_termino_contrato)}). Contacta a Therion Labs para renovarlo.`
+            : "El contrato de tu empresa terminó. Contacta a Therion Labs."}
+        </p>
+      ) : null}
 
-        {datos ? (
-          <>
-            <div>
-              <h1 className="page-title">Hola, {datos.usuario.nombre.split(" ")[0]}</h1>
-              <p className="page-sub">
-                Este es el espacio de <strong>{datos.empresa.razon_social}</strong> en ComplianceAI: el historial de
-                sus evaluaciones y cómo evoluciona su madurez, las reevaluaciones y los documentos de cumplimiento.
-              </p>
-            </div>
+      <nav aria-label="Accesos directos" className={s.rejilla}>
+        <Acceso href="/empresa/evaluaciones" icono="historial" titulo="Mis evaluaciones">
+          Tu historial, cómo evoluciona la madurez y las reevaluaciones.
+        </Acceso>
+        <Acceso href="/panel" icono="diagnostico" titulo="Resultados">
+          Diagnóstico, dominios y brechas de la evaluación más reciente.
+        </Acceso>
+        <Acceso href="/empresa/documentos" icono="carpeta" titulo="Mis documentos">
+          Informes, borradores, evidencias y constancias.
+        </Acceso>
+      </nav>
 
-            {dias != null && dias <= 30 ? (
-              <p className="callout" role="status">
-                {dias >= 0
-                  ? `El contrato de tu empresa termina en ${dias} ${dias === 1 ? "día" : "días"} (${fechaCorta(datos.empresa.fecha_termino_contrato)}). Contacta a Therion Labs para renovarlo.`
-                  : "El contrato de tu empresa terminó. Contacta a Therion Labs."}
-              </p>
-            ) : null}
-
-            {/* HU-29: historial con su evolución y reevaluación, y los documentos de la empresa */}
-            <MisEvaluaciones onDocumentoGuardado={() => setRecargaDocumentos((n) => n + 1)} />
-            <MisDocumentos recarga={recargaDocumentos} />
-
-            <section className="card" aria-labelledby="titulo-contrato">
-              <div className="card-head">
-                <div>
-                  <h2 id="titulo-contrato" className="card-title">Tu empresa</h2>
-                </div>
-              </div>
-              <dl style={{ display: "grid", gap: 8, margin: 0 }}>
-                <div><dt className={s.sub}>Razón social</dt><dd style={{ margin: 0 }}>{datos.empresa.razon_social}</dd></div>
-                <div><dt className={s.sub}>RUT</dt><dd style={{ margin: 0 }}>{datos.empresa.rut}</dd></div>
-                <div><dt className={s.sub}>Rubro</dt><dd style={{ margin: 0 }}>{datos.empresa.rubro ?? "—"}</dd></div>
-                <div>
-                  <dt className={s.sub}>Contrato</dt>
-                  <dd style={{ margin: 0 }}>
-                    {fechaCorta(datos.empresa.fecha_inicio_contrato)} al {fechaCorta(datos.empresa.fecha_termino_contrato)}
-                  </dd>
-                </div>
-                <div><dt className={s.sub}>Usuario</dt><dd style={{ margin: 0 }}>{datos.usuario.email}</dd></div>
-              </dl>
-            </section>
-          </>
-        ) : null}
-      </main>
-    </div>
+      <section className="card" aria-labelledby="titulo-empresa">
+        <div className="card-head">
+          <h2 id="titulo-empresa" className="card-title">Tu empresa</h2>
+        </div>
+        <dl style={{ display: "grid", gap: 8, margin: 0 }}>
+          <div><dt className={s.sub}>Razón social</dt><dd style={{ margin: 0 }}>{datos.empresa.razon_social}</dd></div>
+          <div><dt className={s.sub}>RUT</dt><dd style={{ margin: 0 }}>{datos.empresa.rut}</dd></div>
+          <div><dt className={s.sub}>Rubro</dt><dd style={{ margin: 0 }}>{datos.empresa.rubro ?? "—"}</dd></div>
+          <div>
+            <dt className={s.sub}>Contrato</dt>
+            <dd style={{ margin: 0 }}>
+              {fechaCorta(datos.empresa.fecha_inicio_contrato)} al {fechaCorta(datos.empresa.fecha_termino_contrato)}
+            </dd>
+          </div>
+          <div><dt className={s.sub}>Usuario</dt><dd style={{ margin: 0 }}>{datos.usuario.email}</dd></div>
+        </dl>
+      </section>
+    </>
   );
 }
 
+function Acceso({ href, icono, titulo, children }: { href: string; icono: IconName; titulo: string; children: string }) {
+  return (
+    <Link href={href} className="card acceso-empresa" prefetch={false}>
+      <Icon name={icono} />
+      <span>
+        <strong>{titulo}</strong>
+        <span className={s.sub}>{children}</span>
+      </span>
+    </Link>
+  );
+}
 
 /** HU-30 · Lo que ve el usuario cuando el servicio pagado de su empresa no está activo. */
 function SinServicio({ datos }: { datos: ContratoClienteApi }) {
@@ -138,14 +101,25 @@ function SinServicio({ datos }: { datos: ContratoClienteApi }) {
 
   return (
     <>
-      <div>
-        <h1 className="page-title">Servicio no disponible</h1>
-        <p className="callout" role="status">{contrato.mensaje}</p>
-      </div>
+      <header className="page-head">
+        <div>
+          <span className="eyebrow">{datos.empresa.razon_social}</span>
+          <h1 className="page-title">Servicio no disponible</h1>
+        </div>
+      </header>
+      <p className="callout" role="status">{contrato.mensaje}</p>
 
       {/* HU-29: los resultados son gratuitos (el historial se ve igual); reevaluar exige el servicio */}
-      <MisEvaluaciones />
-      {contrato.documentos_disponibles ? <MisDocumentos /> : null}
+      <nav aria-label="Lo que sigue disponible" className={s.rejilla}>
+        <Acceso href="/empresa/evaluaciones" icono="historial" titulo="Mis evaluaciones">
+          Tu historial y los resultados siguen disponibles.
+        </Acceso>
+        {contrato.documentos_disponibles ? (
+          <Acceso href="/empresa/documentos" icono="carpeta" titulo="Mis documentos">
+            Descarga tus documentos mientras dure el plazo de gracia.
+          </Acceso>
+        ) : null}
+      </nav>
 
       <p className="card-sub">
         Tus derechos sobre tus datos personales (acceso, rectificación, supresión, oposición, portabilidad y

@@ -40,7 +40,8 @@ import { pedir } from "@/lib/encuesta/cliente";
 import s from "./admin.module.css";
 
 type Pestana = "solicitudes" | "empresas" | "evaluaciones" | "bitacora";
-const FILTROS: (EstadoSolicitud | "todas")[] = ["nueva", "contactada", "contratada", "migrada", "descartada", "todas"];
+// Correcciones 29-10: "Todas" primero y por defecto, para que una solicitud no "desaparezca" al cambiar de estado
+const FILTROS: (EstadoSolicitud | "todas")[] = ["todas", "nueva", "contactada", "contratada", "migrada", "descartada"];
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const enUnAnio = () => {
@@ -57,10 +58,12 @@ function Estado({ texto, tono }: { texto: string; tono: string }) {
 export function PanelClientes() {
   const router = useRouter();
   const [pestana, setPestana] = useState<Pestana>("solicitudes");
-  // HU-31: la bandeja abre en las solicitudes nuevas (las que esperan contacto)
-  const [filtro, setFiltro] = useState<EstadoSolicitud | "todas">("nueva");
+  // Correcciones 29-10: la bandeja abre en "Todas", de la más nueva a la más antigua
+  const [filtro, setFiltro] = useState<EstadoSolicitud | "todas">("todas");
   const [solicitudes, setSolicitudes] = useState<Solicitud[] | null>(null);
   const [conteo, setConteo] = useState<Partial<Record<EstadoSolicitud, number>>>({});
+  const valoresConteo = Object.values(conteo).filter((n): n is number => typeof n === "number");
+  const totalSolicitudes = valoresConteo.length ? valoresConteo.reduce((a, b) => a + b, 0) : null;
   const [empresas, setEmpresas] = useState<Empresa[] | null>(null);
   const [bitacora, setBitacora] = useState<FilaBitacora[] | null>(null);
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionAdmin[] | null>(null);
@@ -85,7 +88,8 @@ export function PanelClientes() {
   const cargarSolicitudes = useCallback(async () => {
     try {
       const r = await api.solicitudes(filtro === "todas" ? undefined : filtro);
-      setSolicitudes(r.items);
+      // El backend ya ordena por id descendente; se ordena también aquí por fecha por si cambia
+      setSolicitudes([...r.items].sort((a, b) => (b.fecha_creacion ?? "").localeCompare(a.fecha_creacion ?? "") || b.id - a.id));
       setConteo(r.conteo_por_estado ?? {});
     } catch (e) {
       manejarError(e);
@@ -242,8 +246,8 @@ export function PanelClientes() {
                 <div>
                   <h2 id="titulo-solicitudes" className="card-title">Solicitudes</h2>
                   <p className="card-sub">
-                    Las nuevas esperan contacto. Marca el avance de cada una y, cuando cierren acuerdo, elige las
-                    contratadas que pasarán a la empresa.
+                    De la más nueva a la más antigua. Marca el avance de cada una y, cuando cierren acuerdo, elige
+                    las contratadas que pasarán a la empresa.
                   </p>
                 </div>
                 <div className={s.filtros} role="group" aria-label="Filtrar por estado">
@@ -251,10 +255,10 @@ export function PanelClientes() {
                     <button key={f} type="button" className="chip" aria-pressed={filtro === f}
                             onClick={() => { setFiltro(f); setSeleccion([]); }}>
                       {f === "todas" ? "Todas" : ETIQUETA_ESTADO_SOLICITUD[f].texto}
-                      {f !== "todas" && conteo[f] != null ? (
+                      {(f === "todas" ? totalSolicitudes : conteo[f]) != null ? (
                         <span>
                           {" "}
-                          ({conteo[f]}
+                          ({f === "todas" ? totalSolicitudes : conteo[f]}
                           <span className="sr-only"> solicitudes</span>)
                         </span>
                       ) : null}
@@ -262,7 +266,7 @@ export function PanelClientes() {
                   ))}
                 </div>
               </div>
-              <TablaSolicitudes solicitudes={solicitudes} seleccion={seleccion}
+              <TablaSolicitudes solicitudes={solicitudes} seleccion={seleccion} todas={filtro === "todas"}
                                 alternar={(id) => setSeleccion((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id])}
                                 cambiarEstado={cambiarEstado} />
             </section>
@@ -283,15 +287,18 @@ export function PanelClientes() {
 
 /* ------------------------------------------------------------------ solicitudes */
 function TablaSolicitudes({
-  solicitudes, seleccion, alternar, cambiarEstado,
+  solicitudes, seleccion, alternar, cambiarEstado, todas,
 }: {
+  todas: boolean;
   solicitudes: Solicitud[] | null;
   seleccion: number[];
   alternar: (id: number) => void;
   cambiarEstado: (id: number, estado: EstadoSolicitud) => void;
 }) {
   if (!solicitudes) return <p className={s.vacio}>Cargando…</p>;
-  if (!solicitudes.length) return <p className={s.vacio}>No hay solicitudes con este estado.</p>;
+  if (!solicitudes.length) {
+    return <p className={s.vacio}>{todas ? "Aún no hay solicitudes de contratación." : "No hay solicitudes con este estado."}</p>;
+  }
   return (
     <div className="table-wrap">
       <table className="table">

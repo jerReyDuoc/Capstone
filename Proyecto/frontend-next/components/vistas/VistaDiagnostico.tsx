@@ -80,7 +80,7 @@ export function VistaDiagnostico() {
                 <Kpi
                   className="col-3 md-col-3"
                   icono="lista"
-                  etiqueta="Controles evaluados"
+                  etiqueta="Preguntas evaluadas"
                   valor={p.controlesEvaluados}
                   pista={p.enRevision > 0 ? `${p.enRevision} en revisión por la IA` : "Sin respuestas pendientes de revisión"}
                 />

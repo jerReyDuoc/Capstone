@@ -1,17 +1,9 @@
 /* HU-01 / HU-02 · Cuestionario adaptativo del encuestado */
 
-/* ---------- distribución: índice a la izquierda (≥ 1024 px), pregunta al centro ---------- */
+/* ---------- distribución ----------
+   Correcciones 29-10: una sola columna. El índice de preguntas va plegado sobre la pregunta
+   (antes era una columna fija a la izquierda) y la pregunta usa todo el ancho. */
 .layout { display: grid; gap: var(--sp-6); align-items: start; }
-@media (min-width: 1024px) {
-  .layout { grid-template-columns: 260px minmax(0, 1fr); }
-}
-@media (min-width: 1440px) {
-  .layout { grid-template-columns: 300px minmax(0, 1fr); }
-}
-@media (min-width: 1024px) {
-  /* el índice sí acompaña al scroll, pero bajo el encabezado público (68 px), no tapado por él */
-  .indice { position: sticky; top: 88px; max-height: calc(100vh - 108px); overflow-y: auto; }
-}
 /* contenedor de las container queries de la tarjeta de pregunta (un elemento no puede consultarse a sí mismo) */
 .columna { display: grid; gap: var(--sp-5); min-width: 0; container: pregunta / inline-size; }
 
@@ -20,11 +12,25 @@
 .avanceFila { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); }
 .avanceFila strong { color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* ---------- índice de controles ---------- */
-.indice { padding: var(--sp-5); }
-.indiceResumen { display: none; }
-.indiceTitulo { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-3); }
-.grupo + .grupo { margin-top: var(--sp-4); }
+/* ---------- índice de preguntas (plegable) ---------- */
+.indice { padding: 0; }
+.indiceResumen {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4);
+  min-height: var(--target); padding: var(--sp-3) var(--sp-5);
+  font-weight: 600; cursor: pointer; list-style: none; border-radius: var(--radius-md);
+}
+.indiceResumen::-webkit-details-marker { display: none; }
+.indiceResumen:hover { background: var(--surface-2); }
+.indiceResumen:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.indiceResumenTexto { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.indiceResumenCuenta { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.indiceFlecha { transform: rotate(90deg); transition: transform var(--dur) var(--ease); }
+.indiceFlecha[data-abierto] { transform: rotate(-90deg); }
+.indiceCuerpo { padding: var(--sp-2) var(--sp-5) var(--sp-5); border-top: 1px solid var(--line); }
+.indiceGrupos { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); padding-top: var(--sp-3); }
+/* sin min-width: 0 el texto largo de cada pregunta ensancha la columna en vez de recortarse */
+.indiceGrupos > * { min-width: 0; }
+.lista li { min-width: 0; }
 .grupoTitulo {
   display: flex; justify-content: space-between; gap: var(--sp-2);
   font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
@@ -36,30 +42,19 @@
   min-height: 36px; padding: 0 var(--sp-2);
   border: 1px solid transparent; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted); text-align: left;
-  font-family: var(--font-mono); font-size: var(--fs-sm); cursor: pointer;
+  font-size: var(--fs-sm); cursor: pointer; overflow: hidden;
 }
 .item:hover { background: var(--surface-2); color: var(--text); }
 .item[aria-current="step"] { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.itemEstado { margin-left: auto; font-family: var(--font-body); font-size: var(--fs-xs); }
+.itemNumero { flex: none; min-width: 1.75em; font-variant-numeric: tabular-nums; color: var(--text-subtle); }
+.itemTexto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .punto { width: 10px; height: 10px; border-radius: 50%; flex: none; border: 2px solid var(--line-control); }
 .punto[data-estado="cumplido"] { background: var(--ok); border-color: var(--ok); }
 .punto[data-estado="parcialmente_cumplido"] { background: var(--medio); border-color: var(--medio); }
 .punto[data-estado="no_cumplido"] { background: var(--alto); border-color: var(--alto); }
 .punto[data-estado="requiere_revision"] { background: var(--info); border-color: var(--info); border-radius: 2px; }
 .punto[data-estado="no_aplica"] { background: var(--text-subtle); border-color: var(--text-subtle); }
-
-@media (max-width: 1023px) {
-  .indice { padding: 0; order: 2; } /* en pantallas angostas el índice va después de la pregunta */
-  .indiceResumen {
-    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
-    min-height: var(--target); padding: var(--sp-3) var(--sp-5);
-    font-weight: 600; cursor: pointer; list-style: none;
-  }
-  .indiceResumen::-webkit-details-marker { display: none; }
-  .indiceCuerpo { padding: 0 var(--sp-5) var(--sp-5); }
-  .indiceTitulo { display: none; }
-}
 
 /* ---------- tarjeta de pregunta ----------
    Dos zonas: el planteamiento (pregunta, qué se exige, evidencia esperada) y la respuesta
@@ -275,24 +270,17 @@
 .botonSiNo:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .botonSiNo:has(input:checked) .atajo { border-color: var(--accent); color: var(--accent); }
 .botonSiNoTexto { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600; }
-.consecuencia { margin: 0; min-height: 1.5em; font-size: var(--fs-sm); color: var(--text-muted); }
-.consecuencia strong { color: var(--text); }
 .filtroAcciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 .filtroAcciones .atajos { margin: 0 0 0 auto; }
 .filtroAcciones :global(.btn-primary) { margin-left: auto; }
 
-/* "Tu cuestionario": contador vivo y lo ya respondido */
+/* "Tus respuestas": lo ya respondido (correcciones 29-10: sin el contador de controles) */
+.filtroResumenTitulo { margin: 0; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-subtle); }
 .filtroResumen {
   display: grid; gap: var(--sp-4);
   padding: var(--sp-5);
   border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2);
 }
-.contador { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-3); align-items: center; }
-.contadorValor {
-  font-family: var(--font-display); font-size: 2.75rem; font-weight: 600; line-height: 1;
-  color: var(--accent); font-variant-numeric: tabular-nums;
-}
-.contadorTexto { font-size: var(--fs-sm); color: var(--text-muted); }
 .respondidas { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; max-height: 320px; overflow-y: auto; }
 .respondida {
   display: flex; align-items: center; gap: var(--sp-3); width: 100%;

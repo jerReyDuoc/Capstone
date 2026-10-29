@@ -56,7 +56,7 @@ export const SEVERIDAD_GUIA: Record<Severidad, string> = {
   Alta: "Resolver en el corto plazo",
   Media: "Planificar este trimestre",
   Baja: "Mejora continua",
-  "Sin clasificar": "Falta clasificar el control",
+  "Sin clasificar": "Impacto aún sin clasificar",
 };
 
 const esCriticaExplicita = (valor: string | null | undefined) => {

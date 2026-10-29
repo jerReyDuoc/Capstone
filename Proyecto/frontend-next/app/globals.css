@@ -573,6 +573,12 @@ button, select, input { font: inherit; color: inherit; }
 .tone-naranja { background: var(--naranja-soft); color: var(--naranja); }
 
 /* Análisis automático: franja que explica de dónde salen las brechas */
+/* Correcciones 29-10: aviso pequeño de respuestas en revisión (Brechas) */
+.aviso-revision {
+  display: flex; align-items: center; gap: var(--sp-2); margin: 0;
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+.aviso-revision svg { flex: none; width: 16px; height: 16px; color: var(--info); }
 .analisis {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-6);
   padding: var(--sp-4) var(--sp-5);
@@ -1103,6 +1109,62 @@ textarea { font: inherit; color: inherit; }
   .material-item { grid-template-columns: auto 1fr; }
   .material-item .badge { grid-column: 2; justify-self: start; }
 }
+
+/* ---------- Correcciones 29-10 ---------- */
+/* "Cerrar sesión" como un ítem más de la barra lateral */
+.nav-boton { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.nav-boton:disabled { cursor: progress; opacity: 0.7; }
+.nav-boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* "Contratar": la única puerta al servicio para quien no tiene cuenta */
+.nav-link-destacado { color: var(--accent); border: 1px solid rgba(20, 216, 158, 0.35); }
+.nav-link-destacado svg { color: var(--accent); }
+@media (max-width: 1023.98px) {
+  /* Barra superior: todos los grupos en una fila (el modo compacto les daba 100 % de ancho
+     a cada uno y solo se veía el primero); si no caben, se desplaza en vez de desbordar. */
+  .sidebar { overflow-x: auto; gap: var(--sp-2); }
+  .nav, .nav-list { width: auto; }
+  .nav { flex-direction: row; flex: none; }
+  .nav + .nav { padding-left: var(--sp-2); border-left: 1px solid var(--line); }
+  .nav-heading { display: none; }
+  .nav-link { white-space: nowrap; min-height: 44px; }
+  .nav-link[aria-current="page"]::before { display: none; }
+}
+
+/* Botón (i) con detalle: se abre con clic o teclado, no solo al pasar el mouse */
+.infotip { position: relative; display: inline-flex; vertical-align: middle; margin-left: var(--sp-2); }
+.infotip-boton {
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.infotip-boton svg { width: 16px; height: 16px; }
+.infotip-boton:hover, .infotip-boton[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.infotip-boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.infotip-panel {
+  position: absolute; z-index: 40; top: calc(100% + 8px); left: 0;
+  width: min(340px, calc(100vw - 48px));
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  background: var(--surface-3); color: var(--text);
+  font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 400; line-height: 1.5;
+  letter-spacing: normal; text-transform: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Accesos directos de "Mi empresa" */
+.acceso-empresa {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  color: var(--text); text-decoration: none;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.acceso-empresa > svg { flex: none; width: 24px; height: 24px; color: var(--accent); }
+.acceso-empresa strong { display: block; margin-bottom: 2px; }
+.acceso-empresa:hover { border-color: var(--accent); background: var(--surface-2); }
+.acceso-empresa:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Pie de gráfico sin resumen visible: "Ver como tabla" queda a la derecha */
+.chart-foot-solo { justify-content: flex-end; }
 
 /* ---------- Informe para PDF (solo impresión) ---------- */
 .print-only { display: none; }

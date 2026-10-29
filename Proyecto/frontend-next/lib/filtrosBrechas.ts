@@ -26,13 +26,16 @@ const sinTildes = (s: string) =>
 
 export function filtrarBrechas(brechas: BrechaVista[], f: FiltrosBrechas): BrechaVista[] {
   const q = sinTildes(f.texto.trim());
+  // "#3" busca por prioridad (los chips de Capacitación enlazan así, sin códigos internos)
+  const prioridad = /^#(\d+)$/.exec(q)?.[1];
   return brechas.filter(
     (b) =>
       (f.severidades.length === 0 || f.severidades.includes(b.severidad)) &&
       (!f.dominio || b.dominio === f.dominio) &&
       (!f.estado || b.estado === f.estado) &&
       (!q ||
-        sinTildes([b.codigo, b.descripcion, b.accion ?? "", b.rutaFormativa ?? "", b.controlCodigo ?? ""].join(" ")).includes(q)),
+        (prioridad ? b.prioridad === Number(prioridad)
+          : sinTildes([b.descripcion, b.accion ?? "", b.rutaFormativa ?? "", b.dominio].join(" ")).includes(q))),
   );
 }
 

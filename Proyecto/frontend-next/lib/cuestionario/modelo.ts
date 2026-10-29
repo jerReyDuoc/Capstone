@@ -175,7 +175,7 @@ export const ESTADOS: OpcionEstado[] = [
   {
     valor: "cumplido",
     etiqueta: "Cumplido",
-    ayuda: "El control está implementado y se puede demostrar.",
+    ayuda: "Está implementado y se puede demostrar.",
     tono: "ok",
     justificacionObligatoria: false,
     admiteEvidencia: true,
@@ -193,7 +193,7 @@ export const ESTADOS: OpcionEstado[] = [
   {
     valor: "no_cumplido",
     etiqueta: "No cumplido",
-    ayuda: "El control no existe hoy en la organización.",
+    ayuda: "Hoy no existe en la organización.",
     tono: "alto",
     justificacionObligatoria: false,
     admiteEvidencia: false,
@@ -211,7 +211,7 @@ export const ESTADOS: OpcionEstado[] = [
   {
     valor: "no_aplica",
     etiqueta: "No aplica",
-    ayuda: "Este control no corresponde a la realidad de la organización.",
+    ayuda: "No corresponde a la realidad de la organización.",
     tono: "bajo",
     justificacionObligatoria: false,
     admiteEvidencia: false,
@@ -238,7 +238,7 @@ export function errorJustificacion(estado: EstadoDeclarado, texto: string): stri
   if (limpio.length > JUSTIFICACION_MAX) return `La justificación no puede superar ${JUSTIFICACION_MAX} caracteres.`;
   if (!ESTADO_POR_VALOR[estado].justificacionObligatoria) return null;
   if (limpio.length < JUSTIFICACION_MIN || !/\p{L}/u.test(limpio)) {
-    return `Explica en al menos ${JUSTIFICACION_MIN} caracteres por qué el control queda en este estado (llevas ${limpio.length}).`;
+    return `Explica en al menos ${JUSTIFICACION_MIN} caracteres por qué eliges este estado (llevas ${limpio.length}).`;
   }
   return null;
 }
@@ -279,7 +279,7 @@ export const ESTADO_EVIDENCIA: Record<string, { etiqueta: string; tono: OpcionEs
   pending: { etiqueta: "En cola", tono: "info" },
   processing: { etiqueta: "Validando con IA", tono: "info" },
   validated: { etiqueta: "Validada", tono: "ok" },
-  rejected: { etiqueta: "No respalda el control", tono: "alto" },
+  rejected: { etiqueta: "No respalda la respuesta", tono: "alto" },
   error: { etiqueta: "No se pudo validar", tono: "medio" },
 };
 

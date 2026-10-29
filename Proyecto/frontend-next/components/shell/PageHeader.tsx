@@ -20,6 +20,11 @@ export function PageHeader({
 }) {
   const { evaluaciones, evaluacionId, seleccionarEvaluacion, recargar, estado } = usePanel();
   const idSelect = useId();
+  // Correcciones 29-10: el selector solo aparece cuando hay algo que elegir (≥2 completadas).
+  const completadas = evaluaciones
+    .filter((e) => e.estado_progreso === "completada")
+    .sort((a, b) => b.id - a.id);
+  const mostrarSelector = completadas.length >= 2;
 
   return (
     <header className="page-head">
@@ -30,7 +35,7 @@ export function PageHeader({
       </div>
       <div className="page-actions">
         {children}
-        {evaluaciones.length > 0 ? (
+        {mostrarSelector ? (
           <div className="field">
             <label className="field-label" htmlFor={idSelect}>
               Evaluación
@@ -41,10 +46,9 @@ export function PageHeader({
               value={evaluacionId ?? ""}
               onChange={(e) => seleccionarEvaluacion(Number(e.target.value))}
             >
-              {evaluaciones.map((e) => (
+              {completadas.map((e, i) => (
                 <option key={e.id} value={e.id}>
-                  #{e.id} · {fecha(e.fecha_inicio)}
-                  {e.estado_progreso === "completada" ? "" : " · en curso"}
+                  {i === 0 ? "Más reciente" : `Evaluación ${completadas.length - i}`} · {fecha(e.fecha_inicio)}
                 </option>
               ))}
             </select>

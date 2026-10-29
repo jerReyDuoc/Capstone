@@ -1,29 +1,89 @@
 "use client";
 
+/**
+ * Barra lateral común del panel (/panel/*) y del espacio de la empresa (/empresa/*).
+ *
+ * Correcciones 29-10:
+ * - El usuario definitivo (modo "cliente") ve la misma barra en ambos lugares, con el grupo
+ *   "Mi empresa": Mi empresa, Mis evaluaciones y Mis documentos (cada uno con su página).
+ * - Quien hizo el autodiagnóstico sin cuenta (modo "encuestado") no ve "Cerrar brechas",
+ *   "Mis documentos" ni "Mi evaluación" una vez completada: le quedan sus resultados y "Contratar".
+ *   Si su evaluación sigue en curso, conserva "Mi evaluación" para volver a ella.
+ * Fuera de <PanelProvider> (páginas de /empresa) se asume el modo "cliente".
+ */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { usePanel } from "@/hooks/usePanel";
+import type { ReactNode } from "react";
+import { usePanelOpcional, type ModoPanel } from "@/hooks/usePanel";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 
-const ITEMS: { ruta: string; etiqueta: string; icono: IconName; servicio?: boolean }[] = [
-  { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico" },
+interface Item {
+  ruta: string;
+  etiqueta: string;
+  icono: IconName;
+  /** Ruta exacta (no marca sus subrutas como activas). */
+  exacta?: boolean;
+}
+
+const RESULTADOS: Item[] = [
+  { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico", exacta: true },
   { ruta: "/panel/dominios", etiqueta: "Dominios", icono: "dominios" },
   { ruta: "/panel/brechas", etiqueta: "Brechas", icono: "brechas" },
+  // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
   { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
-  // HU-17: re-evaluar controles con evidencia (servicio contratado). El encuestado también la
-  // ve, con candado: la página le explica que es del servicio y cómo contratarlo.
-  { ruta: "/panel/remediacion", etiqueta: "Cerrar brechas", icono: "subir", servicio: true },
+];
+
+// HU-17: cerrar brechas con evidencia. Es del servicio contratado: solo el cliente la ve.
+const CERRAR_BRECHAS: Item = { ruta: "/panel/remediacion", etiqueta: "Cerrar brechas", icono: "subir" };
+
+const EMPRESA: Item[] = [
+  { ruta: "/empresa", etiqueta: "Mi empresa", icono: "empresa", exacta: true },
+  { ruta: "/empresa/evaluaciones", etiqueta: "Mis evaluaciones", icono: "historial" },
+  { ruta: "/empresa/documentos", etiqueta: "Mis documentos", icono: "carpeta" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { href, estado, demo, modo } = usePanel();
-  const abiertas = estado.tipo === "listo" ? estado.panel.brechas.length : null;
+  const panel = usePanelOpcional();
+  const modo: ModoPanel = panel?.modo ?? "cliente";
+  const href = panel?.href ?? ((ruta: string) => ruta);
+  const abiertas = panel?.estado.tipo === "listo" ? panel.estado.panel.brechas.length : null;
+  const demo = panel?.demo ?? false;
+  // El encuestado conserva "Mi evaluación" solo mientras su evaluación sigue en curso
+  const evaluacionEnCurso =
+    modo === "encuestado" && (panel?.evaluaciones ?? []).some((e) => e.estado_progreso !== "completada");
+
+  const resultados = modo === "cliente" ? [...RESULTADOS, CERRAR_BRECHAS] : RESULTADOS;
+
+  const enlace = (it: Item, extra?: ReactNode) => {
+    const activo = it.exacta ? pathname === it.ruta : pathname === it.ruta || pathname.startsWith(`${it.ruta}/`);
+    // Las rutas del panel conservan la evaluación elegida; las de la empresa no la necesitan
+    const destino = it.ruta.startsWith("/panel") ? href(it.ruta) : it.ruta;
+    return (
+      <li key={it.ruta}>
+        <Link
+          href={destino}
+          className="nav-link"
+          aria-current={activo ? "page" : undefined}
+          data-label={it.etiqueta}
+          prefetch={it.ruta.startsWith("/empresa") ? false : undefined}
+        >
+          <Icon name={it.icono} />
+          <span className="nav-label">{it.etiqueta}</span>
+          {extra}
+        </Link>
+      </li>
+    );
+  };
 
   return (
     <aside className="sidebar">
-      <Link href={href("/panel")} className="brand" aria-label="TherionLabs ComplianceAI, ir al diagnóstico">
+      <Link
+        href={modo === "cliente" ? "/empresa" : href("/panel")}
+        className="brand"
+        aria-label={modo === "cliente" ? "TherionLabs ComplianceAI, ir a Mi empresa" : "TherionLabs ComplianceAI, ir al diagnóstico"}
+      >
         <BrandMark className="brand-mark" />
         <span className="brand-text">
           <span className="brand-name">
@@ -33,55 +93,46 @@ export function Sidebar() {
         </span>
       </Link>
 
-      <nav className="nav" aria-label="Secciones del panel">
+      {modo === "cliente" ? (
+        <nav className="nav" aria-labelledby="nav-empresa">
+          <p className="nav-heading" id="nav-empresa">Mi empresa</p>
+          <ul className="nav-list">{EMPRESA.map((it) => enlace(it))}</ul>
+        </nav>
+      ) : null}
+
+      <nav className="nav" aria-labelledby="nav-heading">
         <p className="nav-heading" id="nav-heading">Gobernanza de IA</p>
-        <ul className="nav-list" aria-labelledby="nav-heading">
-          {ITEMS.filter((it) => !it.servicio || modo === "cliente" || modo === "encuestado").map((it) => {
-            // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
-            const activo = pathname === it.ruta || (it.ruta !== "/panel" && pathname.startsWith(`${it.ruta}/`));
-            return (
-              <li key={it.ruta}>
-                <Link
-                  href={href(it.ruta)}
-                  className="nav-link"
-                  aria-current={activo ? "page" : undefined}
-                  data-label={it.etiqueta}
-                >
-                  <Icon name={it.icono} />
-                  <span className="nav-label">{it.etiqueta}</span>
-                  {it.servicio && modo === "encuestado" ? (
-                    <span className="nav-candado" title="Incluido en el servicio contratado">
-                      <Icon name="candado" />
-                      <span className="sr-only"> (incluido en el servicio contratado)</span>
-                    </span>
-                  ) : null}
-                  {it.ruta === "/panel/brechas" && abiertas ? (
-                    <span className="nav-count">
-                      {abiertas}
-                      <span className="sr-only"> brechas abiertas</span>
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
+        <ul className="nav-list">
+          {resultados.map((it) =>
+            enlace(
+              it,
+              it.ruta === "/panel/brechas" && abiertas ? (
+                <span className="nav-count">
+                  {abiertas}
+                  <span className="sr-only"> brechas abiertas</span>
+                </span>
+              ) : null,
+            ),
+          )}
         </ul>
       </nav>
 
       {modo === "encuestado" ? (
-        <nav className="nav" aria-label="Mi evaluación">
+        <nav className="nav" aria-label="Siguiente paso">
           <ul className="nav-list">
+            {evaluacionEnCurso ? (
+              <li>
+                <Link href="/encuesta" className="nav-link" data-label="Mi evaluación" prefetch={false}>
+                  <Icon name="lista" />
+                  <span className="nav-label">Mi evaluación</span>
+                </Link>
+              </li>
+            ) : null}
             <li>
-              <Link href="/encuesta" className="nav-link" data-label="Mi evaluación" prefetch={false}>
-                <Icon name="lista" />
-                <span className="nav-label">Mi evaluación</span>
-              </Link>
-            </li>
-            <li>
-              {/* HU-31 */}
+              {/* HU-31: única puerta al servicio para quien no tiene cuenta, por eso destaca */}
               <Link
                 href={href("/panel/contratar")}
-                className="nav-link"
+                className="nav-link nav-link-destacado"
                 data-label="Contratar"
                 aria-current={pathname === "/panel/contratar" ? "page" : undefined}
                 prefetch={false}
@@ -95,19 +146,12 @@ export function Sidebar() {
       ) : null}
 
       {modo === "cliente" ? (
-        // HU-28: el usuario definitivo vuelve al espacio de su empresa o cierra su sesión
-        <nav className="nav" aria-label="Mi empresa">
+        <nav className="nav" aria-label="Sesión">
           <ul className="nav-list">
             <li>
-              <Link href="/empresa" className="nav-link" data-label="Mi empresa" prefetch={false}>
-                <Icon name="lista" />
-                <span className="nav-label">Mi empresa</span>
-              </Link>
+              <BotonCerrarSesion tipo="cliente" className="nav-link nav-boton" icono={<Icon name="salir" />} />
             </li>
           </ul>
-          <div style={{ padding: "8px 12px" }}>
-            <BotonCerrarSesion tipo="cliente" />
-          </div>
         </nav>
       ) : null}
 

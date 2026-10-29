@@ -78,7 +78,7 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
   },
   LIMITE_EVIDENCIAS: {
     titulo: "Llegaste al máximo de evidencias",
-    detalle: "Puedes seguir respondiendo y justificando tus controles sin adjuntar más archivos.",
+    detalle: "Puedes seguir respondiendo y justificando tus respuestas sin adjuntar más archivos.",
     accion: "ninguna",
   },
   LIMITE_EVIDENCIAS_IP: {
@@ -109,7 +109,7 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
   // ---- Cuestionario (HU-01/02) y cierre de la evaluación
   JUSTIFICACION_OBLIGATORIA: {
     titulo: "Falta la justificación",
-    detalle: "Para este estado explica con tus palabras por qué el control queda así (al menos 20 caracteres).",
+    detalle: "Para este estado explica con tus palabras por qué lo eliges (al menos 20 caracteres).",
     accion: "ninguna",
   },
   PROMPT_INJECTION: {
@@ -118,8 +118,8 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     accion: "ninguna",
   },
   CONTROL_NO_APLICABLE: {
-    titulo: "Este control ya no aplica",
-    detalle: "Cambiaron las preguntas iniciales y este control quedó fuera. Recarga para ver el cuestionario actualizado.",
+    titulo: "Esta pregunta ya no aplica",
+    detalle: "Cambiaron las preguntas iniciales y esta pregunta quedó fuera. Recarga para ver el cuestionario actualizado.",
     accion: "recargar",
   },
   FILTRO_PENDIENTE: {
@@ -133,8 +133,8 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     accion: "recargar",
   },
   CUESTIONARIO_INCOMPLETO: {
-    titulo: "Aún quedan controles por responder",
-    detalle: "Responde todos los controles antes de completar la evaluación.",
+    titulo: "Aún quedan preguntas por responder",
+    detalle: "Responde todas las preguntas antes de completar la evaluación.",
     accion: "ninguna",
   },
   EVIDENCIAS_EN_PROCESO: {
@@ -143,8 +143,8 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     accion: "reintentar",
   },
   REVISION_SIN_EVIDENCIA: {
-    titulo: "Hay controles en 'Requiere revisión' sin evidencia",
-    detalle: "Adjunta una evidencia en esos controles o elige otro estado para poder completar.",
+    titulo: "Hay preguntas en 'Requiere revisión' sin evidencia",
+    detalle: "Adjunta una evidencia en esas preguntas o elige otro estado para poder completar.",
     accion: "ninguna",
   },
   ANONIMIZACION_NO_DISPONIBLE: {
@@ -198,13 +198,13 @@ const GENERICO: Omit<MensajeError, "esperaS"> = {
   accion: "reintentar",
 };
 
-/** Códigos cuyo mensaje del backend es más preciso que el genérico (dice qué controles faltan). */
-const DETALLE_DEL_BACKEND = new Set([
-  "JUSTIFICACION_OBLIGATORIA",
-  "CUESTIONARIO_INCOMPLETO",
-  "EVIDENCIAS_EN_PROCESO",
-  "REVISION_SIN_EVIDENCIA",
-]);
+/**
+ * Códigos cuyo mensaje del backend es más preciso que el genérico.
+ * Correcciones 29-10: CUESTIONARIO_INCOMPLETO, EVIDENCIAS_EN_PROCESO y REVISION_SIN_EVIDENCIA
+ * ya no usan el detalle del backend porque lista los códigos internos de los controles
+ * (DAT-001…). La revisión final ya muestra qué preguntas faltan, numeradas.
+ */
+const DETALLE_DEL_BACKEND = new Set(["JUSTIFICACION_OBLIGATORIA"]);
 
 export function mensajeDeError(e: ErrorEncuesta): MensajeError {
   let base = TEXTOS[e.codigo] ?? (e.mensaje ? { ...GENERICO, detalle: e.mensaje } : GENERICO);

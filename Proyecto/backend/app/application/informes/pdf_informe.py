@@ -134,7 +134,7 @@ def generar_pdf(d: DatosInforme) -> bytes:
     nivel = ETIQUETA_MADUREZ[nivel_madurez(d.puntaje_general)]
     tiles = [
         [p("Puntaje general", gris_chico), p("Nivel de madurez", gris_chico),
-         p("Controles evaluados", gris_chico), p("Brechas detectadas", gris_chico)],
+         p("Preguntas evaluadas", gris_chico), p("Brechas detectadas", gris_chico)],
         [p(f"{_fmt(d.puntaje_general)}<font size=9> / 100</font>", cifra), p(nivel, cifra),
          p(str(d.controles_evaluados), cifra), p(str(d.brechas_total), cifra)],
     ]
@@ -146,13 +146,13 @@ def generar_pdf(d: DatosInforme) -> bytes:
     ]))
     historia += [t, Spacer(1, 6)]
     if d.en_revision:
-        historia.append(p(f"{d.en_revision} control(es) siguen en revisión y no suman puntaje todavía.", gris_chico))
+        historia.append(p(f"{d.en_revision} pregunta(s) siguen en revisión y no suman puntaje todavía.", gris_chico))
 
     # ------------------------------------------------------------ comparativa
     historia.append(p("Comparativa por dimensión normativa", h2))
     historia.append(p(
         f"La meta es el nivel que debería alcanzar cada dimensión ({_fmt(d.comparativa[0].meta if d.comparativa else 75)} "
-        "puntos: controles definidos, documentados y con responsables). El promedio del rubro aparece cuando "
+        "puntos: prácticas definidas, documentadas y con responsables). El promedio del rubro aparece cuando "
         "hay suficientes evaluaciones completadas para que sea representativo.", gris_chico))
     historia.append(Spacer(1, 4))
     filas = [[p(x, cabecera) for x in ("Dimensión", "Tu puntaje", "Nivel", "Meta", "Frente a la meta",
@@ -185,20 +185,19 @@ def generar_pdf(d: DatosInforme) -> bytes:
         cuenta = contar_por_severidad(d.brechas)
         partes = [f'<font color="{COLOR_SEVERIDAD[s]}"><b>{cuenta[s]} {s.lower()}</b></font>'
                   for s in SEVERIDADES if cuenta[s]]
-        historia.append(p(" · ".join(partes) if partes else "Sin brechas: todos los controles evaluados se cumplen.",
+        historia.append(p(" · ".join(partes) if partes else "Sin brechas: todas las prácticas evaluadas se cumplen.",
                           chico))
     historia.append(Spacer(1, 4))
     if d.brechas:
-        filas = [[p(x, cabecera) for x in ("#", "Severidad", "Código", "Dimensión", "Estado",
+        # Correcciones 29-10: el informe es del cliente; no lleva los códigos internos del catálogo.
+        filas = [[p(x, cabecera) for x in ("#", "Severidad", "Dimensión", "Estado",
                                            "Brecha detectada", "Acción sugerida")]]
         for b in d.brechas:
-            codigo = _esc(b.codigo) + (f"<br/><font color='{GRIS}'>{_esc(b.control_codigo)}</font>"
-                                       if b.control_codigo and b.control_codigo != b.codigo else "")
             filas.append([
-                p(str(b.prioridad), chico), sev(b.severidad), p(codigo, chico), p(_esc(b.dominio), chico),
+                p(str(b.prioridad), chico), sev(b.severidad), p(_esc(b.dominio), chico),
                 p(ETIQUETA_ESTADO[b.estado], chico), p(_esc(b.descripcion), chico), p(_esc(b.accion or "—"), chico),
             ])
-        t = Table(filas, colWidths=[ancho * w for w in (0.05, 0.10, 0.14, 0.13, 0.11, 0.28, 0.19)], repeatRows=1)
+        t = Table(filas, colWidths=[ancho * w for w in (0.05, 0.11, 0.15, 0.12, 0.35, 0.22)], repeatRows=1)
         t.setStyle(estilo_tabla)
         historia.append(t)
         historia.append(Spacer(1, 4))
@@ -223,8 +222,7 @@ def generar_pdf(d: DatosInforme) -> bytes:
         filas = [[p(x, cabecera) for x in ("Nivel", "Módulo y objetivo", "Horas", "Por qué")]]
         for m in dim.modulos:
             motivo = ("Base del nivel asignado" if m.motivo == "nivel"
-                      else f"Cubre {', '.join(_esc(x.codigo) for x in m.brechas[:6])}"
-                      + (" …" if len(m.brechas) > 6 else ""))
+                      else f"Cubre {len(m.brechas)} brecha(s) de esta dimensión")
             objetivo = f"<b>{_esc(m.ruta.nombre)}</b>"
             if m.ruta.objetivo:
                 objetivo += f"<br/>{_esc(m.ruta.objetivo)}"
@@ -242,9 +240,8 @@ def generar_pdf(d: DatosInforme) -> bytes:
             historia.append(t)
     if plan.brechas_sin_ruta:
         historia.append(Spacer(1, 6))
-        historia.append(p("Brechas sin ruta en el catálogo: "
-                          + ", ".join(_esc(b.codigo) for b in plan.brechas_sin_ruta)
-                          + ". Agrega su ruta en catalogo_brechas.ruta_formativa_id.", gris_chico))
+        historia.append(p(f"{len(plan.brechas_sin_ruta)} brecha(s) aún no tienen un módulo formativo asociado; "
+                          "Therion Labs te orientará sobre ellas.", gris_chico))
 
     historia.append(Spacer(1, 12))
     historia.append(p("Este informe es una autoevaluación orientativa y no constituye asesoría legal.", gris_chico))

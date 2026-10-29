@@ -35,7 +35,7 @@ export function VistaBrechas() {
       <PageHeader
         eyebrow="Brechas normativas priorizadas"
         titulo="Brechas"
-        subtitulo="Controles no cumplidos o parcialmente cumplidos tras el autodiagnóstico, ordenados por severidad para enfocar primero los recursos donde el riesgo es mayor."
+        subtitulo="Prácticas no cumplidas o cumplidas en parte tras el autodiagnóstico, ordenados por severidad para enfocar primero los recursos donde el riesgo es mayor."
       />
       <EstadoPanel>{(p) => <ListadoPriorizado panel={p} />}</EstadoPanel>
     </>
@@ -176,30 +176,16 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   return (
     <>
       <div className="no-print" style={{ display: "grid", gap: "var(--sp-6)" }}>
-        {/* Criterio 1: análisis automático, explicado en una línea */}
-        <p className="analisis">
-          <Icon name="chispa" />
-          <span className="analisis-flujo">
-            <span>
-              <strong>{panel.controlesEvaluados}</strong> controles evaluados
-            </span>
-            <span className="sep" aria-hidden="true">→</span>
-            <span>
-              <strong>{panel.noCumplidos}</strong> no cumplidos y <strong>{panel.parciales}</strong> parciales
-            </span>
-            <span className="sep" aria-hidden="true">→</span>
-            <span>
-              <strong>{panel.brechas.length}</strong> brechas priorizadas
-            </span>
-          </span>
-          {panel.enRevision > 0 ? (
-            <span>
-              · {panel.enRevision === 1
-                ? "1 respuesta sigue en revisión por la IA y se sumará si resulta incumplida."
-                : `${panel.enRevision} respuestas siguen en revisión por la IA y se sumarán si resultan incumplidas.`}
-            </span>
-          ) : null}
-        </p>
+        {/* Correcciones 29-10: sin la línea "N preguntas evaluadas → …". Solo queda un aviso
+            pequeño cuando hay respuestas en revisión, porque explica por qué el listado puede cambiar. */}
+        {panel.enRevision > 0 ? (
+          <p className="aviso-revision" role="status">
+            <Icon name="reloj" />
+            {panel.enRevision === 1
+              ? "1 respuesta sigue en revisión por la IA y se sumará al listado si resulta incumplida."
+              : `${panel.enRevision} respuestas siguen en revisión por la IA y se sumarán al listado si resultan incumplidas.`}
+          </p>
+        ) : null}
 
         {/* Criterio 2: severidades (también filtran) */}
         <TarjetasSeveridad conteo={panel.brechasPorSeveridad} seleccion={filtros.severidades} onAlternar={alternarSeveridad} />
@@ -247,7 +233,8 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
           <div className="card-head" style={{ marginBottom: 0, alignItems: "flex-end" }}>
             <div>
               <h2 className="card-title" id="tabla-brechas-titulo">Listado priorizado</h2>
-              <p className="card-sub" role="status" aria-live="polite">
+              {/* Correcciones 29-10: el conteo solo se muestra cuando hay filtros (ahí sí informa) */}
+              <p className={conFiltros ? "card-sub" : "sr-only"} role="status" aria-live="polite">
                 {conFiltros
                   ? `Mostrando ${filtradas.length} de ${panel.brechas.length} brechas · ${describirFiltros(filtros)}`
                   : `${panel.brechas.length} brechas, de la más a la menos urgente`}
@@ -295,7 +282,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                   id={idBuscar}
                   type="search"
                   className="input"
-                  placeholder="Código, brecha o acción"
+                  placeholder="Brecha o acción"
                   aria-describedby={`${idBuscar}-ayuda`}
                   value={texto}
                   onChange={(e) => setTexto(e.target.value)}
@@ -387,11 +374,11 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                       </td>
                       <td style={{ minWidth: 260 }}>
                         <span className="brecha-desc">{b.descripcion}</span>
-                        <span className="brecha-codigos">
-                          <span>{b.codigo}</span>
-                          {b.controlCodigo && b.controlCodigo !== b.codigo ? <span>· Control {b.controlCodigo}</span> : null}
-                          {b.criticidad !== "Sin clasificar" ? <span>· Impacto {IMPACTO_TEXTO[b.criticidad]}</span> : null}
-                        </span>
+                        {b.criticidad !== "Sin clasificar" ? (
+                          <span className="brecha-codigos">
+                            <span>Impacto {IMPACTO_TEXTO[b.criticidad]}</span>
+                          </span>
+                        ) : null}
                       </td>
                       <td>{b.dominio}</td>
                       <td style={{ minWidth: 200 }}>
@@ -407,7 +394,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                             <Icon name="check" />
                             Formación hecha ·{" "}
                             <Link href={hrefRemediacion(panel.evaluacionId, b.respuestaId)}>
-                              subir evidencia<span className="sr-only"> de {b.codigo}</span>
+                              subir evidencia<span className="sr-only"> de la brecha {b.prioridad}</span>
                             </Link>
                           </span>
                         ) : null}

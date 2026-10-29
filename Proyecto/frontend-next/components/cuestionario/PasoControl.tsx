@@ -14,6 +14,9 @@
  *  - Al elegir un estado la vista baja sola hasta la justificación, y la barra de
  *    "Guardar y continuar" queda siempre visible (sticky) al pie de la tarjeta.
  *  - Atajos: 1 a 5 eligen el estado (fuera de un campo de texto) y Ctrl/⌘ + Enter guarda y continúa.
+ *
+ * Correcciones 29-10: para el usuario cada control es una "pregunta" y no se muestra su código
+ * interno (DAT-001…), que expone la documentación de Therion Labs.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
@@ -209,7 +212,6 @@ export function PasoControl({ c, control, onLimites }: Props) {
     <section className={`card ${s.pregunta}`} aria-labelledby="t-control" aria-busy={cargandoPrevia}>
       <div className={s.planteamiento}>
         <div className={s.cabecera}>
-          <span className={s.codigo}>{control.codigo_control}</span>
           {control.criticidad ? (
             <span className={`badge tone-${control.criticidad === "Alta" ? "alto" : control.criticidad === "Media" ? "medio" : "bajo"}`}>
               Criticidad {control.criticidad.toLowerCase()}
@@ -217,7 +219,7 @@ export function PasoControl({ c, control, onLimites }: Props) {
           ) : null}
           <span className={s.dominio}>{control.dominio?.nombre_dominio}</span>
           <span className={s.dominio} style={{ marginLeft: "auto" }}>
-            Control {posicion + 1} de {total}
+            Pregunta {posicion + 1} de {total}
           </span>
         </div>
 
@@ -268,7 +270,7 @@ export function PasoControl({ c, control, onLimites }: Props) {
 
       <div className={s.respuesta}>
         <fieldset className={s.opciones} aria-invalid={tocado && !estado ? true : undefined}>
-          <legend>¿Cuál es el estado de este control en tu organización?</legend>
+          <legend>¿En qué estado está esto en tu organización?</legend>
           <div className={s.chips} onMouseLeave={() => setVistaPrevia(null)}>
             {ESTADOS.map((o, n) => (
               <label
@@ -381,7 +383,7 @@ export function PasoControl({ c, control, onLimites }: Props) {
               {errorArchivo ? <p className={s.errorCampo} role="alert">{errorArchivo}</p> : null}
               {faltaEvidenciaRevision ? (
                 <p className={s.ayuda} role="note">
-                  Sin evidencia, este control quedará pendiente y no podrás completar la evaluación hasta adjuntarla o cambiar el estado.
+                  Sin evidencia, esta pregunta quedará pendiente y no podrás completar la evaluación hasta adjuntarla o cambiar el estado.
                 </p>
               ) : null}
               <ListaEvidencias evidencias={evidencias} />

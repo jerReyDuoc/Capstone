@@ -367,7 +367,8 @@ export interface ModuloRecorridoApi {
   en_plan: boolean;
   motivo: "brechas" | "nivel" | "historial";
   prioridad: Severidad | "Complementario";
-  brechas: { codigo: string; respuesta_id: number | null; control_codigo: string | null; dominio: string; severidad: Severidad; estado: EstadoBrecha }[];
+  /** prioridad: en el listado de brechas (correcciones 29-10; opcional con backends anteriores). */
+  brechas: { codigo: string; respuesta_id: number | null; control_codigo: string | null; dominio: string; severidad: Severidad; estado: EstadoBrecha; prioridad?: number }[];
   lecciones: LeccionApi[];
   actividad: {
     preguntas: PreguntaActividadApi[];

@@ -55,7 +55,7 @@ export function InformeBrechas({
 
       <p className="informe-filtros">
         <strong>Alcance:</strong> {describirFiltros(filtros)} · {brechas.length} de {panel.brechas.length} brechas abiertas ·{" "}
-        {panel.controlesEvaluados} controles evaluados
+        {panel.controlesEvaluados} preguntas evaluadas
       </p>
 
       <table className="informe-tabla">
@@ -63,7 +63,6 @@ export function InformeBrechas({
           <tr>
             <th>#</th>
             <th>Severidad</th>
-            <th>Código</th>
             <th>Brecha detectada</th>
             <th>Dominio</th>
             <th>Estado</th>
@@ -75,10 +74,6 @@ export function InformeBrechas({
             <tr key={b.respuestaId} className={`sev-${SEVERIDAD_TONO[b.severidad]}`}>
               <td>{b.prioridad}</td>
               <td className="informe-sev">{b.severidad}</td>
-              <td className="code">
-                {b.codigo}
-                {b.controlCodigo && b.controlCodigo !== b.codigo ? <><br />{b.controlCodigo}</> : null}
-              </td>
               <td>{b.descripcion}</td>
               <td>{b.dominio}</td>
               <td>{ETIQUETA_ESTADO_LARGA[b.estado]}</td>
@@ -92,8 +87,8 @@ export function InformeBrechas({
       </table>
 
       <p className="informe-pie">
-        Severidad = impacto del control (catálogo de brechas) × estado de cumplimiento: un control de impacto alto no
-        cumplido es crítico. Orden dentro de cada severidad: no cumplidas primero, mayor impacto, dominio menos maduro.
+        Severidad = impacto de la brecha × estado de cumplimiento: una práctica de impacto alto no cumplida es
+        crítica. Orden dentro de cada severidad: no cumplidas primero, mayor impacto, dominio menos maduro.
         Informe generado automáticamente a partir del autodiagnóstico; no constituye asesoría legal.
       </p>
     </article>

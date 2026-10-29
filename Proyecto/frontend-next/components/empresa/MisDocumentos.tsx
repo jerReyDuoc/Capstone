@@ -49,7 +49,11 @@ interface Fila {
   nota?: string;
 }
 
-export function MisDocumentos({ recarga = 0 }: { recarga?: number }) {
+/**
+ * Correcciones 29-10: vive en su propia página (/empresa/documentos). Con `encabezado={false}`
+ * la página pone el título y la tarjeta empieza directo en las pestañas.
+ */
+export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: number; encabezado?: boolean }) {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const [pestana, setPestana] = useState<Pestana>("informes");
@@ -115,7 +119,7 @@ export function MisDocumentos({ recarga = 0 }: { recarga?: number }) {
   const filas: Record<Pestana, Fila[]> = {
     informes: d.informes.map((x) => ({
       clave: `d${x.id}`, tipo: "documento", id: x.id, titulo: x.nombre,
-      detalle: `${x.evaluacion_id ? `Evaluación N.º ${x.evaluacion_id} · ` : ""}${tamanoLegible(x.tamano_bytes)}`,
+      detalle: tamanoLegible(x.tamano_bytes),
       fecha: x.fecha_creacion, descargable: true, eliminable: true,
     })),
     borradores: d.borradores.map((x) => ({
@@ -124,13 +128,13 @@ export function MisDocumentos({ recarga = 0 }: { recarga?: number }) {
     })),
     evidencias: d.evidencias.map((x) => ({
       clave: `e${x.id}`, tipo: "evidencia", id: x.id, titulo: x.nombre,
-      detalle: `Evaluación N.º ${x.evaluacion_id}${x.control ? ` · control ${x.control}` : ""}${x.origen === "remediacion" ? " · remediación" : ""}`,
+      detalle: x.origen === "remediacion" ? "Evidencia para cerrar una brecha" : "Evidencia de la evaluación",
       fecha: x.fecha_subida, descargable: !x.en_proceso, eliminable: !x.en_proceso,
       nota: x.en_proceso ? "En validación" : undefined,
     })),
     constancias: d.constancias.map((x) => ({
       clave: `c${x.ruta_id}`, tipo: "constancia", id: x.ruta_id, titulo: `Constancia: ${x.modulo}`,
-      detalle: `Código ${x.codigo}`, fecha: x.fecha_completado, descargable: true, eliminable: true,
+      detalle: `Código de verificación ${x.codigo}`, fecha: x.fecha_completado, descargable: true, eliminable: true,
     })),
   };
   const vacios: Record<Pestana, ReactNode> = {
@@ -143,16 +147,25 @@ export function MisDocumentos({ recarga = 0 }: { recarga?: number }) {
 
   return (
     <section className="card" aria-labelledby="titulo-mis-documentos" style={{ display: "grid", gap: 16 }}>
-      <div className="card-head">
-        <div>
-          <h2 id="titulo-mis-documentos" className="card-title">Mis documentos</h2>
-          <p className="card-sub">
-            Informes, borradores, evidencias y constancias de tu empresa.
-            {d.documentos_disponibles_hasta ? ` Puedes descargarlos hasta el ${fechaCorta(d.documentos_disponibles_hasta)}.` : ""}
-            {" "}Cada eliminación queda registrada en la bitácora de auditoría.
-          </p>
+      {encabezado ? (
+        <div className="card-head">
+          <div>
+            <h2 id="titulo-mis-documentos" className="card-title">Mis documentos</h2>
+            <p className="card-sub">
+              Informes, borradores, evidencias y constancias de tu empresa.
+              {d.documentos_disponibles_hasta ? ` Puedes descargarlos hasta el ${fechaCorta(d.documentos_disponibles_hasta)}.` : ""}
+              {" "}Eliminar un documento es definitivo.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <h2 id="titulo-mis-documentos" className="sr-only">Documentos de tu empresa</h2>
+      )}
+      {!encabezado && d.documentos_disponibles_hasta ? (
+        <p className="callout" role="status">
+          Puedes descargar tus documentos hasta el {fechaCorta(d.documentos_disponibles_hasta)}.
+        </p>
+      ) : null}
 
       <div className={s.pestanas} role="tablist" aria-label="Tipo de documento">
         {PESTANAS.map((p) => (

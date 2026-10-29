@@ -121,7 +121,7 @@ export function RevisionFinal({ evaluacionId, c }: { evaluacionId: number; c: Cu
       <section className={`card ${s.cierre}`} aria-labelledby="t-fin">
         <Icon name="check" />
         <h2 id="t-fin" ref={titulo} tabIndex={-1} className={s.textoPregunta}>Autodiagnóstico registrado</h2>
-        <p>Como tu organización hoy no utiliza IA, no hay controles que evaluar ni brechas que cerrar. Si eso cambia, vuelve a hacer el autodiagnóstico.</p>
+        <p>Como tu organización hoy no utiliza IA, no hay prácticas que evaluar ni brechas que cerrar. Si eso cambia, vuelve a hacer el autodiagnóstico.</p>
       </section>
     );
   }
@@ -135,7 +135,7 @@ export function RevisionFinal({ evaluacionId, c }: { evaluacionId: number; c: Cu
         </h2>
         <p className={s.ayuda}>
           {sinControles
-            ? "Indicaste que tu organización no utiliza IA, así que ningún control aplica."
+            ? "Indicaste que tu organización no utiliza IA, así que no hay más preguntas."
             : "Al completarla calculamos tu nivel de madurez por dominio y las brechas priorizadas. Después ya no podrás modificar las respuestas."}
         </p>
       </div>
@@ -171,13 +171,13 @@ export function RevisionFinal({ evaluacionId, c }: { evaluacionId: number; c: Cu
               return (
                 <li key={`${b.tipo}-${b.idControl}`} className={s.bloqueo}>
                   <span>
-                    <strong style={{ fontFamily: "var(--font-mono)" }}>{b.codigo}</strong> · {TEXTO_BLOQUEO[b.tipo]}
+                    <strong>{i >= 0 ? `Pregunta ${i + 1}` : "Una pregunta"}</strong> · {TEXTO_BLOQUEO[b.tipo]}
                   </span>
                   {b.tipo === "evidencia-en-curso" ? (
                     <span className="badge tone-info">Esperando a la IA</span>
                   ) : i >= 0 ? (
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => c.irA(i)}>
-                      Ir al control
+                      Ir a la pregunta
                     </button>
                   ) : null}
                 </li>

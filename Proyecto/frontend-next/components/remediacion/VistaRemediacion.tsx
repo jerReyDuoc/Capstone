@@ -90,7 +90,7 @@ export function VistaRemediacion() {
       <PageHeader
         eyebrow="Re-evaluación con evidencia"
         titulo="Cerrar brechas"
-        subtitulo="Sube la evidencia de que un control ya se aplica. La IA la analiza y, si el control mejora, tu puntaje se actualiza sin repetir el autodiagnóstico."
+        subtitulo="Sube la evidencia de que una práctica ya se aplica. La IA la analiza y, si mejora, tu puntaje se actualiza sin repetir el autodiagnóstico."
       />
       <p className="aviso-accion" role="status" aria-live="polite">
         {aviso}
@@ -98,7 +98,7 @@ export function VistaRemediacion() {
 
       {estado.tipo === "cargando" ? (
         <div role="status" className="grid">
-          <span className="sr-only">Cargando los controles con brecha…</span>
+          <span className="sr-only">Cargando tus brechas…</span>
           <div className="skeleton col-12" style={{ height: 96 }} />
           <div className="skeleton col-12" style={{ height: 320 }} />
         </div>
@@ -121,7 +121,7 @@ export function VistaRemediacion() {
       {estado.tipo === "error" ? (
         <div className="state" role="alert">
           <Icon name="alerta" width={32} height={32} style={{ color: "var(--alto)" }} />
-          <h2>No pudimos cargar los controles</h2>
+          <h2>No pudimos cargar tus brechas</h2>
           <p>{estado.mensaje}</p>
           <button type="button" className="btn btn-primary" onClick={() => void cargar()}>
             <Icon name="refrescar" />
@@ -136,7 +136,7 @@ export function VistaRemediacion() {
 
           <div className="remed-filtro">
             <p className="card-sub">
-              {datos.controles.length} {datos.controles.length === 1 ? "control con brecha" : "controles con brecha"} ·{" "}
+              {datos.controles.length} {datos.controles.length === 1 ? "brecha abierta" : "brechas abiertas"} ·{" "}
               {formados} con la formación hecha · PDF, Word o texto de hasta {datos.max_mb} MB
             </p>
             <label className="check">
@@ -149,10 +149,10 @@ export function VistaRemediacion() {
             <div className="state" role="status">
               <Icon name="check" width={32} height={32} style={{ color: "var(--accent)" }} />
               <h2>No quedan brechas abiertas</h2>
-              <p>Todos los controles de esta evaluación están cumplidos o no aplican.</p>
+              <p>No hay brechas abiertas en esta evaluación.</p>
             </div>
           ) : visibles.length === 0 ? (
-            <p className="card-sub">Ningún control tiene la formación hecha todavía. Desmarca el filtro para verlos todos.</p>
+            <p className="card-sub">Ninguna brecha tiene la formación hecha todavía. Desmarca el filtro para verlos todos.</p>
           ) : (
             <ul className="remed-lista">
               {visibles.map((c) => (
@@ -206,7 +206,7 @@ function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: i
         <p className="card-sub">
           {subio
             ? `Subió desde ${formatoPuntaje(inicial)} con ${datos.controles_mejorados ?? 0} ${
-                (datos.controles_mejorados ?? 0) === 1 ? "control mejorado" : "controles mejorados"
+                (datos.controles_mejorados ?? 0) === 1 ? "brecha mejorada" : "brechas mejoradas"
               } por evidencia, sin repetir el autodiagnóstico.`
             : "Cada evidencia que la IA valide actualiza este puntaje y el radar al instante."}
         </p>
@@ -329,7 +329,6 @@ function ControlRemediacion({
     <li ref={item} className={`card remed-item sev-${SEVERIDAD_TONO[c.severidad]}`}>
       <div className="remed-cabeza">
         <div className="remed-id">
-          <span className="code">{c.control_codigo ?? c.codigo_brecha}</span>
           <BadgeSeveridad severidad={c.severidad} />
           <span className={`badge tone-${TONO_ESTADO[c.estado]}`}>{ETIQUETA_ESTADO[c.estado]}</span>
           {c.formacion_completada ? (
@@ -339,7 +338,7 @@ function ControlRemediacion({
             </span>
           ) : null}
         </div>
-        <h3 className="remed-titulo">{c.obligacion ?? c.pregunta ?? "Control sin descripción"}</h3>
+        <h3 className="remed-titulo">{c.obligacion ?? c.pregunta ?? "Brecha sin descripción"}</h3>
         {c.dominio ? <p className="card-sub">{c.dominio}</p> : null}
       </div>
 
@@ -354,7 +353,7 @@ function ControlRemediacion({
       {!c.formacion_completada && c.ruta ? (
         <p className="card-sub">
           ¿Falta preparar al equipo? El módulo <Link href={hrefModulo(c.ruta.id, evaluacionId)}>{c.ruta.nombre}</Link> cubre
-          este control.
+          esta brecha.
         </p>
       ) : null}
 
@@ -389,7 +388,7 @@ function ControlRemediacion({
           >
             <Icon name="subir" />
             {evidencia ? "Subir otra evidencia" : "Subir evidencia"}
-            <span className="sr-only"> de {c.control_codigo}</span>
+            <span className="sr-only"> de esta brecha</span>
           </button>
         </div>
       ) : (
@@ -423,7 +422,7 @@ function ControlRemediacion({
           </div>
 
           <fieldset className="field remed-declarar">
-            <legend className="field-label">¿A qué estado llegó el control?</legend>
+            <legend className="field-label">¿A qué estado llegó esta práctica?</legend>
             <div className="chip-group">
               {declarables.map((d) => (
                 <label key={d} className="opcion opcion-chip">
@@ -484,7 +483,7 @@ function ResultadoEvidencia({ evidencia: e }: { evidencia: EvidenciaRemediacionA
       </p>
       {t && t.terminos.length && fase !== "analizando" ? (
         <p className="remed-terminos">
-          Términos del control encontrados: {t.encontrados.length} de {t.terminos.length}
+          Términos clave encontrados: {t.encontrados.length} de {t.terminos.length}
           {t.encontrados.length ? (
             <span className="remed-terminos-lista">
               {t.encontrados.map((x) => (
@@ -496,7 +495,7 @@ function ResultadoEvidencia({ evidencia: e }: { evidencia: EvidenciaRemediacionA
       ) : null}
       {t?.rag?.aplicado && fase !== "analizando" ? (
         <p className="remed-terminos">
-          El documento era largo: la IA analizó los {t.rag.pasajes_usados} pasajes más relacionados con el control (de{" "}
+          El documento era largo: la IA analizó los {t.rag.pasajes_usados} pasajes más relacionados con la brecha (de{" "}
           {t.rag.pasajes_total}).
         </p>
       ) : null}

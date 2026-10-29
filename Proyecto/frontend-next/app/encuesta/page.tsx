@@ -22,8 +22,8 @@ export default async function Encuesta() {
         <header className={s.flujoCabecera}>
           <h1 className={s.flujoTitulo}>Mi autodiagnóstico</h1>
           <p className={s.flujoBajada}>
-            Primero unas preguntas sobre tu organización y luego cada control que aplica. Solo tú, con tu clave, puedes
-            ver y editar esta evaluación.
+            Primero te preguntamos por tu organización y luego por sus prácticas de gobernanza de IA. Solo tú, con tu
+            clave, puedes ver y editar esta evaluación.
           </p>
         </header>
         <InicioEncuesta />

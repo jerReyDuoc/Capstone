@@ -175,6 +175,12 @@ describe("HU-11 · criterio 3: filtros y exportación", () => {
     expect(texto.length).toBeGreaterThan(0);
   });
 
+  it("correcciones 29-10: buscar \"#N\" filtra por prioridad y los códigos internos ya no buscan", () => {
+    const porPrioridad = filtrarBrechas(panel.brechas, { ...FILTROS_VACIOS, texto: "#2" });
+    expect(porPrioridad.map((b) => b.prioridad)).toEqual([2]);
+    expect(filtrarBrechas(panel.brechas, { ...FILTROS_VACIOS, texto: "ERR-DAT-001" })).toHaveLength(0);
+  });
+
   it("los filtros van y vuelven de la URL sin perder nada", () => {
     const f = { severidades: ["Alta", "Crítica"] as const, dominio: "Gobernanza de IA", estado: "parcialmente_cumplido" as const, texto: "shadow" };
     const params = filtrosAParams({ ...f, severidades: [...f.severidades] });
@@ -192,6 +198,8 @@ describe("HU-11 · criterio 3: filtros y exportación", () => {
     expect(lineas).toHaveLength(3);
     expect(lineas[0]).toContain('"Prioridad";"Severidad"');
     expect(lineas[1].startsWith('"1";"Crítica"')).toBe(true);
+    expect(lineas[0]).not.toMatch(/Código/);
+    expect(csv).not.toMatch(/ERR-/);
     expect(celdaCsv('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"');
     expect(celdaCsv(-3)).toBe('"-3"');
   });

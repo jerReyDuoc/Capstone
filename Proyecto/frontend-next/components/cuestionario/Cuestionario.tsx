@@ -79,13 +79,13 @@ export function Cuestionario({
   const control = c.controles[c.indice];
 
   return (
+    // Correcciones 29-10: una sola columna; el índice va plegado sobre la pregunta
     <div className={s.layout}>
-      <IndiceControles c={c} />
       <div className={s.columna}>
         <div className={s.avance}>
           <div className={s.avanceFila}>
             <span>
-              <strong>{progreso?.controles_respondidos ?? 0}</strong> de <strong>{progreso?.controles_aplicables ?? 0}</strong> controles respondidos
+              <strong>{progreso?.controles_respondidos ?? 0}</strong> de <strong>{progreso?.controles_aplicables ?? 0}</strong> preguntas respondidas
             </span>
             <span>
               <strong>{pct} %</strong>
@@ -96,6 +96,8 @@ export function Cuestionario({
           </div>
         </div>
 
+        <IndiceControles c={c} />
+
         {fase.tipo === "revision" || !control ? (
           <RevisionFinal evaluacionId={evaluacionId} c={c} />
         ) : (
@@ -105,7 +107,7 @@ export function Cuestionario({
               <div className="callout" role="note">
                 <Icon name="check" />
                 <span>
-                  Respondiste todos los controles.{" "}
+                  Respondiste todas las preguntas.{" "}
                   <button type="button" className="link-btn" onClick={c.irARevision}>
                     Ir a la revisión final
                   </button>

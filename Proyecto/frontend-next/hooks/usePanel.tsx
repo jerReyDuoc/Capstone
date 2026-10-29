@@ -162,6 +162,11 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
 
+/** Correcciones 29-10: la barra lateral también vive en /empresa, fuera de <PanelProvider>. */
+export function usePanelOpcional(): PanelContexto | null {
+  return useContext(Ctx);
+}
+
 export function usePanel() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("usePanel debe usarse dentro de <PanelProvider>");

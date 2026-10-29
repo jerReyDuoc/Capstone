@@ -1,5 +1,6 @@
 /**
  * HU-11 · Exportación del listado de brechas.
+ * (Correcciones 29-10: sin los códigos internos del catálogo; el cliente ve la prioridad.)
  *
  * - CSV: para llevar el listado a un dashboard externo (Power BI, Looker Studio, Excel).
  *   Separador ";" y BOM UTF-8 para que Excel en es-CL lo abra con tildes y columnas bien.
@@ -17,11 +18,9 @@ export const ETIQUETA_ESTADO_LARGA: Record<EstadoBrecha, string> = {
 const COLUMNAS: [string, (b: BrechaVista) => string | number | null][] = [
   ["Prioridad", (b) => b.prioridad],
   ["Severidad", (b) => b.severidad],
-  ["Código brecha", (b) => b.codigo],
-  ["Código control", (b) => b.controlCodigo],
   ["Dominio", (b) => b.dominio],
   ["Estado", (b) => ETIQUETA_ESTADO_LARGA[b.estado]],
-  ["Impacto del control", (b) => b.criticidad],
+  ["Impacto", (b) => b.criticidad],
   ["Brecha detectada", (b) => b.descripcion],
   ["Acción sugerida", (b) => b.accion],
   ["Ruta formativa", (b) => b.rutaFormativa],

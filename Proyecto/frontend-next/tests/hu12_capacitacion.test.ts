@@ -145,7 +145,9 @@ describe("HU-12 · Plan formativo en el panel", () => {
     expect(lineas).toHaveLength(1 + 3);
     expect(lineas[2]).toContain('"Activado por brechas"');
     expect(lineas[2]).toContain(`"'=Conocer"`); // inyección CSV neutralizada
-    expect(lineas[2]).toContain('"ERR-DAT-001"');
+    // Correcciones 29-10: las brechas se nombran por su prioridad, sin códigos internos
+    expect(lineas[2]).toContain('"#1"');
+    expect(csv).not.toMatch(/ERR-|DAT-0/);
   });
 
   it("modo demo: el plan sigue la misma regla (mapeo + ruta base del nivel)", () => {

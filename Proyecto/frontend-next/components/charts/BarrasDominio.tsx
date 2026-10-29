@@ -85,12 +85,11 @@ export function BarrasDominio({
   return (
     <ChartFrame
       titulo="Comparativa: meta y rubro"
-      subtitulo={
-        hayIndustria
-          ? "Barra sólida: tu empresa · línea de puntos: meta · barra punteada: promedio del rubro"
-          : "Barra sólida: tu empresa · línea de puntos: meta de cumplimiento"
-      }
+      // Correcciones 29-10: sin subtítulo ni pie visibles. La meta ya va rotulada en el gráfico;
+      // solo cuando aparece el promedio del rubro hace falta explicar la barra punteada.
+      subtitulo={hayIndustria ? "Barra punteada: promedio de tu rubro" : undefined}
       resumen={resumen}
+      resumenVisible={false}
       tabla={tabla}
     >
       <svg
@@ -150,7 +149,7 @@ export function BarrasDominio({
                 ["Tu empresa", formatoPuntaje(d.puntaje)],
                 ["Meta", formatoPuntaje(d.meta)],
                 ["Rubro", d.promedioIndustria != null ? formatoPuntaje(d.promedioIndustria) : "Sin referencia"],
-                ["Controles", String(d.controles)],
+                ["Preguntas", String(d.controles)],
               ],
             });
           };

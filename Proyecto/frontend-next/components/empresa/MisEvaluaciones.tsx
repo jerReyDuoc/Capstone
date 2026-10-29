@@ -8,11 +8,15 @@
  * evolución global y por dimensión; y el botón para iniciar (o continuar) una reevaluación.
  * Lee GET /api/cliente/evaluaciones, que responde también sin contrato vigente (los
  * resultados son gratuitos); iniciar una reevaluación exige el servicio activo.
+ *
+ * Correcciones 29-10: es su propia página (/empresa/evaluaciones); el subtítulo largo pasó a un
+ * botón (i) y el cliente ya no ve los números internos de cada evaluación.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { EvolucionMadurez } from "@/components/charts/EvolucionMadurez";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { ErrorBff } from "@/lib/encuesta/cliente";
 import {
   archivarInforme, cargarHistorial, fechaCorta, iniciarReevaluacion, textoVariacion,
@@ -25,10 +29,10 @@ type Estado = { tipo: "cargando" } | { tipo: "listo"; datos: HistorialApi } | { 
 
 const TONO_NIVEL: Record<string, string> = { inicial: "alto", en_desarrollo: "medio", gestionado: "bajo", optimizado: "ok" };
 
-export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?: () => void }) {
+export function MisEvaluaciones() {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
-  const [aviso, setAviso] = useState("");
+  const [aviso, setAviso] = useState<{ texto: string; enlace?: boolean } | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -52,11 +56,12 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
         router.push(`/empresa/evaluacion/${e.info.evaluacionId}`);
         return;
       }
-      setAviso(
-        e instanceof ErrorBff && e.info.codigo === "CONTRATO_NO_VIGENTE"
-          ? "El servicio de tu empresa no está activo: no puedes iniciar una reevaluación."
-          : "No pudimos iniciar la reevaluación. Inténtalo de nuevo.",
-      );
+      setAviso({
+        texto:
+          e instanceof ErrorBff && e.info.codigo === "CONTRATO_NO_VIGENTE"
+            ? "El servicio de tu empresa no está activo: no puedes iniciar una reevaluación."
+            : "No pudimos iniciar la reevaluación. Inténtalo de nuevo.",
+      });
       setOcupado(null);
     }
   }
@@ -65,12 +70,11 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
     setOcupado(`inf${ev.id}`);
     try {
       const doc = await archivarInforme(ev.id);
-      setAviso(`Guardamos el informe de la evaluación N.º ${ev.id} en Mis documentos (${doc.nombre}).`);
-      onDocumentoGuardado?.();
+      setAviso({ texto: `Guardamos el informe del ${fechaCorta(ev.fecha)} (${doc.nombre}).`, enlace: true });
     } catch (e) {
-      setAviso(
-        e instanceof ErrorBff && e.info.mensaje ? e.info.mensaje : "No pudimos guardar el informe. Inténtalo de nuevo.",
-      );
+      setAviso({
+        texto: e instanceof ErrorBff && e.info.mensaje ? e.info.mensaje : "No pudimos guardar el informe. Inténtalo de nuevo.",
+      });
     } finally {
       setOcupado(null);
     }
@@ -95,24 +99,27 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
   const enCurso = r.evaluacion_en_curso_id;
 
   return (
-    <section className="card" aria-labelledby="titulo-mis-evaluaciones" style={{ display: "grid", gap: 20 }}>
-      <div className="card-head">
+    <>
+      <header className="page-head">
         <div>
-          <h2 id="titulo-mis-evaluaciones" className="card-title">Mis evaluaciones</h2>
-          <p className="card-sub">
-            Todas las evaluaciones de tu empresa, incluidas las del autodiagnóstico. Para la comparación con tu rubro
-            solo cuenta la más reciente completada.
-          </p>
+          <span className="eyebrow">Mi empresa</span>
+          <h1 className="page-title">
+            Mis evaluaciones
+            <InfoTip etiqueta="Qué evaluaciones aparecen aquí">
+              Todas las evaluaciones de tu empresa, incluida la del autodiagnóstico. Para la comparación con tu rubro
+              solo cuenta la más reciente completada.
+            </InfoTip>
+          </h1>
         </div>
         <div className={s.acciones}>
           {enCurso ? (
-            <Link className="btn btn-primary btn-sm" href={`/empresa/evaluacion/${enCurso}`} prefetch={false}>
-              Continuar evaluación N.º {enCurso}
+            <Link className="btn btn-primary" href={`/empresa/evaluacion/${enCurso}`} prefetch={false}>
+              Continuar evaluación
             </Link>
           ) : (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary"
               onClick={nueva}
               disabled={!datos.puede_reevaluar || ocupado !== null}
               aria-busy={ocupado === "nueva"}
@@ -122,7 +129,7 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {r.completadas ? (
         <div className={s.rejilla}>
@@ -145,14 +152,22 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
         </div>
       ) : null}
 
-      {r.completadas ? <EvolucionMadurez evolucion={datos.evolucion} /> : null}
+      {r.completadas ? (
+        <section className="card" aria-label="Evolución de la madurez">
+          <EvolucionMadurez evolucion={datos.evolucion} />
+        </section>
+      ) : null}
 
       {!datos.evaluaciones.length ? (
-        <p className={s.vacio}>
+        <p className={`card ${s.vacio}`}>
           Tu empresa aún no tiene evaluaciones. {datos.puede_reevaluar ? "Inicia la primera con Nueva evaluación." : ""}
         </p>
       ) : (
-        <div className="table-wrap">
+        <section className="card" aria-labelledby="titulo-historial">
+          <div className="card-head">
+            <h2 id="titulo-historial" className="card-title">Historial</h2>
+          </div>
+          <div className="table-wrap">
           <table className="table">
             <caption className="sr-only">Historial de evaluaciones de la empresa</caption>
             <thead>
@@ -170,11 +185,8 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
               {datos.evaluaciones.map((ev) => (
                 <tr key={ev.id}>
                   <th scope="row">
-                    N.º {ev.id}
-                    <span className={s.sub}>
-                      {ev.tipo === "migrada" ? "Autodiagnóstico (traspasada)" : "Reevaluación"}
-                      {ev.vigente ? " · vigente" : ""}
-                    </span>
+                    {ev.tipo === "migrada" ? "Autodiagnóstico" : "Reevaluación"}
+                    {ev.vigente ? <span className={s.sub}>Vigente para la comparación</span> : null}
                   </th>
                   <td>{fechaCorta(ev.fecha)}</td>
                   <td>
@@ -209,10 +221,16 @@ export function MisEvaluaciones({ onDocumentoGuardado }: { onDocumentoGuardado?:
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </section>
       )}
-      <p className="sr-only" role="status" aria-live="polite">{aviso}</p>
-      {aviso ? <p className="callout" aria-hidden="true">{aviso}</p> : null}
-    </section>
+      <p className="sr-only" role="status" aria-live="polite">{aviso?.texto ?? ""}</p>
+      {aviso ? (
+        <p className="callout" aria-hidden="true">
+          {aviso.texto}
+          {aviso.enlace ? <> <Link href="/empresa/documentos" prefetch={false}>Ver en Mis documentos</Link></> : null}
+        </p>
+      ) : null}
+    </>
   );
 }

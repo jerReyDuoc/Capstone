@@ -618,19 +618,19 @@ function PasoCierre({
         <section className="cierre-brechas" aria-labelledby="cierre-brechas-t">
           <h3 className="material-titulo" id="cierre-brechas-t">El siguiente paso: cerrar las brechas</h3>
           <p className="card-sub">
-            La formación quedó registrada, pero el puntaje de madurez solo cambia cuando subes evidencia de que el control ya se
+            La formación quedó registrada, pero el puntaje de madurez solo cambia cuando subes evidencia de que la práctica ya se
             aplica en tu organización.
           </p>
           <ul className="cierre-lista">
             {m.brechas.map((b) => (
               <li key={b.codigo}>
-                <span className="code">{b.codigo}</span>
+                <span className="code">{b.prioridad != null ? `Brecha #${b.prioridad}` : b.dominio}</span>
                 <BadgeSeveridad severidad={b.severidad} />
                 <span className="cierre-estado">Formación hecha · falta evidencia</span>
                 {b.respuesta_id ? (
                   <Link className="btn btn-ghost btn-sm" href={hrefRemediacion(m.evaluacion_id, b.respuesta_id)}>
                     <Icon name="subir" />
-                    Subir evidencia<span className="sr-only"> de {b.codigo}</span>
+                    Subir evidencia<span className="sr-only"> de esta brecha</span>
                   </Link>
                 ) : null}
               </li>

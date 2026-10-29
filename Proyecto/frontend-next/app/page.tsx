@@ -1,17 +1,17 @@
 /**
- * HU-19 · Landing pública (antes redirigía a /panel). Rediseño: "mapa de gobernanza".
+ * HU-19 · Landing pública (antes redirigía a /panel).
  *
  * 100 % estática (force-static) y sin componentes cliente: no hidrata nada propio y no
  * carga el CAPTCHA. El flujo interactivo vive en /comenzar, que se carga solo al hacer
  * clic (prefetch desactivado para no bajar su JavaScript en segundo plano).
  *
- * La pieza central es un mapa topográfico (components/publico/MapaGobernanza.tsx): cada
- * cima es un dominio y su altura, la madurez. Es SVG generado al compilar, sin imágenes.
+ * Correcciones 29-10: el héroe es centrado y muestra un ejemplo del resultado
+ * (components/publico/HeroePortada.tsx) en lugar del mapa topográfico, que no se entendía.
  */
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
 import Link from "next/link";
-import { MapaGobernanza } from "@/components/publico/MapaGobernanza";
+import { HeroePortada } from "@/components/publico/HeroePortada";
 import { PaginaPublica } from "@/components/publico/Marco";
 import s from "@/components/publico/portada.module.css";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -53,30 +53,7 @@ export default function Landing() {
   return (
     <PaginaPublica>
       <div className={`${archivo.variable} ${s.portada}`}>
-        <section className={s.heroe} aria-labelledby="titulo-heroe">
-          <div className={s.contenedor}>
-            <div className={s.heroeTexto}>
-              <h1 id="titulo-heroe" className={s.titulo}>
-                Levanta el mapa de gobernanza de IA de tu organización
-              </h1>
-              <div className={s.heroeLado}>
-                <p className={s.bajada}>
-                  Un autodiagnóstico gratuito que se adapta a cómo usas la inteligencia artificial. Al terminar ves tu
-                  madurez en cada dominio, las brechas que conviene cerrar primero y la formación para cerrarlas.
-                </p>
-                <CTAs />
-              </div>
-            </div>
-            <div className={s.mapa}>
-              <MapaGobernanza />
-            </div>
-            <ul className={s.garantias}>
-              <li><Icon name="usuario" /> Sin registro ni invitación</li>
-              <li><Icon name="reloj" /> Guarda y retoma cuando quieras</li>
-              <li><Icon name="candado" /> Datos anonimizados antes de la IA</li>
-            </ul>
-          </div>
-        </section>
+        <HeroePortada />
 
         <section id="como-funciona" className={s.seccion} aria-labelledby="titulo-como">
           <div className={s.contenedor}>
@@ -91,7 +68,7 @@ export default function Landing() {
               </li>
               <li className={s.parada}>
                 <h3>Responde y adjunta evidencias</h3>
-                <p>Unas preguntas iniciales filtran los controles que aplican a tu caso. La IA ayuda a validar las evidencias.</p>
+                <p>Unas preguntas iniciales adaptan el cuestionario a tu caso. La IA ayuda a validar las evidencias.</p>
               </li>
               <li className={s.parada}>
                 <h3>Recibe tu diagnóstico</h3>
@@ -106,7 +83,7 @@ export default function Landing() {
             <div>
               <h2 id="titulo-dominios" className={s.seccionTitulo}>Qué evalúa</h2>
               <p className={s.seccionBajada}>
-                Cuatro dominios, con controles basados en la Ley 21.719, el NIST AI RMF y OWASP para aplicaciones con
+                Cuatro dominios, con preguntas basadas en la Ley 21.719, el NIST AI RMF y OWASP para aplicaciones con
                 modelos de lenguaje.
               </p>
             </div>

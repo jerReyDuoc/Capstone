@@ -212,8 +212,9 @@ class FormacionEmpresa:
             "motivo": mod.motivo if mod else "historial",
             "prioridad": mod.prioridad if mod else "Complementario",
             "brechas": [
+                # Correcciones 29-10: "prioridad" para que el frontend nombre la brecha sin su código
                 {"codigo": c.codigo, "respuesta_id": c.respuesta_id, "control_codigo": c.control_codigo,
-                 "dominio": c.dominio, "severidad": c.severidad, "estado": c.estado}
+                 "dominio": c.dominio, "severidad": c.severidad, "estado": c.estado, "prioridad": c.prioridad}
                 for c in (mod.brechas if mod else [])
             ],
             "lecciones": [

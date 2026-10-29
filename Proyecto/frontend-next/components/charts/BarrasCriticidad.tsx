@@ -70,7 +70,7 @@ export function BarrasCriticidad({
   return (
     <ChartFrame
       titulo="Brechas por severidad"
-      subtitulo="Impacto del control × estado de cumplimiento"
+      subtitulo="Impacto × estado de cumplimiento"
       resumen={resumen}
       tabla={tabla}
     >

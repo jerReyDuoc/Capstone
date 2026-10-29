@@ -55,7 +55,7 @@ export function construirBrechas(
         descripcion:
           cat?.comportamiento_detectado ??
           ctrl?.obligacion ??
-          "Control no cumplido sin brecha de catálogo asociada.",
+          "Práctica no cumplida (sin descripción en el catálogo).",
         criticidad: impacto,
         severidad,
         prioridad: 0, // se numera después de ordenar

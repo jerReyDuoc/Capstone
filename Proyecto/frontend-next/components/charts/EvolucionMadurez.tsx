@@ -12,15 +12,22 @@
  * la superficie oscura; cada color sigue a su dimensión aunque se oculten otras). La
  * identidad nunca va solo en el color: leyenda con botones, rótulos directos al final de
  * cada línea y la tabla de datos (ChartFrame).
+ *
+ * Correcciones 29-10: el ancho del dibujo sigue al de la tarjeta (antes el viewBox fijo dejaba
+ * el gráfico encajonado al centro en pantallas anchas) y el eje ya no muestra los números
+ * internos de las evaluaciones, solo su fecha.
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { COLORES_DIMENSION, fechaCorta, textoVariacion, type HistorialApi } from "@/lib/empresa";
 import { formatoPuntaje, NIVELES, nivelDesdePuntaje } from "@/lib/madurez";
 import { ChartFrame, posicionEnContenedor, Tooltip, type TooltipState } from "./ChartFrame";
 
-const W = 640;
+const ANCHO_MIN = 320;
 const H = 300;
-const M = { top: 20, right: 132, bottom: 52, left: 44 };
+// Margen derecho: en "Por dimensión" hay rótulos con el nombre al final de cada línea; en
+// "Global" basta el espacio del valor.
+const M_GLOBAL = { top: 20, right: 56, bottom: 36, left: 44 };
+const M_DIMENSION = { ...M_GLOBAL, right: 132 };
 
 type Vista = "global" | "dimension";
 
@@ -33,6 +40,15 @@ interface Serie {
 
 export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolucion"] }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Nodo por estado (no ref) para volver a observar cuando el gráfico se remonta tras "Ver como tabla"
+  const [caja, setCaja] = useState<HTMLDivElement | null>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    if (!caja || typeof ResizeObserver === "undefined") return;
+    const obs = new ResizeObserver(([e]) => setW(Math.max(ANCHO_MIN, Math.round(e.contentRect.width))));
+    obs.observe(caja);
+    return () => obs.disconnect();
+  }, [caja]);
   const [tip, setTip] = useState<TooltipState>(null);
   const [vista, setVista] = useState<Vista>("global");
   const [ocultas, setOcultas] = useState<Set<number>>(new Set());
@@ -53,6 +69,7 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
       .map((x) => x.s);
   }, [vista, evolucion, dimensiones, ocultas]);
 
+  const M = vista === "dimension" ? M_DIMENSION : M_GLOBAL;
   const iw = W - M.left - M.right;
   const ih = H - M.top - M.bottom;
   const x = (i: number) => (n <= 1 ? M.left + iw / 2 : M.left + (i / (n - 1)) * iw);
@@ -108,7 +125,7 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
         <tbody>
           {evolucion.global.map((p, i) => (
             <tr key={p.evaluacion_id}>
-              <th scope="row">N.º {p.evaluacion_id} · {fechaCorta(p.fecha)}</th>
+              <th scope="row">{fechaCorta(p.fecha)}</th>
               <td className="num">{formatoPuntaje(p.puntaje)}</td>
               {evolucion.dimensiones.map((d) => (
                 <td className="num" key={d.dominio_id}>{formatoPuntaje(d.puntos[i]?.puntaje)}</td>
@@ -169,7 +186,7 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
       tabla={tabla}
     >
       {leyenda}
-      <div style={{ position: "relative" }}>
+      <div ref={setCaja} style={{ position: "relative" }}>
         <svg
           ref={svgRef}
           className="chart-svg"
@@ -195,11 +212,6 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
               {fechaCorta(f)}
             </text>
           ))}
-          {fechas.map((_, i) => (
-            <text key={`id${i}`} className="tick" x={x(i)} y={H - M.bottom + 36} textAnchor="middle" aria-hidden="true">
-              N.º {evolucion.global[i].evaluacion_id}
-            </text>
-          ))}
 
           {series.map((s) => {
             // La línea se corta donde la dimensión no aplicó (punto vacío)
@@ -221,7 +233,7 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
                   if (v == null) return null;
                   const p = evolucion.global[i];
                   const anterior = i > 0 ? s.puntos[i - 1] : null;
-                  const etiqueta = `${s.nombre}, evaluación N.º ${p.evaluacion_id} del ${fechaCorta(p.fecha)}: ${formatoPuntaje(v)} puntos, nivel ${NIVELES[nivelDesdePuntaje(v)].etiqueta}${anterior != null ? `, ${textoVariacion(v - anterior)} frente a la anterior` : ""}.`;
+                  const etiqueta = `${s.nombre}, evaluación del ${fechaCorta(p.fecha)}: ${formatoPuntaje(v)} puntos, nivel ${NIVELES[nivelDesdePuntaje(v)].etiqueta}${anterior != null ? `, ${textoVariacion(v - anterior)} frente a la anterior` : ""}.`;
                   const mostrar = () => {
                     const pos = posicionEnContenedor(svgRef.current, x(i), y(v) - 8);
                     setTip({
@@ -231,7 +243,6 @@ export function EvolucionMadurez({ evolucion }: { evolucion: HistorialApi["evolu
                         ["Puntaje", formatoPuntaje(v)],
                         ["Nivel", NIVELES[nivelDesdePuntaje(v)].etiqueta],
                         ["Frente a la anterior", anterior != null ? textoVariacion(v - anterior) : "—"],
-                        ["Evaluación", `N.º ${p.evaluacion_id}`],
                       ],
                     });
                   };

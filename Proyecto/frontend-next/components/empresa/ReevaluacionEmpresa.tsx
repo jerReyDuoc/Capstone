@@ -31,13 +31,12 @@ export function ReevaluacionEmpresa({ evaluacionId }: { evaluacionId: number }) 
       <main id="contenido" className={s.contenido} tabIndex={-1}>
         <div>
           <p className="card-sub" style={{ margin: 0 }}>
-            <Link href="/empresa" prefetch={false}>← Volver al espacio de tu empresa</Link>
+            <Link href="/empresa/evaluaciones" prefetch={false}>← Volver a Mis evaluaciones</Link>
           </p>
-          <h1 className="page-title">Reevaluación N.º {evaluacionId}</h1>
+          <h1 className="page-title">Reevaluación</h1>
           <p className="page-sub">
-            Responde de nuevo los controles para medir cuánto avanzó tu organización. Tu avance se guarda solo y puedes
-            retomarla desde Mis evaluaciones. Al completarla se calcula el nuevo nivel de madurez y su informe queda en
-            Mis documentos.
+            Responde de nuevo las preguntas para medir cuánto avanzó tu organización. Al completarla se calcula el nuevo
+            nivel de madurez y su informe queda en Mis documentos.
           </p>
         </div>
         <Cuestionario evaluacionId={evaluacionId} base="/bff/cliente/api" onLimites={() => undefined} />
