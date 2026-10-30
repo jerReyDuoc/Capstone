@@ -9,6 +9,7 @@ import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
 import { BarrasDominio } from "@/components/charts/BarrasDominio";
 import { RadarMadurez } from "@/components/charts/RadarMadurez";
+import { AvisoCohorte } from "@/components/sector/AvisoCohorte";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
@@ -87,6 +88,9 @@ export function VistaDiagnostico() {
               </div>
 
               <VistasFijadas panel={p} />
+
+              {/* HU-10: advertencia si la comparación con el sector está oculta (k < 5) */}
+              <AvisoCohorte panel={p} compacto hrefSector={href("/panel/sector")} />
 
               <div className="grid">
                 <div className="card col-7 md-col-7">

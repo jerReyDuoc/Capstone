@@ -382,7 +382,7 @@ Si todos los controles quedan fuera (F1 = NO o 100 % `no_aplica`), no se genera 
 `GET /api/evaluaciones/{id}/comparativa` devuelve por dominio:
 
 - la **meta de cumplimiento** (`META_CUMPLIMIENTO_PUNTAJE`, 75 = techo de *gestionado*): lo que debería alcanzar cada dimensión, la diferencia y si la cumple. Está siempre, aunque no haya benchmark ni rubro;
-- el **promedio del rubro**, solo si hay `COMPARATIVA_MIN_MUESTRAS` evaluaciones completadas o más (3 por defecto; con 1 sería la propia empresa). Si no, `promedio_industria = null` y `muestras` indica cuántas hay; el panel lo explica en texto.
+- el **sector (rubro)** con k-anonimato (HU-10): el promedio solo se publica si la cohorte tiene `K_ANONIMATO_MINIMO` **empresas distintas** o más (5 por defecto, mínimo 5 en production; una empresa que se reevalúa cuenta una vez). Con menos, todas las métricas del sector salen en `null`, no se revela cuántas empresas hay y `sector.advertencia` trae el aviso para la interfaz. Mediana y percentiles 25/75 solo con `K_ANONIMATO_DISTRIBUCION` (10); máximo y mínimo nunca se publican. Detalle en `Extras/Cambios/backend/CAMBIOS_HU10.md`.
 
 ### 5.8 Solicitudes de derechos ARCOP (Ley 21.719)
 
@@ -648,11 +648,11 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | POST | `/api/evaluaciones/{id}/cerrar` | 📋 | Genera resumen por dominio, puntaje y nivel general (vista previa: **no** cierra la evaluación, se puede repetir) |
 | POST | `/api/evaluaciones/{id}/completar` | 📋 | **Cierre definitivo:** exige filtro completo, todos los controles aplicables respondidos y ninguna evidencia en validación; genera el resumen y marca `estado_progreso = completada` (entra al benchmark). 409 `CUESTIONARIO_INCOMPLETO`, `EVIDENCIAS_EN_PROCESO`, `REVISION_SIN_EVIDENCIA` (control en `requiere_revision` sin evidencia), `FILTRO_PENDIENTE` o `EVALUACION_CERRADA`; 404 si no existe |
 | GET | `/api/evaluaciones/{id}/resumen` | 📋 | Resumen guardado (404 si no se ha cerrado) |
-| GET | `/api/evaluaciones/{id}/comparativa` | 📋 | Resumen vs. **meta de cumplimiento** (siempre) y benchmark del rubro (solo con ≥ `COMPARATIVA_MIN_MUESTRAS`); trae `meta_puntaje`, `diferencia_vs_meta`, `cumple_meta`, `referencia_suficiente`, `muestras` |
+| GET | `/api/evaluaciones/{id}/comparativa` | 📋 | Resumen vs. **meta de cumplimiento** (siempre) y sector del rubro con k-anonimato (HU-10, solo con ≥ `K_ANONIMATO_MINIMO` empresas); trae `meta_puntaje`, `diferencia_vs_meta`, `cumple_meta`, `sector` (general, `posicion`, `advertencia`) y por dimensión `cohorte_suficiente`, `promedio_industria`, `posicion` |
 | GET | `/api/evaluaciones/{id}/plan-formativo` | 📋 | HU-12: plan de estudio por dimensión (nivel asignado, objetivo, módulos y brechas que cubren); 404 `SIN_RESULTADOS` si no hay resumen |
 | GET | `/api/evaluaciones/{id}/informe/pdf?severidad=&dominio=&estado=&q=` | 📋 | Informe en PDF para descargar (resultado, comparativa, brechas, plan formativo) |
 | POST | `/api/evaluaciones/{id}/informe/enviar` | 📋 | `{email?, recordar?, severidad?, …}` → envía el mismo PDF por correo; 422 `EMAIL_REQUERIDO`/`EMAIL_INVALIDO`, 429 `LIMITE_CORREOS`, 502 `CORREO_FALLIDO`, 503 `CORREO_NO_DISPONIBLE` |
-| GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔑 | Benchmark por rubro × dominio (datos agregados) |
+| GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔑 | HU-10: promedios por rubro × dominio y general del rubro (`dominio_id` null), con supresión k < 5; sin máximo ni mínimo |
 | PATCH | `/api/evaluaciones/{id}/prueba` | 🛡️ | `{es_prueba}` — excluye/incluye la evaluación del benchmark (HU-19) |
 
 Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size, pages}`.
@@ -1033,7 +1033,8 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backe
 | `ARCOP_PLAZO_RESPUESTA_DIAS` | vacío | Plazo de respuesta ARCOP (días corridos). **Dejar comentada** hasta definirla: con `=` vacío la app no arranca |
 | `ARCOP_PLAZO_INFORMACION_DIAS` | vacío | Plazo para aportar información (mismo cuidado) |
 | `META_CUMPLIMIENTO_PUNTAJE` | `75` | Meta por dimensión que muestra la comparativa ("lo que debería cumplir") |
-| `COMPARATIVA_MIN_MUESTRAS` | `3` | Evaluaciones del rubro necesarias para mostrar su promedio (`1` = siempre; útil en demos) |
+| `K_ANONIMATO_MINIMO` | `5` | HU-10: empresas distintas del rubro necesarias para publicar su promedio (en production no puede ser < 5; `1` solo en demos locales) |
+| `K_ANONIMATO_DISTRIBUCION` | `10` | HU-10: empresas necesarias para publicar mediana y percentiles 25/75 del rubro |
 | `BENCHMARK_AL_COMPLETAR` | `true` | Recalcular el benchmark al completar cada evaluación |
 | `CORREO_MODO` | `archivo` | `archivo` (guarda el `.eml`, desarrollo) · `smtp` (envío real) · `desactivado`. En `production` no se permite `archivo` |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | Servidor de correo (Gmail: `smtp.gmail.com`). Obligatorio con `CORREO_MODO=smtp` |
@@ -1144,7 +1145,7 @@ alembic revision --autogenerate -m "descripcion"                   # nueva migra
 | «No pudimos enviar el correo» + `SSLCertVerificationError` en `docker compose logs api` | Avast/AVG u otro antivirus intercepta el correo cifrado | Desactivar «Analizar correo saliente (SMTP)» en el Escudo de correo |
 | `SMTPAuthenticationError` / `535` | Clave que no es de aplicación, con espacios o de otra cuenta | Crear una contraseña de aplicación con la misma cuenta de `SMTP_USUARIO` |
 | `TimeoutError` al enviar | La red bloquea el puerto 587 | Otra red, o `SMTP_PORT=465`, `SMTP_SSL=true`, `SMTP_STARTTLS=false` |
-| La comparativa no muestra el promedio del rubro | Menos de `COMPARATIVA_MIN_MUESTRAS` evaluaciones completadas del rubro | Es lo esperado (se muestra la meta); en demos usar `COMPARATIVA_MIN_MUESTRAS=1` |
+| La comparativa no muestra el promedio del rubro | Menos de `K_ANONIMATO_MINIMO` (5) empresas distintas del rubro, o el benchmark no se recalculó tras la migración HU-10 | Es lo esperado (HU-10: se muestra la advertencia y la meta). Tras migrar: `docker compose exec worker python scripts/recalcular_benchmark.py`; en demos locales `K_ANONIMATO_MINIMO=1` |
 | Caracteres raros (`polÃtica`) | Codificación de la consola | Verificar en `psql`; suele ser solo visual |
 
 ---

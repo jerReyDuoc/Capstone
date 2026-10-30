@@ -43,6 +43,39 @@ export interface ResumenApi {
   }[];
 }
 
+/** HU-10: dónde queda la empresa frente a su sector, sin mostrar puntajes ajenos. */
+export type PosicionSector =
+  | "bajo_cuartil_inferior"
+  | "franja_central"
+  | "sobre_cuartil_superior"
+  | "bajo_promedio"
+  | "en_promedio"
+  | "sobre_promedio";
+
+/** HU-10: por qué la comparación con el sector está oculta (o parcialmente). */
+export type CodigoAdvertenciaSector = "SIN_RUBRO" | "COHORTE_INSUFICIENTE" | "COHORTE_PARCIAL";
+
+/** HU-10: bloque `sector` de la comparativa (puntaje general frente al rubro). */
+export interface SectorApi {
+  rubro_id: number | null;
+  rubro: string | null;
+  /** Empresas distintas necesarias para publicar (K_ANONIMATO_MINIMO, 5). */
+  k_minimo: number;
+  cohorte_suficiente: boolean;
+  /** null si la cohorte es insuficiente: el backend no revela cuántas hay. */
+  empresas: number | null;
+  promedio: number | null;
+  mediana: number | null;
+  percentil_25: number | null;
+  percentil_75: number | null;
+  tu_puntaje: number | null;
+  diferencia: number | null;
+  posicion: PosicionSector | null;
+  dimensiones_publicadas: number;
+  dimensiones_suprimidas: number;
+  advertencia: { codigo: CodigoAdvertenciaSector; mensaje: string } | null;
+}
+
 /** GET /api/evaluaciones/{id}/comparativa */
 export interface ComparativaApi {
   evaluacion_id: number;
@@ -50,18 +83,28 @@ export interface ComparativaApi {
   /** HU-12/HU-13: lo que debería alcanzar cada dimensión (META_CUMPLIMIENTO_PUNTAJE). Backends previos no lo traen. */
   meta_puntaje?: number;
   meta_nivel?: NivelMadurez;
-  /** Evaluaciones del rubro necesarias para mostrar su promedio (COMPARATIVA_MIN_MUESTRAS). */
+  /** HU-10: empresas distintas del rubro necesarias para mostrar su promedio (K_ANONIMATO_MINIMO). */
+  k_minimo?: number;
+  /** Nombre previo de k_minimo (HU-12). */
   muestras_minimas?: number;
+  /** HU-10. Backends previos no lo traen. */
+  sector?: SectorApi;
   comparativas: {
+    dominio_id?: number;
     dominio: string;
     tu_puntaje: number | null;
     tu_nivel: NivelMadurez | null;
     promedio_industria: number | null;
     mediana_industria: number | null;
-    maximo_industria: number | null;
-    minimo_industria: number | null;
-    muestras: number;
+    /** HU-10: solo con cohortes grandes (K_ANONIMATO_DISTRIBUCION). */
+    percentil_25?: number | null;
+    percentil_75?: number | null;
+    cohorte_suficiente?: boolean;
     referencia_suficiente?: boolean;
+    empresas?: number | null;
+    /** HU-10: null si la cohorte es < k (no se revela cuántas hay). */
+    muestras: number | null;
+    posicion?: PosicionSector | null;
     diferencia_vs_promedio: number | null;
     meta?: number;
     diferencia_vs_meta?: number;
@@ -125,7 +168,14 @@ export interface DominioVista {
   controles: number;
   promedioIndustria: number | null;
   diferencia: number | null;    // puntos vs. promedio de la industria
+  /** HU-10: empresas de la cohorte; 0 si es insuficiente (el backend no revela cuántas). */
   muestras: number;
+  /** HU-10: la cohorte del sector tiene al menos k empresas en esta dimensión. */
+  cohorteSuficiente: boolean;
+  /** HU-10: franja central del sector (solo con cohortes grandes). */
+  p25Industria: number | null;
+  p75Industria: number | null;
+  posicion: PosicionSector | null;
   /** Puntaje que debería alcanzar la dimensión y cuánto le falta (negativo) o sobra. */
   meta: number;
   diferenciaMeta: number;
@@ -167,11 +217,32 @@ export interface PanelVista {
   tieneBenchmark: boolean;
   /** Meta de cumplimiento por dimensión (0-100). */
   meta: number;
-  /** Evaluaciones del rubro necesarias para mostrar su promedio, y las que hay hoy (máx. entre dominios). */
+  /** HU-10: empresas distintas del rubro necesarias para mostrar su promedio (k). */
   muestrasMinimas: number;
+  /** Empresas de la cohorte (máx. entre dominios); 0 si es insuficiente. */
   muestrasRubro: number;
   /** El backend no tiene rubro para esta evaluación o falló la comparativa. */
   sinRubro: boolean;
+  /** HU-10: comparación del puntaje general con el sector (null con backends previos). */
+  sector: SectorVista | null;
+}
+
+/** HU-10 · Comparativa sectorial con k-anonimato. */
+export interface SectorVista {
+  rubro: string | null;
+  kMinimo: number;
+  cohorteSuficiente: boolean;
+  empresas: number | null;
+  promedio: number | null;
+  mediana: number | null;
+  p25: number | null;
+  p75: number | null;
+  tuPuntaje: number;
+  diferencia: number | null;
+  posicion: PosicionSector | null;
+  dimensionesPublicadas: number;
+  dimensionesSuprimidas: number;
+  advertencia: { codigo: CodigoAdvertenciaSector; mensaje: string } | null;
 }
 
 /* ------------------------------------------------------------------

@@ -95,7 +95,7 @@ describe("construirPanel", () => {
       comparativa: {
         evaluacion_id: 7,
         rubro_id: 1,
-        comparativas: [{ dominio: "Uso Responsable", tu_puntaje: 80, tu_nivel: null, promedio_industria: 62.5, mediana_industria: null, maximo_industria: null, minimo_industria: null, muestras: 3, diferencia_vs_promedio: null }],
+        comparativas: [{ dominio: "Uso Responsable", tu_puntaje: 80, tu_nivel: null, promedio_industria: 62.5, mediana_industria: null, muestras: 3, diferencia_vs_promedio: null }],
       },
       respuestas: [],
       catalogo,

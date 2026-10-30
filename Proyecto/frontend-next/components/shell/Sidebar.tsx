@@ -30,6 +30,8 @@ const RESULTADOS: Item[] = [
   { ruta: "/panel", etiqueta: "Diagnóstico", icono: "diagnostico", exacta: true },
   { ruta: "/panel/dominios", etiqueta: "Dominios", icono: "dominios" },
   { ruta: "/panel/brechas", etiqueta: "Brechas", icono: "brechas" },
+  // HU-10: comparativa contra el sector (k-anonimato)
+  { ruta: "/panel/sector", etiqueta: "Sector", icono: "sector" },
   // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
   { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
 ];

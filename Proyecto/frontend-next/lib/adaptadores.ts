@@ -11,6 +11,7 @@ import type {
   PanelVista,
   RespuestaApi,
   ResumenApi,
+  SectorVista,
 } from "./types";
 
 const ESTADOS_BRECHA = new Set(["no_cumplido", "parcialmente_cumplido"]);
@@ -104,8 +105,10 @@ export function construirDominios(resumen: ResumenApi, comparativa: ComparativaA
     .map<DominioVista>((d) => {
       const puntaje = d.puntaje ?? 0;
       const c = bench.get(d.dominio);
-      // Backends previos devolvían el promedio aunque hubiera 1 sola evaluación (la propia)
-      const prom = c?.referencia_suficiente === false ? null : (c?.promedio_industria ?? null);
+      // HU-10: el backend suprime el sector si la cohorte tiene menos de k empresas. Por si
+      // acaso (backends previos), nunca se muestra un promedio marcado como insuficiente.
+      const suficiente = (c?.cohorte_suficiente ?? c?.referencia_suficiente) !== false && c?.promedio_industria != null;
+      const prom = suficiente ? (c?.promedio_industria ?? null) : null;
       const meta = c?.meta ?? metaGeneral;
       return {
         id: d.dominio_id,
@@ -115,7 +118,11 @@ export function construirDominios(resumen: ResumenApi, comparativa: ComparativaA
         controles: d.total_controles_evaluados ?? 0,
         promedioIndustria: prom,
         diferencia: prom == null ? null : (c?.diferencia_vs_promedio ?? round(puntaje - prom)),
-        muestras: c?.muestras ?? 0,
+        muestras: suficiente ? (c?.empresas ?? c?.muestras ?? 0) : 0,
+        cohorteSuficiente: suficiente,
+        p25Industria: suficiente ? (c?.percentil_25 ?? null) : null,
+        p75Industria: suficiente ? (c?.percentil_75 ?? null) : null,
+        posicion: suficiente ? (c?.posicion ?? null) : null,
         meta,
         diferenciaMeta: round(puntaje - meta),
       };
@@ -147,17 +154,47 @@ export function construirPanel(args: {
     parciales: brechas.filter((b) => b.estado === "parcialmente_cumplido").length,
     tieneBenchmark: dominios.some((d) => d.promedioIndustria != null),
     meta: args.comparativa?.meta_puntaje ?? META_POR_DEFECTO,
-    muestrasMinimas: args.comparativa?.muestras_minimas ?? 1,
+    muestrasMinimas: args.comparativa?.k_minimo ?? args.comparativa?.muestras_minimas ?? K_POR_DEFECTO,
     muestrasRubro: Math.max(0, ...dominios.map((d) => d.muestras)),
     sinRubro: args.comparativa == null || args.comparativa.rubro_id == null,
+    sector: construirSector(args.comparativa, args.resumen.puntaje_general),
+  };
+}
+
+/** HU-10: k por defecto si el backend no lo informa (criterio de aceptación: k < 5 se oculta). */
+export const K_POR_DEFECTO = 5;
+
+export function construirSector(comparativa: ComparativaApi | null, puntajeGeneral: number): SectorVista | null {
+  const s = comparativa?.sector;
+  if (!s) return null;
+  const suficiente = s.cohorte_suficiente && s.promedio != null;
+  return {
+    rubro: s.rubro,
+    kMinimo: s.k_minimo ?? K_POR_DEFECTO,
+    cohorteSuficiente: suficiente,
+    // Defensa en profundidad: aunque llegara un valor, con cohorte insuficiente no se usa
+    empresas: suficiente ? s.empresas : null,
+    promedio: suficiente ? s.promedio : null,
+    mediana: suficiente ? s.mediana : null,
+    p25: suficiente ? s.percentil_25 : null,
+    p75: suficiente ? s.percentil_75 : null,
+    tuPuntaje: s.tu_puntaje ?? puntajeGeneral,
+    diferencia: suficiente ? s.diferencia : null,
+    posicion: suficiente ? s.posicion : null,
+    dimensionesPublicadas: s.dimensiones_publicadas,
+    dimensionesSuprimidas: s.dimensiones_suprimidas,
+    advertencia: s.advertencia,
   };
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-/** Por qué el panel no muestra el promedio del rubro (null si sí lo muestra). */
+/**
+ * Por qué el panel no muestra el promedio del rubro (null si sí lo muestra).
+ * HU-10: no dice cuántas empresas hay, solo el umbral (revelar k ya acota quiénes son).
+ */
 export function notaIndustria(p: PanelVista): string | null {
   if (p.tieneBenchmark) return null;
   if (p.sinRubro) return "Esta evaluación no tiene rubro asociado: se compara solo con la meta.";
-  return `El promedio del rubro aparece con al menos ${p.muestrasMinimas} evaluaciones completadas (hoy ${p.muestrasRubro === 1 ? "hay 1, la tuya" : `hay ${p.muestrasRubro}`}).`;
+  return `El promedio del rubro está oculto: hay menos de ${p.muestrasMinimas} empresas evaluadas en tu sector y mostrarlo podría revelar sus resultados.`;
 }

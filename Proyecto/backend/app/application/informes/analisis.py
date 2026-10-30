@@ -195,6 +195,8 @@ class ComparativaDominio:
     promedio_industria: float | None
     muestras: int
     meta: float
+    # HU-10: false = cohorte del rubro < K_ANONIMATO_MINIMO empresas (promedio oculto)
+    cohorte_suficiente: bool = False
 
 
 # --------------------------------------------------------------------- brechas

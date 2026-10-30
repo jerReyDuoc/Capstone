@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { BarrasDominio } from "@/components/charts/BarrasDominio";
+import { AvisoCohorte } from "@/components/sector/AvisoCohorte";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
@@ -33,6 +34,8 @@ export function VistaDominios() {
       <EstadoPanel>
         {(p) => (
           <>
+            {/* HU-10: si el sector está oculto (k < 5), se advierte junto al gráfico */}
+            <AvisoCohorte panel={p} compacto hrefSector={href("/panel/sector")} />
             <div className="card">
               <BarrasDominio dominios={p.dominios} notaIndustria={notaIndustria(p) ?? undefined} />
             </div>

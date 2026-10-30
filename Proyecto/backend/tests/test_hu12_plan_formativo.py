@@ -292,7 +292,8 @@ def test_api_plan_formativo_404_sin_resultados_y_200_al_completar():
 @api
 def test_api_comparativa_trae_meta_y_benchmark_tras_completar(monkeypatch):
     from app.core.config import settings
-    monkeypatch.setattr(settings, "COMPARATIVA_MIN_MUESTRAS", 1)
+    # HU-10: con k = 1 una sola empresa basta para ver el promedio del rubro (solo en pruebas)
+    monkeypatch.setattr(settings, "K_ANONIMATO_MINIMO", 1)
 
     async def esc(c, eval_id, todos):
         await _completar(c, eval_id, todos)
@@ -302,19 +303,21 @@ def test_api_comparativa_trae_meta_y_benchmark_tras_completar(monkeypatch):
         assert fila["meta"] == j["meta_puntaje"] and "diferencia_vs_meta" in fila
         # El benchmark se recalculó al completar: ya hay promedio del rubro (n = 1 permitido)
         assert fila["muestras"] >= 1 and fila["promedio_industria"] is not None
+        assert j["sector"]["cohorte_suficiente"] is True and j["sector"]["promedio"] is not None
     _correr(esc)
 
 
 @api
 def test_api_comparativa_oculta_el_promedio_con_pocas_muestras(monkeypatch):
     from app.core.config import settings
-    monkeypatch.setattr(settings, "COMPARATIVA_MIN_MUESTRAS", 3)
+    monkeypatch.setattr(settings, "K_ANONIMATO_MINIMO", 5)
 
     async def esc(c, eval_id, todos):
         await _completar(c, eval_id, todos)
         fila = (await c.get(f"/api/evaluaciones/{eval_id}/comparativa")).json()["comparativas"][0]
         assert fila["promedio_industria"] is None and fila["referencia_suficiente"] is False
-        assert fila["muestras"] == 1
+        # HU-10: con k < 5 tampoco se revela cuántas empresas hay
+        assert fila["muestras"] is None
     _correr(esc)
 
 

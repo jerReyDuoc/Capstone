@@ -140,21 +140,21 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
 
     rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
     rubro = await db.get(Rubro, rubro_id) if rubro_id else None
-    bench = {}
-    if rubro_id:
-        bench = {b.dominio_id: b for b in (await db.execute(
-            select(Benchmark).where(Benchmark.rubro_id == rubro_id)
-        )).scalars().all()}
-    comparativa = [
-        ComparativaDominio(
+    # HU-10: el promedio del rubro sale con la supresión k-anónima (cohortes < k ocultas)
+    from app.application.benchmark.sector import filas_del_rubro, publicar_fila
+
+    bench = await filas_del_rubro(db, rubro_id)
+    general_ok = publicar_fila(bench.get(None)).suficiente
+    comparativa = []
+    for d in dominios:
+        pub = publicar_fila(bench.get(d.dominio_id)) if general_ok else publicar_fila(None)
+        comparativa.append(ComparativaDominio(
             dominio=d.nombre, tu_puntaje=d.puntaje,
-            promedio_industria=(bench[d.dominio_id].promedio_puntaje
-                                if d.dominio_id in bench and referencia_suficiente(bench[d.dominio_id]) else None),
-            muestras=(bench[d.dominio_id].total_evaluaciones or 0) if d.dominio_id in bench else 0,
+            promedio_industria=pub.promedio,
+            muestras=pub.empresas or 0,
             meta=settings.META_CUMPLIMIENTO_PUNTAJE,
-        )
-        for d in dominios
-    ]
+            cohorte_suficiente=pub.suficiente,
+        ))
 
     return DatosEvaluacion(
         evaluacion_id=evaluacion_id, fecha_inicio=evaluacion.fecha_inicio, estado=evaluacion.estado_progreso,
@@ -168,5 +168,7 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
 
 
 def referencia_suficiente(bm: Benchmark | None) -> bool:
-    """El promedio del rubro solo se muestra con suficientes evaluaciones (incluye la propia)."""
-    return bm is not None and (bm.total_evaluaciones or 0) >= settings.COMPARATIVA_MIN_MUESTRAS
+    """HU-10: el promedio del rubro solo se muestra con K_ANONIMATO_MINIMO empresas o más."""
+    from app.application.benchmark.sector import publicar_fila
+
+    return publicar_fila(bm).suficiente

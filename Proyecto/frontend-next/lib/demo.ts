@@ -102,27 +102,60 @@ export function panelDemo(evaluacionId: number): PanelVista {
     })),
   };
 
+  // HU-10: cohorte de 27 empresas; la última dimensión tiene menos de 5 con puntaje y se suprime
+  const suprimida = filas.length - 1;
+  const promedioSector = 58;
   const comparativa: ComparativaApi = {
     evaluacion_id: id,
     rubro_id: 3,
     meta_puntaje: 75,
     meta_nivel: "gestionado",
-    muestras_minimas: 3,
-    comparativas: filas.map(([dominio, puntaje, , prom]) => ({
-      dominio,
-      tu_puntaje: puntaje,
-      tu_nivel: null,
-      promedio_industria: prom,
-      mediana_industria: prom,
-      maximo_industria: 88,
-      minimo_industria: 12,
-      muestras: 27,
-      diferencia_vs_promedio: Math.round((puntaje - prom) * 100) / 100,
-      referencia_suficiente: true,
-      meta: 75,
-      diferencia_vs_meta: Math.round((puntaje - 75) * 100) / 100,
-      cumple_meta: puntaje >= 75,
-    })),
+    k_minimo: 5,
+    muestras_minimas: 5,
+    sector: {
+      rubro_id: 3,
+      rubro: "Servicios financieros",
+      k_minimo: 5,
+      cohorte_suficiente: true,
+      empresas: 27,
+      promedio: promedioSector,
+      mediana: 57,
+      percentil_25: 44,
+      percentil_75: 71,
+      tu_puntaje: general,
+      diferencia: Math.round((general - promedioSector) * 10) / 10,
+      posicion: general < 44 ? "bajo_cuartil_inferior" : general > 71 ? "sobre_cuartil_superior" : "franja_central",
+      dimensiones_publicadas: filas.length - 1,
+      dimensiones_suprimidas: 1,
+      advertencia: {
+        codigo: "COHORTE_PARCIAL",
+        mensaje: `En 1 de ${filas.length} dimensiones hay menos de 5 empresas con puntaje, por eso esas comparaciones están ocultas.`,
+      },
+    },
+    comparativas: filas.map(([dominio, puntaje, , prom], i): ComparativaApi["comparativas"][number] => {
+      const ok = i !== suprimida;
+      const p25 = Math.max(0, Math.round(prom - 13));
+      const p75 = Math.min(100, Math.round(prom + 12));
+      return {
+        dominio_id: i + 1,
+        dominio,
+        tu_puntaje: puntaje,
+        tu_nivel: null,
+        promedio_industria: ok ? prom : null,
+        mediana_industria: ok ? prom : null,
+        percentil_25: ok ? p25 : null,
+        percentil_75: ok ? p75 : null,
+        cohorte_suficiente: ok,
+        referencia_suficiente: ok,
+        empresas: ok ? 27 : null,
+        muestras: ok ? 27 : null,
+        posicion: ok ? (puntaje < p25 ? "bajo_cuartil_inferior" : puntaje > p75 ? "sobre_cuartil_superior" : "franja_central") : null,
+        diferencia_vs_promedio: ok ? Math.round((puntaje - prom) * 10) / 10 : null,
+        meta: 75,
+        diferencia_vs_meta: Math.round((puntaje - 75) * 100) / 100,
+        cumple_meta: puntaje >= 75,
+      };
+    }),
   };
 
   const respuestas: RespuestaApi[] = [

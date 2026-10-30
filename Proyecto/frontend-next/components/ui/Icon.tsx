@@ -50,6 +50,8 @@ const PATHS = {
   carpeta: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z",
   salir: "M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3",
   flechaIzq: "M19 12H5m6 6-6-6 6-6",
+  // HU-10: comparativa sectorial (tu barra frente a las del grupo)
+  sector: "M3 21h18M6 21v-6M10.5 21V9M15 21v-9M19.5 21V6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

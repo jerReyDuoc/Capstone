@@ -16,6 +16,10 @@ from app.domain.models.dominio import Dominio
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.rubro import Rubro
 from app.domain.models.evaluacion import Evaluacion
+from app.application.benchmark.k_anonimato import SUPRIMIDA, diferencia, posicion
+from app.application.benchmark.sector import bloque_sector, filas_del_rubro, publicar_fila
+
+GENERAL = "Puntaje general"
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +131,13 @@ async def get_benchmark(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Devuelve los promedios del mercado por rubro y dominio.
-    Si no se especifica rubro_id, devuelve todos.
+    Promedios agregados por rubro (HU-10, criterio 1): una fila por dimensión y una con
+    `dominio_id = null` para el puntaje GENERAL del rubro.
+
+    HU-10 (criterio 2): las filas cuya cohorte tiene menos de K_ANONIMATO_MINIMO empresas
+    salen con `cohorte_suficiente = false` y TODAS sus métricas en null, incluido el número de
+    empresas. Mediana y percentiles solo con K_ANONIMATO_DISTRIBUCION empresas o más. Máximo y
+    mínimo ya no se publican: siempre son el puntaje de una sola empresa.
 
     HU-20: datos agregados (sin evaluaciones individuales), pero es un reporte: exige el
     token de un encuestado, referente o admin.
@@ -136,26 +145,21 @@ async def get_benchmark(
     query = (
         select(Benchmark, Rubro, Dominio)
         .join(Rubro, Benchmark.rubro_id == Rubro.id)
-        .join(Dominio, Benchmark.dominio_id == Dominio.id)
-        .order_by(Rubro.nombre_rubro, Dominio.nombre_dominio)
+        .outerjoin(Dominio, Benchmark.dominio_id == Dominio.id)
+        .order_by(Rubro.nombre_rubro, Benchmark.dominio_id.is_not(None), Dominio.nombre_dominio)
     )
     if rubro_id is not None:
         query = query.where(Benchmark.rubro_id == rubro_id)
 
-    result = await db.execute(query)
-    filas = list(result.all())
-
+    filas = list((await db.execute(query)).all())
     return [
         {
             "rubro_id": rubro.id,
             "rubro": rubro.nombre_rubro,
-            "dominio_id": dominio.id,
-            "dominio": dominio.nombre_dominio,
-            "promedio": bm.promedio_puntaje,
-            "mediana": bm.mediana_puntaje,
-            "maximo": bm.puntaje_maximo,
-            "minimo": bm.puntaje_minimo,
-            "total_evaluaciones": bm.total_evaluaciones,
+            "dominio_id": dominio.id if dominio else None,
+            "dominio": dominio.nombre_dominio if dominio else GENERAL,
+            "k_minimo": settings.K_ANONIMATO_MINIMO,
+            **publicar_fila(bm).como_dict(),
         }
         for bm, rubro, dominio in filas
     ]
@@ -167,8 +171,11 @@ async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)
     Compara el resumen de una evaluación con:
       - la META de cumplimiento (META_CUMPLIMIENTO_PUNTAJE): lo que debería alcanzar cada
         dimensión. Siempre está, aunque no haya benchmark ni rubro.
-      - el promedio de su RUBRO (benchmark), solo si hay COMPARATIVA_MIN_MUESTRAS o más
-        evaluaciones completadas; si no, promedio_industria = null y `muestras` dice cuántas hay.
+      - HU-10: su SECTOR (rubro). `sector` resume el puntaje general frente al rubro y trae
+        la `advertencia` que la interfaz debe mostrar; cada fila de `comparativas` trae la
+        dimensión. Si la cohorte tiene menos de K_ANONIMATO_MINIMO empresas, las métricas del
+        sector salen en null (`cohorte_suficiente = false`) y no se revela cuántas hay.
+        `posicion` dice en qué franja del sector queda la empresa sin mostrar puntajes ajenos.
     """
     evaluacion = await db.get(Evaluacion, evaluacion_id)
     if not evaluacion:
@@ -178,51 +185,59 @@ async def get_comparativa(evaluacion_id: int, db: AsyncSession = Depends(get_db)
     from app.application.use_cases.historial_empresa import rubro_id_de_evaluacion
 
     rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
+    rubro = await db.get(Rubro, rubro_id) if rubro_id is not None else None
 
-    resumenes_result = await db.execute(
+    resumenes = list((await db.execute(
         select(Resumen, Dominio)
         .join(Dominio, Resumen.dominio_id == Dominio.id)
         .where(Resumen.evaluacion_id == evaluacion_id)
-    )
-    resumenes = list(resumenes_result.all())
-
+    )).all())
     if not resumenes:
         raise HTTPException(status_code=404, detail="Genera el resumen primero con POST /cerrar")
 
-    benchmarks = {}
-    if rubro_id is not None:
-        benchmarks_result = await db.execute(select(Benchmark).where(Benchmark.rubro_id == rubro_id))
-        benchmarks = {b.dominio_id: b for b in benchmarks_result.scalars().all()}
+    bench = await filas_del_rubro(db, rubro_id)
+    general = publicar_fila(bench.get(None)) if rubro_id is not None else SUPRIMIDA
 
     meta = settings.META_CUMPLIMIENTO_PUNTAJE
-    minimo = settings.COMPARATIVA_MIN_MUESTRAS
     comparativas = []
-    for resumen, dominio in resumenes:
-        bm = benchmarks.get(dominio.id)
-        muestras = (bm.total_evaluaciones or 0) if bm else 0
-        suficiente = bm is not None and muestras >= minimo
+    suma = controles = 0.0
+    for resumen, dominio in sorted(resumenes, key=lambda rd: rd[1].nombre_dominio or ""):
         puntaje = resumen.puntaje_obtenido
+        # Si el rubro completo está suprimido, ninguna dimensión se publica (coherencia)
+        pub = publicar_fila(bench.get(dominio.id)) if general.suficiente else SUPRIMIDA
+        if puntaje is not None and resumen.total_controles_evaluados:
+            suma += puntaje * resumen.total_controles_evaluados
+            controles += resumen.total_controles_evaluados
         comparativas.append({
+            "dominio_id": dominio.id,
             "dominio": dominio.nombre_dominio,
             "tu_puntaje": puntaje,
             "tu_nivel": resumen.nivel_madurez,
-            "promedio_industria": bm.promedio_puntaje if suficiente else None,
-            "mediana_industria": bm.mediana_puntaje if suficiente else None,
-            "maximo_industria": bm.puntaje_maximo if suficiente else None,
-            "minimo_industria": bm.puntaje_minimo if suficiente else None,
-            "muestras": muestras,
-            "referencia_suficiente": suficiente,
-            "diferencia_vs_promedio": round((puntaje or 0) - (bm.promedio_puntaje or 0), 2) if suficiente else None,
+            "promedio_industria": pub.promedio,
+            "mediana_industria": pub.mediana,
+            "percentil_25": pub.p25,
+            "percentil_75": pub.p75,
+            "cohorte_suficiente": pub.suficiente,
+            "referencia_suficiente": pub.suficiente,  # nombre previo (HU-12)
+            "empresas": pub.empresas,
+            "muestras": pub.empresas,                 # nombre previo; null si la cohorte es < k
+            "diferencia_vs_promedio": diferencia(puntaje, pub),
+            "posicion": posicion(puntaje, pub),
             "meta": meta,
             "diferencia_vs_meta": round((puntaje or 0) - meta, 2),
             "cumple_meta": (puntaje or 0) >= meta,
         })
 
+    tu_general = round(suma / controles, 2) if controles else None
+    suprimidas = sum(1 for c in comparativas if not c["cohorte_suficiente"])
     return {
         "evaluacion_id": evaluacion_id,
         "rubro_id": rubro_id,
         "meta_puntaje": meta,
         "meta_nivel": nivel_madurez(meta),
-        "muestras_minimas": minimo,
+        "k_minimo": settings.K_ANONIMATO_MINIMO,
+        "muestras_minimas": settings.K_ANONIMATO_MINIMO,  # nombre previo (HU-12)
+        "sector": bloque_sector(rubro_id, rubro.nombre_rubro if rubro else None, bench.get(None),
+                                tu_general, suprimidas, len(comparativas)),
         "comparativas": comparativas,
     }

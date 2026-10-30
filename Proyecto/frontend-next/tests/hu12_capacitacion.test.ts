@@ -33,18 +33,20 @@ const comparativa = (extra: Partial<ComparativaApi> = {}, suficiente = true): Co
   evaluacion_id: 7,
   rubro_id: 3,
   meta_puntaje: 70,
-  muestras_minimas: 3,
+  k_minimo: 5,
+  muestras_minimas: 5,
   comparativas: RESUMEN.dominios.map((d) => ({
     dominio: d.dominio,
     tu_puntaje: d.puntaje,
     tu_nivel: d.nivel_madurez,
-    promedio_industria: 60,
-    mediana_industria: 60,
-    maximo_industria: 90,
-    minimo_industria: 10,
-    muestras: suficiente ? 5 : 1,
+    // HU-10: con cohorte insuficiente el backend suprime todo (promedio y número de empresas)
+    promedio_industria: suficiente ? 60 : null,
+    mediana_industria: suficiente ? 60 : null,
+    muestras: suficiente ? 5 : null,
+    empresas: suficiente ? 5 : null,
+    cohorte_suficiente: suficiente,
     referencia_suficiente: suficiente,
-    diferencia_vs_promedio: (d.puntaje ?? 0) - 60,
+    diferencia_vs_promedio: suficiente ? (d.puntaje ?? 0) - 60 : null,
     meta: 70,
     diferencia_vs_meta: (d.puntaje ?? 0) - 70,
     cumple_meta: (d.puntaje ?? 0) >= 70,
@@ -74,10 +76,12 @@ describe("Comparativa al completar: meta siempre, rubro solo con muestras sufici
     expect(notaIndustria(p)).toMatch("no tiene rubro");
   });
 
-  it("con pocas evaluaciones del rubro no muestra un promedio engañoso y explica por qué", () => {
+  it("con menos de 5 empresas en el rubro no muestra el promedio y explica por qué sin revelar cuántas hay", () => {
     const p = panel(comparativa({}, false));
     expect(p.dominios.every((d) => d.promedioIndustria === null && d.diferencia === null)).toBe(true);
-    expect(notaIndustria(p)).toBe("El promedio del rubro aparece con al menos 3 evaluaciones completadas (hoy hay 1, la tuya).");
+    expect(notaIndustria(p)).toBe(
+      "El promedio del rubro está oculto: hay menos de 5 empresas evaluadas en tu sector y mostrarlo podría revelar sus resultados.",
+    );
   });
 
   it("textos de la distancia a la meta", () => {

@@ -1,0 +1,212 @@
+/* HU-10 · Comparativa sectorial con k-anonimato
+   La tira 0–100 es el elemento central: tu punto (menta), el promedio del sector (lavanda,
+   trazo discontinuo) y su mitad central (banda lavanda, solo con cohortes grandes). Si la
+   cohorte es menor que k, la tira se raya: lo oculto se ve como oculto, no como vacío. */
+
+/* ---------- Tira ---------- */
+.tira {
+  position: relative;
+  height: 32px;
+  --alto-pista: 6px;
+}
+.grande { height: 52px; --alto-pista: 10px; }
+
+.pista {
+  position: absolute; left: 0; right: 0;
+  top: calc(50% - var(--alto-pista) / 2);
+  height: var(--alto-pista);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.banda {
+  position: absolute;
+  top: calc(50% - var(--alto-pista));
+  height: calc(var(--alto-pista) * 2);
+  border-radius: 4px;
+  background: rgba(143, 163, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(143, 163, 255, 0.55);
+}
+
+.marca {
+  position: absolute; top: 3px; bottom: 3px; width: 0;
+  transform: translateX(-1px);
+}
+.marcaSector { border-left: 2px dashed var(--serie-industria); }
+.marcaMeta { border-left: 2px dotted var(--serie-meta); }
+
+.tu {
+  position: absolute; top: 50%;
+  width: 16px; height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--serie-empresa);
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px rgba(20, 216, 158, 0.35);
+}
+.grande .tu { width: 22px; height: 22px; }
+
+/* Cohorte insuficiente: rayado + candado. El punto propio se sigue viendo. */
+.oculta .pista {
+  top: calc(50% - 11px); height: 22px;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(135deg, rgba(86, 112, 103, 0.38) 0 2px, transparent 2px 9px),
+    var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-control);
+}
+.grande.oculta .pista { top: calc(50% - 15px); height: 30px; }
+.sello {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 1px 8px 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--fs-xs); color: var(--text-muted);
+  white-space: nowrap;
+}
+.sello svg { width: 13px; height: 13px; color: var(--medio); flex: none; }
+
+.escala {
+  display: flex; justify-content: space-between;
+  margin-top: 6px;
+  font-size: var(--fs-xs); color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Resumen general ---------- */
+.resumen { display: grid; gap: var(--sp-5); }
+.resumenHead {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: var(--sp-3);
+}
+.rubro {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.02em;
+}
+.frase { margin-top: var(--sp-1); color: var(--text-muted); max-width: 62ch; }
+.frase strong { color: var(--text); }
+
+.cohorte {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 32px; padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  border: 1px solid var(--line-strong);
+  color: var(--text-muted);
+}
+.cohorte svg { width: 16px; height: 16px; flex: none; }
+.cohorteOk svg { color: var(--accent); }
+.cohorteOculta { border-color: rgba(242, 181, 63, 0.45); color: var(--medio); }
+
+.cifras {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-4);
+  margin: 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.cifras div { min-width: 0; }
+.cifras dt { font-size: var(--fs-xs); color: var(--text-subtle); }
+.cifras dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums;
+}
+.cifras dd small { font-family: var(--font-body); font-size: var(--fs-xs); color: var(--text-subtle); margin-left: 4px; }
+.vacio { color: var(--text-subtle); }
+
+.alto { color: var(--alto); }
+.medio { color: var(--medio); }
+.bajo { color: var(--bajo); }
+
+/* ---------- Leyenda ---------- */
+.leyenda {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5);
+  margin: 0; padding: 0; list-style: none;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.leyenda li { display: inline-flex; align-items: center; gap: 8px; }
+.muestra { display: inline-block; flex: none; }
+.muestraTu { width: 12px; height: 12px; border-radius: 50%; background: var(--serie-empresa); }
+.muestraSector { width: 0; height: 14px; border-left: 2px dashed var(--serie-industria); }
+.muestraBanda { width: 18px; height: 10px; border-radius: 3px; background: rgba(143, 163, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(143, 163, 255, 0.55); }
+.muestraMeta { width: 0; height: 14px; border-left: 2px dotted var(--serie-meta); }
+.muestraOculta {
+  width: 18px; height: 12px; border-radius: 3px;
+  background: repeating-linear-gradient(135deg, rgba(86, 112, 103, 0.6) 0 2px, transparent 2px 6px), var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-control);
+}
+
+/* ---------- Filas por dimensión ---------- */
+.filas { list-style: none; margin: var(--sp-4) 0 0; padding: 0; }
+.fila {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(220px, 2.6fr) minmax(210px, auto);
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+}
+.fila:first-child { border-top: 0; }
+.nombre { font-weight: 600; line-height: 1.3; }
+.nombre span { display: block; font-weight: 400; font-size: var(--fs-xs); color: var(--text-subtle); margin-top: 2px; }
+
+.valores {
+  display: grid; grid-template-columns: repeat(3, auto);
+  justify-content: end; gap: var(--sp-4);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.valores div { text-align: right; }
+.valores dt { font-size: var(--fs-xs); color: var(--text-subtle); }
+.valores dd { margin: 0; font-weight: 600; }
+
+/* ---------- Cómo protegemos ---------- */
+.proteccion summary {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: var(--target);
+  cursor: pointer;
+  font-family: var(--font-display); font-size: var(--fs-lg);
+  list-style: none;
+}
+.proteccion summary::-webkit-details-marker { display: none; }
+.proteccion summary svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
+.proteccion summary::after {
+  content: ""; margin-left: auto;
+  width: 8px; height: 8px;
+  border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform var(--dur) var(--ease);
+}
+.proteccion[open] summary::after { transform: rotate(-135deg) translateY(-1px); }
+.reglas {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-8);
+  margin: var(--sp-4) 0 0; padding: 0; list-style: none;
+  color: var(--text-muted); font-size: var(--fs-sm);
+}
+.reglas strong { display: block; color: var(--text); font-weight: 600; margin-bottom: 2px; }
+
+@media (max-width: 1100px) {
+  .fila { grid-template-columns: minmax(130px, 1fr) minmax(180px, 2fr); }
+  .valores { grid-column: 1 / -1; justify-content: start; }
+  .valores div { text-align: left; }
+}
+
+@media (max-width: 720px) {
+  .cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fila { grid-template-columns: 1fr; gap: var(--sp-2); }
+  .reglas { grid-template-columns: 1fr; }
+  .rubro { font-size: var(--fs-xl); }
+  /* En pantallas angostas el sello no cabe junto a tu punto: lo dicen la etiqueta
+     "Sin comparación" y el valor "Oculto" de la fila (y el aria-label de la tira). */
+  .sello { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proteccion summary::after { transition: none; }
+}

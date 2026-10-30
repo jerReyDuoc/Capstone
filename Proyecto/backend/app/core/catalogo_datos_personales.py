@@ -115,6 +115,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     "benchmark": _sin_dp(
         "id_benchmark", "promedio_puntaje", "mediana_puntaje", "puntaje_maximo", "puntaje_minimo",
         "total_evaluaciones", "Rubro_id", "dominio_id",
+        "total_empresas", "percentil_25", "percentil_75",  # HU-10
     ),
     "resumen": _sin_dp(
         "id_resumen", "puntaje_obtenido", "nivel_madurez", "total_controles_evaluados",

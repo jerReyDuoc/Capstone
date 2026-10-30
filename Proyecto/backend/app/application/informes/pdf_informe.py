@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from app.core.config import settings
 from app.application.informes.analisis import (
     ETIQUETA_ESTADO,
     ETIQUETA_MADUREZ,
@@ -152,8 +153,10 @@ def generar_pdf(d: DatosInforme) -> bytes:
     historia.append(p("Comparativa por dimensión normativa", h2))
     historia.append(p(
         f"La meta es el nivel que debería alcanzar cada dimensión ({_fmt(d.comparativa[0].meta if d.comparativa else 75)} "
-        "puntos: prácticas definidas, documentadas y con responsables). El promedio del rubro aparece cuando "
-        "hay suficientes evaluaciones completadas para que sea representativo.", gris_chico))
+        "puntos: prácticas definidas, documentadas y con responsables). El promedio del rubro solo aparece "
+        f"cuando al menos {settings.K_ANONIMATO_MINIMO} empresas distintas del sector completaron la evaluación: "
+        "con menos, se oculta para que nadie pueda deducir el resultado de una empresa en particular.",
+        gris_chico))
     historia.append(Spacer(1, 4))
     filas = [[p(x, cabecera) for x in ("Dimensión", "Tu puntaje", "Nivel", "Meta", "Frente a la meta",
                                        "Promedio del rubro")]]
@@ -165,8 +168,9 @@ def generar_pdf(d: DatosInforme) -> bytes:
             frente = f'<font color="{COLOR_SEVERIDAD["Baja"]}"><b>Cumple (+{_fmt(dif)})</b></font>'
         else:
             frente = f'<font color="{COLOR_SEVERIDAD["Crítica"]}"><b>Faltan {_fmt(-dif)} pts</b></font>'
+        # HU-10: con menos de k empresas no se publica el promedio ni cuántas hay
         prom = (_fmt(cm.promedio_industria) if cm.promedio_industria is not None
-                else f"Sin referencia aún ({cm.muestras} eval.)")
+                else f"Oculto: menos de {settings.K_ANONIMATO_MINIMO} empresas")
         filas.append([
             p(_esc(cm.dominio), chico), p(_fmt(cm.tu_puntaje), chico),
             p(ETIQUETA_MADUREZ[nivel_madurez(cm.tu_puntaje)], chico), p(_fmt(cm.meta), chico),

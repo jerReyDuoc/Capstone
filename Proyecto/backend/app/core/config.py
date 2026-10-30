@@ -114,9 +114,16 @@ class Settings(BaseSettings):
     # "Lo que debería cumplir": puntaje de referencia por dimensión que se muestra junto al
     # resultado. 75 = techo de "gestionado" (controles definidos, documentados y con dueño).
     META_CUMPLIMIENTO_PUNTAJE: float = 75.0
-    # El promedio del rubro solo se muestra desde N evaluaciones completadas (incluida la
-    # propia): con 1 o 2 la "industria" sería casi tu propio puntaje. 1 = mostrar siempre.
-    COMPARATIVA_MIN_MUESTRAS: int = 3
+    # HU-10 · k-anonimato de la comparativa sectorial. Las métricas de un rubro (promedio,
+    # diferencia, posición) solo se publican si la cohorte tiene al menos K_ANONIMATO_MINIMO
+    # EMPRESAS distintas (no evaluaciones: una empresa que se reevalúa cuenta una vez). Con
+    # menos se suprimen, sin revelar cuántas hay, y la interfaz muestra una advertencia.
+    # En production no puede bajar de 5 (criterio de aceptación). Reemplaza a
+    # COMPARATIVA_MIN_MUESTRAS (HU-12), que contaba evaluaciones y valía 3.
+    K_ANONIMATO_MINIMO: int = 5
+    # Mediana y percentiles 25/75 exigen una cohorte mayor: con pocas empresas un percentil
+    # coincide con el puntaje exacto de una de ellas. Debe ser >= K_ANONIMATO_MINIMO.
+    K_ANONIMATO_DISTRIBUCION: int = 10
     # Recalcular el benchmark al completar cada evaluación (además del cron diario de las
     # 02:00 UTC). Sin esto la comparativa no aparece hasta el día siguiente.
     BENCHMARK_AL_COMPLETAR: bool = True
@@ -306,6 +313,12 @@ class Settings(BaseSettings):
             raise ValueError("ACTIVACION_TTL_HORAS debe ser mayor que 0.")
         if self.CLIENTE_PASSWORD_MIN < 10:
             raise ValueError("CLIENTE_PASSWORD_MIN no puede ser menor que 10 (HU-27).")
+        if self.K_ANONIMATO_MINIMO < 1:
+            raise ValueError("K_ANONIMATO_MINIMO debe ser mayor que 0 (HU-10).")
+        if self.APP_ENV == "production" and self.K_ANONIMATO_MINIMO < 5:
+            raise ValueError("K_ANONIMATO_MINIMO no puede ser menor que 5 con APP_ENV=production (HU-10).")
+        if self.K_ANONIMATO_DISTRIBUCION < self.K_ANONIMATO_MINIMO:
+            raise ValueError("K_ANONIMATO_DISTRIBUCION debe ser mayor o igual que K_ANONIMATO_MINIMO (HU-10).")
         if not 0 <= self.CONTRATO_GRACIA_DIAS <= 365:
             raise ValueError("CONTRATO_GRACIA_DIAS debe estar entre 0 y 365 (HU-30).")
         if self.CONTRATACION_AVISO_EMAIL and "@" not in self.CONTRATACION_AVISO_EMAIL:
