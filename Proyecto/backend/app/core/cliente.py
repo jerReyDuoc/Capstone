@@ -7,8 +7,10 @@ y se identifica con `X-BFF-Secret`. Solo si ese secreto coincide se confía en l
 reenviada; si no, se usa la IP de la conexión (un cliente directo no puede falsear
 su IP para esquivar los límites).
 
-La IP es un dato personal: no se guarda ni en BD ni en Redis. Los contadores usan
-una huella HMAC-SHA256 truncada, que no permite recuperar la IP sin el secreto.
+La IP es un dato personal. Los contadores de Redis usan una huella HMAC-SHA256 truncada,
+que no permite recuperar la IP sin el secreto. La única tabla que guarda la IP en claro es
+audit_log (HU-09, criterio 2: trazabilidad del art. 14 ter), como excepción documentada en
+app/core/catalogo_datos_personales.py.
 """
 import hashlib
 import hmac

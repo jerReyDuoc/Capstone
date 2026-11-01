@@ -181,6 +181,43 @@ class IniciarSesionUseCase:
         await self.db.commit()
         return _respuesta(admin.id, Rol.ADMIN_THERION, token)
 
+    async def auditor(self, email: str, password: str, limitador: Limitador | None = None,
+                      ip: str | None = None) -> dict:
+        """
+        HU-09: login del Auditor Externo (rol auditor_externo, solo lectura del audit_log).
+        Mismas protecciones que el admin (HU-28): intentos limitados, sesión revocable y cada
+        intento en el log. Una cuenta vencida o desactivada responde igual que una
+        contraseña incorrecta (no revela que la cuenta existe).
+        """
+        from app.domain.models.auditoria_externa import UsuarioAuditor
+
+        email = _normalizar_email(email)
+        proteccion = ProteccionLogin(limitador, "auditor", email, ip)
+        await self._bloqueo_previo(proteccion, "auditor", "usuario_auditor")
+        auditor = await self.db.scalar(select(UsuarioAuditor).where(func.lower(UsuarioAuditor.email) == email))
+        ahora = _ahora()
+        if auditor is None:
+            await asyncio.to_thread(verificar_password_senuelo, password or "")
+            ok = False
+        else:
+            ok = (await asyncio.to_thread(verificar_password, password or "", auditor.password_hash)
+                  and auditor.vigente(ahora))
+        if not ok:
+            await self._fallo(proteccion, "auditor", "usuario_auditor", auditor.id if auditor else None)
+        await proteccion.registrar_exito()
+        token, sesion = await abrir_sesion(self.db, Rol.AUDITOR_EXTERNO.value, auditor.id, ahora)
+        # La sesión no dura más que la cuenta
+        if sesion.fecha_expiracion > auditor.fecha_expiracion:
+            sesion.fecha_expiracion = auditor.fecha_expiracion
+        auditor.ultimo_acceso = ahora
+        BitacoraRepository(self.db).registrar(
+            accion=Accion.AUDITOR_LOGIN, entidad="usuario_auditor", entidad_id=auditor.id,
+            actor_rol=Rol.AUDITOR_EXTERNO.value, actor_id=auditor.id, detalle={"sesion_id": sesion.id}, fecha=ahora,
+        )
+        await self.db.commit()
+        return _respuesta(auditor.id, Rol.AUDITOR_EXTERNO, token,
+                          cuenta_vence=auditor.fecha_expiracion.isoformat(timespec="seconds"))
+
     async def titular(self, usuario_temporal_id: int, email: str) -> dict:
         usuario = await self.db.get(UsuarioTemporal, usuario_temporal_id)
         valido = (

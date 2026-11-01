@@ -24,9 +24,9 @@ Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
   Evaluaciones (HU-28: el panel interno lista todas, con su empresa si fue migrada)
     GET   /api/admin/evaluaciones?estado=&origen=&empresa_id=&page=&size=
 
-  Bitácora (base HU-09)
+  Bitácora = audit_log (HU-09; el Auditor Externo usa /api/auditoria/*)
     GET   /api/admin/bitacora?entidad=&entidad_id=&accion=&page=&size=
-    GET   /api/admin/bitacora/verificacion                HU-18: integridad de la cadena de hashes
+    GET   /api/admin/bitacora/verificacion                HU-18 + HU-09: cadena HMAC y hash por lote
 
 El admin nunca ve ni define la contraseña del cliente, ni recibe el token de activación:
 el enlace solo va al correo del usuario definitivo.
@@ -54,7 +54,7 @@ from app.domain.models.rubro import Rubro
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository, categoria
 
 router = APIRouter(prefix="/api/admin", tags=["admin · empresas cliente (HU-27)"])
 
@@ -408,7 +408,8 @@ async def bitacora(
                                                        page=page, size=size)
     return {
         "items": [{"id": f.id, "fecha": f.fecha, "actor_rol": f.actor_rol, "actor_id": f.actor_id,
-                   "accion": f.accion, "entidad": f.entidad, "entidad_id": f.entidad_id,
+                   "ip": f.ip, "accion": f.accion, "categoria": categoria(f.accion),
+                   "entidad": f.entidad, "entidad_id": f.entidad_id,
                    "resultado": f.resultado, "detalle": f.detalle, "hash": f.hash} for f in filas],
         "total": total, "page": page, "size": size,
     }
@@ -416,13 +417,23 @@ async def bitacora(
 
 @router.get("/bitacora/verificacion")
 async def verificar_bitacora(
-    _: Actor = Depends(solo_admin),
+    actor: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
     HU-18: verifica la cadena de hashes de la bitácora (registro inmutable). `integra=false`
     trae la primera fila alterada, borrada o intercalada. Guarda el `ancla` (último id y hash)
     fuera del sistema para detectar también un borrado de las últimas filas.
+    HU-09: además verifica cada lote sellado (`lotes`, `filas`, `ancla_lote`).
     """
-    from app.infrastructure.repositories.bitacora_cadena import verificar_cadena
-    return await verificar_cadena(db)
+    from app.infrastructure.repositories.audit_log_lotes import verificar_lotes
+    r = await verificar_lotes(db)
+    BitacoraRepository(db).registrar(
+        accion=Accion.AUDITORIA_VERIFICACION, entidad="audit_log", actor=actor,
+        resultado="ok" if r["integra"] else "rechazado",
+        detalle={"integra": r["integra"], "lotes": r["lotes"]["total"], "lotes_con_falla": r["lotes"]["con_falla"],
+                 "filas": r["filas"]["total"]})
+    await db.commit()
+    # Mismas claves que HU-18 (integra, total, verificadas, primera_falla, ancla) + las de HU-09
+    return {**r["cadena"], "integra": r["integra"], "lotes": r["lotes"], "filas": r["filas"],
+            "ancla_lote": r["ancla"], "metodo": r["metodo"], "fecha_verificacion": r["fecha_verificacion"]}

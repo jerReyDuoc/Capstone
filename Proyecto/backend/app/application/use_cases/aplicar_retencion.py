@@ -27,6 +27,10 @@ plazo (config RETENCION_*; vacío = regla desactivada) se aplica:
 Cada titular se procesa en su propia transacción (o todo o nada por titular) y los
 archivos se borran después del commit. El resultado y los logs llevan solo conteos.
 
+HU-09: cada supresión queda en el audit_log (actor "sistema") en la MISMA transacción:
+un registro por titular (R1) y por solicitud ARCOP (R2), y uno por corrida con la cantidad
+y los ids afectados en R3 y R4.
+
 Lo ejecuta el worker una vez al día (app/worker/tasks.py) y se puede correr a mano en
 modo simulación con scripts/retencion_datos.py.
 """
@@ -53,6 +57,9 @@ from app.infrastructure.repositories.anonimizacion_repository import (
     TEXTO_ANONIMIZADO,
     AnonimizacionRepository,
 )
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+
+_MAX_IDS_EN_DETALLE = 500  # R3/R4: más ids que esto se informan solo como cantidad
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +97,17 @@ class AplicarRetencionUseCase:
             "eventos": settings.RETENCION_EVENTOS_SEGURIDAD_DIAS,
             "tutor": settings.TUTOR_RETENCION_DIAS,
         }
+
+    def _auditar(self, accion: str, entidad: str, entidad_id: int | None, regla: str, **detalle) -> None:
+        BitacoraRepository(self.s).registrar(
+            accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ACTOR_SISTEMA,
+            detalle={"regla": regla, "plazo_dias": self.plazos.get(
+                {"R1": "titulares", "R2": "arcop", "R3": "eventos", "R4": "tutor"}[regla]), **detalle},
+        )
+
+    @staticmethod
+    def _ids(ids: list[int]) -> dict:
+        return {"cantidad": len(ids), "ids": ids[:_MAX_IDS_EN_DETALLE], "ids_truncados": len(ids) > _MAX_IDS_EN_DETALLE}
 
     def _limite(self, regla: str) -> date | None:
         dias = self.plazos.get(regla)
@@ -153,6 +171,8 @@ class AplicarRetencionUseCase:
                                             UsuarioTemporal.fecha_anonimizacion.is_(None))
                                      .values(email=None, fecha_anonimizacion=ahora)
                                      .execution_options(synchronize_session=False))
+                self._auditar(Accion.RETENCION_TITULAR, "usuario_temporal", usuario_id, "R1",
+                              evaluaciones_publicas=len(publicas), archivos=len(rutas))
                 await self.s.commit()
             except Exception as e:  # noqa: BLE001 — un titular fallido no detiene al resto
                 await self.s.rollback()
@@ -213,6 +233,7 @@ class AplicarRetencionUseCase:
                 actor_rol=ACTOR_SISTEMA, actor_id=None,
                 comentario=None,
             ))
+            self._auditar(Accion.RETENCION_ARCOP, "solicitudes_arcop", f.id, "R2", estado=f.estado)
         await self.s.commit()
 
     # ------------------------------------------------------------------ R3
@@ -223,9 +244,14 @@ class AplicarRetencionUseCase:
             r.eventos_seguridad += (await self.s.execute(
                 select(func.count()).select_from(EventoSeguridad).where(*cond))).scalar_one()
             return
-        res = await self.s.execute(update(EventoSeguridad).where(*cond).values(extracto=None)
+        ids = list((await self.s.execute(
+            select(EventoSeguridad.id_evento).where(*cond).order_by(EventoSeguridad.id_evento))).scalars().all())
+        if not ids:
+            return
+        res = await self.s.execute(update(EventoSeguridad).where(EventoSeguridad.id_evento.in_(ids)).values(extracto=None)
                                    .execution_options(synchronize_session=False))
         r.eventos_seguridad += res.rowcount or 0
+        self._auditar(Accion.RETENCION_EVENTOS, "eventos_seguridad", None, "R3", **self._ids(ids))
         await self.s.commit()
 
     # ------------------------------------------------------------------ R4 (HU-15)
@@ -240,4 +266,5 @@ class AplicarRetencionUseCase:
         if not ids:
             return
         r.conversaciones_tutor += await repo.eliminar_ids(ids)
+        self._auditar(Accion.RETENCION_TUTOR, "conversacion_tutor", None, "R4", **self._ids(sorted(ids)))
         await self.s.commit()

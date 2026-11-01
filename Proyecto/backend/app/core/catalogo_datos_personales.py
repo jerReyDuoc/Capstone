@@ -66,6 +66,11 @@ C_SESION = "Mientras la cuenta exista (el PO fija una depuración de sesiones y 
 C_TUTOR = ("TUTOR_RETENCION_DIAS (30) días sin actividad en la conversación, o hasta la supresión ARCOP "
            "del usuario definitivo (HU-15); el usuario también la puede borrar")
 B_TUTOR = "Ejecución del contrato del servicio pagado: Agente IA Tutor del panel de formación (HU-15)"
+# HU-09: el log es inmutable (no se puede suprimir una fila ni su IP). Una purga solo sería
+# por lote sellado y exportado, con un procedimiento del dueño de la BD: plazo pendiente del PO.
+C_AUDITORIA = ("Mientras exista el registro del audit_log (inmutable, HU-09). Plazo de conservación "
+               "y purga por lote sellado: pendiente de definir por el PO")
+C_AUDITOR = "Mientras la cuenta del auditor exista (vence sola; el admin puede desactivarla)"
 
 
 @dataclass(frozen=True)
@@ -486,15 +491,40 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         ),
         "advertencias": Dato(SIN_DP, escaneo="pii"),
     },
-    # Sin datos personales por diseño: el detalle lleva solo ids, conteos y códigos (se escanea).
-    "bitacora_auditoria": {
+    # HU-09: audit_log (antes bitacora_auditoria). El detalle lleva solo ids, conteos y códigos
+    # (se escanea). La IP es la ÚNICA excepción de minimización de la tabla: la exige el
+    # criterio 2 de HU-09 para demostrar la trazabilidad (art. 14 ter).
+    "audit_log": {
         **_sin_dp("id", "fecha", "actor_rol", "accion", "entidad", "entidad_id", "resultado",
                   "hash_anterior", "hash"),  # HU-18: cadena de HMAC (no contiene datos)
         "actor_id": Dato(
             METADATO, finalidad="Trazabilidad: quién ejecutó cada acción (HU-09)",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_AUDITORIA,
+        ),
+        "ip": Dato(
+            METADATO, finalidad="Trazabilidad: desde dónde se ejecutó cada acción (HU-09, art. 14 ter)",
+            base=B_RESPONSABILIDAD, conservacion=C_AUDITORIA,
         ),
         "detalle": Dato(SIN_DP, escaneo="pii"),
+    },
+    # HU-09: sellos SHA-256 por lote del audit_log (solo hashes, ids y conteos)
+    "audit_log_sello": _sin_dp("id", "desde_id", "hasta_id", "cantidad", "hash_lote", "sello_anterior",
+                               "sello", "firma", "algoritmo", "fecha"),
+    # HU-09: cuentas del Auditor Externo (la organización es la firma auditora, no una persona)
+    "usuario_auditor": {
+        **_sin_dp("id", "organizacion", "activo", "creado_por_admin_id"),
+        "email": Dato(
+            CONTACTO, EN_CLARO, finalidad="Usuario de inicio de sesión del Auditor Externo (HU-09)",
+            base=B_RESPONSABILIDAD, conservacion=C_AUDITOR,
+        ),
+        "password_hash": Dato(
+            CREDENCIAL, HASH, finalidad="Verificar la contraseña (PBKDF2-SHA256, nunca en claro)",
+            base=B_SEGURIDAD, conservacion=C_AUDITOR,
+        ),
+        "fecha_creacion": Dato(METADATO, finalidad="Trazabilidad de la cuenta", base=B_SEGURIDAD, conservacion=C_AUDITOR),
+        "fecha_expiracion": Dato(METADATO, finalidad="Vencimiento del acceso del auditor",
+                                 base=B_SEGURIDAD, conservacion=C_AUDITOR),
+        "ultimo_acceso": Dato(METADATO, finalidad="Detectar accesos indebidos", base=B_SEGURIDAD, conservacion=C_AUDITOR),
     },
 }
 

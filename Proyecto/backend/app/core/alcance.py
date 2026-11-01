@@ -119,6 +119,10 @@ async def verificar_alcance(db: AsyncSession, actor: Actor | None, evaluacion_id
         if origen == ORIGEN_PUBLICA or usuario_temporal_id != actor.id:
             raise _NO_ENCONTRADA
         return
+    if actor is not None:
+        # HU-09: cualquier otro rol (p. ej. auditor_externo, que solo lee el audit_log) no ve
+        # evaluaciones: nunca se trata como "sin token".
+        raise _NO_ENCONTRADA
     # sin token. HU-29: la reevaluación de una empresa exige SIEMPRE la sesión del cliente,
     # también con EXIGIR_TOKEN_EVALUACIONES=false (es del servicio pagado, como la pública).
     if origen in (ORIGEN_PUBLICA, ORIGEN_EMPRESA) or settings.EXIGIR_TOKEN_EVALUACIONES:

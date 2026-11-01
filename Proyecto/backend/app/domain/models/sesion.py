@@ -4,14 +4,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
 # HU-28: roles con inicio de sesión por email y contraseña (los demás usan otros accesos)
-ROLES_CON_CONTRASENA = ("admin_therion", "cliente")
-_CHECK_ROL = "actor_rol IN ('admin_therion', 'cliente')"
+# HU-09: también el Auditor Externo
+ROLES_CON_CONTRASENA = ("admin_therion", "cliente", "auditor_externo")
+_CHECK_ROL = "actor_rol IN ('admin_therion', 'cliente', 'auditor_externo')"
 
 
 class MotivoCierre:
     LOGOUT = "logout"                    # el usuario cerró sesión
     CAMBIO_CONTRASENA = "cambio_password"  # restableció su contraseña: se cierran todas
     SUPRESION_ARCOP = "supresion_arcop"    # HU-30: se suprimieron los datos del usuario definitivo
+    DESACTIVACION = "desactivacion"        # HU-09: el admin desactivó la cuenta (auditor externo)
 
 
 class SesionUsuario(Base):

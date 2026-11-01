@@ -127,8 +127,12 @@ class CreateRespuestaUseCase:
         guard: PromptGuardPort | None = None,
         registrar_evento: RegistrarEventoSeguridad | None = None,
         anonimizador: AnonimizadorPII | None = None,
+        auditar_modificacion=None,
     ):
         self.repo = repo
+        # HU-09: callable(respuesta, detalle) que agrega el registro al audit_log SIN commit;
+        # se llama justo antes de guardar una modificación, así va en la misma transacción.
+        self.auditar_modificacion = auditar_modificacion
         self.evaluaciones = evaluaciones
         self.guard = guard
         self.registrar_evento = registrar_evento
@@ -263,7 +267,19 @@ class CreateRespuestaUseCase:
         ):
             # Reenvío idéntico (guardado automático): no se pierde nada de lo validado.
             return ResultadoRespuesta(respuesta, creada=False, modificada=False)
+        detalle = {
+            "evaluacion_id": respuesta.evaluacion_id,
+            "matriz_control_id": respuesta.matriz_controles_id_control,
+            "estado_anterior": respuesta.estado_clasificacion,
+            "estado_nuevo": estado_clasificacion,
+            "estado_final_anterior": respuesta.estado_clasificacion_final,
+            "fuente_anterior": respuesta.fuente_clasificacion,
+            # el texto nunca va al log (puede traer datos personales): solo si cambió
+            "justificacion_modificada": (respuesta.justificacion_usuario or "") != (justificacion or ""),
+        }
         self._aplicar_declaracion(respuesta, estado_clasificacion, justificacion, control)
+        if self.auditar_modificacion is not None:
+            self.auditar_modificacion(respuesta, detalle)
         return ResultadoRespuesta(await self.repo.update(respuesta), creada=False, modificada=True)
 
     @staticmethod

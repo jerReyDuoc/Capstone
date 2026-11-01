@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion, empresa_del_cliente, solo_admin
 from app.core.autenticacion import Actor, Rol
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 from app.core.database import get_db
 from app.application.schemas.api_schemas import (
     EvaluacionResumenResponse,
@@ -165,6 +166,13 @@ async def marcar_prueba(
     evaluacion = await db.get(Evaluacion, evaluacion_id)
     if evaluacion is None:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    anterior = bool(evaluacion.es_prueba)
     evaluacion.es_prueba = payload.es_prueba
+    if anterior != bool(payload.es_prueba):
+        # HU-09: modificación de datos (entra o sale del benchmark) en la misma transacción
+        BitacoraRepository(db).registrar(
+            accion=Accion.EVALUACION_PRUEBA, entidad="evaluacion", entidad_id=evaluacion.id, actor=actor,
+            detalle={"es_prueba_anterior": anterior, "es_prueba": bool(payload.es_prueba)},
+        )
     await db.commit()
     return {"evaluacion_id": evaluacion.id, "origen": evaluacion.origen, "es_prueba": evaluacion.es_prueba}

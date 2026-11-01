@@ -328,7 +328,8 @@ def test_c3_sin_destinatario_o_con_el_correo_caido_la_solicitud_igual_queda(monk
         assert (await _enviar(c, b, email_contacto="b@acme.cl")).status_code == 201
 
         avisos = await _acciones_bitacora(c, "solicitud_contratacion.aviso_comercial")
-        assert sorted(i["resultado"] for i in avisos) == ["fallido", "omitido"]
+        # HU-09: el aviso que falla queda como "error" (dominio del audit_log: ok/rechazado/error/omitido)
+        assert sorted(i["resultado"] for i in avisos) == ["error", "omitido"]
         assert (await c.get("/api/admin/contrataciones", headers=admin())).json()["total"] == 2
     _correr(esc)
 

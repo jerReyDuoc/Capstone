@@ -4,9 +4,23 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.models.solicitud_arcop import EstadoSolicitudARCOP, SolicitudARCOP, EventoSolicitud
+from app.domain.models.solicitud_arcop import (
+    EstadoSolicitudARCOP, EventoSolicitud, EventoSolicitudARCOP, SolicitudARCOP,
+)
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+
+# HU-09: cada evento del historial de una solicitud ARCOP queda también en el audit_log
+_ACCION_POR_EVENTO = {
+    EventoSolicitudARCOP.CREADA.value: Accion.ARCOP_SOLICITUD_CREADA,
+    EventoSolicitudARCOP.CAMBIO_ESTADO.value: Accion.ARCOP_ESTADO,
+    EventoSolicitudARCOP.INFORMACION_APORTADA.value: Accion.ARCOP_INFORMACION,
+    EventoSolicitudARCOP.RESOLUCION.value: Accion.ARCOP_RESOLUCION,
+    EventoSolicitudARCOP.CANCELACION.value: Accion.ARCOP_CANCELADA,
+    EventoSolicitudARCOP.ANONIMIZACION.value: Accion.ARCOP_SUPRESION,
+    EventoSolicitudARCOP.PRORROGA.value: Accion.ARCOP_PRORROGA,
+}
 
 
 class SolicitudARCOPRepository:
@@ -32,10 +46,30 @@ class SolicitudARCOPRepository:
         q = select(SolicitudARCOP).where(SolicitudARCOP.codigo_seguimiento == codigo)
         return (await self.session.execute(q)).scalar_one_or_none()
 
+    def _auditar(self, solicitud: SolicitudARCOP, eventos, extra: dict | None = None) -> None:
+        """
+        HU-09: un registro del audit_log por evento, en la MISMA transacción. Sin textos
+        (descripción, comentarios y respuesta pueden traer datos personales): solo el tipo
+        de solicitud, los estados y, en una supresión, los conteos de lo anonimizado.
+        """
+        bitacora = BitacoraRepository(self.session)
+        for evento in eventos:
+            detalle = {"tipo_solicitud": solicitud.tipo, "evento": evento.tipo_evento,
+                       "estado_anterior": evento.estado_anterior, "estado_nuevo": evento.estado_nuevo}
+            if evento.tipo_evento == EventoSolicitudARCOP.ANONIMIZACION.value and extra:
+                detalle.update(extra)
+            bitacora.registrar(
+                accion=_ACCION_POR_EVENTO.get(evento.tipo_evento, f"arcop.{evento.tipo_evento}"),
+                entidad="solicitudes_arcop", entidad_id=solicitud.id,
+                actor_rol=evento.actor_rol, actor_id=evento.actor_id, detalle=detalle, fecha=evento.fecha,
+            )
+
     async def create(self, solicitud: SolicitudARCOP, evento: EventoSolicitud) -> SolicitudARCOP:
         """Crea la solicitud y su primer evento en una sola transacción."""
         solicitud.eventos.append(evento)
         self.session.add(solicitud)
+        await self.session.flush()  # HU-09: el id de la solicitud va en el audit_log
+        self._auditar(solicitud, [evento])
         await self.session.commit()
         return await self.get(solicitud.id)
 
@@ -96,8 +130,10 @@ class SolicitudARCOPRepository:
         result = await self.session.execute(q.offset(offset).limit(limit))
         return list(result.scalars().all()), total
 
-    async def guardar(self, solicitud: SolicitudARCOP, *eventos: EventoSolicitud) -> SolicitudARCOP:
-        """Persiste el cambio de la solicitud y sus eventos en la MISMA transacción."""
+    async def guardar(self, solicitud: SolicitudARCOP, *eventos: EventoSolicitud,
+                      auditoria_extra: dict | None = None) -> SolicitudARCOP:
+        """Persiste el cambio de la solicitud y sus eventos (y su audit_log) en la MISMA transacción."""
         solicitud.eventos.extend(eventos)
+        self._auditar(solicitud, eventos, auditoria_extra)
         await self.session.commit()
         return await self.get(solicitud.id)

@@ -20,15 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
 from app.core.config import settings
-from app.domain.models.bitacora_auditoria import RESULTADO_OK
+# HU-09: el audit_log admite ok / rechazado / error / omitido (CHECK en PostgreSQL); un aviso
+# que falla al enviarse queda como "error"
+from app.domain.models.bitacora_auditoria import RESULTADO_ERROR as RESULTADO_FALLIDO
+from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.models.resumen import Resumen
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 
 logger = logging.getLogger(__name__)
-
-RESULTADO_OMITIDO = "omitido"
-RESULTADO_FALLIDO = "fallido"
 
 
 @dataclass(frozen=True)

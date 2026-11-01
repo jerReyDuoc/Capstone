@@ -182,7 +182,7 @@ class GestionarSolicitudARCOPUseCase:
 
     async def _transicionar(self, actor: Actor, solicitud: SolicitudARCOP, nuevo: str,
                             tipo_evento: Evento, comentario: str | None,
-                            eventos_extra: tuple = ()) -> SolicitudARCOP:
+                            eventos_extra: tuple = (), auditoria_extra: dict | None = None) -> SolicitudARCOP:
         anterior = solicitud.estado
         if not transicion_permitida(anterior, nuevo):
             raise TransicionInvalidaError(anterior, nuevo)
@@ -196,8 +196,9 @@ class GestionarSolicitudARCOPUseCase:
             solicitud.fecha_limite_informacion = _sumar_dias(ahora, self.plazo_informacion_dias)
         else:
             solicitud.fecha_limite_informacion = None
+        extra = {"auditoria_extra": auditoria_extra} if auditoria_extra else {}
         return await self.repo.guardar(
-            solicitud, self._evento(actor, tipo_evento, anterior, nuevo, comentario), *eventos_extra
+            solicitud, self._evento(actor, tipo_evento, anterior, nuevo, comentario), *eventos_extra, **extra
         )
 
     # ------------------------------------------------------------ titular
@@ -357,7 +358,7 @@ class GestionarSolicitudARCOPUseCase:
             raise TransicionInvalidaError(solicitud.estado, resultado)
         solicitud.respuesta = texto
 
-        eventos_extra, rutas = (), []
+        eventos_extra, rutas, auditoria_extra = (), [], None
         if resultado == Estado.RESUELTA.value and solicitud.tipo == TipoSolicitudARCOP.SUPRESION.value:
             if self.anonimizacion_repo is None:
                 raise RuntimeError("Falta el repositorio de anonimización para resolver una supresión.")
@@ -375,13 +376,15 @@ class GestionarSolicitudARCOPUseCase:
                     solicitud.evaluacion_id, _ahora()
                 )
             resumen = ", ".join(f"{k}={v}" for k, v in conteo.items())
+            # HU-09: qué se suprimió (conteos por tabla) queda en el audit_log
+            auditoria_extra = {"suprimido": {str(k): int(v or 0) for k, v in conteo.items()}}
             eventos_extra = (self._evento(
                 actor, Evento.ANONIMIZACION, resultado, resultado,
                 f"Datos del titular anonimizados ({resumen}).",
             ),)
 
         resuelta = await self._transicionar(
-            actor, solicitud, resultado, Evento.RESOLUCION, None, eventos_extra
+            actor, solicitud, resultado, Evento.RESOLUCION, None, eventos_extra, auditoria_extra
         )
         await self._borrar_archivos(solicitud_id, rutas)
         return resuelta

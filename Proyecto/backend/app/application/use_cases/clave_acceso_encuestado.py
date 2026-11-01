@@ -53,12 +53,22 @@ def verificar_clave(clave: str, almacenado: str | None) -> bool:
     return verificar_password(normalizar_clave(clave), almacenado)
 
 
-async def generar_clave_acceso(db: AsyncSession, evaluacion_id: int) -> str:
-    """Crea (o reemplaza) la clave de la evaluación y la devuelve en claro UNA vez."""
+async def generar_clave_acceso(db: AsyncSession, evaluacion_id: int, actor=None) -> str:
+    """
+    Crea (o reemplaza) la clave de la evaluación y la devuelve en claro UNA vez.
+    HU-09: si la regenera un admin (`actor`), el cambio queda en el audit_log (sin la clave).
+    """
     evaluacion = await db.get(Evaluacion, evaluacion_id)
     if evaluacion is None:
         raise EvaluacionNoEncontradaError("Evaluación no encontrada")
+    reemplaza = evaluacion.clave_acceso_hash is not None
     clave = nueva_clave()
     evaluacion.clave_acceso_hash = hash_clave(clave)
+    if actor is not None:
+        from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+        BitacoraRepository(db).registrar(
+            accion=Accion.ENCUESTADO_CLAVE_GENERADA, entidad="evaluacion", entidad_id=evaluacion_id,
+            actor=actor, detalle={"reemplaza_clave_anterior": reemplaza},
+        )
     await db.commit()
     return clave

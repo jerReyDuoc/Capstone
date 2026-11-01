@@ -21,6 +21,7 @@ from app.infrastructure.repositories.evento_seguridad_repository import EventoSe
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 from app.infrastructure.llm.factory import crear_anonimizador
 from app.domain.models.respuesta import EstadoClasificacion, FuenteClasificacion
+from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
 
@@ -36,14 +37,24 @@ class UpdateRespuestaRequest(BaseModel):
     justificacion: str
 
 
-def _use_case(db: AsyncSession) -> CreateRespuestaUseCase:
+def _use_case(db: AsyncSession, actor: Actor | None = None) -> CreateRespuestaUseCase:
     guard = ReglasPromptGuard()
+
+    def auditar(respuesta, detalle: dict) -> None:
+        # HU-09: la modificación queda en el audit_log en la MISMA transacción que el cambio.
+        # Sin token (solo con EXIGIR_TOKEN_EVALUACIONES=false, desarrollo) el actor es anónimo.
+        BitacoraRepository(db).registrar(
+            accion=Accion.RESPUESTA_MODIFICADA, entidad="respuestas", entidad_id=respuesta.id,
+            actor=actor, detalle=detalle,
+        )
+
     return CreateRespuestaUseCase(
         RespuestaRepository(db),
         EvaluacionRepository(db),
         guard=guard,
         registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(db), guard),
         anonimizador=crear_anonimizador(),  # HU-06: la justificación se guarda anonimizada
+        auditar_modificacion=auditar,
     )
 
 
@@ -90,7 +101,7 @@ async def create_respuesta(
     si el control ya estaba respondido la actualiza (200, mismo `id_respuesta`).
     """
     await verificar_alcance(db, actor, payload.evaluacion_id)  # HU-19: solo su evaluación
-    resultado = await _ejecutar(_use_case(db).guardar(
+    resultado = await _ejecutar(_use_case(db, actor).guardar(
         evaluacion_id=payload.evaluacion_id,
         matriz_control_id=payload.matriz_control_id,
         estado_clasificacion=payload.estado_clasificacion,
@@ -101,14 +112,15 @@ async def create_respuesta(
     return _cuerpo(resultado)
 
 
-@router.put("/{respuesta_id}", dependencies=[Depends(alcance_respuesta)])
+@router.put("/{respuesta_id}")
 async def update_respuesta(
     respuesta_id: int,
     payload: UpdateRespuestaRequest,
     db: AsyncSession = Depends(get_db),
+    actor: Actor | None = Depends(alcance_respuesta),
 ):
     """Modifica la declaración de una respuesta existente (mismas validaciones que el POST)."""
-    resultado = await _ejecutar(_use_case(db).actualizar(
+    resultado = await _ejecutar(_use_case(db, actor).actualizar(
         respuesta_id=respuesta_id,
         estado_clasificacion=payload.estado_clasificacion,
         justificacion=payload.justificacion,
@@ -178,6 +190,14 @@ async def revisar_respuesta(
     if not respuesta:
         raise HTTPException(status_code=404, detail="Respuesta no encontrada")
 
+    # HU-09: la revisión cambia la clasificación final: queda en el audit_log (misma transacción)
+    BitacoraRepository(db).registrar(
+        accion=Accion.RESPUESTA_REVISADA, entidad="respuestas", entidad_id=respuesta.id, actor=_admin,
+        detalle={"evaluacion_id": respuesta.evaluacion_id,
+                 "estado_final_anterior": respuesta.estado_clasificacion_final,
+                 "fuente_anterior": respuesta.fuente_clasificacion,
+                 "estado_final_nuevo": payload.clasificacion_revisada},
+    )
     respuesta.clasificacion_revisada = payload.clasificacion_revisada
     respuesta.fecha_revision = date.today()
     respuesta.estado_clasificacion_final = payload.clasificacion_revisada

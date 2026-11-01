@@ -422,6 +422,8 @@ RUTAS_DE_ACCESO = [
     ("POST", "/api/auth/cliente"),
     ("POST", "/api/auth/activacion/verificar"),
     ("POST", "/api/auth/activacion"),
+    # HU-09: login del Auditor Externo (la prueba completa está en test_hu09_audit_log.py)
+    ("POST", "/api/auth/auditor"),
     # HU-28: recuperación de contraseña (la prueba completa está en test_hu28_sesion.py)
     ("POST", "/api/auth/recuperacion"),
     ("POST", "/api/auth/recuperacion/verificar"),
@@ -518,6 +520,21 @@ def test_ruta_con_token_propio_exige_token(metodo, ruta, url, kwargs):
     _correr(esc)
 
 
+# HU-09: log inmutable. /api/auditoria/* es del Auditor Externo y del admin; /api/admin/auditores
+# solo del admin. Sus pruebas de 401, 403 (encuestado, referente, cliente) y 2xx están en
+# tests/test_hu09_audit_log.py::test_rutas_hu09_por_rol.
+RUTAS_HU09 = [
+    ("GET", "/api/auditoria/catalogo"),
+    ("GET", "/api/auditoria/registros"),
+    ("GET", "/api/auditoria/verificacion"),
+    ("GET", "/api/auditoria/lotes"),
+    ("GET", "/api/auditoria/exportacion"),
+    ("GET", "/api/admin/auditores"),
+    ("POST", "/api/admin/auditores"),
+    ("PATCH", "/api/admin/auditores/{auditor_id}"),
+]
+
+
 # ===================================================================== C3: cobertura de la matriz
 def test_todas_las_rutas_estan_clasificadas():
     """
@@ -535,6 +552,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | {(m, r) for m, r, _, _ in RUTAS_CON_TOKEN_PROPIO}
         | set(RUTAS_DE_ACCESO)
         | set(RUTAS_ADMIN_HU27)
+        | set(RUTAS_HU09)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"
@@ -562,7 +580,8 @@ def test_exigir_token_no_se_puede_apagar_en_produccion():
     from app.core.config import Settings
     base = dict(DATABASE_URL="x", DATABASE_URL_SYNC="x", REDIS_URL="x", GROQ_API_KEY="x",
                 APP_ENV="production", ENTITY_MAP_KEY="k", AUTH_SECRET="a" * 32,
-                TURNSTILE_SECRET_KEY="t", BFF_SHARED_SECRET="b" * 32, CORREO_MODO="desactivado")
+                TURNSTILE_SECRET_KEY="t", BFF_SHARED_SECRET="b" * 32, CORREO_MODO="desactivado",
+                DB_APP_PASSWORD="p" * 20)  # HU-09: clave propia del rol de la app en producción
     assert Settings(_env_file=None, **base).EXIGIR_TOKEN_EVALUACIONES is True  # por defecto
     with pytest.raises(ValueError, match="EXIGIR_TOKEN_EVALUACIONES"):
         Settings(_env_file=None, EXIGIR_TOKEN_EVALUACIONES=False, **base)

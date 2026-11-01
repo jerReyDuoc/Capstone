@@ -8,6 +8,8 @@ Roles (referente y admin_therion son los mismos que usa el frontend):
   - cliente        -> usuario definitivo de una empresa cliente (sub = usuario_definitivo.id).
                       HU-27: rol único del servicio pagado; ve las evaluaciones migradas
                       a su empresa. NO es titular ARCOP (no usa esas rutas).
+  - auditor_externo -> Auditor Externo (sub = usuario_auditor.id). HU-09: SOLO LECTURA del
+                      audit_log (consultar, verificar, exportar). Cuenta con vencimiento.
 referente y encuestado son TITULARES de sus datos en las solicitudes ARCOP.
 
 Cómo se obtiene el token (app/api/routes/auth.py):
@@ -15,6 +17,7 @@ Cómo se obtiene el token (app/api/routes/auth.py):
   - Encuestado: POST /api/auth/encuestado  {evaluacion_id, clave}
   - Admin:      POST /api/auth/login       {email, password}
   - Cliente:    POST /api/auth/cliente     {email, password}  (HU-27, tras activar la cuenta)
+  - Auditor:    POST /api/auth/auditor     {email, password}  (HU-09, cuenta creada por un admin)
 
 El token es un HMAC-SHA256 firmado con AUTH_SECRET (solo librería estándar):
     base64url(json {"sub": <id>, "rol": <rol>, "exp": <epoch>[, "sid": <sesión>]}) . base64url(firma)
@@ -55,6 +58,7 @@ class Rol(str, Enum):
     ENCUESTADO = "encuestado"
     ADMIN_THERION = "admin_therion"
     CLIENTE = "cliente"  # HU-27
+    AUDITOR_EXTERNO = "auditor_externo"  # HU-09
 
     @classmethod
     def valores(cls) -> list[str]:
@@ -65,7 +69,8 @@ class Rol(str, Enum):
 class Actor:
     """
     Quién hace la petición. `id` es usuario_temporal.id (referente),
-    evaluacion.id (encuestado), usuarios_admin.id (admin) o usuario_definitivo.id (cliente).
+    evaluacion.id (encuestado), usuarios_admin.id (admin), usuario_definitivo.id (cliente)
+    o usuario_auditor.id (auditor_externo, HU-09).
     """
     id: int
     rol: str
@@ -83,6 +88,10 @@ class Actor:
     @property
     def es_cliente(self) -> bool:
         return self.rol == Rol.CLIENTE.value
+
+    @property
+    def es_auditor(self) -> bool:
+        return self.rol == Rol.AUDITOR_EXTERNO.value
 
 
 class TokenInvalidoError(Exception):
@@ -180,7 +189,8 @@ _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 # muestre el botón "Authorize". auto_error=False -> los errores los damos nosotros.
 _bearer = HTTPBearer(
     auto_error=False,
-    description="Token de /api/auth/login, /api/auth/titular, /api/auth/encuestado o /api/auth/cliente "
+    description="Token de /api/auth/login, /api/auth/titular, /api/auth/encuestado, /api/auth/cliente "
+                "o /api/auth/auditor "
                 "(sin la palabra Bearer)",
 )
 
@@ -211,6 +221,12 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
         from app.domain.models.usuario_definitivo import UsuarioDefinitivo
         usuario = await db.get(UsuarioDefinitivo, actor.id)
         return bool(usuario and usuario.activo)
+    if actor.es_auditor:
+        # HU-09: cuenta activa y no vencida (desactivarla o que venza corta el acceso al instante)
+        from datetime import datetime, timezone
+        from app.domain.models.auditoria_externa import UsuarioAuditor
+        auditor = await db.get(UsuarioAuditor, actor.id)
+        return bool(auditor and auditor.vigente(datetime.now(timezone.utc).replace(tzinfo=None)))
     from app.domain.models.usuario_temporal import UsuarioTemporal
     usuario = await db.get(UsuarioTemporal, actor.id)
     return bool(usuario and usuario.fecha_anonimizacion is None)
@@ -260,8 +276,8 @@ if __name__ == "__main__":  # emisión de tokens de prueba
 
     p = argparse.ArgumentParser(description="Emite un token de acceso de prueba (solo desarrollo).")
     p.add_argument("--usuario", type=int, required=True,
-                   help="usuario_temporal.id, evaluacion.id (encuestado), usuarios_admin.id "
-                        "o usuario_definitivo.id (cliente)")
+                   help="usuario_temporal.id, evaluacion.id (encuestado), usuarios_admin.id, "
+                        "usuario_definitivo.id (cliente) o usuario_auditor.id (auditor_externo)")
     p.add_argument("--rol", choices=Rol.valores(), required=True)
     p.add_argument("--ttl", type=int, default=None, help="minutos de validez")
     a = p.parse_args()

@@ -1,10 +1,14 @@
 """
-HU-18 · Encadena cada fila nueva de la bitácora con la anterior (HMAC) al hacer flush.
+HU-18 · Encadena cada fila nueva del audit_log con la anterior (HMAC) al hacer flush.
 
-Funciona para TODA inserción en bitacora_auditoria, venga de donde venga (BitacoraRepository
+Funciona para TODA inserción en audit_log (HU-09), venga de donde venga (BitacoraRepository
 es el único que inserta). En PostgreSQL toma un advisory lock de transacción antes de leer
 el último hash: dos transacciones simultáneas no pueden encadenarse al mismo eslabón (el
 lock se libera al commit o rollback). En SQLite (pruebas) no hace falta.
+
+HU-09: el mismo lock lo toma el sellado por lote (audit_log_lotes.py). Como cada
+transacción que inserta lo conserva hasta su commit, al sellar no puede quedar una fila
+"en vuelo" con un id menor que otra ya confirmada: los lotes no tienen huecos falsos.
 """
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ def clave_bitacora() -> bytes:
 def campos(fila: BitacoraAuditoria) -> dict:
     return {"id": fila.id, "fecha": fila.fecha, "actor_rol": fila.actor_rol, "actor_id": fila.actor_id,
             "accion": fila.accion, "entidad": fila.entidad, "entidad_id": fila.entidad_id,
-            "resultado": fila.resultado, "detalle": fila.detalle,
+            "resultado": fila.resultado, "detalle": fila.detalle, "ip": fila.ip,
             "hash_anterior": fila.hash_anterior, "hash": fila.hash}
 
 
@@ -56,23 +60,40 @@ def instalar() -> None:
         event.listen(Session, "before_flush", _encadenar)
 
 
-async def verificar_cadena(session, lote: int = 1000) -> dict:
-    """Recorre la bitácora por id y verifica cada eslabón (sin devolver texto de los registros)."""
-    async def filas():
-        ultimo = 0
-        while True:
-            bloque = (await session.execute(
-                select(BitacoraAuditoria).where(BitacoraAuditoria.id > ultimo)
-                .order_by(BitacoraAuditoria.id).limit(lote)
-            )).scalars().all()
-            if not bloque:
-                return
-            for f in bloque:
-                yield campos(f)
-            ultimo = bloque[-1].id
+_COLUMNAS = ("id", "fecha", "actor_rol", "actor_id", "accion", "entidad", "entidad_id", "resultado",
+             "detalle", "ip", "hash_anterior", "hash")
 
-    datos = [f async for f in filas()]
-    return auditoria_hash.verificar(datos, clave_bitacora())
+
+async def filas_en_orden(session, desde_id: int = 0, hasta_id: int | None = None, lote: int = 1000):
+    """
+    Recorre audit_log por id, de a `lote` filas. Lee columnas (no entidades ORM): no llena el
+    mapa de identidad de la sesión, así una tabla grande no se acumula en memoria.
+    `desde_id` es exclusivo y `hasta_id` inclusivo.
+    """
+    cols = [getattr(BitacoraAuditoria, c) for c in _COLUMNAS]
+    ultimo = desde_id
+    while True:
+        q = select(*cols).where(BitacoraAuditoria.id > ultimo)
+        if hasta_id is not None:
+            q = q.where(BitacoraAuditoria.id <= hasta_id)
+        bloque = (await session.execute(q.order_by(BitacoraAuditoria.id).limit(lote))).all()
+        if not bloque:
+            return
+        for fila in bloque:
+            datos = dict(zip(_COLUMNAS, fila))
+            if isinstance(datos["detalle"], str):  # según el driver, JSON puede llegar como texto
+                import json
+                datos["detalle"] = json.loads(datos["detalle"])
+            yield datos
+        ultimo = bloque[-1][0]
+
+
+async def verificar_cadena(session, lote: int = 1000) -> dict:
+    """Recorre el audit_log por id y verifica cada eslabón (sin devolver texto de los registros)."""
+    v = auditoria_hash.VerificadorCadena(clave_bitacora())
+    async for f in filas_en_orden(session, lote=lote):
+        v.agregar(f)
+    return v.resultado()
 
 
 instalar()

@@ -18,6 +18,7 @@ from app.application.use_cases.aplicar_retencion import AplicarRetencionUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.core.contexto_auditoria import ORIGEN_WORKER, fijar_origen_por_defecto
 
 async def process_evidence_task(ctx, evidencia_id: int):
     # Sesión aparte para métricas/auditoría de IA: un rollback del negocio no las borra.
@@ -56,6 +57,12 @@ async def process_evidence_task(ctx, evidencia_id: int):
             )
             await session.commit()
 
+        def auditar_supresion(evidencia):
+            BitacoraRepository(session).registrar(
+                accion=Accion.EVIDENCIA_ORIGINAL_SUPRIMIDO, entidad="evidencias", entidad_id=evidencia.id_evidencia,
+                actor_rol=ROL_SISTEMA, detalle={"motivo": "hu06_solo_texto_anonimizado"},
+            )
+
         use_case = ProcessEvidenceUseCase(
             evidencia_repo, respuesta_repo, storage, validator,
             guard=guard,
@@ -64,6 +71,7 @@ async def process_evidence_task(ctx, evidencia_id: int):
             recalcular=recalcular,
             puntaje_actual=puntaje_actual,
             auditar=auditar,
+            auditar_supresion=auditar_supresion,
         )
         await use_case.execute(evidencia_id)
 
@@ -82,9 +90,20 @@ async def aplicar_retencion_task(ctx):
         resultado = await AplicarRetencionUseCase(session, storage=crear_storage_evidencias()).execute()
         return resultado.como_dict()
 
+async def sellar_audit_log_task(ctx):
+    """HU-09 criterio 3: sella en lotes (hash SHA-256 encadenado) las filas nuevas del audit_log."""
+    from app.infrastructure.repositories.audit_log_lotes import sellar_pendientes
+    async with AsyncSessionLocal() as session:
+        nuevos = await sellar_pendientes(session)
+        await session.commit()
+        return {"lotes_sellados": len(nuevos), "hasta_id": nuevos[-1].hasta_id if nuevos else None}
+
+
 async def startup(ctx):
     """Carga el motor NER al iniciar: si falta spaCy/modelo, el worker no arranca
     (mejor fallar al inicio que en cada evidencia)."""
+    # HU-09: lo que el worker registre fuera de una petición HTTP queda con origen "sistema:worker"
+    fijar_origen_por_defecto(ORIGEN_WORKER)
     if settings.SANITIZER_ENABLED:
         from app.infrastructure.security.ner_sanitizer import cargar_spacy
         cargar_spacy()
@@ -96,6 +115,8 @@ class WorkerSettings:
     cron_jobs = [
         cron(update_benchmark_task, hour=2, minute=0),  # 02:00 UTC diario
         cron(aplicar_retencion_task, hour=3, minute=0),  # 03:00 UTC diario (T-06)
+        # HU-09: sellado por lote del audit_log cada AUDIT_SELLO_CADA_MIN minutos
+        cron(sellar_audit_log_task, minute=set(range(0, 60, settings.AUDIT_SELLO_CADA_MIN)), run_at_startup=True),
     ]
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     max_tries = 3

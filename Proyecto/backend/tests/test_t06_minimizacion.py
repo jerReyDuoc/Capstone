@@ -214,7 +214,8 @@ def test_h3_mapa_reversible_prohibido_en_produccion():
                 APP_ENV="production", ENTITY_MAP_KEY="k", AUTH_SECRET="a" * 32,
                 TURNSTILE_SECRET_KEY="t", BFF_SHARED_SECRET="b" * 32,
                 # HU-12: en producción CORREO_MODO=archivo (el valor por defecto) está prohibido
-                CORREO_MODO="desactivado")
+                CORREO_MODO="desactivado",
+                DB_APP_PASSWORD="p" * 20)  # HU-09: clave propia del rol de la app en producción
     Settings(_env_file=None, **base)  # configuración válida
     with pytest.raises(ValueError, match="GUARDAR_MAPA_ENTIDADES_CIFRADO"):
         Settings(_env_file=None, GUARDAR_MAPA_ENTIDADES_CIFRADO=True, **base)

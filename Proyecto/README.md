@@ -82,6 +82,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
 | Capa de Políticas e IA (gateway, prompts versionados, métricas) | ✅ Hecho | `GET /api/ia/metricas`, revisión humana. HU-15: agente de **LangGraph** que orquesta las skills `validar_evidencia` y `tutor` (el gateway sigue siendo la única salida al LLM) |
 | Gobernanza del Agente IA (HU-18) | ✅ Hecho | Scope locking en el system prompt (`tutor/1.2.0`) con canario por llamada, filtro de entrada por categoría de ataque (inyección, jailbreak, fuga del prompt, delimitadores, codificado, uso indebido, varios turnos), validación de la salida, advertencia tras 3 bloqueos y bitácora encadenada con HMAC verificable. Ver [5.13](#513-gobernanza-del-agente-ia-hu-18) y `Extras/Cambios/backend/CAMBIOS_HU18.md` |
+| Log inmutable para el Auditor Externo (HU-09) | ✅ Hecho | `audit_log` de solo inserción (el rol de la app no tiene UPDATE/DELETE/TRUNCATE y los triggers frenan al dueño), IP obligatoria en cada registro, sellos SHA-256 por lote verificables por un tercero, rol `auditor_externo` con exportación ZIP y cobertura de modificaciones y supresiones (ARCOP, retención, respuestas, HU-06). Ver [5.14](#514-log-inmutable-para-el-auditor-externo-hu-09) y `Extras/Cambios/backend/CAMBIOS_HU09.md` |
 | Agente IA Tutor (HU-15) | ✅ Hecho | Chat en el panel de formación para el usuario definitivo con contrato vigente: explicaciones y planes de acción por nivel (Inicial/Intermedio/Avanzado) sobre las brechas no conformes de la evaluación más reciente de **su** empresa; mensajes anonimizados, cuota diaria por empresa (60), borrado a los 30 días sin actividad y con la supresión ARCOP. Ver [5.12](#512-agente-ia-tutor-hu-15) y `Extras/Cambios/backend/CAMBIOS_HU15.md` |
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
 | PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `Extras/Cambios/backend/CAMBIOS_HU06.md` |
@@ -463,6 +464,12 @@ El agente se somete a los mismos controles que el sistema exige a las empresas. 
 
 Toda interacción (respondida, bloqueada o rechazada por cuota, largo o permisos) queda en la bitácora con la huella del mensaje y las entidades que el NER enmascaró, nunca con el texto. Cada fila de la bitácora guarda el HMAC de la anterior, de modo que una modificación, un borrado o una inserción en medio se detectan con `GET /api/admin/bitacora/verificacion`. Con 3 bloqueos de la misma empresa en 10 minutos aparece una advertencia en el chat, sin cortar el servicio. El test-set de ataques está en `backend/tests/data/ataques_tutor.jsonl`; la prueba automática mide el filtro y `scripts/evaluar_ataques_tutor.py` lo corre contra Groq.
 
+### 5.14 Log inmutable para el Auditor Externo (HU-09)
+
+La bitácora de HU-27/HU-18 pasó a llamarse **`audit_log`** y quedó cerrada en tres capas. La API y el worker ya no se conectan como `postgres`: usan el rol **`complianceia_app`** (`DB_APP_USER`), sin superusuario, que en `audit_log` y `audit_log_sello` solo tiene `SELECT` e `INSERT`; las migraciones siguen corriendo con el dueño. Además, unos triggers impiden `UPDATE`, `DELETE` y `TRUNCATE` aunque los intente el dueño, y si alguien con superusuario los desactiva, la cadena HMAC de cada fila y los sellos por lote lo dejan en evidencia.
+
+Cada registro trae fecha (UTC), actor (rol e id, o `sistema`), **IP** (la del visitante que reenvía el BFF, o `sistema:worker`/`sistema:cli`), acción, entidad y resultado (`ok`, `rechazado`, `error`, `omitido`); en PostgreSQL lo exigen restricciones `CHECK`. El worker sella cada 15 minutos las filas nuevas en lotes de 500: cada lote recibe un `hash_lote` SHA-256 y un sello encadenado al anterior que **un tercero puede recalcular** sin claves. El Auditor Externo entra con `POST /api/auth/auditor` (cuenta de solo lectura que vence), filtra el historial por categoría (`modificacion`, `supresion`…), verifica la integridad y descarga un ZIP con los lotes completos, el manifiesto de hashes y `verificar_exportacion.py`, que corre con la librería estándar de Python. Cada consulta y exportación queda en el propio log.
+
 ---
 
 ## 6. Base de datos
@@ -616,6 +623,7 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | POST | `/api/auth/encuestado/clave` | 🛡️ | `{evaluacion_id}` → 201 `{clave}` (se muestra una vez; invalida la anterior) |
 | GET | `/api/auth/me` | 🔑 | `{usuario_id, rol}` |
 | POST | `/api/auth/cliente` | 🔓 | HU-27: `{email, password}` → token del rol `cliente`. HU-30: entra también sin contrato vigente; la respuesta trae `contrato` con su situación |
+| POST | `/api/auth/auditor` | 🔓 | HU-09: `{email, password}` → token del rol `auditor_externo` (solo lectura del audit_log; la sesión no dura más que la cuenta) |
 | POST | `/api/auth/activacion/verificar` | 🔓 | HU-27: `{token}` → ¿el enlace sigue válido? (no lo consume) |
 | POST | `/api/auth/activacion` | 🔓 | HU-27: `{token, password}` → define la contraseña; el enlace queda usado (400 `ENLACE_INVALIDO`, 410 `ENLACE_VENCIDO`, 422 `CONTRASENA_DEBIL`) |
 | POST | `/api/auth/logout` | 🔑 | HU-28: 204; cierra la sesión del token (admin o cliente): desde ese momento el token responde 401 |
@@ -709,7 +717,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/admin/empresas/{id}/contrato/reactivacion` | 🛡️ | HU-30: levanta la suspensión |
 | POST | `/api/admin/empresas/{id}/contrato/terminacion` | 🛡️ | HU-30: `{motivo}` → termina el contrato y abre el plazo de gracia (`CONTRATO_GRACIA_DIAS`) |
 | GET | `/api/admin/evaluaciones?estado=&origen=&empresa_id=` | 🛡️ | HU-28: todas las evaluaciones con rubro, puntaje general y empresa (si migró); sin contacto del encuestado |
-| GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | Bitácora de auditoría (solo inserción, sin datos personales) |
+| GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | audit_log (HU-09): solo inserción; cada fila con IP y categoría |
 | GET | `/api/admin/bitacora/verificacion` | 🛡️ | HU-18: recalcula la cadena de hashes de la bitácora; devuelve si está íntegra, la primera falla y el último hash (ancla) |
 | GET | `/api/cliente/empresa` | 🏢 | HU-28: espacio del cliente: su empresa, contrato y evaluaciones migradas (HU-30: 403 `CONTRATO_NO_VIGENTE` sin contrato vigente) |
 | GET | `/api/cliente/contrato` | 🏢 | HU-30: situación del contrato, documentos que aún puede descargar y acceso a ARCOP (responde siempre) |
@@ -735,6 +743,20 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/tutor/conversaciones/{id}/mensajes` | 🏢 | HU-15: `{texto}` → respuesta estructurada del tutor (tipo, pasos, brechas citadas, referencias, sugerencias) y la cuota |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
+
+### Log inmutable — `/api/auditoria` (HU-09)
+
+Rol `auditor_externo` o admin (🔍). Fechas en UTC; `hasta` no se incluye.
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/auditoria/registros?desde=&hasta=&categoria=&accion=&entidad=&entidad_id=&resultado=&actor_rol=` | 🔍 | Historial con fecha, actor, IP, acción, resultado y hash; `categoria`: modificacion, supresion, creacion, acceso, seguridad, auditoria |
+| GET | `/api/auditoria/verificacion` | 🔍 | Cadena HMAC + hash por lote: `integra`, lotes con falla (motivo) y ancla (último lote y sello) |
+| GET | `/api/auditoria/lotes` | 🔍 | Sellos de los lotes (para anotar el ancla) |
+| GET | `/api/auditoria/exportacion?desde=&hasta=` | 🔍 | ZIP: lotes completos (`audit_log.jsonl` y `.csv`), `lotes.json`, `verificacion.json`, `manifiesto.json` y `verificar_exportacion.py`. Cabecera `X-Audit-Export-SHA256` |
+| GET | `/api/auditoria/catalogo` | 🔍 | Acciones y su categoría |
+| GET / POST | `/api/admin/auditores` | 🛡️ | Lista / crea una cuenta `{email, organizacion, password, dias_vigencia}` |
+| PATCH | `/api/admin/auditores/{id}` | 🛡️ | `{activo?, dias_vigencia?, password?}`; desactivar cierra sus sesiones |
 
 ### Códigos de error
 
@@ -1043,6 +1065,10 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backe
 | `SMTP_TIMEOUT_S` | `20` | Tiempo máximo de conexión SMTP |
 | `CORREO_REMITENTE` | `ComplianceIA <no-responder@complianceia.cl>` | Remitente; con Gmail debe ser la misma cuenta de `SMTP_USUARIO` |
 | `INFORME_CORREOS_DIA_EVALUACION` / `INFORME_CORREOS_DIA_IP` | `3` / `10` | Envíos del informe permitidos por día |
+| `DB_APP_USER` / `DB_APP_PASSWORD` | `complianceia_app` / `complianceia_app_dev` | HU-09: rol de PostgreSQL de la API y el worker (sin UPDATE/DELETE en el audit_log). Lo crea la migración; en `production` la clave debe ser propia (≥ 16) |
+| `AUDIT_LOTE_TAMANO` / `AUDIT_SELLO_CADA_MIN` | `500` / `15` | HU-09: filas por lote sellado y cada cuántos minutos sella el worker |
+| `AUDIT_EXPORT_MAX_FILAS` | `200000` | HU-09: tope de registros por exportación (413 si se supera) |
+| `AUDITOR_VIGENCIA_MAX_DIAS` / `AUDITOR_PASSWORD_MIN` | `90` / `12` | HU-09: vigencia máxima y largo mínimo de la clave del Auditor Externo |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `postgres` / `1234` / `complaince_db` | `Proyecto/.env` (solo los usa `docker-compose.yml`) |
 
 ---

@@ -175,7 +175,7 @@ async def generar_clave_encuestado(
     Uso: soporte y pruebas mientras la encuesta pública (HU-19) no la entregue sola.
     """
     try:
-        clave = await generar_clave_acceso(db, payload.evaluacion_id)
+        clave = await generar_clave_acceso(db, payload.evaluacion_id, actor=actor)
     except EvaluacionNoEncontradaError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"evaluacion_id": payload.evaluacion_id, "clave": clave}
@@ -222,6 +222,30 @@ async def login_cliente(
         raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
     except ContratoNoVigenteError as e:
         raise HTTPException(status_code=403, detail={"codigo": "CONTRATO_NO_VIGENTE", "mensaje": str(e)})
+    except DemasiadosIntentosError as e:
+        raise _demasiados_intentos(e)
+    except LimitadorNoDisponibleError:
+        raise _LIMITADOR_CAIDO
+
+
+@router.post("/auditor")
+async def login_auditor(
+    payload: LoginAdminRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limitador: Limitador = Depends(obtener_limitador),
+):
+    """
+    HU-09: login del Auditor Externo (rol auditor_externo). Su token solo abre /api/auditoria/*
+    (consultar, verificar y exportar el audit_log). Sesión revocable con POST /api/auth/logout;
+    intentos fallidos limitados por cuenta e IP (429); cada intento queda en el log.
+    """
+    _exigir_secreto()
+    try:
+        return await IniciarSesionUseCase(db).auditor(payload.email, payload.password, limitador,
+                                                      ip_cliente(request))
+    except CredencialesInvalidasError as e:
+        raise HTTPException(status_code=401, detail={"codigo": "CREDENCIALES_INVALIDAS", "mensaje": str(e)})
     except DemasiadosIntentosError as e:
         raise _demasiados_intentos(e)
     except LimitadorNoDisponibleError:

@@ -32,7 +32,9 @@ from app.domain.models.solicitud_contratacion import (
     SolicitudContratacion,
     EstadoSolicitudContratacion,
 )
-from app.domain.models.bitacora_auditoria import BitacoraAuditoria
+from app.domain.models.bitacora_auditoria import BitacoraAuditoria, AuditLog
+# HU-09: sellos por lote del audit_log y cuentas del Auditor Externo
+from app.domain.models.auditoria_externa import AuditLogSello, UsuarioAuditor
 # HU-28: sesiones revocables y recuperación de contraseña
 from app.domain.models.sesion import SesionUsuario, TokenRecuperacion
 # HU-26: recorrido de módulos formativos y avance de la empresa
@@ -86,6 +88,9 @@ __all__ = [
     "SolicitudContratacion",
     "EstadoSolicitudContratacion",
     "BitacoraAuditoria",
+    "AuditLog",
+    "AuditLogSello",
+    "UsuarioAuditor",
     "SesionUsuario",
     "TokenRecuperacion",
     "AvanceFormativo",

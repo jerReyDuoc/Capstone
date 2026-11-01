@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Literal
 from pydantic import model_validator
@@ -266,6 +267,23 @@ class Settings(BaseSettings):
     BITACORA_CLAVE_HASH: str | None = None
     TUTOR_VENTANA_BLOQUEOS_MIN: int = 10
 
+    # HU-09: log inmutable (audit_log) para el Auditor Externo (Ley 21.719, art. 14 ter)
+    # Filas por lote sellado. Cada lote recibe un hash SHA-256 que un tercero puede
+    # recalcular con el archivo exportado (verificación de integridad por hash en lote).
+    AUDIT_LOTE_TAMANO: int = 500
+    # Cada cuántos minutos el worker sella las filas pendientes (1-60).
+    AUDIT_SELLO_CADA_MIN: int = 15
+    # Tope de filas de una exportación (si se supera, se pide acotar el rango de fechas).
+    AUDIT_EXPORT_MAX_FILAS: int = 200_000
+    # Vigencia máxima (días) de una cuenta de auditor externo: la auditoría es acotada.
+    AUDITOR_VIGENCIA_MAX_DIAS: int = 90
+    AUDITOR_PASSWORD_MIN: int = 12
+    # Rol de PostgreSQL con el que se conectan la API y el worker. NO es dueño de las tablas:
+    # en audit_log y audit_log_sello solo tiene SELECT e INSERT (sin UPDATE, DELETE ni
+    # TRUNCATE). Lo crea la migración de HU-09 (que corre con el dueño, POSTGRES_USER).
+    DB_APP_USER: str = "complianceia_app"
+    DB_APP_PASSWORD: str = "complianceia_app_dev"
+
     @property
     def contratacion_solicitudes_ip_dia(self) -> int:
         valor = self.CONTRATACION_SOLICITUDES_IP_DIA
@@ -343,6 +361,20 @@ class Settings(BaseSettings):
             raise ValueError("TUTOR_BLOQUEOS_ADVERTENCIA no puede ser negativo y TUTOR_VENTANA_BLOQUEOS_MIN debe ser > 0 (HU-18).")
         if not 0 <= self.TUTOR_TEMPERATURA <= 1:
             raise ValueError("TUTOR_TEMPERATURA debe estar entre 0 y 1 (HU-15).")
+        if not 10 <= self.AUDIT_LOTE_TAMANO <= 10_000:
+            raise ValueError("AUDIT_LOTE_TAMANO debe estar entre 10 y 10000 (HU-09).")
+        if not 1 <= self.AUDIT_SELLO_CADA_MIN <= 60:
+            raise ValueError("AUDIT_SELLO_CADA_MIN debe estar entre 1 y 60 (HU-09).")
+        if self.AUDIT_EXPORT_MAX_FILAS < 1 or not 1 <= self.AUDITOR_VIGENCIA_MAX_DIAS <= 365:
+            raise ValueError("AUDIT_EXPORT_MAX_FILAS debe ser > 0 y AUDITOR_VIGENCIA_MAX_DIAS estar entre 1 y 365 (HU-09).")
+        if self.AUDITOR_PASSWORD_MIN < 12:
+            raise ValueError("AUDITOR_PASSWORD_MIN no puede ser menor que 12 (HU-09).")
+        if not re.fullmatch(r"[a-z_][a-z0-9_]{2,62}", self.DB_APP_USER or ""):
+            raise ValueError("DB_APP_USER debe ser un nombre de rol simple (minúsculas, dígitos y _) (HU-09).")
+        if self.APP_ENV == "production" and (self.DB_APP_PASSWORD == "complianceia_app_dev"
+                                             or len(self.DB_APP_PASSWORD) < 16):
+            raise ValueError("DB_APP_PASSWORD (mínimo 16 caracteres, distinta de la de desarrollo) "
+                             "es obligatoria con APP_ENV=production (HU-09).")
         if (self.APP_ENV == "production" and self.CORREO_MODO == "smtp"
                 and not self.RECUPERACION_URL_BASE.startswith("https://")):
             # Al arrancar y no al enviar: un error solo cuando el correo existe revelaría cuáles existen

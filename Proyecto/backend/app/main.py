@@ -11,6 +11,8 @@ from app.api.routes import contratacion, admin_clientes  # HU-27 (+ bases de HU-
 from app.api.routes import cliente  # HU-28: espacio de la empresa del usuario definitivo
 from app.api.routes import formacion, remediacion  # HU-26 (módulos formativos) y HU-17 (remediación)
 from app.api.routes import tutor  # HU-15: Agente IA Tutor del panel de formación
+from app.api.routes import auditoria  # HU-09: log inmutable para el Auditor Externo
+from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,8 @@ async def lifespan(app: FastAPI):
     await app.state.arq.close()
 
 app = FastAPI(title="Validador de Evidencias con LLM", lifespan=lifespan)
+# HU-09: la IP de cada petición queda disponible para el audit_log (criterio 2)
+app.add_middleware(ContextoAuditoriaMiddleware)
 
 app.include_router(respuestas.router)
 app.include_router(evidencias.router)
@@ -56,6 +60,8 @@ app.include_router(cliente.router)
 app.include_router(formacion.router)
 app.include_router(remediacion.router)
 app.include_router(tutor.router)
+app.include_router(auditoria.router)
+app.include_router(auditoria.router_admin)
 
 @app.get("/health")
 async def health():

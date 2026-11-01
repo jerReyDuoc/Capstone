@@ -60,6 +60,7 @@ class ProcessEvidenceUseCase:
         recalcular: Callable[[int], Awaitable[object]] | None = None,
         puntaje_actual: Callable[[int], Awaitable[float | None]] | None = None,
         auditar: Callable[[Evidencia, Respuesta | None], Awaitable[None]] | None = None,
+        auditar_supresion: Callable[[Evidencia], None] | None = None,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
@@ -76,6 +77,9 @@ class ProcessEvidenceUseCase:
         self.puntaje_actual = puntaje_actual
         # HU-17: registra el resultado de la remediación en la bitácora (HU-09)
         self.auditar = auditar
+        # HU-09: registra en el audit_log (sin commit) que el archivo original se suprimió y
+        # quedó solo su texto anonimizado; va en la misma transacción que el cambio de ruta.
+        self.auditar_supresion = auditar_supresion
 
     async def execute(self, evidencia_id: int) -> Evidencia:
         evidencia = await self.evidencia_repo.get(evidencia_id)
@@ -141,6 +145,8 @@ class ProcessEvidenceUseCase:
             return
         try:
             evidencia.storage_path = nueva
+            if self.auditar_supresion is not None:
+                self.auditar_supresion(evidencia)
             await self.evidencia_repo.update(evidencia)
         except Exception as e:  # noqa: BLE001
             logger.error("HU-06: no se pudo registrar el archivo anonimizado de la evidencia %s (%s)",

@@ -5,7 +5,7 @@
 #   web       http://localhost:3000        (frontend Next.js: landing, encuesta y panel)
 #   api       http://localhost:8000/docs   (FastAPI)
 #   worker    procesa evidencias (capa de Políticas e IA: spaCy + Groq)
-#   migrate   aplica "alembic upgrade head" y termina
+#   migrate   aplica "alembic upgrade head" y termina (con el dueño de la BD; ver HU-09 abajo)
 #   db        PostgreSQL 16   -> localhost:5433 (para DBeaver/psql y las pruebas en vivo)
 #   redis     cola de ARQ     -> localhost:6379
 #
@@ -26,18 +26,35 @@
 # Para ver los rangos reservados en tu PC (PowerShell):
 #     netsh interface ipv4 show excludedportrange protocol=tcp
 
+# HU-09: dos usuarios de PostgreSQL.
+#   - migrate se conecta con el DUEÑO de las tablas (POSTGRES_USER): crea y altera tablas y
+#     crea el rol de la aplicación.
+#   - api y worker se conectan con DB_APP_USER (complianceia_app): un rol SIN superusuario
+#     que en audit_log solo puede leer e insertar (sin UPDATE, DELETE ni TRUNCATE). Su clave
+#     es DB_APP_PASSWORD (en producción, una propia de 16+ caracteres).
+x-backend-env: &backend-env
+  REDIS_URL: redis://redis:6379
+  STORAGE_DIR: /data/storage
+  # HU-19: mismo secreto que el servicio web. Vacío = la API no exige el BFF.
+  BFF_SHARED_SECRET: ${BFF_SHARED_SECRET:-}
+
+# Conexión del rol limitado (api y worker)
+x-backend-env-app: &backend-env-app
+  <<: *backend-env
+  DATABASE_URL: postgresql+asyncpg://${DB_APP_USER:-complianceia_app}:${DB_APP_PASSWORD:-complianceia_app_dev}@db:5432/${POSTGRES_DB:-complaince_db}
+  DATABASE_URL_SYNC: postgresql+psycopg2://${DB_APP_USER:-complianceia_app}:${DB_APP_PASSWORD:-complianceia_app_dev}@db:5432/${POSTGRES_DB:-complaince_db}
+  # Los contenedores de la app no necesitan la clave del dueño (viene en el .env único)
+  POSTGRES_PASSWORD: ""
+
 x-backend: &backend
   build: ./backend
   image: complianceai-backend:latest
   env_file:
     - ./.env
   environment:
+    <<: *backend-env
     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
     DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-1234}@db:5432/${POSTGRES_DB:-complaince_db}
-    REDIS_URL: redis://redis:6379
-    STORAGE_DIR: /data/storage
-    # HU-19: mismo secreto que el servicio web. Vacío = la API no exige el BFF.
-    BFF_SHARED_SECRET: ${BFF_SHARED_SECRET:-}
 
 services:
   db:
@@ -69,7 +86,7 @@ services:
       retries: 10
 
   migrate:
-    <<: *backend
+    <<: *backend          # con el dueño de las tablas (HU-09)
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     depends_on:
@@ -78,6 +95,7 @@ services:
 
   api:
     <<: *backend
+    environment: *backend-env-app   # HU-09: rol limitado
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     ports:
@@ -98,6 +116,7 @@ services:
 
   worker:
     <<: *backend
+    environment: *backend-env-app   # HU-09: rol limitado
     command: ["arq", "app.worker.tasks.WorkerSettings"]
     restart: unless-stopped
     volumes:

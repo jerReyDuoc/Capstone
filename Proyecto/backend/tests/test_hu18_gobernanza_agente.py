@@ -272,7 +272,7 @@ def test_api_la_bitacora_queda_encadenada_y_se_verifica(hu27, proveedor):
         objetivo = filas[3].id
 
         async def alterar(s):
-            await s.execute(text("UPDATE bitacora_auditoria SET resultado = 'rechazado' WHERE id = :i"), {"i": objetivo})
+            await s.execute(text("UPDATE audit_log SET resultado = 'rechazado' WHERE id = :i"), {"i": objetivo})
             await s.commit()
         await hu27._bd(alterar)
         r = (await c.get("/api/admin/bitacora/verificacion", headers=hu27.admin())).json()
