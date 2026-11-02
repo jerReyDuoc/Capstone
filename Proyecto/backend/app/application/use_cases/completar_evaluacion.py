@@ -125,6 +125,10 @@ class CompletarEvaluacionUseCase:
         evaluacion.estado_progreso = ESTADO_COMPLETADA
         # HU-29: fecha del historial de la empresa y de su gráfico de evolución
         evaluacion.fecha_completado = datetime.now(timezone.utc).replace(tzinfo=None)
+        # HU-21: con qué matriz se calcularon los puntajes (va impreso en el informe PDF)
+        from app.application.informes.carga import version_matriz_vigente
+
+        evaluacion.version_matriz = await version_matriz_vigente(self.session)
         resumen = await GenerateResumenUseCase(self.session).execute(evaluacion_id)
         return {
             **resumen,

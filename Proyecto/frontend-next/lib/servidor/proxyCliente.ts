@@ -64,6 +64,8 @@ const REGLAS: Regla[] = [
   { metodo: "POST", patron: /^respuestas\/\d{1,9}\/evidencias$/, archivo: true, conIp: true, timeoutMs: 60_000 },
   { metodo: "GET", patron: /^evidencias\/\d{1,9}$/ },
   { metodo: "GET", patron: /^evaluaciones\/\d{1,9}\/informe\/pdf$/, binario: true, timeoutMs: 30_000 },
+  // HU-21: ficha del informe (portada del PDF en JSON)
+  { metodo: "GET", patron: /^evaluaciones\/\d{1,9}\/informe\/ficha$/, timeoutMs: 30_000 },
   { metodo: "POST", patron: /^evaluaciones\/\d{1,9}\/informe\/enviar$/, conIp: true, timeoutMs: 45_000 },
   // Catálogos (públicos, sin datos personales)
   { metodo: "GET", patron: /^(brechas|dominios|rubros|rutas-formativas|controles)$/ },

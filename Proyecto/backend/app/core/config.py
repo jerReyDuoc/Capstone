@@ -115,6 +115,10 @@ class Settings(BaseSettings):
     # "Lo que debería cumplir": puntaje de referencia por dimensión que se muestra junto al
     # resultado. 75 = techo de "gestionado" (controles definidos, documentados y con dueño).
     META_CUMPLIMIENTO_PUNTAJE: float = 75.0
+    # HU-21: etiqueta de la versión de la matriz de controles que se imprime en el informe.
+    # El informe la acompaña de una huella del contenido ("2026.1+3fa9c2d1"), así un cambio en
+    # la matriz se nota aunque nadie suba la etiqueta. Súbela al publicar una matriz nueva.
+    MATRIZ_VERSION: str = "2026.1"
     # HU-10 · k-anonimato de la comparativa sectorial. Las métricas de un rubro (promedio,
     # diferencia, posición) solo se publican si la cohorte tiene al menos K_ANONIMATO_MINIMO
     # EMPRESAS distintas (no evaluaciones: una empresa que se reevalúa cuenta una vez). Con
@@ -387,6 +391,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"{nombre} debe ser mayor que 0 (HU-26/HU-17/HU-29).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
+        if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
+            raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),
         # para no bloquear alembic ni la API, que no la necesitan.
         return self

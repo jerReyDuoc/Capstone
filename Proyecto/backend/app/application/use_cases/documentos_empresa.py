@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.informes.analisis import construir_brechas, construir_plan, filtrar_brechas, parsear_filtros
+from app.application.informes.analisis import parsear_filtros
 from app.application.informes.carga import SinResultadosError, cargar_evaluacion
 from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf
 from app.core.autenticacion import Actor
@@ -122,18 +122,10 @@ async def guardar_documento(
 
 
 def _datos_informe(datos) -> DatosInforme:
-    """El informe completo (sin filtros), igual al que se descarga desde el panel."""
-    filtros = parsear_filtros(None, None, None, None)
-    puntajes = {d.nombre: d.puntaje for d in datos.dominios if d.puntaje is not None}
-    brechas = construir_brechas(datos.respuestas, puntajes)
-    return DatosInforme(
-        evaluacion_id=datos.evaluacion_id, rubro=datos.rubro, puntaje_general=datos.puntaje_general,
-        controles_evaluados=datos.controles_evaluados, en_revision=datos.en_revision,
-        comparativa=datos.comparativa, brechas_total=len(brechas),
-        brechas=filtrar_brechas(brechas, filtros), filtros=filtros,
-        plan=construir_plan(brechas, datos.dominios, datos.rutas),
-        generado=datetime.now(timezone.utc),
-    )
+    """El informe completo (sin filtros), igual al que se descarga desde el panel (HU-21)."""
+    from app.application.informes.informe import construir_informe
+
+    return construir_informe(datos, parsear_filtros(None, None, None, None), datetime.now(timezone.utc))
 
 
 async def archivar_informe(db: AsyncSession, evaluacion: Evaluacion, actor: Actor | None) -> DocumentoEmpresa:

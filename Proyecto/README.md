@@ -447,6 +447,7 @@ Cada módulo trae objetivo general, objetivos específicos, contenidos, horas, m
 ### 5.11 Informe PDF y envío por correo
 
 - `GET /api/evaluaciones/{id}/informe/pdf` genera el informe con **reportlab**: resultado general, comparativa con meta y rubro, brechas priorizadas (HU-11) y plan formativo (HU-12). Acepta los filtros del listado (`severidad`, `dominio`, `estado`, `q`). El panel lo **descarga directo** (`Content-Disposition: attachment`).
+- HU-21: la portada del PDF lleva la **ficha de identificación** (código de evaluación con dígito verificador, fecha de la evaluación, fecha de emisión y **versión de la matriz**, que `POST /completar` guarda en `evaluacion.version_matriz` como `MATRIZ_VERSION+huella`), el **aviso legal** completo (y resumido en el pie de cada página, con "Página X de Y") y los **5 puntajes** (Global y las 4 dimensiones, siempre). Cierra con una huella SHA-256 de los resultados que coincide con `GET /informe/ficha`.
 - `POST /api/evaluaciones/{id}/informe/enviar` `{email?, recordar?, filtros…}` envía **ese mismo PDF** como adjunto, para que quede en la bandeja si se pierde el archivo. El PDF siempre lo genera el servidor con datos de la BD (no se aceptan archivos del cliente). El encuestado puede omitir el correo (se usa el registrado) o guardarlo con `recordar`. Límite: 3 envíos por evaluación y 10 por IP al día.
 - `CORREO_MODO`: `archivo` (defecto en desarrollo: el `.eml` queda en `STORAGE_DIR/correos`, no sale nada), `smtp` (envío real) o `desactivado`. Configuración en [12.1, paso 4](#121-con-docker-recomendado).
 
@@ -658,7 +659,8 @@ Base: `http://localhost:8000` (o a través del proxy del frontend en `http://loc
 | GET | `/api/evaluaciones/{id}/resumen` | 📋 | Resumen guardado (404 si no se ha cerrado) |
 | GET | `/api/evaluaciones/{id}/comparativa` | 📋 | Resumen vs. **meta de cumplimiento** (siempre) y sector del rubro con k-anonimato (HU-10, solo con ≥ `K_ANONIMATO_MINIMO` empresas); trae `meta_puntaje`, `diferencia_vs_meta`, `cumple_meta`, `sector` (general, `posicion`, `advertencia`) y por dimensión `cohorte_suficiente`, `promedio_industria`, `posicion` |
 | GET | `/api/evaluaciones/{id}/plan-formativo` | 📋 | HU-12: plan de estudio por dimensión (nivel asignado, objetivo, módulos y brechas que cubren); 404 `SIN_RESULTADOS` si no hay resumen |
-| GET | `/api/evaluaciones/{id}/informe/pdf?severidad=&dominio=&estado=&q=` | 📋 | Informe en PDF para descargar (resultado, comparativa, brechas, plan formativo) |
+| GET | `/api/evaluaciones/{id}/informe/pdf?severidad=&dominio=&estado=&q=` | 📋 | Informe en PDF para descargar. HU-21: portada con código de evaluación, fechas, versión de la matriz, aviso legal (también en el pie de cada página) y los 5 puntajes; luego comparativa, brechas, plan formativo y huella de verificación |
+| GET | `/api/evaluaciones/{id}/informe/ficha` | 📋 | HU-21: la portada del PDF en JSON (código `CIA-AAAA-NNNNNN-D`, `version_matriz`, aviso legal, 5 puntajes, resumen de brechas y rutas, `huella`); 404 `SIN_RESULTADOS` |
 | POST | `/api/evaluaciones/{id}/informe/enviar` | 📋 | `{email?, recordar?, severidad?, …}` → envía el mismo PDF por correo; 422 `EMAIL_REQUERIDO`/`EMAIL_INVALIDO`, 429 `LIMITE_CORREOS`, 502 `CORREO_FALLIDO`, 503 `CORREO_NO_DISPONIBLE` |
 | GET | `/api/evaluaciones/benchmark?rubro_id=` | 🔑 | HU-10: promedios por rubro × dominio y general del rubro (`dominio_id` null), con supresión k < 5; sin máximo ni mínimo |
 | PATCH | `/api/evaluaciones/{id}/prueba` | 🛡️ | `{es_prueba}` — excluye/incluye la evaluación del benchmark (HU-19) |

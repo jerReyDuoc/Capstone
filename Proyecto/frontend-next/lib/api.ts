@@ -1,6 +1,7 @@
 import { construirPanel } from "./adaptadores";
 import { DEMO_EVALUACIONES, panelDemo, planDemo } from "./demo";
 import { filtrosAParams, type FiltrosBrechas } from "./filtrosBrechas";
+import { fichaDemo, type FichaInformeApi } from "./informe";
 import type {
   BrechaCatalogoApi,
   ComparativaApi,
@@ -156,6 +157,16 @@ const consulta = (filtros?: FiltrosBrechas) => {
   const q = new URLSearchParams(filtros ? filtrosAParams(filtros) : {}).toString();
   return q ? `?${q}` : "";
 };
+
+/** HU-21 · Ficha del informe: lo que dice la portada del PDF (mismo cálculo del servidor). */
+export async function cargarFichaInforme(
+  evaluacionId: number,
+  signal?: AbortSignal,
+  base: BaseApi = "/api",
+): Promise<FichaInformeApi> {
+  if (MODO_DEMO) return fichaDemo(panelDemo(evaluacionId));
+  return getJson<FichaInformeApi>(`${base}/evaluaciones/${evaluacionId}/informe/ficha`, signal);
+}
 
 /** Nombre que propone el servidor en Content-Disposition, o uno de respaldo. */
 export function nombreDesdeDisposicion(cabecera: string | null, respaldo: string): string {

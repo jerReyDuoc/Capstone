@@ -1,0 +1,188 @@
+/* HU-21 · Informe para el directorio
+   La hoja (página 1 del PDF) es lo único llamativo de la página: lleva los colores del PAPEL
+   (los mismos de app/application/informes/pdf_informe.py), no los del panel oscuro, para que
+   quien la revisa vea lo que se va a imprimir. Todo lo demás usa los componentes del panel. */
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+.lateral { display: grid; gap: var(--sp-5); min-width: 0; }
+
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  /* En pantallas angostas la acción va primero y la hoja después */
+  .lateral { order: -1; }
+}
+
+/* ---------- La hoja ---------- */
+.vistaPrevia { margin: 0; min-width: 0; display: grid; gap: var(--sp-3); justify-items: center; }
+.esqueletoHoja { aspect-ratio: 210 / 297; width: 100%; max-width: 560px; justify-self: center; }
+
+.hoja {
+  --papel: #fbfcfb;
+  --tinta: #14201b;
+  --tinta-gris: #5b6b64;   /* 5,6:1 sobre --papel */
+  --verde: #0b7a5a;        /* 5,4:1 sobre --papel */
+  --linea: #d5ddd9;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 560px;
+  aspect-ratio: 210 / 297;  /* A4; crece si el contenido no cabe (zoom 200 %) */
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 7% 7% 4%;
+  background: var(--papel);
+  color: var(--tinta);
+  border-top: 4px solid var(--verde);
+  border-radius: 3px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 40px -12px rgba(0, 0, 0, 0.6);
+}
+/* Las páginas que siguen, asomando detrás: el informe tiene más de una */
+.hoja::before,
+.hoja::after {
+  content: "";
+  position: absolute; z-index: -1;
+  inset: 0;
+  border-radius: 3px;
+  background: #dfe5e2;
+  transform: translate(8px, 8px);
+}
+.hoja::after { background: #c5cfca; transform: translate(16px, 16px); }
+.vistaPrevia { isolation: isolate; padding: 0 16px 16px 0; }
+
+.hojaCuerpo { display: grid; gap: 0.7em; }
+.hojaCuerpo p { margin: 0; }
+.hojaMarca { font-size: 0.6875rem; color: var(--tinta-gris); }
+.hojaTitulo { font-size: 1.375rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+.hojaBajada { color: var(--tinta-gris); margin-top: -0.3em !important; }
+
+.hojaFicha {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0.4em 0 0;
+  border: 1px solid var(--linea);
+}
+.hojaFicha div { padding: 0.55em 0.7em; min-width: 0; }
+.hojaFicha div + div { border-left: 1px solid var(--linea); }
+.hojaFicha dt { font-size: 0.6875rem; color: var(--tinta-gris); }
+.hojaFicha dd { margin: 0.15em 0 0; font-weight: 700; overflow-wrap: anywhere; }
+
+.hojaAviso {
+  display: grid; gap: 0.4em;
+  padding: 0.75em 0.9em;
+  background: #f6f4ee;
+  border-left: 3px solid #8a6200;
+  font-size: 0.6875rem; line-height: 1.45;
+}
+.hojaAvisoTitulo { font-weight: 700; font-size: 0.75rem; }
+.hojaGris { color: var(--tinta-gris); }
+
+.hojaSeccion { color: var(--verde); font-weight: 700; font-size: 0.9375rem; margin-top: 0.3em !important; }
+
+.hojaTabla { width: 100%; border-collapse: collapse; font-size: 0.75rem; table-layout: fixed; }
+.hojaTabla th:first-child { width: 34%; }
+.hojaTabla th:nth-child(2) { width: 15%; }
+.hojaTabla th:nth-child(3) { width: 21%; }
+.hojaTabla thead th {
+  background: var(--verde); color: #fff;
+  font-size: 0.6875rem; font-weight: 700; text-align: left;
+  padding: 0.4em 0.5em;
+}
+.hojaTabla tbody th,
+.hojaTabla td {
+  padding: 0.4em 0.5em;
+  border-bottom: 1px solid var(--linea);
+  text-align: left; font-weight: 400;
+  vertical-align: middle;
+}
+.hojaNum { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.875rem; }
+.hojaGlobal { background: #e3f4ee; }
+.hojaGlobal th { font-weight: 700 !important; }
+.hojaGlobal .hojaNum { font-size: 1.125rem; }
+.hojaCeldaBarra { width: 30%; }
+.hojaPista { position: relative; display: block; height: 7px; background: #e7ecea; }
+.hojaGlobal .hojaPista { height: 10px; }
+.hojaRelleno { position: absolute; inset: 0 auto 0 0; background: #3f9e80; }
+.hojaGlobal .hojaRelleno { background: var(--verde); }
+.hojaMeta { position: absolute; top: -3px; bottom: -3px; border-left: 1px dotted var(--tinta); }
+
+.hojaPie {
+  display: grid; gap: 0.2em;
+  margin-top: 1.2em; padding-top: 0.5em;
+  border-top: 1px solid var(--linea);
+  font-size: 0.625rem;
+}
+.hojaPie p { margin: 0; }
+.hojaPie .hojaGris { display: flex; justify-content: space-between; gap: 1em; }
+
+.leyenda { margin-top: 18px; max-width: 560px; font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
+
+/* ---------- Columna lateral ---------- */
+.descarga { border-color: rgba(20, 216, 158, 0.4); }
+.acciones { margin-top: var(--sp-4); }
+.acciones :global(.export-group) { flex-wrap: wrap-reverse; justify-content: flex-start; }
+.avisoVisible { margin: var(--sp-3) 0 0; min-height: 1.4em; font-size: var(--fs-sm); color: var(--accent); }
+
+.ficha { display: grid; margin: var(--sp-4) 0 0; }
+.fichaFila {
+  display: grid; grid-template-columns: minmax(130px, 40%) minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+}
+.fichaFila:first-child { border-top: 0; padding-top: 0; }
+.fichaFila dt { font-size: var(--fs-sm); color: var(--text-subtle); }
+.fichaFila dd { margin: 0; display: grid; gap: var(--sp-1); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.fichaCodigo { display: flex !important; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.fichaCodigo > span { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; letter-spacing: 0.02em; }
+.nota { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.45; }
+
+.copiar { padding: 0 var(--sp-2); }
+.copiar svg { width: 16px; height: 16px; }
+
+.incluye { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-4); }
+.incluye li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--sp-3); }
+.incluye svg { width: 20px; height: 20px; color: var(--accent); margin-top: 1px; }
+.incluye div { display: grid; gap: 2px; }
+.incluye strong { font-weight: 600; }
+.incluye span { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ---------- Verificación ---------- */
+.verificacion {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  gap: var(--sp-6); align-items: center;
+}
+.verifTexto { margin: var(--sp-2) 0 0; color: var(--text-muted); max-width: 68ch; font-size: var(--fs-sm); }
+.huella {
+  display: grid; gap: var(--sp-2); justify-items: start;
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+}
+.huellaEtiqueta { font-size: var(--fs-xs); color: var(--text-subtle); }
+/* Un hash sí es dato de ancho fijo: la monoespaciada ayuda a compararlo carácter a carácter */
+.huellaValor { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-xl); letter-spacing: 0.04em; color: var(--text); }
+
+@media (max-width: 720px) {
+  .verificacion { grid-template-columns: minmax(0, 1fr); }
+  .fichaFila { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
+  .hoja { font-size: 0.6875rem; padding: 6% 5% 4%; }
+  .vistaPrevia { justify-items: stretch; width: 100%; }
+  /* En el teléfono la barra no cabe: el número ya dice lo mismo */
+  .hojaTabla thead th:last-child, .hojaCeldaBarra { display: none; }
+  .hojaFicha { grid-template-columns: minmax(0, 1fr); }
+  .hojaFicha div + div { border-left: 0; border-top: 1px solid var(--linea); }
+  .vistaPrevia { padding: 0 10px 10px 0; }
+  .hoja::before { transform: translate(5px, 5px); }
+  .hoja::after { transform: translate(10px, 10px); }
+}
+
+@media print {
+  .grid, .verificacion { display: block; }
+}

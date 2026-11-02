@@ -55,6 +55,9 @@ class Evaluacion(Base):
     # HU-29: cuándo se completó (UTC). La fija POST /completar; las anteriores a HU-29 quedan
     # NULL y el historial usa fecha_inicio como fecha de referencia.
     fecha_completado: Mapped[datetime | None] = mapped_column("fecha_completado", DateTime, nullable=True)
+    # HU-21: versión de la matriz de controles con la que se calcularon los puntajes
+    # ("<MATRIZ_VERSION>+<huella SHA-256>"). La fija POST /completar; NULL en las anteriores.
+    version_matriz: Mapped[str | None] = mapped_column("version_matriz", String(40), nullable=True)
 
     respuestas: Mapped[list["Respuesta"]] = relationship(
         back_populates="evaluacion",

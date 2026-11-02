@@ -36,6 +36,8 @@ const REGLAS: Regla[] = [
   // HU-12: plan formativo e informe (PDF descargable y por correo)
   { metodo: "GET", patron: /^evaluaciones\/(\d+)\/plan-formativo$/, conEvaluacion: true },
   { metodo: "GET", patron: /^evaluaciones\/(\d+)\/informe\/pdf$/, conEvaluacion: true, binario: true, timeoutMs: 30_000 },
+  // HU-21: ficha del informe (portada del PDF en JSON) para la página "Informe"
+  { metodo: "GET", patron: /^evaluaciones\/(\d+)\/informe\/ficha$/, conEvaluacion: true, timeoutMs: 30_000 },
   { metodo: "POST", patron: /^evaluaciones\/(\d+)\/informe\/enviar$/, conEvaluacion: true, conIp: true, timeoutMs: 45_000 },
   { metodo: "POST", patron: /^respuestas$/ },
   { metodo: "GET", patron: /^respuestas\/\d+$/ },

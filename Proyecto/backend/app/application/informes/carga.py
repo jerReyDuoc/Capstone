@@ -5,7 +5,7 @@ analisis.py (la lógica no toca la BD).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +49,29 @@ class DatosEvaluacion:
     rutas: list[RutaCatalogo]
     comparativa: list[ComparativaDominio]
     email_registrado: str | None
+    # HU-21: identificación del informe (con valores por defecto para no romper a quien ya
+    # construye DatosEvaluacion a mano, p. ej. las pruebas del tutor)
+    fecha_completado: datetime | None = None
+    version_matriz: str | None = None          # la que quedó registrada al completar
+    version_matriz_actual: str | None = None   # la de hoy (respaldo de las evaluaciones antiguas)
+    aviso_aceptado_version: str | None = None
+    aviso_aceptado_fecha: datetime | None = None
+    dimensiones_catalogo: tuple[str, ...] = ()
+
+
+async def version_matriz_vigente(db: AsyncSession) -> str:
+    """
+    HU-21 · "<MATRIZ_VERSION>+<huella>" de la matriz de controles tal como está ahora en la BD.
+    POST /completar la guarda en la evaluación, así el informe dice con qué matriz se calculó.
+    """
+    from app.application.informes.ficha import huella_matriz, version_matriz
+
+    filas = (await db.execute(select(
+        MatrizControl.id_control, MatrizControl.codigo_control, MatrizControl.dominio_id,
+        MatrizControl.pregunta_evaluacion, MatrizControl.aplicabilidad, MatrizControl.criticidad,
+        MatrizControl.obligacion, MatrizControl.catalogo_brechas_id_brecha,
+    ))).all()
+    return version_matriz(settings.MATRIZ_VERSION, huella_matriz(tuple(f) for f in filas))
 
 
 def _ruta(r: RutaFormativa | None, dominios: dict[int, str]) -> RutaCatalogo | None:
@@ -164,6 +187,12 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
         rutas=[r for r in rutas.values() if r is not None],
         comparativa=sorted(comparativa, key=lambda c: c.dominio),
         email_registrado=usuario.email if usuario else None,
+        fecha_completado=evaluacion.fecha_completado,
+        version_matriz=evaluacion.version_matriz,
+        version_matriz_actual=None if evaluacion.version_matriz else await version_matriz_vigente(db),
+        aviso_aceptado_version=usuario.aviso_legal_version if usuario else None,
+        aviso_aceptado_fecha=usuario.fecha_aceptacion_aviso if usuario else None,
+        dimensiones_catalogo=tuple(sorted(nombres_dominio.values())),
     )
 
 

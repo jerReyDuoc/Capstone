@@ -34,6 +34,8 @@ const RESULTADOS: Item[] = [
   { ruta: "/panel/sector", etiqueta: "Sector", icono: "sector" },
   // HU-26: /panel/capacitacion/[ruta] sigue marcando "Capacitación"
   { ruta: "/panel/capacitacion", etiqueta: "Capacitación", icono: "birrete" },
+  // HU-21: informe en PDF para el directorio o un auditor (gratis: también lo ve el encuestado)
+  { ruta: "/panel/informe", etiqueta: "Informe", icono: "pdf" },
 ];
 
 // HU-17: cerrar brechas con evidencia. Es del servicio contratado: solo el cliente la ve.

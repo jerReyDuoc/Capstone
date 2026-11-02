@@ -4,6 +4,9 @@ Informes de una evaluación completada.
   GET  /api/evaluaciones/{id}/plan-formativo   HU-12: plan de estudio por dimensión normativa
   GET  /api/evaluaciones/{id}/informe/pdf      PDF descargable (mismos filtros que el panel:
                                                ?severidad=Crítica,Alta&dominio=…&estado=…&q=…)
+  GET  /api/evaluaciones/{id}/informe/ficha    HU-21: lo que dice la portada del PDF en JSON
+                                               (código, fechas, versión de la matriz, aviso
+                                               legal, 5 puntajes, resumen y huella)
   POST /api/evaluaciones/{id}/informe/enviar   el mismo PDF por correo
 
 Todas exigen que la evaluación tenga resumen (se completó o se cerró). El alcance es el
@@ -29,11 +32,11 @@ from app.application.informes.analisis import (
     construir_brechas,
     construir_plan,
     contar_por_severidad,
-    filtrar_brechas,
     nivel_madurez,
     parsear_filtros,
     plan_a_dict,
 )
+from app.application.informes.informe import construir_informe, ficha_a_dict
 from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
 from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf, nombre_archivo
 from app.application.use_cases.limites_encuesta import ventana_diaria
@@ -48,7 +51,7 @@ from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleE
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/evaluaciones", tags=["informes (HU-11 / HU-12)"])
+router = APIRouter(prefix="/api/evaluaciones", tags=["informes (HU-11 / HU-12 / HU-21)"])
 
 _SIN_CACHE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
 
@@ -65,16 +68,8 @@ async def _datos(db: AsyncSession, evaluacion_id: int) -> DatosEvaluacion:
 
 
 def _informe(datos: DatosEvaluacion, filtros: FiltrosBrechas) -> DatosInforme:
-    puntajes = {d.nombre: d.puntaje for d in datos.dominios if d.puntaje is not None}
-    brechas = construir_brechas(datos.respuestas, puntajes)
-    return DatosInforme(
-        evaluacion_id=datos.evaluacion_id, rubro=datos.rubro, puntaje_general=datos.puntaje_general,
-        controles_evaluados=datos.controles_evaluados, en_revision=datos.en_revision,
-        comparativa=datos.comparativa, brechas_total=len(brechas),
-        brechas=filtrar_brechas(brechas, filtros), filtros=filtros,
-        plan=construir_plan(brechas, datos.dominios, datos.rutas),
-        generado=datetime.now(timezone.utc),
-    )
+    # HU-21: el mismo armado para la descarga, el correo, "Mis documentos" y la ficha
+    return construir_informe(datos, filtros, datetime.now(timezone.utc))
 
 
 def _pdf(informe: DatosInforme) -> bytes:
@@ -101,6 +96,25 @@ async def plan_formativo(evaluacion_id: int, db: AsyncSession = Depends(get_db),
     puntajes = {d.nombre: d.puntaje for d in datos.dominios if d.puntaje is not None}
     plan = construir_plan(construir_brechas(datos.respuestas, puntajes), datos.dominios, datos.rutas)
     return JSONResponse({"evaluacion_id": evaluacion_id, **plan_a_dict(plan)}, headers=_SIN_CACHE)
+
+
+# ---------------------------------------------------------------------------- HU-21
+@router.get("/{evaluacion_id}/informe/ficha")
+async def ficha_informe(evaluacion_id: int, db: AsyncSession = Depends(get_db),
+                        _actor: Actor | None = Depends(alcance_evaluacion)):
+    """
+    HU-21 · Ficha del informe: lo mismo que imprime la portada del PDF, en JSON.
+
+    - **codigo**: CIA-AAAA-NNNNNN-D (dígito verificador módulo 11).
+    - **version_matriz**: `<MATRIZ_VERSION>+<huella>` registrada al completar
+      (`version_matriz_registrada=false` en evaluaciones anteriores: es la vigente hoy).
+    - **aviso_legal**: el texto de la primera página y del pie (HU-04).
+    - **puntajes**: los 5 de HU-03 (Global y las 4 dimensiones), siempre.
+    - **huella**: SHA-256 de puntajes, brechas y rutas (sin la fecha de emisión). Es la
+      que trae el PDF: sirve para confirmar que una copia no fue alterada.
+    """
+    informe = _informe(await _datos(db, evaluacion_id), parsear_filtros(None, None, None, None))
+    return JSONResponse(ficha_a_dict(informe), headers=_SIN_CACHE)
 
 
 # ---------------------------------------------------------------------------- PDF

@@ -3,6 +3,14 @@ PDF del informe de la evaluación: resultado, comparativa, brechas priorizadas (
 y plan formativo (HU-12). Lo usan la descarga directa (GET …/informe.pdf) y el envío
 por correo (POST …/informe/enviar), así el adjunto es idéntico a lo descargado.
 
+HU-21 (presentar al directorio o a un auditor):
+  - Portada con la ficha de identificación: código de evaluación con dígito verificador,
+    fecha de la evaluación, fecha de emisión y versión de la matriz de controles.
+  - Aviso legal (HU-04) completo en la primera página y resumido en el pie de TODAS.
+  - Los 5 puntajes de HU-03 (Global y las 4 dimensiones), siempre, con barra 0–100 y meta.
+  - Pie con "Página X de Y" y el código, para que una hoja suelta se identifique.
+  - Cierre con la huella de los datos, que el auditor compara con GET …/informe/ficha.
+
 Con reportlab (texto real y seleccionable, fuentes base Helvetica, sin archivos
 externos). Se importa aquí y no al iniciar la app: si faltara la dependencia, solo
 fallan estos endpoints (503), no toda la API.
@@ -15,6 +23,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
+from app.application.informes.ficha import FichaInforme, huella_legible
 from app.application.informes.analisis import (
     ETIQUETA_ESTADO,
     ETIQUETA_MADUREZ,
@@ -34,6 +43,10 @@ VERDE_SUAVE = "#e3f4ee"
 TINTA = "#14201b"
 GRIS = "#5b6b64"
 LINEA = "#d5ddd9"
+VERDE_BARRA = "#3f9e80"
+PISTA = "#e7ecea"
+AVISO_FONDO = "#f6f4ee"
+AVISO_BORDE = "#8a6200"
 COLOR_SEVERIDAD = {
     "Crítica": "#b4233f",
     "Alta": "#c4561b",
@@ -60,6 +73,11 @@ class DatosInforme:
     filtros: FiltrosBrechas
     plan: PlanFormativo
     generado: datetime
+    # HU-21: ficha de identificación (None solo en pruebas antiguas que arman el PDF a mano:
+    # el PDF sale igual, con el aviso legal y los puntajes de la comparativa)
+    ficha: FichaInforme | None = None
+    # Todas las brechas, sin filtrar (la huella y el resumen de la portada no dependen del filtro)
+    brechas_completas: tuple[Brecha, ...] = ()
 
 
 def _fmt(n: float | None) -> str:
@@ -77,13 +95,43 @@ def nombre_archivo(evaluacion_id: int, fecha: datetime) -> str:
     return f"informe_evaluacion-{evaluacion_id}_{fecha:%Y-%m-%d}.pdf"
 
 
+ZONA = ZoneInfo("America/Santiago")
+
+
+def _fecha_local(v: datetime | None, con_hora: bool = False) -> str:
+    if v is None:
+        return "—"
+    if v.tzinfo is None:  # en la BD las fechas van en UTC sin zona
+        from datetime import timezone
+        v = v.replace(tzinfo=timezone.utc)
+    v = v.astimezone(ZONA)
+    return f"{v:%d-%m-%Y %H:%M}" if con_hora else f"{v:%d-%m-%Y}"
+
+
+def _ficha_basica(d: "DatosInforme") -> FichaInforme:
+    """Ficha mínima para quien arma DatosInforme sin ella (pruebas antiguas)."""
+    from app.application.informes.analisis import DominioResultado
+    from app.application.informes.ficha import AVISO_INFORME, cinco_puntajes, codigo_evaluacion
+
+    dominios = [DominioResultado(None, c.dominio, c.tu_puntaje, None, 1 if c.tu_puntaje is not None else 0)
+                for c in d.comparativa]
+    return FichaInforme(
+        codigo=codigo_evaluacion(d.evaluacion_id, d.generado.year), fecha_evaluacion=None,
+        fecha_completado=None, version_matriz="sin registro", version_matriz_registrada=False,
+        aviso=AVISO_INFORME, aviso_aceptado_version=None, aviso_aceptado_fecha=None,
+        puntajes=cinco_puntajes(d.puntaje_general, d.controles_evaluados, dominios), huella="0" * 64,
+    )
+
+
 def generar_pdf(d: DatosInforme) -> bytes:
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_LEFT
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle
+        from reportlab.graphics.shapes import Drawing, Line, Rect
         from reportlab.lib.units import mm
+        from reportlab.pdfgen.canvas import Canvas
         from reportlab.platypus import (
             KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
         )
@@ -121,33 +169,119 @@ def generar_pdf(d: DatosInforme) -> bytes:
     ancho = A4[0] - 30 * mm
     historia = []
 
-    # ------------------------------------------------------------ portada / resumen
-    fecha = d.generado.astimezone(ZoneInfo("America/Santiago"))
+    # ------------------------------------------------------------ HU-21 · portada
+    f = d.ficha or _ficha_basica(d)
+    meta = d.comparativa[0].meta if d.comparativa else settings.META_CUMPLIMIENTO_PUNTAJE
+    etiqueta = ParagraphStyle("etq", parent=chico, textColor=c(GRIS))
+    valor = ParagraphStyle("val", parent=base, fontName="Helvetica-Bold", fontSize=10, leading=13)
+    aviso_t = ParagraphStyle("aviso_t", parent=base, fontName="Helvetica-Bold", fontSize=9.5, leading=12,
+                             textColor=c(TINTA))
+    aviso_p = ParagraphStyle("aviso_p", parent=chico, fontSize=8.2, leading=11, spaceAfter=3)
+
     historia += [
-        p("ComplianceIA · Gobernanza de IA y protección de datos", gris_chico),
+        p("ComplianceIA de Therion Labs: gobernanza de IA y protección de datos personales", gris_chico),
         Spacer(1, 2),
-        p("Informe de diagnóstico", h1),
-        Spacer(1, 4),
-        p(f"Evaluación #{d.evaluacion_id}" + (f" · Rubro {_esc(d.rubro)}" if d.rubro else "")
-          + f" · Generado el {fecha:%d-%m-%Y %H:%M} (hora de Chile)", gris),
-        Spacer(1, 10),
+        p("Informe de autodiagnóstico", h1),
+        Spacer(1, 2),
+        p("Puntajes por dimensión, brechas priorizadas y rutas recomendadas"
+          + (f" para una organización del rubro {_esc(d.rubro)}" if d.rubro else ""), gris),
+        Spacer(1, 8),
     ]
-    nivel = ETIQUETA_MADUREZ[nivel_madurez(d.puntaje_general)]
-    tiles = [
-        [p("Puntaje general", gris_chico), p("Nivel de madurez", gris_chico),
-         p("Preguntas evaluadas", gris_chico), p("Brechas detectadas", gris_chico)],
-        [p(f"{_fmt(d.puntaje_general)}<font size=9> / 100</font>", cifra), p(nivel, cifra),
-         p(str(d.controles_evaluados), cifra), p(str(d.brechas_total), cifra)],
+
+    # Ficha de identificación (criterio 3: fecha, código de evaluación y versión de la matriz)
+    version_txt = _esc(f.version_matriz)
+    if not f.version_matriz_registrada:
+        version_txt += '<br/><font size=7 color="%s">Vigente al emitir: la evaluación es anterior al registro de versión</font>' % GRIS
+    celdas = [
+        ("Código de evaluación", _esc(f.codigo)),
+        ("Fecha de la evaluación", _fecha_local(f.fecha_completado, True) if f.fecha_completado
+         else (f"{f.fecha_evaluacion:%d-%m-%Y}" if f.fecha_evaluacion else "—")),
+        ("Emitido el", _fecha_local(d.generado, True) + '<font size=7> (hora de Chile)</font>'),
+        ("Versión de la matriz", version_txt),
+        ("Aviso legal", f"Versión {_esc(f.aviso.version)}"),
+        ("Rubro", _esc(d.rubro) if d.rubro else "Sin rubro informado"),
     ]
-    t = Table(tiles, colWidths=[ancho / 4] * 4)
+    filas_ficha = []
+    for i in range(0, len(celdas), 3):
+        trio = celdas[i:i + 3]
+        filas_ficha.append([p(e, etiqueta) for e, _ in trio])
+        filas_ficha.append([p(v, valor) for _, v in trio])
+    t = Table(filas_ficha, colWidths=[ancho / 3] * 3)
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), c(VERDE_SUAVE)),
-        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("BOX", (0, 0), (-1, -1), 0.6, c(LINEA)),
+        ("LINEBELOW", (0, 1), (-1, 1), 0.4, c(LINEA)),
+        ("LINEAFTER", (0, 0), (1, -1), 0.4, c(LINEA)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("TOPPADDING", (0, 0), (-1, 0), 6), ("TOPPADDING", (0, 2), (-1, 2), 6),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 6), ("BOTTOMPADDING", (0, 3), (-1, 3), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
-    historia += [t, Spacer(1, 6)]
+    historia += [t, Spacer(1, 8)]
+
+    # Aviso legal completo en la primera página (HU-04 criterio 2)
+    caja = [[[p(_esc(f.aviso.titulo), aviso_t), Spacer(1, 3)] + [p(_esc(x), aviso_p) for x in f.aviso.texto]
+             + ([p(f"El encuestado aceptó el aviso legal versión {_esc(f.aviso_aceptado_version)}"
+                   + (f" el {_fecha_local(f.aviso_aceptado_fecha)}" if f.aviso_aceptado_fecha else "")
+                   + " antes de responder.", gris_chico)] if f.aviso_aceptado_version else [])]]
+    t = Table(caja, colWidths=[ancho])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), c(AVISO_FONDO)),
+        ("LINEBEFORE", (0, 0), (0, -1), 3, c(AVISO_BORDE)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    historia += [t, Spacer(1, 4)]
+
+    # Los 5 puntajes (HU-03): Global y las 4 dimensiones, con barra 0–100 y la meta punteada
+    historia.append(p("Puntajes de madurez", h2))
+    historia.append(p(
+        f"Escala de 0 a 100. Las preguntas que no aplican a la organización no cuentan. La línea punteada "
+        f"marca la meta de {_fmt(meta)} puntos: prácticas definidas, documentadas y con responsables.", gris_chico))
+    historia.append(Spacer(1, 4))
+    col_barra = ancho * 0.33
+    ancho_barra = col_barra - 10  # descuenta el relleno de la celda
+
+    def barra(puntaje: float | None, destacado: bool):
+        alto = 11 if destacado else 8
+        dib = Drawing(ancho_barra, alto + 4)
+        dib.add(Rect(0, 2, ancho_barra, alto, fillColor=c(PISTA), strokeColor=None))
+        if puntaje is not None:
+            dib.add(Rect(0, 2, ancho_barra * max(0.0, min(puntaje, 100.0)) / 100, alto,
+                         fillColor=c(VERDE if destacado else VERDE_BARRA), strokeColor=None))
+        x = ancho_barra * meta / 100
+        dib.add(Line(x, 0, x, alto + 4, strokeColor=c(TINTA), strokeWidth=0.8, strokeDashArray=[1.5, 1.5]))
+        return dib
+
+    filas = [[p(x, cabecera) for x in ("Dimensión", "Puntaje", "Nivel", "Preguntas", "0 a 100")]]
+    estilos_extra = []
+    for i, pt in enumerate(f.puntajes, start=1):
+        num = (f"{_fmt(pt.puntaje)}" if pt.puntaje is not None else "—")
+        estilo_num = cifra if pt.es_global else ParagraphStyle("n", parent=base, fontName="Helvetica-Bold",
+                                                                fontSize=11, leading=13)
+        nombre = "Puntaje global" if pt.es_global else _esc(pt.nombre)
+        filas.append([
+            p(f"<b>{nombre}</b>" if pt.es_global else nombre, base),
+            p(num, estilo_num), p(_esc(pt.nivel), chico),
+            p(str(pt.preguntas) if pt.preguntas else "—", chico), barra(pt.puntaje, pt.es_global),
+        ])
+        if pt.es_global:
+            estilos_extra.append(("BACKGROUND", (0, i), (-1, i), c(VERDE_SUAVE)))
+    t = Table(filas, colWidths=[ancho * w for w in (0.28, 0.11, 0.16, 0.12)] + [col_barra], repeatRows=1)
+    t.setStyle(TableStyle(list(estilo_tabla.getCommands()) + [("VALIGN", (0, 1), (-1, -1), "MIDDLE")] + estilos_extra))
+    historia.append(t)
+    historia.append(Spacer(1, 4))
+    completas = list(d.brechas_completas) or d.brechas
+    cuenta_total = contar_por_severidad(completas)
+    resumen_brechas = ", ".join(f"{cuenta_total[s]} {s.lower()}" for s in SEVERIDADES if cuenta_total[s])
+    historia.append(p(
+        f"{d.controles_evaluados} preguntas evaluadas. {d.brechas_total} brecha(s) detectada(s)"
+        + (f" ({resumen_brechas})" if resumen_brechas else "")
+        + f". El plan recomienda {d.plan.modulos} módulo(s) formativo(s) con {d.plan.horas} horas en total.",
+        chico))
     if d.en_revision:
         historia.append(p(f"{d.en_revision} pregunta(s) siguen en revisión y no suman puntaje todavía.", gris_chico))
+    historia.append(PageBreak())
 
     # ------------------------------------------------------------ comparativa
     historia.append(p("Comparativa por dimensión normativa", h2))
@@ -247,25 +381,62 @@ def generar_pdf(d: DatosInforme) -> bytes:
         historia.append(p(f"{len(plan.brechas_sin_ruta)} brecha(s) aún no tienen un módulo formativo asociado; "
                           "Therion Labs te orientará sobre ellas.", gris_chico))
 
+    # ------------------------------------------------------------ HU-21 · verificación
     historia.append(Spacer(1, 12))
-    historia.append(p("Este informe es una autoevaluación orientativa y no constituye asesoría legal.", gris_chico))
+    bloque = [
+        p("Identificación y verificación", h3),
+        p(f"Código de evaluación <b>{_esc(f.codigo)}</b>. Versión de la matriz <b>{_esc(f.version_matriz)}</b>. "
+          f"Huella de los resultados <b>{huella_legible(f.huella)}</b>.", chico),
+        p("La huella resume los puntajes, las brechas y las rutas de esta evaluación (no la fecha de emisión): "
+          "dos copias con la misma huella afirman lo mismo. Para confirmar que una copia no fue alterada, pida a "
+          "Therion Labs la ficha del informe de este código y compare la huella.", gris_chico),
+    ]
+    historia.append(KeepTogether(bloque))
 
-    def pie(canvas, doc):
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7.5)
-        canvas.setFillColor(c(GRIS))
-        canvas.drawString(15 * mm, 10 * mm, f"ComplianceIA · Evaluación #{d.evaluacion_id}")
-        canvas.drawRightString(A4[0] - 15 * mm, 10 * mm, f"Página {doc.page}")
-        canvas.setStrokeColor(c(VERDE))
-        canvas.setLineWidth(2)
-        canvas.line(15 * mm, A4[1] - 10 * mm, A4[0] - 15 * mm, A4[1] - 10 * mm)
-        canvas.restoreState()
+    pie_aviso = f.aviso.pie
+    izquierda = f"ComplianceIA | {f.codigo} | Matriz {f.version_matriz}"
+
+    class _Lienzo(Canvas):
+        """Dibuja el pie al final, cuando ya se conoce el total de páginas ("Página X de Y")."""
+
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self._paginas: list[dict] = []
+
+        def showPage(self):
+            self._paginas.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total = len(self._paginas)
+            for estado in self._paginas:
+                self.__dict__.update(estado)
+                self._pie(total)
+                super().showPage()
+            super().save()
+
+        def _pie(self, total: int):
+            self.saveState()
+            self.setStrokeColor(c(VERDE))
+            self.setLineWidth(2)
+            self.line(15 * mm, A4[1] - 10 * mm, A4[0] - 15 * mm, A4[1] - 10 * mm)
+            self.setStrokeColor(c(LINEA))
+            self.setLineWidth(0.5)
+            self.line(15 * mm, 14.5 * mm, A4[0] - 15 * mm, 14.5 * mm)
+            self.setFont("Helvetica", 7)
+            self.setFillColor(c(TINTA))
+            self.drawString(15 * mm, 11 * mm, pie_aviso)  # HU-04: el aviso en el pie de cada página
+            self.setFillColor(c(GRIS))
+            self.drawString(15 * mm, 7.5 * mm, izquierda)
+            self.drawRightString(A4[0] - 15 * mm, 7.5 * mm, f"Página {self._pageNumber} de {total}")
+            self.restoreState()
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
-        title=f"Informe de diagnóstico · Evaluación {d.evaluacion_id}", author="ComplianceIA",
-        subject="Brechas normativas y plan formativo",
+        buffer, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=16 * mm, bottomMargin=20 * mm,
+        title=f"Informe de autodiagnóstico {f.codigo}", author="ComplianceIA (Therion Labs)",
+        subject="Puntajes por dimensión, brechas priorizadas y rutas recomendadas",
+        keywords=f"{f.codigo}, matriz {f.version_matriz}, aviso {f.aviso.version}",
     )
-    doc.build(historia, onFirstPage=pie, onLaterPages=pie)
+    doc.build(historia, canvasmaker=_Lienzo)
     return buffer.getvalue()
