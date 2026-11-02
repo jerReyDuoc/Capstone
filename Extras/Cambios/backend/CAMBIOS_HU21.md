@@ -16,7 +16,9 @@ En el **pie de cada página** va el aviso legal resumido, el código de evaluaci
 
 **Versión de la matriz.** Es la etiqueta `MATRIZ_VERSION` (variable de entorno, por defecto `2026.1`) más los 8 primeros caracteres de un SHA-256 del contenido de la matriz de controles, por ejemplo `2026.1+3fa9c2d1`. Así, si alguien modifica una pregunta, su criticidad o su dominio y olvida subir la etiqueta, la huella cambia igual. `POST /completar` la guarda en la nueva columna `evaluacion.version_matriz`, de modo que el informe dice con qué matriz se calcularon los puntajes aunque la matriz cambie después. Las evaluaciones completadas antes de esta migración quedan en NULL: su informe imprime la versión vigente y lo aclara, sin inventar un dato que no se registró.
 
-**Los 5 puntajes siempre.** Una dimensión con todas sus preguntas N/A antes desaparecía del resultado (observación de HU-03, tarea T-SM-12). En el informe aparece como "Sin preguntas aplicables".
+**Los 5 puntajes siempre.** El informe toma las dimensiones del catálogo de la BD (tabla `dominio`), todas, y las ordena como HU-03 (Global, Gobernanza de IA, Gestión de Riesgos, Protección de Datos, Uso Responsable); no inventa dimensiones que esa instalación no tiene. Una dimensión con todas sus preguntas N/A antes desaparecía del resultado (observación de HU-03, tarea T-SM-12); en el informe aparece como "Sin preguntas aplicables".
+
+**Inventarios de control.** La columna `evaluacion.version_matriz` quedó clasificada en `app/core/catalogo_datos_personales.py` (sin datos personales, T-06) y la ruta `/informe/ficha` en la matriz de acceso de HU-20, con el mismo alcance que el PDF.
 
 **Huella de los resultados.** Es un SHA-256 de los puntajes, la lista completa de brechas y las rutas del plan, sin la fecha de emisión. Dos descargas de la misma evaluación dan la misma huella; si alguien edita una copia, deja de coincidir con la que entrega la API. Un filtro de brechas en la descarga no la altera.
 

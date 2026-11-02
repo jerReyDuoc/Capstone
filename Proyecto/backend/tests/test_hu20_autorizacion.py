@@ -184,6 +184,8 @@ RUTAS_CON_ALCANCE = [
     ("GET", "/api/evaluaciones/{evaluacion_id}/comparativa", None),
     ("GET", "/api/evaluaciones/{evaluacion_id}/plan-formativo", None),
     ("GET", "/api/evaluaciones/{evaluacion_id}/informe/pdf", None),
+    # HU-21: la portada del PDF en JSON (mismo alcance que el PDF)
+    ("GET", "/api/evaluaciones/{evaluacion_id}/informe/ficha", None),
     ("POST", "/api/evaluaciones/{evaluacion_id}/informe/enviar",
      lambda m, t: {"json": {"email": "informe@example.com"}}),
     ("POST", "/api/respuestas/", _respuesta_nueva),

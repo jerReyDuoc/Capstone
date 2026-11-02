@@ -153,15 +153,22 @@ def _clave(nombre: str | None) -> str:
 def cinco_puntajes(puntaje_general: float, preguntas_total: int, dominios: list[DominioResultado],
                    catalogo: Iterable[str] = ()) -> list[PuntajeInforme]:
     """
-    Global + las 4 dimensiones oficiales, siempre en el mismo orden. Una dimensión del catálogo
-    que no tiene resumen (todas sus preguntas N/A) aparece con puntaje None. Si la BD tuviera
-    otras dimensiones, van al final (no se pierde información).
+    Global + cada dimensión del catálogo (tabla dominio), siempre todas: una dimensión sin
+    resumen (todas sus preguntas N/A) aparece con puntaje None en vez de desaparecer. Con la
+    semilla real son las 4 de HU-03, en el orden de DIMENSIONES_OFICIALES; otra dimensión que
+    exista en la BD va después, por nombre. Sin catálogo (pruebas que arman el informe a
+    mano) se usan las 4 oficiales.
+
+    El catálogo de la BD manda: no se inventan dimensiones que no existen en esa instalación.
     """
     por_clave = {_clave(d.nombre): d for d in dominios}
-    nombres = list(DIMENSIONES_OFICIALES)
-    for extra in [*catalogo, *(d.nombre for d in dominios)]:
-        if extra and _clave(extra) not in {_clave(n) for n in nombres}:
-            nombres.append(extra)
+    base = [n for n in catalogo if n] or list(DIMENSIONES_OFICIALES)
+    nombres: list[str] = []
+    for nombre in [*base, *(d.nombre for d in dominios)]:
+        if nombre and _clave(nombre) not in {_clave(n) for n in nombres}:
+            nombres.append(nombre)
+    orden = {_clave(n): i for i, n in enumerate(DIMENSIONES_OFICIALES)}
+    nombres.sort(key=lambda n: (orden.get(_clave(n), len(orden)), _clave(n)))
 
     filas = [PuntajeInforme(
         nombre=GLOBAL,

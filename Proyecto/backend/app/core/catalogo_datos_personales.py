@@ -181,7 +181,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         **_sin_dp("id", "fecha_inicio", "estado_progreso", "Usuario_temporal_id",
                   "filtro_completado", "fecha_filtro", "origen", "es_prueba",
                   "empresa_id", "fecha_migracion",  # HU-27
-                  "fecha_completado"),  # HU-29
+                  "fecha_completado",  # HU-29
+                  "version_matriz"),  # HU-21: "<etiqueta>+<huella>" de la matriz, sin datos personales
         "clave_acceso_hash": Dato(
             CREDENCIAL, HASH,
             finalidad="Que el encuestado anónimo retome su evaluación y ejerza sus derechos",

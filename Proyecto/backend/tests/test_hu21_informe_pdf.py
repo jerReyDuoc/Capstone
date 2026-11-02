@@ -180,6 +180,16 @@ def test_dimension_sin_preguntas_aplicables_se_informa_y_no_desaparece():
     assert p["Gestión de Riesgos"].puntaje is None and p["Gestión de Riesgos"].nivel == SIN_APLICABLES
 
 
+def test_las_dimensiones_salen_del_catalogo_de_la_bd():
+    # Una instalación con otro catálogo (como _api_harness.py) no recibe dimensiones inventadas
+    catalogo = ["Datos", "Gobernanza", "Riesgos", "Seguridad"]
+    dominios = [DominioResultado(1, "Datos", 50.0, "en_desarrollo", 6),
+                DominioResultado(2, "Gobernanza", 40.0, "en_desarrollo", 5)]
+    p = cinco_puntajes(45, 11, dominios, catalogo)
+    assert [x.nombre for x in p] == ["Global", "Datos", "Gobernanza", "Riesgos", "Seguridad"]
+    assert p[3].puntaje is None and p[3].nivel == SIN_APLICABLES
+
+
 def test_dimension_extra_de_la_bd_no_se_pierde():
     extra = [*DOMINIOS, DominioResultado(9, "Ciberseguridad", 40.0, "en_desarrollo", 3)]
     nombres = [x.nombre for x in cinco_puntajes(50, 9, extra)]
