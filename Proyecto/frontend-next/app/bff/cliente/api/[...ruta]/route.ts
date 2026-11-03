@@ -9,6 +9,7 @@
  * - HU-15: el chat del tutor usa además PATCH (nivel) y DELETE (borrar conversación).
  * - HU-29: reevaluación (cuestionario con la sesión del cliente) y "Mis documentos": descarga de
  *   PDF, texto o DOCX según la regla, y DELETE de documentos, evidencias y constancias.
+ * - HU-16: borradores de cumplimiento (PATCH de la edición, descarga en Markdown o PDF).
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -91,7 +92,8 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
     return new NextResponse(await res.arrayBuffer(), {
       status: 200,
       headers: {
-        "Content-Type": tipo === "text/plain" ? "text/plain; charset=utf-8" : tipo,
+        // HU-16: también text/markdown (descarga previa de un borrador)
+        "Content-Type": tipo.startsWith("text/") ? `${tipo}; charset=utf-8` : tipo,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),

@@ -10,6 +10,7 @@ class OrigenEvento(str, Enum):
     EVIDENCIA = "evidencia"
     TUTOR = "tutor"  # HU-15: mensaje al Agente IA Tutor
     TUTOR_ANTECEDENTE = "tutor_antecedente"  # HU-18: justificación guardada con inyección (se omitió)
+    BORRADOR = "borrador"  # HU-16: instrucciones de redacción de un borrador
 
 
 class EventoSeguridad(Base):

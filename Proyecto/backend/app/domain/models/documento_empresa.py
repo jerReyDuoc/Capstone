@@ -6,9 +6,9 @@ Una fila por archivo GUARDADO por el sistema para la empresa:
   informe_pdf   el informe de brechas de una evaluación (HU-11/HU-12) tal como estaba al
                 generarlo. Se archiva al completar una reevaluación de la empresa o cuando
                 el usuario lo pide desde "Mis evaluaciones".
-  borrador      borradores de documentos de cumplimiento (HU-16). La tabla ya los admite:
-                HU-16 solo tiene que guardarlos con app/application/use_cases/documentos_empresa.py
-                (guardar_documento) y aparecen en "Mis documentos" con descarga y eliminación.
+  borrador      PDF de un borrador de cumplimiento CONSOLIDADO (HU-16). El borrador en revisión
+                vive en borrador_documento; al consolidarlo, app/application/use_cases/borradores.py
+                lo guarda aquí con guardar_documento() y aparece en "Mis documentos".
 
 Las evidencias (tabla evidencias) y las constancias (avance_formativo) NO se copian aquí:
 "Mis documentos" las lee de su propia tabla para no duplicar archivos.

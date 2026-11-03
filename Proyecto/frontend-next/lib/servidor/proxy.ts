@@ -102,11 +102,14 @@ export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSes
 
 /**
  * Parámetros de consulta permitidos y su largo máximo: paginación y filtros del listado de
- * respuestas, y los filtros de brechas del informe PDF (HU-11/HU-12).
+ * respuestas, los filtros de brechas del informe PDF (HU-11/HU-12) y el formato de la
+ * descarga de un borrador (HU-16).
  */
 const QUERY_PERMITIDOS = new Map<string, number>([
   ["page", 40], ["size", 40], ["estado_final", 40], ["fuente", 40],
   ["severidad", 80], ["dominio", 80], ["estado", 30], ["q", 80],
+  // HU-16: formato de la descarga previa de un borrador (md | pdf)
+  ["formato", 5],
 ]);
 
 export function filtrarQuery(params: URLSearchParams): string {

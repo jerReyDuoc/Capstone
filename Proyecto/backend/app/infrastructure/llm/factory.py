@@ -60,6 +60,12 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
             timeout_tutor_s=settings.TUTOR_TIMEOUT_S,
             modelo_tutor=settings.TUTOR_MODELO,
             temperatura_tutor=settings.TUTOR_TEMPERATURA,
+            # HU-16: tarea redactar_borrador
+            max_chars_instrucciones_borrador=settings.BORRADORES_MAX_CHARS_INSTRUCCIONES,
+            max_tokens_borrador=settings.BORRADOR_MAX_TOKENS_SALIDA,
+            timeout_borrador_s=settings.BORRADOR_TIMEOUT_S,
+            modelo_borrador=settings.BORRADOR_MODELO,
+            temperatura_borrador=settings.BORRADOR_TEMPERATURA,
         ),
         sanitizer_enabled=settings.SANITIZER_ENABLED,
         precios=PreciosModelo(settings.LLM_PRECIO_ENTRADA_USD_1M, settings.LLM_PRECIO_SALIDA_USD_1M),
@@ -67,7 +73,7 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
 
 
 def crear_agente(sesion_auditoria: AsyncSession) -> AgenteIA:
-    """HU-15: agente de LangGraph con sus skills (validar_evidencia, tutor)."""
+    """HU-15: agente de LangGraph con sus skills (validar_evidencia, tutor y, HU-16, borrador)."""
     from app.infrastructure.security.filtro_agente import FiltroAgente
     from app.infrastructure.security.prompt_guard import ReglasPromptGuard
     guard = ReglasPromptGuard()

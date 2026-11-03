@@ -14,6 +14,9 @@
  * /cerrar (recalcular un resumen) y todo DELETE sobre evaluaciones. Además: "Mis
  * evaluaciones" y "Mis documentos" (descarga y eliminación).
  *
+ * HU-16: borradores de cumplimiento (generar, revisar, editar con PATCH, descargar en
+ * Markdown o PDF, consolidar y descartar). Generar espera al Agente IA: hasta 90 s.
+ *
  * La autorización real la hace FastAPI (app/core/alcance.py): el rol cliente solo ve las
  * evaluaciones migradas a SU empresa (404 en cualquier otra).
  */
@@ -38,6 +41,9 @@ export const TIPOS_DOCUMENTO = [
   "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
+
+/** HU-16: la descarga previa de un borrador es Markdown o PDF. */
+export const TIPOS_BORRADOR = ["application/pdf", "text/markdown"] as const;
 
 const REGLAS: Regla[] = [
   // Espacio de la empresa (HU-28; HU-29 lo amplía)
@@ -87,6 +93,15 @@ const REGLAS: Regla[] = [
   { metodo: "PATCH", patron: /^tutor\/conversaciones\/\d{1,9}$/ },
   { metodo: "DELETE", patron: /^tutor\/conversaciones\/\d{1,9}$/ },
   { metodo: "POST", patron: /^tutor\/conversaciones\/\d{1,9}\/mensajes$/, timeoutMs: 60_000 },
+  // HU-16: borradores de cumplimiento (generar espera al Agente IA)
+  { metodo: "GET", patron: /^borradores\/plantillas$/ },
+  { metodo: "GET", patron: /^borradores$/ },
+  { metodo: "POST", patron: /^borradores$/, timeoutMs: 90_000 },
+  { metodo: "GET", patron: /^borradores\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^borradores\/\d{1,9}$/ },
+  { metodo: "DELETE", patron: /^borradores\/\d{1,9}$/ },
+  { metodo: "GET", patron: /^borradores\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_BORRADOR, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^borradores\/\d{1,9}\/consolidacion$/, timeoutMs: 30_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

@@ -458,6 +458,30 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
+    # ------------------------------------------------------------ HU-16: borradores de cumplimiento
+    # Borrador en revisión de un documento de la EMPRESA (política, aviso de privacidad, PIA).
+    # El contenido lo edita la empresa y necesita datos de contacto reales (p. ej. el canal del
+    # Encargado de Protección de Datos): se guarda CIFRADO (excepción documentada, como ARCOP).
+    # Las instrucciones dadas al Agente IA no se guardan.
+    "borrador_documento": {
+        **_sin_dp("id", "empresa_id", "evaluacion_id", "tipo", "titulo", "estado", "version", "adaptado_ia",
+                  "prompt_version", "traza_id", "version_plantillas", "huella_contexto", "fecha_creacion",
+                  "fecha_actualizacion", "fecha_consolidacion", "documento_id"),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa generó el borrador (HU-16)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+        "contenido": Dato(
+            TEXTO_LIBRE, CIFRADO,
+            finalidad="Documento de cumplimiento que la empresa revisa y edita antes de consolidarlo (HU-16)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="cifrado",
+        ),
+        "notas": Dato(
+            DERIVADO_IA, ANONIMIZADO, finalidad="Puntos que el Agente IA sugiere revisar en el borrador",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
+        "advertencias": Dato(SIN_DP, escaneo="pii"),
+    },
     # ------------------------------------------------------------ HU-15: Agente IA Tutor
     # Conversación de la EMPRESA con el tutor. Los textos se guardan ANONIMIZADOS (el del
     # usuario es el que vio el LLM tras el NER; el del tutor se re-anonimiza). Un mensaje

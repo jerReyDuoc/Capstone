@@ -5,7 +5,7 @@
  *
  * Correcciones 29-10:
  * - El usuario definitivo (modo "cliente") ve la misma barra en ambos lugares, con el grupo
- *   "Mi empresa": Mi empresa, Mis evaluaciones y Mis documentos (cada uno con su página).
+ *   "Mi empresa": Mi empresa, Mis evaluaciones, Mis documentos y (HU-16) Borradores.
  * - Quien hizo el autodiagnóstico sin cuenta (modo "encuestado") no ve "Cerrar brechas",
  *   "Mis documentos" ni "Mi evaluación" una vez completada: le quedan sus resultados y "Contratar".
  *   Si su evaluación sigue en curso, conserva "Mi evaluación" para volver a ella.
@@ -45,6 +45,8 @@ const EMPRESA: Item[] = [
   { ruta: "/empresa", etiqueta: "Mi empresa", icono: "empresa", exacta: true },
   { ruta: "/empresa/evaluaciones", etiqueta: "Mis evaluaciones", icono: "historial" },
   { ruta: "/empresa/documentos", etiqueta: "Mis documentos", icono: "carpeta" },
+  // HU-16: borradores de cumplimiento adaptados por el Agente IA
+  { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" },
 ];
 
 export function Sidebar() {

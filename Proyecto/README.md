@@ -471,6 +471,14 @@ La bitácora de HU-27/HU-18 pasó a llamarse **`audit_log`** y quedó cerrada en
 
 Cada registro trae fecha (UTC), actor (rol e id, o `sistema`), **IP** (la del visitante que reenvía el BFF, o `sistema:worker`/`sistema:cli`), acción, entidad y resultado (`ok`, `rechazado`, `error`, `omitido`); en PostgreSQL lo exigen restricciones `CHECK`. El worker sella cada 15 minutos las filas nuevas en lotes de 500: cada lote recibe un `hash_lote` SHA-256 y un sello encadenado al anterior que **un tercero puede recalcular** sin claves. El Auditor Externo entra con `POST /api/auth/auditor` (cuenta de solo lectura que vence), filtra el historial por categoría (`modificacion`, `supresion`…), verifica la integridad y descarga un ZIP con los lotes completos, el manifiesto de hashes y `verificar_exportacion.py`, que corre con la librería estándar de Python. Cada consulta y exportación queda en el propio log.
 
+### 5.15 Borradores de cumplimiento (HU-16)
+
+El usuario definitivo (con contrato vigente) genera desde `/empresa/borradores` una **Política de uso de LLM**, un **Aviso de privacidad** o una **Evaluación de impacto (PIA/EIPD)**. Cada plantilla (`application/borradores/plantillas.py`) es una lista de cláusulas atadas a una dimensión del modelo de madurez y a los controles de la matriz que ayudan a cerrar. El backend arma el Markdown con la evaluación más reciente de la empresa: las cláusulas que tratan una brecha abierta llevan una *medida prioritaria*, cada una cierra con su fundamento real (framework y artículo de `matriz_controles`) y el documento termina con el Anexo A (alineación por dimensión) y el Anexo B (plan de implementación). La razón social y el RUT los escribe el backend; el LLM nunca los ve.
+
+Si se pide, la skill `borrador` del agente adapta hasta 6 cláusulas al rubro, a las brechas y a las indicaciones de la empresa. Las indicaciones pasan por la guardia (un ataque bloquea sin llamar al NER ni al LLM) y por el NER del gateway; la salida se ancla a la plantilla (`borradores/salida_ia.py`: sin cláusulas inventadas ni fijas, sin artículos no verificados, sin código, enlaces ni códigos internos) y una fuga del system prompt descarta todo lo del modelo. Si la IA no está habilitada, falla o se agotó `BORRADORES_IA_DIA_EMPRESA`, el borrador se arma igual con la plantilla y se avisa.
+
+El borrador queda **en revisión** (`borrador_documento`, contenido cifrado): se edita con control de versión, se descarga en Markdown o en PDF con marca de agua y, al **consolidarlo** (si quedan campos `[COMPLETAR: …]` hay que confirmarlo), pasa a solo lectura y su PDF final se guarda en **Mis documentos** (HU-29). Todo queda en el audit log sin el texto del borrador ni de las indicaciones.
+
 ---
 
 ## 6. Base de datos
@@ -743,6 +751,11 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET / POST | `/api/tutor/conversaciones` | 🏢 | HU-15: lista / abre una conversación `{ruta_id?, nivel?}` |
 | GET / PATCH / DELETE | `/api/tutor/conversaciones/{id}` | 🏢 | HU-15: conversación con mensajes / cambia el nivel `{nivel}` / la borra |
 | POST | `/api/tutor/conversaciones/{id}/mensajes` | 🏢 | HU-15: `{texto}` → respuesta estructurada del tutor (tipo, pasos, brechas citadas, referencias, sugerencias) y la cuota |
+| GET | `/api/borradores/plantillas` | 🏢 | HU-16: plantillas (Política de uso de LLM, Aviso de privacidad, PIA), cuota de IA y límites |
+| GET / POST | `/api/borradores` | 🏢 | HU-16: borradores de la empresa / genera uno `{tipo, instrucciones?, usar_ia?, evaluacion_id?}` (201) |
+| GET / PATCH / DELETE | `/api/borradores/{id}` | 🏢 | HU-16: borrador con su Markdown / guarda la edición `{contenido, version}` (409 si la versión cambió) / lo descarta |
+| GET | `/api/borradores/{id}/descarga?formato=md\|pdf` | 🏢 | HU-16: descarga previa (PDF con marca «BORRADOR») |
+| POST | `/api/borradores/{id}/consolidacion` | 🏢 | HU-16: `{version, confirmar_pendientes}` → solo lectura y PDF final en Mis documentos (409 `CAMPOS_PENDIENTES` sin confirmar) |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 
@@ -853,6 +866,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | `/ingresar` | Usuario definitivo de una empresa cliente | Inicio de sesión; con sesión vigente lleva directo a `/empresa` |
 | `/empresa` | Usuario definitivo | Espacio de su empresa: contrato, **Mis evaluaciones** (HU-29: historial con gráfico de evolución global y por dimensión, **Nueva evaluación** y **Guardar informe**; cada una con **Ver resultados** en `/panel` modo cliente) y **Mis documentos** (informes, borradores, evidencias y constancias con descarga y eliminación) |
 | `/empresa/evaluacion/[id]` | Usuario definitivo | HU-29: responde la reevaluación con el cuestionario de siempre, por `/bff/cliente/api/*` |
+| `/empresa/borradores` | Usuario definitivo | HU-16: genera la política de uso de LLM, el aviso de privacidad o la PIA adaptados a sus brechas; editor Markdown con vista previa y campos por completar, descarga en Markdown/PDF y consolidación |
 | `/panel/capacitacion` (modo cliente) | Usuario definitivo | HU-26: avance de la empresa (por dimensión y nivel) y, en cada módulo, su estado y la acción Empezar / Continuar / Constancia |
 | `/panel/capacitacion/[ruta]` | Usuario definitivo | HU-26: recorrido del módulo (lecciones, material, actividad de verificación y constancia) |
 | `/panel/remediacion` | Usuario definitivo | HU-17: cerrar brechas subiendo evidencia; el puntaje y el radar se actualizan si el control mejora |

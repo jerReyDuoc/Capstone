@@ -29,6 +29,7 @@ from app.domain.ports.registro_ia_port import ContextoLlamada
 class SkillIA(str, Enum):
     VALIDAR_EVIDENCIA = "validar_evidencia"
     TUTOR = "tutor"
+    BORRADOR = "borrador"  # HU-16: adaptar un borrador de cumplimiento
 
 
 BLOQUEAR = "bloquear"        # un ataque en el campo corta la ejecución (sin NER ni LLM)
@@ -43,6 +44,8 @@ class SpecSkill:
     # mensaje se bloquea y los antecedentes guardados de la empresa se neutralizan (HU-18):
     # una justificación con inyección no debe impedir que el usuario use el tutor.
     campos: dict[str, str] = field(default_factory=dict)
+    # HU-18: código de control (canario) distinto en cada llamada, que nunca debe salir
+    canario: bool = False
 
     @property
     def guardia(self) -> bool:
@@ -51,7 +54,10 @@ class SpecSkill:
 
 SKILLS: dict[SkillIA, SpecSkill] = {
     SkillIA.VALIDAR_EVIDENCIA: SpecSkill(TareaIA.VALIDAR_EVIDENCIA),
-    SkillIA.TUTOR: SpecSkill(TareaIA.TUTOR, {"mensaje": BLOQUEAR, "antecedentes": NEUTRALIZAR}),
+    SkillIA.TUTOR: SpecSkill(TareaIA.TUTOR, {"mensaje": BLOQUEAR, "antecedentes": NEUTRALIZAR}, canario=True),
+    # HU-16: las instrucciones de la empresa se bloquean si traen un ataque (no se llama al NER
+    # ni al LLM y el borrador se arma solo con la plantilla). Mismos estándares que el tutor (HU-18).
+    SkillIA.BORRADOR: SpecSkill(TareaIA.REDACTAR_BORRADOR, {"instrucciones": BLOQUEAR}, canario=True),
 }
 
 MOTIVO_INYECCION = CategoriaAtaque.INYECCION.value
@@ -132,7 +138,7 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
                     lineas.append(linea)
             textos[campo] = "\n".join(lineas)
     cambios: dict = {"bloqueado": False, "textos": textos, "neutralizados": neutralizados}
-    if SkillIA(estado["skill"]) == SkillIA.TUTOR:
+    if spec.canario:
         # HU-18: código de control (canario) distinto en cada llamada; nunca debe salir en la respuesta
         cambios["datos"] = {**datos, "canario": validacion.generar_canario()}
     return cambios
@@ -159,6 +165,10 @@ async def nodo_validar_evidencia(estado: EstadoAgente, config: RunnableConfig) -
 
 
 async def nodo_tutor(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    return await _ejecutar_tarea(estado, config)
+
+
+async def nodo_borrador(estado: EstadoAgente, config: RunnableConfig) -> dict:
     return await _ejecutar_tarea(estado, config)
 
 
@@ -214,11 +224,37 @@ async def nodo_anclar_contexto(estado: EstadoAgente, config: RunnableConfig) -> 
     return {"resultado": _resultado(resultado, limpio)}
 
 
+async def nodo_validar_borrador(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    """
+    HU-16: la salida del redactor se valida y se ancla a la plantilla antes de entrar al
+    documento (app/application/borradores/salida_ia.py). Una fuga del system prompt descarta
+    TODO lo que aportó el modelo: el borrador queda con la plantilla base.
+    """
+    from app.application.ai.prompts.borrador import SYSTEM
+    from app.application.borradores.salida_ia import anclar
+    from app.application.schemas.borrador import BorradorIA, SeccionBorrador
+
+    resultado: ResultadoIA = estado["resultado"]
+    datos = estado.get("datos") or {}
+    adaptacion, _descartadas, bloqueada = anclar(
+        resultado.data, plantilla=datos["plantilla"], contexto=datos["contexto"],
+        canario=datos.get("canario"), system_prompt=SYSTEM,
+    )
+    limpio = BorradorIA(
+        introduccion=adaptacion.introduccion or "",
+        secciones=[SeccionBorrador(clausula_id=k, texto=v) for k, v in adaptacion.secciones.items()],
+        notas_revision=list(adaptacion.notas),
+    )
+    return {"resultado": _resultado(resultado, limpio), "salida_bloqueada": bloqueada}
+
+
 def construir_grafo():
     g = StateGraph(EstadoAgente)
     g.add_node("guardia", nodo_guardia)
     g.add_node(SkillIA.VALIDAR_EVIDENCIA.value, nodo_validar_evidencia)
     g.add_node(SkillIA.TUTOR.value, nodo_tutor)
+    g.add_node(SkillIA.BORRADOR.value, nodo_borrador)
+    g.add_node("validar_borrador", nodo_validar_borrador)
     g.add_node("validar_salida", nodo_validar_salida)
     g.add_node("anclar_contexto", nodo_anclar_contexto)
     g.add_edge(START, "guardia")
@@ -226,11 +262,14 @@ def construir_grafo():
         END: END,
         SkillIA.VALIDAR_EVIDENCIA.value: SkillIA.VALIDAR_EVIDENCIA.value,
         SkillIA.TUTOR.value: SkillIA.TUTOR.value,
+        SkillIA.BORRADOR.value: SkillIA.BORRADOR.value,
     })
     g.add_edge(SkillIA.VALIDAR_EVIDENCIA.value, END)
     g.add_edge(SkillIA.TUTOR.value, "validar_salida")
     g.add_edge("validar_salida", "anclar_contexto")
     g.add_edge("anclar_contexto", END)
+    g.add_edge(SkillIA.BORRADOR.value, "validar_borrador")
+    g.add_edge("validar_borrador", END)
     return g.compile()
 
 

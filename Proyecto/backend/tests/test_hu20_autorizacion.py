@@ -510,6 +510,16 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("DELETE", "/api/tutor/conversaciones/{conversacion_id}", "/api/tutor/conversaciones/1", {}),
     ("POST", "/api/tutor/conversaciones/{conversacion_id}/mensajes", "/api/tutor/conversaciones/1/mensajes",
      {"json": {"texto": "hola"}}),
+    # HU-16: borradores de cumplimiento (solo cliente con contrato vigente; roles en test_hu16_borradores.py)
+    ("GET", "/api/borradores/plantillas", "/api/borradores/plantillas", {}),
+    ("GET", "/api/borradores", "/api/borradores", {}),
+    ("POST", "/api/borradores", "/api/borradores", {"json": {"tipo": "politica_llm"}}),
+    ("GET", "/api/borradores/{borrador_id}", "/api/borradores/1", {}),
+    ("PATCH", "/api/borradores/{borrador_id}", "/api/borradores/1", {"json": {"contenido": "x", "version": 1}}),
+    ("GET", "/api/borradores/{borrador_id}/descarga", "/api/borradores/1/descarga", {}),
+    ("POST", "/api/borradores/{borrador_id}/consolidacion", "/api/borradores/1/consolidacion",
+     {"json": {"version": 1}}),
+    ("DELETE", "/api/borradores/{borrador_id}", "/api/borradores/1", {}),
 ]
 
 

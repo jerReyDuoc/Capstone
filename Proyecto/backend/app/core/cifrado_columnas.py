@@ -62,3 +62,42 @@ class TextoCifrado(TypeDecorator):
             # No se rompe el listado completo por una fila; el error queda en el log (sin el texto).
             logger.error("No se pudo descifrar un texto ARCOP (¿cambió ENTITY_MAP_KEY?)")
             return TEXTO_ILEGIBLE
+
+
+# ---------------------------------------------------------------- HU-16: borradores
+# El contenido de un borrador de cumplimiento (política, aviso de privacidad, PIA) lo edita
+# la empresa y DEBE poder llevar datos de contacto reales (p. ej. el correo del Encargado de
+# Protección de Datos en un aviso de privacidad): no se puede reemplazar por etiquetas como los
+# textos de la evaluación (HU-06). Misma excepción documentada que ARCOP, con su propia
+# subclave ("borradores"), así un borrador no se descifra con la clave de ARCOP.
+@lru_cache(maxsize=4)
+def _cifrador_borradores(clave: str) -> CifradorDatos:
+    return CifradorDatos(clave, "borradores")
+
+
+def cifrador_borradores() -> CifradorDatos:
+    if not settings.ENTITY_MAP_KEY:
+        raise ClaveCifradoInvalida(
+            "ENTITY_MAP_KEY no configurada: los borradores se guardan cifrados (HU-16) "
+            "y sin clave no se pueden escribir."
+        )
+    return _cifrador_borradores(settings.ENTITY_MAP_KEY)
+
+
+class TextoCifradoBorrador(TextoCifrado):
+    """Como TextoCifrado (prefijo enc:v1:, fail-closed), con la subclave de los borradores."""
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return cifrador_borradores().cifrar_texto(str(value))
+
+    def process_result_value(self, value, dialect):
+        if value is None or not CifradorDatos.esta_cifrado(value):
+            return value
+        try:
+            return cifrador_borradores().descifrar_texto(value)
+        except ClaveCifradoInvalida:
+            logger.error("No se pudo descifrar un borrador (¿cambió ENTITY_MAP_KEY?)")
+            return TEXTO_ILEGIBLE

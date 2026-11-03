@@ -11,6 +11,7 @@ from app.api.routes import contratacion, admin_clientes  # HU-27 (+ bases de HU-
 from app.api.routes import cliente  # HU-28: espacio de la empresa del usuario definitivo
 from app.api.routes import formacion, remediacion  # HU-26 (módulos formativos) y HU-17 (remediación)
 from app.api.routes import tutor  # HU-15: Agente IA Tutor del panel de formación
+from app.api.routes import borradores  # HU-16: borradores de cumplimiento adaptados por el Agente IA
 from app.api.routes import auditoria  # HU-09: log inmutable para el Auditor Externo
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
@@ -60,6 +61,7 @@ app.include_router(cliente.router)
 app.include_router(formacion.router)
 app.include_router(remediacion.router)
 app.include_router(tutor.router)
+app.include_router(borradores.router)
 app.include_router(auditoria.router)
 app.include_router(auditoria.router_admin)
 

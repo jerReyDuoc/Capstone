@@ -3,11 +3,11 @@ Acceso al servicio pagado de la empresa cliente según la vigencia de su contrat
 
 Dos guardas, una por tipo de ruta. Las reglas viven en app/domain/contrato.py:
 
-  empresa_con_servicio     cursos (HU-26), remediación (HU-17), espacio de la empresa (HU-28)
-                           y lo que venga del servicio pagado: tutor IA y borradores.
+  empresa_con_servicio     cursos (HU-26), remediación (HU-17), espacio de la empresa (HU-28),
+                           tutor IA (HU-15) y borradores de cumplimiento (HU-16).
                            Solo con contrato VIGENTE.
-  empresa_con_documentos   descargar los documentos de la empresa (constancias, y los
-                           borradores cuando existan). Con contrato vigente, pendiente,
+  empresa_con_documentos   descargar los documentos de la empresa (constancias y, desde
+                           "Mis documentos", los borradores consolidados de HU-16). Con contrato vigente, pendiente,
                            suspendido o en plazo de gracia; no después (HU-25).
 
 Lo gratuito (evaluación, resultados, informe PDF y plan formativo) y los derechos ARCOP NO

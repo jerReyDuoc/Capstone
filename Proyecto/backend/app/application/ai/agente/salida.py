@@ -77,23 +77,41 @@ def textos_de(r: TutorRespuesta) -> list[str]:
     return salida + list(r.sugerencias)
 
 
-def problemas(r: TutorRespuesta, canario: str | None, system_prompt: str) -> list[str]:
-    """Problemas de la salida, en orden estable. No modifica nada."""
-    textos = textos_de(r)
+def problemas_en_textos(textos: list[str], canario: str | None, system_prompt: str,
+                        marcadores: re.Pattern | None = None) -> list[str]:
+    """
+    Fugas (canario, frases o marcadores del system prompt), código y enlaces en una lista de
+    textos que escribió el modelo. HU-16 la usa también para los borradores.
+    """
     unido = "\n".join(textos)
     encontrados: list[str] = []
     if canario and (canario.lower() in unido.lower() or canario.split("-")[-1].lower() in unido.lower()):
         encontrados.append("fuga_canario")
     coincidencias = _ventanas_prompt(system_prompt) & _ventanas(unido)
-    if len(coincidencias) >= 3 or _MARCADORES.search(unido):
+    if len(coincidencias) >= 3 or (marcadores or _MARCADORES).search(unido):
         encontrados.append("fuga_prompt")
     if any(_CODIGO.search(t) for t in textos):
         encontrados.append("codigo")
     if any(_URL.search(t) for t in textos):
         encontrados.append("url")
+    return encontrados
+
+
+def problemas(r: TutorRespuesta, canario: str | None, system_prompt: str) -> list[str]:
+    """Problemas de la salida, en orden estable. No modifica nada."""
+    encontrados = problemas_en_textos(textos_de(r), canario, system_prompt)
     if r.tipo == TipoRespuestaTutor.FUERA_DE_ALCANCE and (r.pasos or r.brechas_referenciadas):
         encontrados.append("alcance")
     return encontrados
+
+
+def sin_codigo(texto: str) -> str:
+    """HU-16: quita bloques y líneas de código de un texto del modelo."""
+    return _sin_codigo(texto)
+
+
+def sin_enlaces(texto: str) -> str:
+    return _URL.sub("[enlace omitido]", texto or "")
 
 
 def respuesta_bloqueada() -> TutorRespuesta:

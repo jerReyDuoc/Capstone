@@ -271,6 +271,24 @@ class Settings(BaseSettings):
     BITACORA_CLAVE_HASH: str | None = None
     TUTOR_VENTANA_BLOQUEOS_MIN: int = 10
 
+    # ------------------------------------------------ HU-16: borradores de cumplimiento
+    # Borradores adaptados por el Agente IA por empresa y día (cada uno es una llamada al LLM;
+    # sin IA, o si la cuota se agotó, el borrador se arma igual con la plantilla). 0 = sin límite.
+    BORRADORES_IA_DIA_EMPRESA: int = 10
+    # Borradores EN REVISIÓN por empresa (los consolidados no cuentan).
+    BORRADORES_MAX_EN_REVISION: int = 20
+    # Largo máximo del Markdown editado (el BFF acepta hasta 64 KB de JSON).
+    BORRADORES_MAX_CHARS_CONTENIDO: int = 30000
+    # Largo máximo de las instrucciones de redacción que la empresa da al Agente IA.
+    BORRADORES_MAX_CHARS_INSTRUCCIONES: int = 1500
+    # false = los borradores se arman solo con la plantilla (sin llamar al LLM).
+    BORRADORES_IA_HABILITADA: bool = True
+    # Modelo del redactor. Vacío = LLM_MODEL.
+    BORRADOR_MODELO: str | None = None
+    BORRADOR_MAX_TOKENS_SALIDA: int = 6000
+    BORRADOR_TIMEOUT_S: float = 60.0
+    BORRADOR_TEMPERATURA: float = 0.2
+
     # HU-09: log inmutable (audit_log) para el Auditor Externo (Ley 21.719, art. 14 ter)
     # Filas por lote sellado. Cada lote recibe un hash SHA-256 que un tercero puede
     # recalcular con el archivo exportado (verificación de integridad por hash en lote).
@@ -391,6 +409,16 @@ class Settings(BaseSettings):
                 raise ValueError(f"{nombre} debe ser mayor que 0 (HU-26/HU-17/HU-29).")
         if not 0 < self.META_CUMPLIMIENTO_PUNTAJE <= 100:
             raise ValueError("META_CUMPLIMIENTO_PUNTAJE debe estar entre 1 y 100.")
+        if self.BORRADORES_IA_DIA_EMPRESA < 0:
+            raise ValueError("BORRADORES_IA_DIA_EMPRESA no puede ser negativo (HU-16).")
+        if not 1 <= self.BORRADORES_MAX_EN_REVISION <= 200:
+            raise ValueError("BORRADORES_MAX_EN_REVISION debe estar entre 1 y 200 (HU-16).")
+        if not 2000 <= self.BORRADORES_MAX_CHARS_CONTENIDO <= 50000:
+            raise ValueError("BORRADORES_MAX_CHARS_CONTENIDO debe estar entre 2000 y 50000 (el BFF acepta 64 KB, HU-16).")
+        if not 100 <= self.BORRADORES_MAX_CHARS_INSTRUCCIONES <= 4000:
+            raise ValueError("BORRADORES_MAX_CHARS_INSTRUCCIONES debe estar entre 100 y 4000 (HU-16).")
+        if not 0 <= self.BORRADOR_TEMPERATURA <= 1:
+            raise ValueError("BORRADOR_TEMPERATURA debe estar entre 0 y 1 (HU-16).")
         if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
             raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

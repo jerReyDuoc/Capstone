@@ -71,6 +71,14 @@ class Accion:
     # HU-18: gobernanza del agente
     TUTOR_SALIDA_BLOQUEADA = "tutor.salida_bloqueada"      # la respuesta filtró el system prompt
     TUTOR_ADVERTENCIA_ABUSO = "tutor.advertencia_abuso"    # bloqueos reiterados de la misma empresa
+    # HU-16: borradores de cumplimiento (el detalle nunca lleva el texto del borrador ni las
+    # instrucciones: solo el tipo, la versión, conteos y la huella HMAC de las instrucciones)
+    BORRADOR_GENERADO = "borrador.generado"
+    BORRADOR_EDITADO = "borrador.editado"
+    BORRADOR_DESCARGADO = "borrador.descargado"            # descarga previa (Markdown o PDF)
+    BORRADOR_CONSOLIDADO = "borrador.consolidado"          # PDF guardado en "Mis documentos"
+    BORRADOR_DESCARTADO = "borrador.descartado"
+    BORRADOR_INSTRUCCIONES_BLOQUEADAS = "borrador.instrucciones_bloqueadas"  # ataque en las instrucciones
     # HU-29: historial, reevaluación y "Mis documentos" del usuario definitivo
     EVALUACION_REEVALUACION_INICIADA = "evaluacion.reevaluacion_iniciada"
     EVALUACION_COMPLETADA_EMPRESA = "evaluacion.completada_empresa"   # reevaluación completada
@@ -127,6 +135,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RETENCION_TUTOR: Categoria.SUPRESION,
     Accion.DOCUMENTO_ELIMINADO: Categoria.SUPRESION,
     Accion.TUTOR_CONVERSACION_ELIMINADA: Categoria.SUPRESION,
+    Accion.BORRADOR_DESCARTADO: Categoria.SUPRESION,
     Accion.EVIDENCIA_ORIGINAL_SUPRIMIDO: Categoria.SUPRESION,
     Accion.USUARIO_TEMPORAL_CERRADO: Categoria.SUPRESION,  # se anonimiza al migrar (HU-27)
     # modificaciones
@@ -151,6 +160,8 @@ _CATEGORIAS: dict[str, str] = {
     Accion.CONTRATO_REACTIVADO: Categoria.MODIFICACION,
     Accion.CONTRATO_TERMINADO: Categoria.MODIFICACION,
     Accion.TUTOR_NIVEL_CAMBIADO: Categoria.MODIFICACION,
+    Accion.BORRADOR_EDITADO: Categoria.MODIFICACION,
+    Accion.BORRADOR_CONSOLIDADO: Categoria.MODIFICACION,
     Accion.AUDITOR_ACTUALIZADO: Categoria.MODIFICACION,
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
@@ -163,6 +174,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.EVALUACION_REEVALUACION_INICIADA: Categoria.CREACION,
     Accion.DOCUMENTO_GENERADO: Categoria.CREACION,
     Accion.TUTOR_CONVERSACION_CREADA: Categoria.CREACION,
+    Accion.BORRADOR_GENERADO: Categoria.CREACION,
     Accion.FORMACION_MODULO_INICIADO: Categoria.CREACION,
     Accion.AUDITOR_CREADO: Categoria.CREACION,
     # seguridad
@@ -173,6 +185,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.TUTOR_MENSAJE_BLOQUEADO: Categoria.SEGURIDAD,
     Accion.TUTOR_SALIDA_BLOQUEADA: Categoria.SEGURIDAD,
     Accion.TUTOR_ADVERTENCIA_ABUSO: Categoria.SEGURIDAD,
+    Accion.BORRADOR_INSTRUCCIONES_BLOQUEADAS: Categoria.SEGURIDAD,
     # actividad del propio log
     Accion.AUDITORIA_CONSULTA: Categoria.AUDITORIA,
     Accion.AUDITORIA_VERIFICACION: Categoria.AUDITORIA,

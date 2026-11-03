@@ -16,6 +16,8 @@ Tareas registradas:
   VALIDAR_EVIDENCIA  evalúa si una evidencia respalda la clasificación de un control.
   TUTOR              HU-15: Agente IA Tutor del panel de formación (explicaciones y planes
                      de acción por nivel sobre las brechas de la empresa).
+  REDACTAR_BORRADOR  HU-16: adapta cláusulas de una plantilla de cumplimiento (Política de uso
+                     de LLM, Aviso de privacidad, PIA) al rubro y a las brechas de la empresa.
 """
 from __future__ import annotations
 
@@ -26,8 +28,10 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
+from app.application.ai.prompts import borrador as prompt_borrador
 from app.application.ai.prompts import tutor, validar_evidencia
 from app.application.ai.prompts.base import PromptRenderizado
+from app.application.schemas.borrador import BorradorIA
 from app.application.schemas.evidence_validation import EvidenceValidation
 from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 
@@ -35,6 +39,7 @@ from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 class TareaIA(str, Enum):
     VALIDAR_EVIDENCIA = "validar_evidencia"
     TUTOR = "tutor"  # HU-15
+    REDACTAR_BORRADOR = "redactar_borrador"  # HU-16
 
 
 def _sin_advertencias(_r: BaseModel, _datos: dict[str, Any] | None = None) -> list[str]:
@@ -128,6 +133,30 @@ def _etiqueta_tutor(r: TutorRespuesta) -> str:
     return r.tipo.value
 
 
+# ---------------------------------------------------------------- REDACTAR_BORRADOR (HU-16)
+def _prompt_borrador(textos: dict[str, str], datos: dict[str, Any]) -> PromptRenderizado:
+    return prompt_borrador.construir(
+        plantilla=datos["plantilla"],
+        contexto=datos["contexto"],
+        instrucciones=textos.get("instrucciones") or "",
+        prioritarias=list(datos.get("prioritarias") or []),
+        canario=datos.get("canario"),
+    )
+
+
+def _validar_salida_borrador(r: BorradorIA, datos: dict[str, Any] | None = None) -> list[str]:
+    """Solo REGISTRA en la métrica; el nodo "validar_borrador" del agente aplica las reglas."""
+    if not datos or datos.get("plantilla") is None:
+        return []
+    from app.application.borradores.salida_ia import problemas
+    return problemas(r, plantilla=datos["plantilla"], contexto=datos["contexto"],
+                     canario=datos.get("canario"), system_prompt=prompt_borrador.SYSTEM)
+
+
+def _etiqueta_borrador(r: BorradorIA) -> str:
+    return f"secciones:{len(r.secciones)}"
+
+
 def crear_politicas(
     *,
     max_chars_evidencia: int,
@@ -141,6 +170,11 @@ def crear_politicas(
     timeout_tutor_s: float | None = None,
     modelo_tutor: str | None = None,
     temperatura_tutor: float = 0.3,
+    max_chars_instrucciones_borrador: int = 1500,
+    max_tokens_borrador: int | None = None,
+    timeout_borrador_s: float | None = None,
+    modelo_borrador: str | None = None,
+    temperatura_borrador: float = 0.2,
 ) -> dict[TareaIA, PoliticaTarea]:
     return {
         TareaIA.VALIDAR_EVIDENCIA: PoliticaTarea(
@@ -173,5 +207,20 @@ def crear_politicas(
             modelo=modelo_tutor or modelo,
             validar_salida=_validar_salida_tutor,
             etiqueta_metrica=_etiqueta_tutor,
+        ),
+        TareaIA.REDACTAR_BORRADOR: PoliticaTarea(
+            tarea=TareaIA.REDACTAR_BORRADOR,
+            schema=BorradorIA,
+            prompt_version=prompt_borrador.PROMPT_VERSION,
+            construir_prompt=_prompt_borrador,
+            # Lo único que escribe la empresa: sus instrucciones de redacción. Las cláusulas, el
+            # rubro, los puntajes y las brechas los arma el backend con datos de catálogo.
+            campos_no_confiables={"instrucciones": max_chars_instrucciones_borrador},
+            max_tokens_salida=max_tokens_borrador or max_tokens_salida,
+            timeout_s=timeout_borrador_s or timeout_s,
+            temperatura=temperatura_borrador,
+            modelo=modelo_borrador or modelo,
+            validar_salida=_validar_salida_borrador,
+            etiqueta_metrica=_etiqueta_borrador,
         ),
     }

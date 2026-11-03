@@ -60,6 +60,9 @@ export function EspacioEmpresa() {
         <Acceso href="/empresa/documentos" icono="carpeta" titulo="Mis documentos">
           Informes, borradores, evidencias y constancias.
         </Acceso>
+        <Acceso href="/empresa/borradores" icono="documento" titulo="Borradores de cumplimiento">
+          Política de uso de IA, aviso de privacidad y PIA adaptados a tus brechas.
+        </Acceso>
       </nav>
 
       <section className="card" aria-labelledby="titulo-empresa">

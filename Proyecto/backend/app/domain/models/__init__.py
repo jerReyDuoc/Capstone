@@ -46,6 +46,8 @@ from app.domain.models.formacion import (
 )
 # HU-29: documentos generados de la empresa ("Mis documentos")
 from app.domain.models.documento_empresa import DocumentoEmpresa
+# HU-16: borradores de documentos de cumplimiento
+from app.domain.models.borrador import BorradorDocumento, EstadoBorrador
 # HU-15: conversaciones del Agente IA Tutor
 from app.domain.models.tutor import (
     ConversacionTutor,
@@ -55,6 +57,8 @@ from app.domain.models.tutor import (
 )
 
 __all__ = [
+    "BorradorDocumento",
+    "EstadoBorrador",
     "Dominio",
     "Rubro",
     "RutaFormativa",

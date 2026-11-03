@@ -1,0 +1,116 @@
+/* =====================================================================
+   HU-16 · Borradores de cumplimiento (/empresa/borradores)
+   Solo tokens de app/globals.css: los pares texto/fondo ya cumplen WCAG 2.1 AA.
+   ===================================================================== */
+
+.plantillas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3, 12px);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.plantillas legend { font-weight: 600; margin-bottom: 8px; }
+
+.plantilla {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  min-height: var(--target, 44px);
+  transition: border-color var(--dur, 0.15s) var(--ease, ease), background var(--dur, 0.15s) var(--ease, ease);
+}
+.plantilla:hover { border-color: var(--text-subtle); }
+.plantilla:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.plantilla:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plantilla input { position: absolute; opacity: 0; pointer-events: none; }
+.plantilla strong { font-size: var(--fs-md); }
+.plantilla p { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.dimensiones { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.generar { display: grid; gap: 16px; }
+.fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.contador { font-size: var(--fs-xs); color: var(--text-subtle); justify-self: end; }
+.espera { display: flex; gap: 10px; align-items: center; color: var(--text-muted); }
+
+/* ---------- Editor ---------- */
+.editor { display: grid; gap: 16px; }
+.cabeza { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.metas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--text-muted); font-size: var(--fs-sm); }
+
+.paneles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.panel { display: grid; gap: 8px; min-width: 0; }
+.panelTitulo { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.04em; color: var(--text-muted); text-transform: uppercase; }
+
+.texto {
+  width: 100%;
+  min-height: 560px;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 2;
+}
+.texto:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.texto[readonly] { opacity: 0.85; }
+
+.vista {
+  max-height: 640px;
+  overflow: auto;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+/* El documento empieza en h3: la página ya tiene su h1 y el h2 del editor */
+.vista h3 { font-size: var(--fs-xl); margin: 0 0 12px; }
+.vista h4 { font-size: var(--fs-lg); margin: 20px 0 8px; color: var(--accent); }
+.vista h5 { font-size: var(--fs-md); margin: 16px 0 6px; }
+.vista p, .vista ul, .vista ol { margin: 0 0 10px; }
+.vista blockquote {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--medio);
+  background: var(--medio-soft);
+  border-radius: var(--radius-sm);
+}
+.vista table { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: var(--fs-sm); }
+.vista th, .vista td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.vista th { color: var(--text-muted); }
+.vista hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.vista code { font-family: var(--font-mono); font-size: 0.92em; }
+.pendiente {
+  background: var(--medio-soft);
+  color: var(--medio);
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.pendientes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.notas { margin: 6px 0 0; padding-left: 18px; }
+.notas li + li { margin-top: 4px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.consolidar { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--accent-soft); border-radius: var(--radius-md); }
+
+.pestanasEditor { display: none; }
+
+@media (max-width: 1199.98px) {
+  .paneles { grid-template-columns: minmax(0, 1fr); }
+  .pestanasEditor { display: flex; }
+  .oculto { display: none; }
+  .texto { min-height: 420px; }
+}
