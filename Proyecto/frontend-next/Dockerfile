@@ -12,7 +12,7 @@ COPY . .
 ARG NEXT_PUBLIC_DEMO=0
 ENV NEXT_PUBLIC_DEMO=$NEXT_PUBLIC_DEMO
 # API_URL se lee al construir los rewrites; en compose es el servicio "api"
-ARG API_URL=http://api:8000
+ARG API_URL=http://api
 ENV API_URL=$API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
