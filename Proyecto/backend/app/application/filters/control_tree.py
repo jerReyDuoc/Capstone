@@ -5,7 +5,16 @@ La lógica es secuencial y aditiva:
 - F1 es la compuerta principal: si es NO, no aplica ningún control.
 - F2..F7 suman controles adicionales al set base si la respuesta es SI.
 - El set base (22 controles) aplica siempre que F1 sea SI.
+
+HU-24: el árbol ya no se edita aquí. Vive en la BD (tabla regla_aplicabilidad y
+preguntas_filtro.es_compuerta) y el administrador lo cambia desde el mantenedor de la
+matriz, con versionado. Las constantes de abajo son la SEMILLA de la versión inicial (la
+migración f8c2a6d4e1b7 las copia a la BD) y el respaldo cuando la tabla está vacía (p. ej.
+la BD SQLite de las pruebas). En ejecución se usa app/infrastructure/cache/arbol_aplicabilidad.py.
 """
+from typing import Mapping
+
+from app.domain.matriz.contenido import ArbolAplicabilidad
 
 
 # Controles que aplican a TODA organización que usa IA (F1=SI)
@@ -28,26 +37,31 @@ CONTROLES_POR_FILTRO = {
 }
 
 
-def get_controles_aplicables(respuestas: dict[str, bool]) -> list[str]:
+# Árbol de respaldo (semilla): F1 es la única compuerta.
+ARBOL_POR_DEFECTO = ArbolAplicabilidad(
+    compuertas=frozenset({"F1"}),
+    base=frozenset(CONTROLES_BASE),
+    por_filtro={k: frozenset(v) for k, v in CONTROLES_POR_FILTRO.items()},
+    origen="semilla",
+)
+
+
+def get_controles_aplicables(
+    respuestas: Mapping[str, bool], arbol: ArbolAplicabilidad | None = None
+) -> list[str]:
     """
-    Recibe un diccionario con las respuestas a las 7 preguntas:
+    Recibe un diccionario con las respuestas a las preguntas de filtro:
         {"F1": True, "F2": False, "F3": True, ..., "F7": False}
 
-    Devuelve la lista ordenada de códigos de control que aplican.
-    Si F1 es False (o falta), devuelve lista vacía.
+    Devuelve la lista ordenada de códigos de control que aplican según `arbol` (el de la
+    versión vigente de la matriz; sin él, el de la semilla). Si una compuerta es False (o
+    falta), devuelve lista vacía.
     """
-    if not respuestas.get("F1", False):
-        return []
-
-    aplicables = set(CONTROLES_BASE)
-
-    for filtro, controles in CONTROLES_POR_FILTRO.items():
-        if respuestas.get(filtro, False):
-            aplicables.update(controles)
-
-    return sorted(aplicables)
+    return (arbol or ARBOL_POR_DEFECTO).aplicables(respuestas)
 
 
-def count_controles_aplicables(respuestas: dict[str, bool]) -> int:
+def count_controles_aplicables(
+    respuestas: Mapping[str, bool], arbol: ArbolAplicabilidad | None = None
+) -> int:
     """Atajo para contar sin materializar la lista."""
-    return len(get_controles_aplicables(respuestas))
+    return len(get_controles_aplicables(respuestas, arbol))

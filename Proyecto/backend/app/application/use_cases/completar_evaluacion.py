@@ -126,9 +126,19 @@ class CompletarEvaluacionUseCase:
         # HU-29: fecha del historial de la empresa y de su gráfico de evolución
         evaluacion.fecha_completado = datetime.now(timezone.utc).replace(tzinfo=None)
         # HU-21: con qué matriz se calcularon los puntajes (va impreso en el informe PDF)
+        # HU-24: y cuál es esa versión, con su contenido completo, para que el informe y el plan
+        # formativo de esta evaluación no cambien cuando el admin publique otra (una sola lectura:
+        # id y texto salen de la misma fila)
         from app.application.informes.carga import version_matriz_vigente
+        from app.domain.models.matriz_version import ESTADO_PUBLICADA, MatrizVersion
 
-        evaluacion.version_matriz = await version_matriz_vigente(self.session)
+        vigente = (await self.session.execute(
+            select(MatrizVersion.id, MatrizVersion.version_texto).where(MatrizVersion.estado == ESTADO_PUBLICADA)
+        )).first()
+        if vigente is not None:
+            evaluacion.matriz_version_id, evaluacion.version_matriz = vigente
+        else:
+            evaluacion.version_matriz = await version_matriz_vigente(self.session)
         resumen = await GenerateResumenUseCase(self.session).execute(evaluacion_id)
         return {
             **resumen,

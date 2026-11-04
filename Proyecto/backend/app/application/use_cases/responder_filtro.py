@@ -67,8 +67,10 @@ class ResponderFiltroUseCase:
         evaluacion.fecha_filtro = date.today()
         await self.evaluacion_repo.update(evaluacion)
 
-        # 6. Calcular controles aplicables
-        controles = get_controles_aplicables(respuestas)
+        # 6. Calcular controles aplicables (HU-24: con el árbol de la versión vigente)
+        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+
+        controles = get_controles_aplicables(respuestas, await arbol_vigente(self.evaluacion_repo.session))
 
         return {
             "evaluacion_id": evaluacion_id,

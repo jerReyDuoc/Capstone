@@ -277,7 +277,7 @@ Las 7 preguntas se responden SI/NO y deben venir **todas** en un mismo envío (s
 | F6 | ¿La IA toma decisiones que afectan derechos, personas, crédito o contrataciones? | RIE-005, RIE-006, SEG-010 |
 | F7 | ¿La empresa desarrolla, entrena o adapta internamente modelos o agentes de IA? | RIE-007, GOB-006 |
 
-Lógica en `app/application/filters/control_tree.py`.
+La tabla es la **semilla** (versión `2026.1`). Desde HU-24 el árbol vive en la BD (`regla_aplicabilidad` y `preguntas_filtro.es_compuerta`) y el administrador lo cambia desde `/admin/matriz`, con versionado (ver 5.16). `app/application/filters/control_tree.py` conserva la semilla y la evaluación del árbol; en ejecución se usa `app/infrastructure/cache/arbol_aplicabilidad.py`.
 
 ### 5.3 Respuesta a un control
 
@@ -478,6 +478,12 @@ El usuario definitivo (con contrato vigente) genera desde `/empresa/borradores` 
 Si se pide, la skill `borrador` del agente adapta hasta 6 cláusulas al rubro, a las brechas y a las indicaciones de la empresa. Las indicaciones pasan por la guardia (un ataque bloquea sin llamar al NER ni al LLM) y por el NER del gateway; la salida se ancla a la plantilla (`borradores/salida_ia.py`: sin cláusulas inventadas ni fijas, sin artículos no verificados, sin código, enlaces ni códigos internos) y una fuga del system prompt descarta todo lo del modelo. Si la IA no está habilitada, falla o se agotó `BORRADORES_IA_DIA_EMPRESA`, el borrador se arma igual con la plantilla y se avisa.
 
 El borrador queda **en revisión** (`borrador_documento`, contenido cifrado): se edita con control de versión, se descarga en Markdown o en PDF con marca de agua y, al **consolidarlo** (si quedan campos `[COMPLETAR: …]` hay que confirmarlo), pasa a solo lectura y su PDF final se guarda en **Mis documentos** (HU-29). Todo queda en el audit log sin el texto del borrador ni de las indicaciones.
+
+### 5.16 Matriz normativa editable con versionado (HU-24)
+
+El administrador mantiene la matriz desde `/admin/matriz` sin tocar código. Trabaja sobre un **borrador** (copia completa de la versión vigente): agrega, modifica, retira o restaura controles, brechas, rutas formativas y preguntas del filtro, y fija las reglas del árbol de cada control (aplica siempre o se suma con ciertas preguntas). Al **publicar** con una etiqueta (`2026.2`) y una nota, las tablas del catálogo quedan iguales al borrador en una sola transacción, la versión anterior pasa a `reemplazada` y su contenido ya no cambia (trigger en PostgreSQL).
+
+Cada versión se guarda completa en `matriz_version` (JSON + huella SHA-256). Retirar no borra: deja `activo=false`, porque las evaluaciones anteriores siguen referenciando ese elemento; el código de un elemento publicado no se cambia. `POST /completar` guarda en `evaluacion.matriz_version_id` la versión con que se respondió, y el informe, el plan formativo, los borradores y el recálculo por remediación de una evaluación cerrada leen **esa** versión. Las evaluaciones en curso pasan a la nueva al publicar. Cada creación, edición, descarte, publicación e intento rechazado queda en el `audit_log` (acciones `matriz.*`). Detalle en `Extras/Cambios/backend/CAMBIOS_HU24.md`.
 
 ---
 
@@ -759,6 +765,21 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 
+### Matriz normativa — `/api/admin/matriz` (HU-24)
+
+Solo admin (🛡️). Las rutas que modifican el borrador aceptan `revision` y responden 409 `BORRADOR_CAMBIADO` si otro admin lo cambió.
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/admin/matriz` | 🛡️ | Versión vigente, borrador en edición y etiqueta sugerida |
+| GET | `/api/admin/matriz/versiones` / `/versiones/{id}` | 🛡️ | Historial / contenido, árbol y diferencias con la anterior |
+| POST / GET | `/api/admin/matriz/borrador` | 🛡️ | Crea el borrador (`desde_version_id?`) / lo devuelve con cambios, errores y advertencias |
+| GET | `/api/admin/matriz/borrador/validacion` | 🛡️ | Problemas y diferencias antes de publicar |
+| POST | `/api/admin/matriz/borrador/descartar` · `/publicar` | 🛡️ | Descarta / publica `{etiqueta, nota_cambio, revision}` |
+| POST / PATCH | `/api/admin/matriz/borrador/{entidad}[/{id}]` | 🛡️ | Crea / modifica (`controles`, `brechas`, `rutas`, `preguntas-filtro`) `{datos, revision}` |
+| POST | `/api/admin/matriz/borrador/{entidad}/{id}/retirar` · `/restaurar` | 🛡️ | Retira (o quita, si es nuevo) / restaura |
+| PATCH | `/api/admin/matriz/borrador/controles/{id}/aplicabilidad` | 🛡️ | `{aplica_siempre, filtros}`: reglas del árbol |
+
 ### Log inmutable — `/api/auditoria` (HU-09)
 
 Rol `auditor_externo` o admin (🔍). Fechas en UTC; `hasta` no se incluye.
@@ -871,6 +892,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | `/panel/capacitacion/[ruta]` | Usuario definitivo | HU-26: recorrido del módulo (lecciones, material, actividad de verificación y constancia) |
 | `/panel/remediacion` | Usuario definitivo | HU-17: cerrar brechas subiendo evidencia; el puntaje y el radar se actualizan si el control mejora |
 | `/admin/login` → `/admin/clientes` | Administrador de Therion Labs | Panel interno con pestañas **Solicitudes de contratación**, **Empresas**, **Evaluaciones** y **Bitácora**, y **Cerrar sesión** |
+| `/admin/matriz` | Administrador de Therion Labs | HU-24: mantenedor de la matriz normativa: versión vigente frente al borrador, controles, brechas, rutas, filtro inicial, árbol de aplicabilidad con simulador, historial de versiones y publicación |
 | `/recuperar` (`?tipo=admin`) | Ambos | "¿Olvidaste tu contraseña?": pide el enlace por correo (misma respuesta exista o no la cuenta) |
 | `/restablecer#token=…` | Ambos | Define la contraseña nueva; cierra todas las sesiones abiertas de la cuenta |
 

@@ -106,17 +106,32 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     "ruta_formativa": _sin_dp(
         "id", "nombre", "dominio_id", "nivel", "objetivo", "objetivos_especificos", "contenidos",
         "horas", "modalidad", "publico_objetivo",
+        "activo",  # HU-24
     ),
-    "preguntas_filtro": _sin_dp("id_pregunta", "codigo", "orden", "pregunta", "descripcion", "activa"),
+    "preguntas_filtro": _sin_dp("id_pregunta", "codigo", "orden", "pregunta", "descripcion", "activa",
+                                "es_compuerta"),  # HU-24
     "catalogo_brechas": _sin_dp(
         "id_brecha", "codigo_brecha", "categoria", "comportamiento_detectado", "criticidad",
         "accion_sistema", "ruta_formativa_id",
+        "activo",  # HU-24
     ),
     "matriz_controles": _sin_dp(
         "id_control", "codigo_control", "framework_fuente", "articulo_referencia", "tipo_fuente",
         "obligacion", "pregunta_evaluacion", "aplicabilidad", "evidencia_esperada", "criticidad",
         "recomendacion", "test_asociado", "dominio_id", "catalogo_brechas_id_brecha",
+        "activo",  # HU-24
     ),
+    # HU-24: versiones de la matriz normativa (contenido del catálogo, sin datos personales) y
+    # el árbol de aplicabilidad vigente. El contenido JSON y la nota los escribe el admin: se
+    # revisan igual por si alguien pegó un correo o un RUT.
+    "matriz_version": {
+        **_sin_dp("id", "etiqueta", "estado", "huella", "version_texto", "base_version_id", "revision",
+                  "creado_por_admin_id", "publicado_por_admin_id", "fecha_creacion", "fecha_actualizacion",
+                  "fecha_publicacion"),
+        "contenido": Dato(SIN_DP, escaneo="pii"),
+        "nota_cambio": Dato(SIN_DP, escaneo="pii"),
+    },
+    "regla_aplicabilidad": _sin_dp("id", "control_id", "pregunta_filtro_id"),
     "benchmark": _sin_dp(
         "id_benchmark", "promedio_puntaje", "mediana_puntaje", "puntaje_maximo", "puntaje_minimo",
         "total_evaluaciones", "Rubro_id", "dominio_id",
@@ -182,7 +197,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                   "filtro_completado", "fecha_filtro", "origen", "es_prueba",
                   "empresa_id", "fecha_migracion",  # HU-27
                   "fecha_completado",  # HU-29
-                  "version_matriz"),  # HU-21: "<etiqueta>+<huella>" de la matriz, sin datos personales
+                  "version_matriz",  # HU-21: "<etiqueta>+<huella>" de la matriz, sin datos personales
+                  "matriz_version_id"),  # HU-24: versión de la matriz con la que se respondió
         "clave_acceso_hash": Dato(
             CREDENCIAL, HASH,
             finalidad="Que el encuestado anónimo retome su evaluación y ejerza sus derechos",

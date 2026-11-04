@@ -48,7 +48,9 @@ async def get_estado_filtro(evaluacion_id: int, db: AsyncSession = Depends(get_d
             for r in respuestas
             if r.pregunta is not None
         }
-        controles_count = len(get_controles_aplicables(respuestas_dict))
+        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+
+        controles_count = len(get_controles_aplicables(respuestas_dict, await arbol_vigente(db)))
 
     return EstadoFiltroResponse(
         evaluacion_id=evaluacion_id,

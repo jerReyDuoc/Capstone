@@ -16,6 +16,7 @@
  *
  * El admin nunca ve ni define la contraseña: el enlace va solo al correo del usuario.
  */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { BrandMark } from "@/components/ui/Icon";
@@ -38,6 +39,7 @@ import {
 } from "@/lib/admin/api";
 import { pedir } from "@/lib/encuesta/cliente";
 import s from "./admin.module.css";
+import m from "./matriz.module.css";
 
 type Pestana = "solicitudes" | "empresas" | "evaluaciones" | "bitacora";
 // Correcciones 29-10: "Todas" primero y por defecto, para que una solicitud no "desaparezca" al cambiar de estado
@@ -194,6 +196,11 @@ export function PanelClientes() {
             <span className={s.marcaSub}>Panel interno · Therion Labs</span>
           </span>
         </div>
+        {/* HU-24: navegación entre las secciones del panel interno */}
+        <nav className={m.nav} aria-label="Secciones del panel interno">
+          <Link className={m.navLink} href="/admin/clientes" aria-current="page">Empresas cliente</Link>
+          <Link className={m.navLink} href="/admin/matriz">Matriz normativa</Link>
+        </nav>
         <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>
           Cerrar sesión
         </button>

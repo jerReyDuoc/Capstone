@@ -9,6 +9,8 @@
 
 export type MetodoAdmin = "GET" | "POST" | "PATCH";
 
+const ENTIDADES_MATRIZ = "(controles|brechas|rutas|preguntas-filtro)";
+
 const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   // Bandeja de solicitudes de contratación (HU-31)
   { metodo: "GET", patron: /^admin\/contrataciones$/ },
@@ -26,6 +28,18 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "GET", patron: /^admin\/bitacora$/ },
   // Catálogo para el formulario
   { metodo: "GET", patron: /^rubros$/ },
+  // HU-24: mantenedor de la matriz normativa con versionado
+  { metodo: "GET", patron: /^admin\/matriz$/ },
+  { metodo: "GET", patron: /^admin\/matriz\/versiones$/ },
+  { metodo: "GET", patron: /^admin\/matriz\/versiones\/\d{1,9}$/ },
+  { metodo: "GET", patron: /^admin\/matriz\/borrador$/ },
+  { metodo: "POST", patron: /^admin\/matriz\/borrador$/ },
+  { metodo: "GET", patron: /^admin\/matriz\/borrador\/validacion$/ },
+  { metodo: "POST", patron: /^admin\/matriz\/borrador\/(descartar|publicar)$/ },
+  { metodo: "POST", patron: new RegExp(`^admin/matriz/borrador/${ENTIDADES_MATRIZ}$`) },
+  { metodo: "PATCH", patron: new RegExp(`^admin/matriz/borrador/${ENTIDADES_MATRIZ}/-?\\d{1,9}$`) },
+  { metodo: "POST", patron: new RegExp(`^admin/matriz/borrador/${ENTIDADES_MATRIZ}/-?\\d{1,9}/(retirar|restaurar)$`) },
+  { metodo: "PATCH", patron: /^admin\/matriz\/borrador\/controles\/-?\d{1,9}\/aplicabilidad$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
@@ -33,7 +47,8 @@ const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
 export type AutorizacionAdmin = { ok: true; ruta: string } | { ok: false };
 
 export function autorizarRutaAdmin(metodo: string, segmentos: string[]): AutorizacionAdmin {
-  if (!segmentos.length || segmentos.length > 5 || !segmentos.every((s) => SEGMENTO.test(s))) return { ok: false };
+  // HU-24: hasta 6 segmentos (admin/matriz/borrador/controles/12/aplicabilidad)
+  if (!segmentos.length || segmentos.length > 6 || !segmentos.every((s) => SEGMENTO.test(s))) return { ok: false };
   const ruta = segmentos.join("/");
   const permitida = REGLAS.some((r) => r.metodo === metodo && r.patron.test(ruta));
   return permitida ? { ok: true, ruta } : { ok: false };
@@ -62,4 +77,5 @@ export function filtrarQueryAdmin(params: URLSearchParams): string {
   return texto ? `?${texto}` : "";
 }
 
-export const MAX_BYTES_JSON_ADMIN = 32 * 1024;
+// HU-24: un control trae textos largos (recomendación, evidencia esperada)
+export const MAX_BYTES_JSON_ADMIN = 64 * 1024;

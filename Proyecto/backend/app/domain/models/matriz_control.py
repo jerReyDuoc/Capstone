@@ -1,6 +1,6 @@
 from app.domain.models.catalogo_brechas import CatalogoBrechas
 from app.domain.models.dominio import Dominio
-from sqlalchemy import Integer, String, Text, ForeignKey
+from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -25,6 +25,12 @@ class MatrizControl(Base):
     catalogo_brechas_id_brecha: Mapped[int | None] = mapped_column(
         "catalogo_brechas_id_brecha", Integer,
         ForeignKey("catalogo_brechas.id_brecha"), nullable=True
+    )
+
+    # HU-24: un control retirado en una versión de la matriz no se borra (sus respuestas en
+    # evaluaciones anteriores lo siguen referenciando); deja de aparecer en el cuestionario.
+    activo: Mapped[bool] = mapped_column(
+        "activo", Boolean, nullable=False, default=True, server_default=sa_true()
     )
 
     dominio: Mapped["Dominio | None"] = relationship("Dominio", lazy="selectin")

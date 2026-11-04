@@ -9,6 +9,7 @@ from app.domain.models.respuesta import Respuesta, EstadoClasificacion
 from app.domain.models.resumen import Resumen
 from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
 from app.application.filters.control_tree import get_controles_aplicables
+from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
 
 
 # Puntajes por clasificación
@@ -49,7 +50,21 @@ class GenerateResumenUseCase:
             for r in respuestas_filtro
             if r.pregunta is not None
         }
-        codigos_aplicables = set(get_controles_aplicables(respuestas_filtro_dict))
+        # HU-24: el árbol de la versión de la matriz con que se respondió (la fija POST /completar
+        # antes de llamar aquí); si no tiene, el de la vigente. Así el recálculo por remediación
+        # (HU-17) de una evaluación cerrada no cambia de reglas aunque el admin publique otra.
+        version_id = getattr(evaluacion, "matriz_version_id", None)
+        arbol = None
+        dominio_de: dict[int, int | None] = {}
+        if version_id:
+            from app.infrastructure.cache.versiones_matriz import arbol_de_version, contenido_de_version
+
+            arbol = await arbol_de_version(self.session, version_id)
+            contenido = await contenido_de_version(self.session, version_id) or {}
+            dominio_de = {int(c["id"]): c.get("dominio_id") for c in contenido.get("controles", [])}
+        if arbol is None:
+            arbol = await arbol_vigente(self.session)
+        codigos_aplicables = set(get_controles_aplicables(respuestas_filtro_dict, arbol))
 
         # 3. Obtener todas las respuestas de la evaluación con sus controles
         result = await self.session.execute(
@@ -75,7 +90,9 @@ class GenerateResumenUseCase:
             if respuesta.estado_clasificacion_final == EstadoClasificacion.NO_APLICA.value:
                 continue
 
-            if control.dominio_id is None:
+            # HU-24: la dimensión del control en ESA versión (el admin pudo moverlo después)
+            dominio_id = dominio_de.get(control.id_control, control.dominio_id) if dominio_de else control.dominio_id
+            if dominio_id is None:
                 continue
 
             clasif = respuesta.estado_clasificacion_final or respuesta.estado_clasificacion
@@ -90,7 +107,7 @@ class GenerateResumenUseCase:
             else:
                 continue
 
-            por_dominio.setdefault(control.dominio_id, []).append({
+            por_dominio.setdefault(dominio_id, []).append({
                 "clasificacion": clasif,
                 "puntaje": puntaje,
             })

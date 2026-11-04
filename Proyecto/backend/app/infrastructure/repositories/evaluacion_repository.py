@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.filters.control_tree import get_controles_aplicables
+from app.domain.matriz.contenido import ArbolAplicabilidad
 from app.domain.models.evaluacion import ESTADOS_CERRADOS, Evaluacion
 from app.domain.models.pregunta_filtro import PreguntaFiltro
 from app.domain.models.respuesta_filtro import RespuestaFiltro
@@ -19,6 +20,8 @@ class ContextoEvaluacion:
     estado_progreso: str | None
     filtro_completado: bool
     respuestas_filtro: dict[str, bool] = field(default_factory=dict)
+    # HU-24: árbol de la versión vigente de la matriz (None = semilla de control_tree.py)
+    arbol: ArbolAplicabilidad | None = None
 
     @property
     def cerrada(self) -> bool:
@@ -29,7 +32,7 @@ class ContextoEvaluacion:
         """Códigos de control que aplican según el filtro F1–F7 (orden alfabético)."""
         if not self.filtro_completado:
             return []
-        return get_controles_aplicables(self.respuestas_filtro)
+        return get_controles_aplicables(self.respuestas_filtro, self.arbol)
 
 
 class EvaluacionRepository:
@@ -65,6 +68,8 @@ class EvaluacionRepository:
         if not filas:
             return None
         primera = filas[0]
+        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+
         return ContextoEvaluacion(
             id=primera.id,
             estado_progreso=primera.estado_progreso,
@@ -72,6 +77,7 @@ class EvaluacionRepository:
             respuestas_filtro={
                 f.codigo: bool(f.respuesta) for f in filas if f.codigo is not None
             },
+            arbol=await arbol_vigente(self.session),
         )
 
     async def update(self, evaluacion) -> "Evaluacion":

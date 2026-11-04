@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Text, ForeignKey
+from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.domain.models.ruta_formativa import RutaFormativa
@@ -16,6 +16,11 @@ class CatalogoBrechas(Base):
     accion_sistema: Mapped[str | None] = mapped_column("accion_sistema", String(100), nullable=True)
     ruta_formativa_id: Mapped[int | None] = mapped_column(
         "ruta_formativa_id", Integer, ForeignKey("ruta_formativa.id"), nullable=True
+    )
+
+    # HU-24: retirada en una versión de la matriz (no se borra: la usan evaluaciones anteriores)
+    activo: Mapped[bool] = mapped_column(
+        "activo", Boolean, nullable=False, default=True, server_default=sa_true()
     )
 
     ruta_formativa_rel: Mapped["RutaFormativa | None"] = relationship(

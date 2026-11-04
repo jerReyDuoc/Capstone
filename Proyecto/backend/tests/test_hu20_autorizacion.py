@@ -547,6 +547,26 @@ RUTAS_HU09 = [
 ]
 
 
+# HU-24: mantenedor de la matriz normativa, solo admin. Sus pruebas de 401 (sin token), 403
+# (encuestado, referente y cliente) y 2xx (admin) están en
+# tests/test_hu24_matriz_versionada.py::test_rutas_hu24_solo_admin.
+RUTAS_HU24 = [
+    ("GET", "/api/admin/matriz"),
+    ("GET", "/api/admin/matriz/versiones"),
+    ("GET", "/api/admin/matriz/versiones/{version_id}"),
+    ("POST", "/api/admin/matriz/borrador"),
+    ("GET", "/api/admin/matriz/borrador"),
+    ("GET", "/api/admin/matriz/borrador/validacion"),
+    ("POST", "/api/admin/matriz/borrador/descartar"),
+    ("POST", "/api/admin/matriz/borrador/publicar"),
+    ("PATCH", "/api/admin/matriz/borrador/controles/{item_id}/aplicabilidad"),
+    ("POST", "/api/admin/matriz/borrador/{entidad}"),
+    ("PATCH", "/api/admin/matriz/borrador/{entidad}/{item_id}"),
+    ("POST", "/api/admin/matriz/borrador/{entidad}/{item_id}/retirar"),
+    ("POST", "/api/admin/matriz/borrador/{entidad}/{item_id}/restaurar"),
+]
+
+
 # ===================================================================== C3: cobertura de la matriz
 def test_todas_las_rutas_estan_clasificadas():
     """
@@ -565,6 +585,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | set(RUTAS_DE_ACCESO)
         | set(RUTAS_ADMIN_HU27)
         | set(RUTAS_HU09)
+        | set(RUTAS_HU24)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"

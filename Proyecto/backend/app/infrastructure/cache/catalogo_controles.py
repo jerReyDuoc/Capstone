@@ -14,8 +14,12 @@ se carga una vez, se serializa con el MISMO esquema ControlResponse y se guarda:
     F2–F7 da como máximo 64 combinaciones).
 
 La caché expira cada CATALOGO_TTL_SEGUNDOS y se puede invalidar a mano con
-`invalidar()` (p.ej. el futuro mantenedor de la matriz, HU-24). Cada proceso de
-uvicorn tiene su propia copia.
+`invalidar()`. Cada proceso de uvicorn tiene su propia copia.
+
+HU-24: el admin edita la matriz desde el mantenedor. Al publicar una versión se invalida
+en ese proceso; los demás lo notan porque la caché recuerda con qué versión publicada se
+cargó y la compara con la vigente (arbol_aplicabilidad.version_vigente_id, una consulta
+mínima cada 15 s). Los controles retirados (activo=false) no entran.
 """
 import json
 import time
@@ -40,8 +44,9 @@ class ControlCatalogo:
 
 
 class _Catalogo:
-    def __init__(self, controles: list[ControlCatalogo]):
+    def __init__(self, controles: list[ControlCatalogo], version_id=None):
         self.cargado_en = time.monotonic()
+        self.version_id = version_id
         self.por_codigo = {c.codigo_control: c for c in controles}
         self.por_id = {c.id_control: c for c in controles}
         self._json: dict[tuple[str, ...], bytes] = {}
@@ -73,12 +78,17 @@ def _vigente() -> _Catalogo | None:
 
 async def obtener(session: AsyncSession) -> _Catalogo:
     global _catalogo
+    from app.infrastructure.cache.arbol_aplicabilidad import version_vigente_id
+
+    version_id = await version_vigente_id(session)
     c = _vigente()
-    if c is not None:
+    if c is not None and c.version_id == version_id:
         return c
     # Sin candado a propósito: si llegan varias peticiones con la caché vacía, cada
     # una carga el catálogo (idempotente) y la última reemplaza a las demás.
-    result = await session.execute(select(MatrizControl).order_by(MatrizControl.codigo_control))
+    result = await session.execute(
+        select(MatrizControl).where(MatrizControl.activo.is_(True)).order_by(MatrizControl.codigo_control)
+    )
     controles = []
     for m in result.scalars().all():
         if not m.codigo_control:
@@ -90,7 +100,7 @@ async def obtener(session: AsyncSession) -> _Catalogo:
             dominio=m.dominio.nombre_dominio if m.dominio else None,
             datos=ControlResponse.model_validate(m).model_dump(mode="json"),
         ))
-    _catalogo = _Catalogo(controles)
+    _catalogo = _Catalogo(controles, version_id)
     return _catalogo
 
 

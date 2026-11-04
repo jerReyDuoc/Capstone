@@ -13,6 +13,7 @@ from app.api.routes import formacion, remediacion  # HU-26 (módulos formativos)
 from app.api.routes import tutor  # HU-15: Agente IA Tutor del panel de formación
 from app.api.routes import borradores  # HU-16: borradores de cumplimiento adaptados por el Agente IA
 from app.api.routes import auditoria  # HU-09: log inmutable para el Auditor Externo
+from app.api.routes import admin_matriz  # HU-24: mantenedor de la matriz normativa con versionado
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ app.include_router(tutor.router)
 app.include_router(borradores.router)
 app.include_router(auditoria.router)
 app.include_router(auditoria.router_admin)
+app.include_router(admin_matriz.router)
 
 @app.get("/health")
 async def health():

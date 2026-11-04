@@ -3,7 +3,7 @@
 .pagina { min-height: 100vh; background: var(--bg); }
 .barra {
   position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4); /* HU-24: + navegación */
   padding: var(--sp-3) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--surface);
 }
 .marca { display: flex; align-items: center; gap: var(--sp-3); font-family: var(--font-display); font-weight: 600; }

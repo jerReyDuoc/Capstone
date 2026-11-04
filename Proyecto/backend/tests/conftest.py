@@ -88,12 +88,17 @@ def _motor_ner_para_la_api():
 @pytest.fixture(autouse=True)
 def _catalogo_controles_limpio():
     """HU-01: el catálogo de controles se cachea en memoria; cada prueba en proceso
-    crea su propia BD SQLite, así que se invalida antes y después de cada test."""
-    from app.infrastructure.cache import catalogo_controles
+    crea su propia BD SQLite, así que se invalida antes y después de cada test.
+    HU-24: lo mismo con el árbol de aplicabilidad y la versión vigente de la matriz."""
+    from app.infrastructure.cache import arbol_aplicabilidad, catalogo_controles, versiones_matriz
 
     catalogo_controles.invalidar()
+    arbol_aplicabilidad.invalidar()
+    versiones_matriz.invalidar()
     yield
     catalogo_controles.invalidar()
+    arbol_aplicabilidad.invalidar()
+    versiones_matriz.invalidar()
 
 
 @pytest.fixture(autouse=True)

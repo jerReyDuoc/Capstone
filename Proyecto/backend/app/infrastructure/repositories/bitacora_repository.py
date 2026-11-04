@@ -109,6 +109,14 @@ class Accion:
     AUDITORIA_CONSULTA = "auditoria.consulta"
     AUDITORIA_VERIFICACION = "auditoria.verificacion"
     AUDITORIA_EXPORTACION = "auditoria.exportacion"
+    # HU-24: mantenedor de la matriz normativa. El detalle lleva qué elemento cambió y los
+    # campos con su valor anterior y nuevo (recortados); el contenido completo de cada
+    # versión publicada queda en matriz_version y no cambia nunca.
+    MATRIZ_BORRADOR_CREADO = "matriz.borrador_creado"
+    MATRIZ_BORRADOR_EDITADO = "matriz.borrador_editado"       # crear, modificar, retirar, restaurar, reglas
+    MATRIZ_BORRADOR_DESCARTADO = "matriz.borrador_descartado"
+    MATRIZ_PUBLICADA = "matriz.version_publicada"             # detalle: etiqueta, huella y conteo de cambios
+    MATRIZ_PUBLICACION_RECHAZADA = "matriz.publicacion_rechazada"  # errores de validación o sin cambios
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -138,6 +146,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.BORRADOR_DESCARTADO: Categoria.SUPRESION,
     Accion.EVIDENCIA_ORIGINAL_SUPRIMIDO: Categoria.SUPRESION,
     Accion.USUARIO_TEMPORAL_CERRADO: Categoria.SUPRESION,  # se anonimiza al migrar (HU-27)
+    Accion.MATRIZ_BORRADOR_DESCARTADO: Categoria.SUPRESION,  # HU-24
     # modificaciones
     Accion.RESPUESTA_MODIFICADA: Categoria.MODIFICACION,
     Accion.RESPUESTA_REVISADA: Categoria.MODIFICACION,
@@ -163,6 +172,9 @@ _CATEGORIAS: dict[str, str] = {
     Accion.BORRADOR_EDITADO: Categoria.MODIFICACION,
     Accion.BORRADOR_CONSOLIDADO: Categoria.MODIFICACION,
     Accion.AUDITOR_ACTUALIZADO: Categoria.MODIFICACION,
+    Accion.MATRIZ_BORRADOR_EDITADO: Categoria.MODIFICACION,      # HU-24
+    Accion.MATRIZ_PUBLICADA: Categoria.MODIFICACION,
+    Accion.MATRIZ_PUBLICACION_RECHAZADA: Categoria.MODIFICACION,
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -177,6 +189,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.BORRADOR_GENERADO: Categoria.CREACION,
     Accion.FORMACION_MODULO_INICIADO: Categoria.CREACION,
     Accion.AUDITOR_CREADO: Categoria.CREACION,
+    Accion.MATRIZ_BORRADOR_CREADO: Categoria.CREACION,           # HU-24
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

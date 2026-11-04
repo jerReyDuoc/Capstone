@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,8 +64,18 @@ async def version_matriz_vigente(db: AsyncSession) -> str:
     """
     HU-21 · "<MATRIZ_VERSION>+<huella>" de la matriz de controles tal como está ahora en la BD.
     POST /completar la guarda en la evaluación, así el informe dice con qué matriz se calculó.
+
+    HU-24: si hay una versión publicada (mantenedor de la matriz), es su version_texto
+    ("<etiqueta del admin>+<huella>"). Sin versiones guardadas, el cálculo de HU-21.
     """
     from app.application.informes.ficha import huella_matriz, version_matriz
+    from app.domain.models.matriz_version import ESTADO_PUBLICADA, MatrizVersion
+
+    texto = (await db.execute(
+        select(MatrizVersion.version_texto).where(MatrizVersion.estado == ESTADO_PUBLICADA)
+    )).scalar_one_or_none()
+    if texto:
+        return texto
 
     filas = (await db.execute(select(
         MatrizControl.id_control, MatrizControl.codigo_control, MatrizControl.dominio_id,
@@ -83,6 +94,39 @@ def _ruta(r: RutaFormativa | None, dominios: dict[int, str]) -> RutaCatalogo | N
         nivel=r.nivel, objetivo=r.objetivo,
         objetivos_especificos=r.lista_objetivos, contenidos=r.lista_contenidos,
         horas=r.horas, modalidad=r.modalidad, publico_objetivo=r.publico_objetivo,
+    )
+
+
+def _ruta_de_version(r: dict, dominios: dict[int, str]) -> RutaCatalogo:
+    """HU-24: la misma ruta, leída del contenido de la versión de la matriz."""
+    from app.domain.models.ruta_formativa import _lineas
+
+    return RutaCatalogo(
+        id=int(r["id"]), nombre=r.get("nombre") or f"Ruta {r['id']}",
+        dominio=dominios.get(r["dominio_id"]) if r.get("dominio_id") else None,
+        nivel=r.get("nivel"), objetivo=r.get("objetivo"),
+        objetivos_especificos=_lineas(r.get("objetivos_especificos")), contenidos=_lineas(r.get("contenidos")),
+        horas=r.get("horas"), modalidad=r.get("modalidad"), publico_objetivo=r.get("publico_objetivo"),
+    )
+
+
+def _brecha_de_version(b: dict, rutas: dict[int, RutaCatalogo]) -> BrechaCatalogo:
+    return BrechaCatalogo(
+        id=int(b["id"]), codigo=b.get("codigo_brecha"), categoria=b.get("categoria"),
+        comportamiento=b.get("comportamiento_detectado"), criticidad=b.get("criticidad"),
+        accion=b.get("accion_sistema"),
+        ruta=rutas.get(b["ruta_formativa_id"]) if b.get("ruta_formativa_id") else None,
+    )
+
+
+def _control_de_version(c: dict, dominios: dict[int, str]) -> SimpleNamespace:
+    """Objeto con los atributos que lee cargar_evaluacion() de un MatrizControl."""
+    dominio_id = c.get("dominio_id")
+    return SimpleNamespace(
+        id_control=int(c["id"]), codigo_control=c.get("codigo_control"), obligacion=c.get("obligacion"),
+        criticidad=c.get("criticidad"), recomendacion=c.get("recomendacion"),
+        catalogo_brechas_id_brecha=c.get("brecha_id"), dominio_id=dominio_id,
+        dominio=SimpleNamespace(nombre_dominio=dominios.get(dominio_id)) if dominio_id else None,
     )
 
 
@@ -122,8 +166,10 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
         round(sum((d.puntaje or 0) * (d.controles or 0) for d in dominios) / total, 2) if total else 0.0
     )
 
+    # Catálogo vigente en las tablas (respaldo para ids que la versión no tenga)
     rutas_orm = (await db.execute(select(RutaFormativa).order_by(RutaFormativa.id))).scalars().all()
     rutas = {r.id: _ruta(r, nombres_dominio) for r in rutas_orm}
+    rutas_activas = {r.id for r in rutas_orm if getattr(r, "activo", True) is not False}
     brechas = {
         b.id_brecha: _brecha(b, rutas)
         for b in (await db.execute(select(CatalogoBrechas))).scalars().all()
@@ -134,6 +180,20 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
             select(MatrizControl).options(selectinload(MatrizControl.dominio))
         )).scalars().all()
     }
+    # HU-24 criterio 2: una evaluación respondida con una versión de la matriz se informa con
+    # los textos, brechas y rutas de ESA versión, aunque el admin haya publicado otra después.
+    if evaluacion.matriz_version_id:
+        from app.infrastructure.cache.versiones_matriz import contenido_de_version
+
+        contenido = await contenido_de_version(db, evaluacion.matriz_version_id)
+        if contenido:
+            for r in contenido.get("rutas", []):
+                rutas[int(r["id"])] = _ruta_de_version(r, nombres_dominio)
+            rutas_activas = {int(r["id"]) for r in contenido.get("rutas", []) if r.get("activo", True)}
+            for b in contenido.get("brechas", []):
+                brechas[int(b["id"])] = _brecha_de_version(b, rutas)
+            for c in contenido.get("controles", []):
+                controles[int(c["id"])] = _control_de_version(c, nombres_dominio)
 
     respuestas_orm = (await db.execute(
         select(Respuesta).where(Respuesta.evaluacion_id == evaluacion_id).order_by(Respuesta.id)
@@ -184,7 +244,8 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
         rubro=rubro.nombre_rubro if rubro else None,
         puntaje_general=puntaje_general, controles_evaluados=total, en_revision=en_revision,
         dominios=sorted(dominios, key=lambda d: d.nombre), respuestas=respuestas,
-        rutas=[r for r in rutas.values() if r is not None],
+        # HU-24: el catálogo de rutas para el plan son las activas (de la versión, si la hay)
+        rutas=[r for rid, r in sorted(rutas.items()) if r is not None and rid in rutas_activas],
         comparativa=sorted(comparativa, key=lambda c: c.dominio),
         email_registrado=usuario.email if usuario else None,
         fecha_completado=evaluacion.fecha_completado,

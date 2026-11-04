@@ -49,6 +49,8 @@ from app.domain.models.documento_empresa import DocumentoEmpresa
 # HU-16: borradores de documentos de cumplimiento
 from app.domain.models.borrador import BorradorDocumento, EstadoBorrador
 # HU-15: conversaciones del Agente IA Tutor
+# HU-24: versiones de la matriz normativa y reglas de aplicabilidad
+from app.domain.models.matriz_version import MatrizVersion, ReglaAplicabilidad
 from app.domain.models.tutor import (
     ConversacionTutor,
     MensajeTutor,
@@ -101,6 +103,8 @@ __all__ = [
     "EstadoAvance",
     "LeccionFormativa",
     "PreguntaVerificacion",
+    "MatrizVersion",
+    "ReglaAplicabilidad",
     "ConversacionTutor",
     "MensajeTutor",
     "RolMensajeTutor",

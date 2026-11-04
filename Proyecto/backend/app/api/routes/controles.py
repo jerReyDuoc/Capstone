@@ -23,7 +23,8 @@ async def list_controles(
     - dominio_id: para obtener solo los controles de un dominio
     - criticidad: para obtener solo los de una criticidad específica
     """
-    query = select(MatrizControl).order_by(MatrizControl.id_control)
+    # HU-24: los retirados en una versión de la matriz no se listan (se conservan en la BD)
+    query = select(MatrizControl).where(MatrizControl.activo.is_(True)).order_by(MatrizControl.id_control)
 
     if dominio_id is not None:
         query = query.where(MatrizControl.dominio_id == dominio_id)

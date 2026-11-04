@@ -58,6 +58,12 @@ class Evaluacion(Base):
     # HU-21: versión de la matriz de controles con la que se calcularon los puntajes
     # ("<MATRIZ_VERSION>+<huella SHA-256>"). La fija POST /completar; NULL en las anteriores.
     version_matriz: Mapped[str | None] = mapped_column("version_matriz", String(40), nullable=True)
+    # HU-24: versión de la matriz (con su contenido completo) con la que se respondió. La fija
+    # POST /completar; el informe y el plan formativo de una evaluación cerrada leen los
+    # textos, brechas y rutas de ESTA versión aunque el admin publique otra después.
+    matriz_version_id: Mapped[int | None] = mapped_column(
+        "matriz_version_id", Integer, ForeignKey("matriz_version.id"), nullable=True, index=True
+    )
 
     respuestas: Mapped[list["Respuesta"]] = relationship(
         back_populates="evaluacion",

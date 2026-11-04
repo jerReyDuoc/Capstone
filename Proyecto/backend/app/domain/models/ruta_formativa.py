@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Text, ForeignKey
+from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -32,6 +32,10 @@ class RutaFormativa(Base):
     horas: Mapped[int | None] = mapped_column("horas", Integer, nullable=True)
     modalidad: Mapped[str | None] = mapped_column("modalidad", String(50), nullable=True)
     publico_objetivo: Mapped[str | None] = mapped_column("publico_objetivo", String(150), nullable=True)
+    # HU-24: retirada en una versión de la matriz (no se borra: la usan avances y planes anteriores)
+    activo: Mapped[bool] = mapped_column(
+        "activo", Boolean, nullable=False, default=True, server_default=sa_true()
+    )
 
     @property
     def lista_objetivos(self) -> tuple[str, ...]:

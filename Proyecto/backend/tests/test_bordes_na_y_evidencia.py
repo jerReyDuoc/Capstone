@@ -109,6 +109,13 @@ def _usar_filtro(monkeypatch, respuestas_filtro: dict[str, bool]):
 
     monkeypatch.setattr(gen_mod, "RespuestaFiltroRepository", FakeRespFiltroRepo)
 
+    # HU-24: el árbol vigente sale de la BD; la sesión falsa no la tiene → semilla
+    async def _arbol_semilla(_session):
+        from app.application.filters.control_tree import ARBOL_POR_DEFECTO
+        return ARBOL_POR_DEFECTO
+
+    monkeypatch.setattr(gen_mod, "arbol_vigente", _arbol_semilla)
+
 
 def _par(codigo, final, declarada=None):
     respuesta = SimpleNamespace(
