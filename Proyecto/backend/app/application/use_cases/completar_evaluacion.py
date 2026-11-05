@@ -30,6 +30,7 @@ from app.application.use_cases.create_respuesta import (
     RespuestaRechazadaError,
 )
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.core.config import settings
 from app.application.use_cases.progreso_cuestionario import calcular_progreso
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
@@ -55,6 +56,12 @@ class EvidenciasEnProcesoError(RespuestaRechazadaError):
 class RevisionSinEvidenciaError(RespuestaRechazadaError):
     status_code = 409
     codigo = "REVISION_SIN_EVIDENCIA"
+
+
+class CumplidoSinEvidenciaError(RespuestaRechazadaError):
+    """Correcciones 05-11: una pregunta 'cumplido' sin evidencia que lo respalde."""
+    status_code = 409
+    codigo = "CUMPLIDO_SIN_EVIDENCIA"
 
 
 class CompletarEvaluacionUseCase:
@@ -108,6 +115,21 @@ class CompletarEvaluacionUseCase:
             r.id_respuesta: r.codigo_control for r in progreso.respondidos
             if r.estado_clasificacion == EstadoClasificacion.REQUIERE_REVISION.value
         }
+        # Correcciones 05-11: "cumplido" también exige evidencia (configurable)
+        cumplidos = {
+            r.id_respuesta: r.codigo_control for r in progreso.respondidos
+            if r.estado_clasificacion == EstadoClasificacion.CUMPLIDO.value
+        } if settings.EVIDENCIA_OBLIGATORIA_CUMPLIDO else {}
+        if cumplidos:
+            con_evidencia = set((await self.session.execute(
+                select(Evidencia.respuesta_id).where(Evidencia.respuesta_id.in_(cumplidos)).distinct()
+            )).scalars().all())
+            sin_evidencia = sorted(c for rid, c in cumplidos.items() if rid not in con_evidencia)
+            if sin_evidencia:
+                raise CumplidoSinEvidenciaError(
+                    f"{len(sin_evidencia)} pregunta(s) marcadas como 'cumplido' no tienen evidencia: "
+                    f"{', '.join(sin_evidencia)}. Adjunta un documento que lo respalde o elige otro estado."
+                )
         if revision:
             con_evidencia = set((await self.session.execute(
                 select(Evidencia.respuesta_id).where(Evidencia.respuesta_id.in_(revision)).distinct()

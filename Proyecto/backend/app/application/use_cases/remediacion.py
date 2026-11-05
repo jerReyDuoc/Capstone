@@ -154,8 +154,11 @@ class Remediacion:
         items.sort(key=lambda x: (not x["formacion_completada"], PESO_SEVERIDAD.get(x["severidad"], 9),
                                   x["control_codigo"] or ""))
         # Evolución del puntaje por remediaciones (incluye controles ya cerrados, que no están en `controles`)
+        # Correcciones 05-11: cada mejora dice en qué dimensión y en qué pregunta ocurrió, para
+        # que "Tu madurez ahora" muestre dónde subió la empresa.
         mejoras = (await self.db.execute(
-            select(Evidencia.fecha_procesada, Evidencia.puntaje_previo, Evidencia.puntaje_resultante)
+            select(Evidencia.fecha_procesada, Evidencia.puntaje_previo, Evidencia.puntaje_resultante,
+                   Evidencia.respuesta_id, Evidencia.estado_previo, Evidencia.estado_resultante)
             .join(Respuesta, Evidencia.respuesta_id == Respuesta.id)
             .where(Respuesta.evaluacion_id == ev.id, Evidencia.origen == ORIGEN_REMEDIACION,
                    Evidencia.puntaje_resultante.is_not(None), Evidencia.puntaje_previo.is_not(None),
@@ -163,11 +166,20 @@ class Remediacion:
             .order_by(Evidencia.id_evidencia)
         )).all()
         cerrados = len(mejoras)
+        por_respuesta = {r.id: r for r in datos.respuestas}
+
+        def _mejora(f, a, d, rid, previo, resultante) -> dict:
+            r = por_respuesta.get(rid)
+            return {"fecha": f.isoformat() if f else None, "antes": a, "despues": d,
+                    "dominio": r.control_dominio if r else None,
+                    "pregunta": r.control_obligacion if r else None,
+                    "estado_previo": previo, "estado_resultante": resultante}
+
         return {
             "evaluacion_id": ev.id,
             "puntaje_general": datos.puntaje_general,
             "puntaje_inicial": mejoras[0][1] if mejoras else datos.puntaje_general,
-            "evolucion": [{"fecha": f.isoformat() if f else None, "antes": a, "despues": d} for f, a, d in mejoras],
+            "evolucion": [_mejora(*m) for m in mejoras],
             "controles_mejorados": cerrados,
             "dominios": [{"dominio": d.nombre, "puntaje": d.puntaje} for d in datos.dominios],
             "controles": items,

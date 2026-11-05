@@ -149,7 +149,23 @@ export function FlujoInicio({ rubros, siteKey, nonce }: { rubros: Rubro[]; siteK
                   <Icon name="escudo" /> Verificación de seguridad lista.
                 </>
               ) : captchaFallo ? (
-                "No pudimos cargar la verificación. Revisa tu conexión o desactiva un momento el bloqueador de contenido."
+                // Correcciones 05-11: se reintenta aquí mismo, sin recargar la página (F5)
+                <>
+                  La verificación no terminó.{" "}
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      setCaptchaFallo(false);
+                      control.current?.reiniciar();
+                    }}
+                  >
+                    Reintentar verificación
+                  </button>
+                  <span className={s.verificacionAyuda}>
+                    Si vuelve a fallar, desactiva un momento el bloqueador de anuncios o la VPN.
+                  </span>
+                </>
               ) : (
                 "Verificando que eres una persona…"
               )}

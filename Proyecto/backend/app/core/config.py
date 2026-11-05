@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # extremos) de la justificación obligatoria en 'parcialmente_cumplido' y
     # 'requiere_revision'.
     JUSTIFICACION_MIN_CARACTERES: int = 20
+    # Correcciones 05-11 (pedido del equipo): la justificación es OPCIONAL en todos los
+    # estados. Con true vuelve la regla original de la HU-02 (obligatoria en parcial y
+    # requiere revisión, con el largo mínimo de arriba).
+    JUSTIFICACION_OBLIGATORIA: bool = False
+    # Correcciones 05-11: para completar la evaluación, cada pregunta declarada "cumplido"
+    # necesita al menos una evidencia (igual que "requiere revisión"). Con false se permite
+    # completar sin ella (útil para poblar datos de prueba).
+    EVIDENCIA_OBLIGATORIA_CUMPLIDO: bool = True
     # OBSOLETO: lo reemplaza SANITIZER_ENABLED (con el sanitizador activo el NER es
     # siempre obligatorio). Se mantiene para no romper archivos .env existentes.
     REQUIERE_NER: bool = False

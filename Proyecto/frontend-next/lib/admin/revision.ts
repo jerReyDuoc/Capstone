@@ -9,6 +9,7 @@
  * Pantalla interna: aquí sí se ven los códigos de control (DAT-001), porque el oficial trabaja
  * con ellos. El cliente nunca los ve.
  */
+import { fechaChile, fechaHoraChile } from "@/lib/fechas";
 import { pedir } from "@/lib/encuesta/cliente";
 
 export type Clasificacion = "cumplido" | "parcialmente_cumplido" | "no_cumplido" | "no_aplica" | "requiere_revision";
@@ -218,11 +219,13 @@ export const nombreClasificacion = (c: string | null | undefined) =>
 
 export const porcentaje = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)} %`);
 
+/**
+ * Correcciones 05-11: fecha y hora de Chile. El backend entrega UTC sin zona y antes se
+ * mostraba como hora local del navegador; los eventos y revisiones llevan además la hora.
+ */
 export function fechaCorta(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
+  return iso.trim().length === 10 ? fechaChile(iso) : fechaHoraChile(iso);
 }
 
 // --------------------------------------------------------------------- decisión

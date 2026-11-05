@@ -25,7 +25,8 @@ async function cargarRubros(): Promise<Rubro[] | null> {
   try {
     const res = await fetch(`${api}/api/rubros`, {
       headers: { Accept: "application/json" },
-      next: { revalidate: 3600 },
+      // Correcciones 05-11: 5 min (antes 1 h) para que un rubro nuevo del admin aparezca pronto
+      next: { revalidate: 300 },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;

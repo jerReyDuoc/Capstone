@@ -279,29 +279,36 @@ class TutorIA:
     async def _anon(self, texto: str | None) -> str | None:
         return await self.anonimizador.anonimizar(texto) if self.anonimizador else texto
 
+    async def _anon_salida(self, texto: str | None) -> str | None:
+        """Correcciones 05-11: lo del modelo, anonimizado y sin etiquetas usadas como vocativo."""
+        from app.application.ai.agente.salida import sin_vocativos_anonimizados
+        return sin_vocativos_anonimizados(await self._anon(texto))
+
     async def _respuesta_anonimizada(self, r: TutorRespuesta, ctx: ContextoTutor) -> tuple[str, dict]:
         """Defensa en profundidad: lo que escribió el modelo también pasa por el NER antes de guardarse."""
         pasos = []
         for p in r.pasos:
             pasos.append({
-                "orden": p.orden, "accion": await self._anon(p.accion),
+                "orden": p.orden, "accion": await self._anon_salida(p.accion),
                 # lista cerrada (v1.1): no puede traer datos personales
                 "responsable_sugerido": p.responsable_sugerido.value if p.responsable_sugerido else None,
-                "evidencia_esperada": await self._anon(p.evidencia_esperada),
+                "evidencia_esperada": await self._anon_salida(p.evidencia_esperada),
             })
         por_ref = {b.ref: b for b in ctx.brechas}
         brechas = [{
             "ref": ref, "codigo": por_ref[ref].codigo, "dominio": por_ref[ref].dominio,
             "severidad": por_ref[ref].severidad, "estado": por_ref[ref].estado,
             "ruta_id": por_ref[ref].ruta_id, "respuesta_id": por_ref[ref].respuesta_id,
+            # Correcciones 05-11: el chat nombra la brecha por su descripción (texto del catálogo)
+            "descripcion": por_ref[ref].descripcion,
         } for ref in r.brechas_referenciadas if ref in por_ref]
         datos = {
             "pasos": pasos, "brechas": brechas,
             # salen de la matriz de controles (v1.1), no del modelo
             "referencias_normativas": list(r.referencias_normativas),
-            "sugerencias": [await self._anon(x) for x in r.sugerencias],
+            "sugerencias": [await self._anon_salida(x) for x in r.sugerencias],
         }
-        return await self._anon(r.respuesta) or "", datos
+        return await self._anon_salida(r.respuesta) or "", datos
 
     async def enviar(self, conversacion_id: int, texto: str | None) -> dict:
         """HU-18: cualquier rechazo (validación, cuota, conversación ajena...) también queda auditado."""

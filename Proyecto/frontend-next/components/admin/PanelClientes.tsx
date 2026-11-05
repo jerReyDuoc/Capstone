@@ -16,10 +16,8 @@
  *
  * El admin nunca ve ni define la contraseña: el enlace va solo al correo del usuario.
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
-import { BrandMark } from "@/components/ui/Icon";
 import {
   ACCIONES_SOLICITUD,
   api,
@@ -27,6 +25,7 @@ import {
   ETIQUETA_ESTADO_SOLICITUD,
   ETIQUETA_ESTADO_USUARIO,
   formatearRut,
+  rutMientrasEscribe,
   rutValido,
   seleccionable,
   type Empresa,
@@ -37,21 +36,24 @@ import {
   type ResultadoAlta,
   type Solicitud,
 } from "@/lib/admin/api";
-import { pedir } from "@/lib/encuesta/cliente";
+import { fechaHoraChile, fechaNumericaChile, ZONA_CHILE } from "@/lib/fechas";
+import { BarraAdmin } from "./BarraAdmin";
 import s from "./admin.module.css";
-import m from "./matriz.module.css";
 
 type Pestana = "solicitudes" | "empresas" | "evaluaciones" | "bitacora";
 // Correcciones 29-10: "Todas" primero y por defecto, para que una solicitud no "desaparezca" al cambiar de estado
 const FILTROS: (EstadoSolicitud | "todas")[] = ["todas", "nueva", "contactada", "contratada", "migrada", "descartada"];
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+// Correcciones 05-11: "hoy" según el calendario de Chile (toISOString da el día en UTC, que
+// después de las 21:00 ya es mañana)
+const hoyISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_CHILE }).format(new Date());
 const enUnAnio = () => {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() + 1);
-  return d.toISOString().slice(0, 10);
+  const [a, mes, d] = hoyISO().split("-").map(Number);
+  return new Date(Date.UTC(a + 1, mes - 1, d)).toISOString().slice(0, 10);
 };
-const fecha = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("es-CL") : "—");
+// Correcciones 05-11: en hora de Chile (el backend entrega UTC sin zona)
+const fecha = (iso?: string | null) => fechaNumericaChile(iso);
+const fechaHora = (iso?: string | null) => fechaHoraChile(iso);
 
 function Estado({ texto, tono }: { texto: string; tono: string }) {
   return <span className={`badge tone-${tono}`}>{texto}</span>;
@@ -139,6 +141,17 @@ export function PanelClientes() {
     if (pestana === "evaluaciones") void cargarEvaluaciones();
   }, [pestana, cargarEvaluaciones]);
 
+  // Correcciones 05-11: botón "Actualizar" de la barra (y al volver a la pestaña del navegador)
+  const actualizarTodo = useCallback(async () => {
+    setError(null);
+    await Promise.all([
+      cargarSolicitudes(),
+      cargarEmpresas(),
+      pestana === "bitacora" ? cargarBitacora() : null,
+      pestana === "evaluaciones" ? cargarEvaluaciones() : null,
+    ]);
+  }, [pestana, cargarSolicitudes, cargarEmpresas, cargarBitacora, cargarEvaluaciones]);
+
   const elegidas = useMemo(
     () => (solicitudes ?? []).filter((x) => seleccion.includes(x.id)),
     [solicitudes, seleccion],
@@ -173,12 +186,6 @@ export function PanelClientes() {
     }
   }
 
-  async function salir() {
-    // HU-28: el BFF revoca la sesión en el servidor y luego borra la cookie
-    await pedir("/bff/admin/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/admin/login?motivo=salida");
-  }
-
   function alTerminarAlta(texto: string) {
     setAviso(texto);
     setSeleccion([]);
@@ -188,24 +195,7 @@ export function PanelClientes() {
 
   return (
     <div className={s.pagina}>
-      <header className={s.barra}>
-        <div className={s.marca}>
-          <BrandMark aria-hidden="true" />
-          <span>
-            ComplianceAI
-            <span className={s.marcaSub}>Panel interno · Therion Labs</span>
-          </span>
-        </div>
-        {/* HU-24: navegación entre las secciones del panel interno */}
-        <nav className={m.nav} aria-label="Secciones del panel interno">
-          <Link className={m.navLink} href="/admin/clientes" aria-current="page">Empresas cliente</Link>
-          <Link className={m.navLink} href="/admin/matriz">Matriz normativa</Link>
-          <Link className={m.navLink} href="/admin/revision">Bandeja de revisión</Link>
-        </nav>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>
-          Cerrar sesión
-        </button>
-      </header>
+      <BarraAdmin onActualizar={actualizarTodo} alVolver />
 
       <main id="contenido" className={s.contenido}>
         <div>
@@ -336,7 +326,7 @@ function TablaSolicitudes({
                 </td>
                 <td>
                   #{x.id}
-                  <span className={s.sub}>{fecha(x.fecha_creacion)}</span>
+                  <span className={s.sub}>{fechaHora(x.fecha_creacion)}</span>
                   {x.razon_social_declarada ? <span className={s.sub}>{x.razon_social_declarada}</span> : null}
                 </td>
                 <td>
@@ -553,7 +543,9 @@ function FormAlta({
                 <div className={s.campo}>
                   <label htmlFor={`${id}-rut`}>RUT de la empresa</label>
                   <input id={`${id}-rut`} className={s.control} value={rut} maxLength={12} inputMode="text"
-                         placeholder="76.123.456-7" onChange={(e) => setRut(e.target.value)} {...invalido("rut")} />
+                         placeholder="76.123.456-7" autoComplete="off"
+                         /* Correcciones 05-11: los puntos y el guion se ponen solos */
+                         onChange={(e) => setRut(rutMientrasEscribe(e.target.value))} {...invalido("rut")} />
                   {err("rut")}
                 </div>
                 <div className={s.campo}>
@@ -800,7 +792,7 @@ function TablaBitacora({ filas }: { filas: FilaBitacora[] | null }) {
             <caption className="sr-only">Bitácora de auditoría</caption>
             <thead>
               <tr>
-                <th scope="col">Fecha (UTC)</th>
+                <th scope="col">Fecha (hora de Chile)</th>
                 <th scope="col">Actor</th>
                 <th scope="col">Acción</th>
                 <th scope="col">Entidad</th>
@@ -811,7 +803,7 @@ function TablaBitacora({ filas }: { filas: FilaBitacora[] | null }) {
             <tbody>
               {filas.map((f) => (
                 <tr key={f.id}>
-                  <td className={s.mono}>{f.fecha.replace("T", " ").slice(0, 19)}</td>
+                  <td className={s.mono}>{fechaHoraChile(f.fecha, true)}</td>
                   <td>{f.actor_rol}{f.actor_id != null ? ` #${f.actor_id}` : ""}</td>
                   <td className={s.mono}>{f.accion}</td>
                   <td>{f.entidad}{f.entidad_id != null ? ` #${f.entidad_id}` : ""}</td>

@@ -165,6 +165,29 @@ button, select, input { font: inherit; color: inherit; }
   background: rgba(5, 8, 7, 0.86);
   border-right: 1px solid var(--line);
   backdrop-filter: blur(8px);
+  /* Correcciones 05-11: con todos los grupos (Mi empresa, Gobernanza de IA y la sesión) la
+     barra no cabe en pantallas bajas (1366 × 768). Antes el exceso quedaba cortado y la rueda
+     movía el contenido de la derecha; ahora la barra se desplaza por su cuenta, sin arrastrar
+     la página al llegar al final. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+/* En pantallas bajas se compacta el espaciado para que quepa más sin desplazar */
+@media (max-height: 820px) and (min-width: 1024px) {
+  .sidebar { gap: var(--sp-4); padding-block: var(--sp-4); }
+  .sidebar-foot { padding: var(--sp-3); }
+}
+@media (max-height: 820px) and (min-width: 1024px) and (max-width: 1279.98px) {
+  .sidebar { gap: var(--sp-2); }
+  .sidebar .nav-link { min-height: 42px; padding: var(--sp-2); }
+}
+/* Último recurso en modo compacto muy bajo: la barra se desplaza (los rótulos se recortan) */
+@media (max-height: 640px) and (min-width: 1024px) and (max-width: 1279.98px) {
+  .shell .sidebar { overflow-y: auto; }
 }
 
 .brand {
@@ -265,6 +288,9 @@ button, select, input { font: inherit; color: inherit; }
     z-index: 30;
   }
   .nav-link:hover::after, .nav-link:focus-visible::after { opacity: 1; }
+  /* Correcciones 05-11: en modo compacto los rótulos salen por fuera de la barra, así que no
+     se recorta (overflow visible); para que quepa en pantallas bajas se achican los botones. */
+  .sidebar { overflow: visible; }
   .main { padding: var(--sp-6) var(--sp-6) var(--sp-10); }
   .kpi.card { padding: var(--sp-5); }
   .kpi-value { font-size: var(--fs-xl); }
@@ -425,6 +451,8 @@ button, select, input { font: inherit; color: inherit; }
 /* ---------- Gráficos ---------- */
 .chart { margin: 0; display: grid; gap: var(--sp-4); }
 .chart-svg { width: 100%; height: auto; max-height: 420px; display: block; overflow: visible; }
+/* Correcciones 05-11: gráfico a todo el ancho de la tarjeta (Dominios) */
+.chart-svg.chart-svg-ancho { max-height: none; }
 .chart-svg text { fill: var(--text-muted); font-family: var(--font-body); font-size: 12px; }
 .chart-svg .axis-label { fill: var(--text); font-weight: 600; font-size: 14px; }
 .chart-svg .tick { fill: var(--text-subtle); font-size: 12px; }
@@ -1041,6 +1069,28 @@ button, select, input { font: inherit; color: inherit; }
 .remed-evolucion strong { color: var(--text); }
 .remed-evolucion-delta { color: var(--accent); font-weight: 600; }
 .remed-radar { display: grid; place-items: center; }
+/* Correcciones 05-11 · "Tu madurez ahora" con el avance por dimensión */
+.remed-puntaje-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.remed-frase { font-size: var(--fs-sm); color: var(--text-muted); max-width: 60ch; }
+.remed-frase strong { color: var(--text); }
+.remed-subtitulo { font-size: var(--fs-sm); font-weight: 600; color: var(--text); margin: 0 0 var(--sp-2); }
+.remed-dims, .remed-ultimas { padding-top: var(--sp-3); border-top: 1px solid var(--line); }
+.remed-dims ul, .remed-ultimas ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.remed-dim { display: grid; gap: 6px; }
+.remed-dim-cabeza { display: flex; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); }
+.remed-dim-nombre { color: var(--text); font-weight: 600; }
+.remed-dim-cifra { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.remed-dim-barra { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: visible; }
+.remed-dim-barra .fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--accent-strong); transition: width 600ms var(--ease); }
+.remed-dim-barra .meta { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--serie-meta); border-radius: 1px; }
+.remed-dim-detalle { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px var(--sp-3); font-size: var(--fs-xs); color: var(--text-subtle); }
+.remed-dim-sube { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; }
+.remed-dim-sube svg { width: 12px; height: 12px; }
+.remed-ultimas li { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); font-size: var(--fs-sm); }
+.remed-ultima-texto { display: grid; gap: 2px; min-width: 0; }
+.remed-ultima-texto strong { color: var(--text); font-weight: 600; }
+.remed-ultima-texto span { font-size: var(--fs-xs); color: var(--text-subtle); }
+@media (prefers-reduced-motion: reduce) { .remed-dim-barra .fill { transition: none; } }
 .remed-filtro { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-2) var(--sp-5); }
 .remed-historial { font-size: var(--fs-sm); color: var(--text-muted); }
 .remed-historial summary { display: inline-flex; align-items: center; min-height: var(--target); color: var(--accent); font-weight: 600; cursor: pointer; }
@@ -1121,7 +1171,7 @@ textarea { font: inherit; color: inherit; }
 @media (max-width: 1023.98px) {
   /* Barra superior: todos los grupos en una fila (el modo compacto les daba 100 % de ancho
      a cada uno y solo se veía el primero); si no caben, se desplaza en vez de desbordar. */
-  .sidebar { overflow-x: auto; gap: var(--sp-2); }
+  .sidebar { overflow-x: auto; overflow-y: hidden; gap: var(--sp-2); }
   .nav, .nav-list { width: auto; }
   .nav { flex-direction: row; flex: none; }
   .nav + .nav { padding-left: var(--sp-2); border-left: 1px solid var(--line); }

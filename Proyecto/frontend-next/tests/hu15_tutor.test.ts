@@ -75,8 +75,9 @@ describe("HU-15 · conversación", () => {
   it("sugiere preguntas con las brechas REALES del contexto, empezando por la prioritaria", () => {
     const s = sugerenciasIniciales(contexto());
     expect(s[0]).toMatch(/cerrar primero/);
-    expect(s.some((q) => q.includes("DAT-001"))).toBe(true);
-    expect(s.some((q) => q.includes("GOB-002"))).toBe(false);
+    // Correcciones 05-11: nunca códigos internos en lo que ve el cliente
+    expect(s.some((q) => /[A-Z]{2,}-\d{3}/.test(q))).toBe(false);
+    expect(s.some((q) => q.includes("Protección de Datos"))).toBe(true);
     const conFoco = sugerenciasIniciales(contexto({ foco: { ruta_id: 1, nombre: "Privacidad - Inicial", nivel: "Inicial" } }));
     expect(conFoco.at(-1)).toMatch(/Privacidad - Inicial/);
     expect(sugerenciasIniciales(contexto({ brechas: [] }))).toHaveLength(1);

@@ -5,7 +5,8 @@
  *
  * Correcciones 29-10:
  * - El usuario definitivo (modo "cliente") ve la misma barra en ambos lugares, con el grupo
- *   "Mi empresa": Mi empresa, Mis evaluaciones, Mis documentos y (HU-16) Borradores.
+ *   "Mi empresa": Mi empresa, Mis evaluaciones y Mis documentos. Desde 05-11 los Borradores
+ *   (HU-16) viven en "Gobernanza de IA", junto a Cerrar brechas.
  * - Quien hizo el autodiagnóstico sin cuenta (modo "encuestado") no ve "Cerrar brechas",
  *   "Mis documentos" ni "Mi evaluación" una vez completada: le quedan sus resultados y "Contratar".
  *   Si su evaluación sigue en curso, conserva "Mi evaluación" para volver a ella.
@@ -45,9 +46,11 @@ const EMPRESA: Item[] = [
   { ruta: "/empresa", etiqueta: "Mi empresa", icono: "empresa", exacta: true },
   { ruta: "/empresa/evaluaciones", etiqueta: "Mis evaluaciones", icono: "historial" },
   { ruta: "/empresa/documentos", etiqueta: "Mis documentos", icono: "carpeta" },
-  // HU-16: borradores de cumplimiento adaptados por el Agente IA
-  { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" },
 ];
+
+// HU-16: borradores de cumplimiento adaptados por el Agente IA. Correcciones 05-11: pasan al
+// grupo "Gobernanza de IA" (servicio contratado: solo el cliente los ve).
+const BORRADORES: Item = { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" };
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -60,7 +63,7 @@ export function Sidebar() {
   const evaluacionEnCurso =
     modo === "encuestado" && (panel?.evaluaciones ?? []).some((e) => e.estado_progreso !== "completada");
 
-  const resultados = modo === "cliente" ? [...RESULTADOS, CERRAR_BRECHAS] : RESULTADOS;
+  const resultados = modo === "cliente" ? [...RESULTADOS, CERRAR_BRECHAS, BORRADORES] : RESULTADOS;
 
   const enlace = (it: Item, extra?: ReactNode) => {
     const activo = it.exacta ? pathname === it.ruta : pathname === it.ruta || pathname.startsWith(`${it.ruta}/`);

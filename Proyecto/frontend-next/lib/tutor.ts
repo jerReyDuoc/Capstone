@@ -63,7 +63,7 @@ export const TIPO_RESPUESTA: Record<TipoMensajeTutor, { etiqueta: string; tono: 
 export const NIVEL_TUTOR_INFO: Record<NivelFormativo, string> = {
   Inicial: "Conceptos simples, el porqué de cada obligación y pocos pasos básicos.",
   Intermedio: "Procedimientos, responsables y la evidencia que debes generar.",
-  Avanzado: "Controles, indicadores y cómo auditar el cierre de cada brecha.",
+  Avanzado: "Indicadores y cómo comprobar que cada brecha quedó cerrada.",
 };
 
 export type ValidacionMensaje = { ok: true; texto: string } | { ok: false; motivo: string };
@@ -89,14 +89,36 @@ export function sugerenciasIniciales(ctx: ContextoTutorApi | null): string[] {
   const [primera] = [...ctx.brechas].sort((a, b) => a.prioridad - b.prioridad);
   const s = ["¿Qué brecha debería cerrar primero y por qué?"];
   if (primera) {
-    s.push(`Explícame la brecha ${primera.ref} de ${primera.dominio}.`);
-    s.push(`Dame un plan de acción para cerrar ${primera.ref}.`);
+    // Correcciones 05-11: sin códigos internos; el backend elige la brecha por prioridad
+    s.push(`Explícame mi brecha más urgente en ${primera.dominio}.`);
+    s.push("Dame un plan paso a paso para cerrar mi brecha más urgente.");
   }
   if (ctx.foco) s.push(`¿Cómo me ayuda el módulo «${ctx.foco.nombre}» con mis brechas?`);
   else if (ctx.brechas.some((b) => b.estado === "parcialmente_cumplido")) {
-    s.push("¿Qué me falta para pasar mis controles parciales a cumplidos?");
+    s.push("¿Qué me falta para que mis preguntas parciales queden cumplidas?");
   }
   return s.slice(0, 4);
+}
+
+/**
+ * Correcciones 05-11 · Subtítulo del tutor, sin el número interno de la evaluación y sin el
+ * extraño "tus 0 brechas" cuando la empresa no tiene brechas abiertas.
+ */
+export function subtituloTutor(brechas: number, fecha: string | null): string {
+  const de = fecha ? `la evaluación del ${fecha}` : "tu evaluación más reciente";
+  if (brechas === 0) return `Tu evaluación ${fecha ? `del ${fecha} ` : ""}no tiene brechas abiertas`;
+  return `${brechas === 1 ? "Tu brecha" : `Tus ${brechas} brechas`} de ${de}`;
+}
+
+/** Correcciones 05-11: un saludo, un "gracias" o una despedida (sin pasos ni brechas). */
+export const esCharla = (m: Pick<MensajeTutorApi, "tipo" | "pasos" | "brechas">) =>
+  m.tipo === "orientacion" && m.pasos.length === 0 && m.brechas.length === 0;
+
+/** Correcciones 05-11: nombre legible de una brecha para el cliente (nunca su código interno). */
+export function nombreBrecha(descripcion: string | null | undefined, max = 90): string {
+  const t = (descripcion ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return "Brecha de tu evaluación";
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
 /** v1.1: lo que se envía al pulsar "Explícame este paso" (pide detalle de ESE paso, no el plan de nuevo). */

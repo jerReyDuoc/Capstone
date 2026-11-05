@@ -6,7 +6,9 @@
  * resultados. Probado en tests/hu17_remediacion.test.ts.
  */
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
-import type { ControlRemediacionApi, EstadoClasificacion, EvidenciaRemediacionApi, RemediacionApi } from "./types";
+import type {
+  ControlRemediacionApi, DominioVista, EstadoClasificacion, EvidenciaRemediacionApi, MejoraRemediacionApi, RemediacionApi,
+} from "./types";
 
 export const BASE_REMEDIACION = "/bff/cliente/api/remediacion";
 
@@ -140,3 +142,50 @@ export function mensajeRemediacion(e: unknown): string {
       return info?.mensaje || "No pudimos subir la evidencia. Inténtalo de nuevo.";
   }
 }
+
+/* ------------------------------------------------------------ correcciones 05-11 */
+
+/** Cómo va cada dimensión en "Tu madurez ahora": puntaje actual y lo que subió por evidencia. */
+export interface AvanceDimension {
+  dominio: string;
+  puntaje: number;
+  meta: number;
+  /** Puntos que sumaron al puntaje GENERAL las evidencias de esta dimensión. */
+  aporte: number;
+  /** Preguntas que mejoraron por evidencia en esta dimensión. */
+  mejoradas: number;
+  /** Brechas que siguen abiertas en esta dimensión. */
+  abiertas: number;
+}
+
+/**
+ * Une el puntaje actual de cada dimensión con las mejoras por evidencia y las brechas abiertas.
+ * Orden: primero donde más subió; luego, las que siguen con más brechas abiertas.
+ */
+export function avancePorDimension(
+  dominios: Pick<DominioVista, "nombre" | "puntaje" | "meta">[],
+  evolucion: MejoraRemediacionApi[] | undefined,
+  controles: Pick<ControlRemediacionApi, "dominio">[],
+): AvanceDimension[] {
+  const filas = dominios.map<AvanceDimension>((d) => ({
+    dominio: d.nombre, puntaje: d.puntaje, meta: d.meta, aporte: 0, mejoradas: 0,
+    abiertas: controles.filter((c) => c.dominio === d.nombre).length,
+  }));
+  const por = new Map(filas.map((f) => [f.dominio, f]));
+  for (const m of evolucion ?? []) {
+    const f = m.dominio ? por.get(m.dominio) : undefined;
+    if (!f) continue;
+    f.aporte = Math.round((f.aporte + (m.despues - m.antes)) * 10) / 10;
+    f.mejoradas += 1;
+  }
+  return filas.sort((a, b) => b.aporte - a.aporte || b.abiertas - a.abiertas || a.puntaje - b.puntaje);
+}
+
+/** "La política de uso de IA…" (recorta textos largos del control para listarlos). */
+export function recortar(texto: string | null | undefined, max = 90): string {
+  const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
+}
+
+export const etiquetaEstado = (e: string | null | undefined) =>
+  e && e in ETIQUETA_ESTADO ? ETIQUETA_ESTADO[e as EstadoClasificacion] : null;

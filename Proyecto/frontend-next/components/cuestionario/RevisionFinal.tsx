@@ -31,6 +31,7 @@ import s from "./cuestionario.module.css";
 const TEXTO_BLOQUEO: Record<Bloqueo["tipo"], string> = {
   pendiente: "Sin responder",
   "revision-sin-evidencia": "Requiere revisión sin evidencia",
+  "cumplido-sin-evidencia": "Cumplido sin evidencia",
   "evidencia-en-curso": "Evidencia en validación",
 };
 

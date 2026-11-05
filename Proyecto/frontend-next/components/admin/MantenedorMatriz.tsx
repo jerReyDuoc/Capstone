@@ -13,10 +13,9 @@
  * evaluaciones cerradas siguen con la versión con que se respondieron; las en curso pasan a
  * la nueva. Cada cambio queda en el audit log (lo registra el backend).
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { BrandMark, Icon } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { comoErrorAdmin, type ErrorAdmin } from "@/lib/admin/api";
 import {
   aplicables,
@@ -50,11 +49,13 @@ import {
   type Problema,
   type Validacion,
 } from "@/lib/admin/matriz";
-import { pedir } from "@/lib/encuesta/cliente";
+import { BarraAdmin } from "./BarraAdmin";
+import { RubrosMatriz } from "./RubrosMatriz";
+import { notaVisible } from "@/lib/admin/rubros";
 import a from "./admin.module.css";
 import s from "./matriz.module.css";
 
-type Pestana = Entidad | "arbol" | "historial";
+type Pestana = Entidad | "arbol" | "historial" | "rubros";
 type FiltroLista = "activos" | "cambios" | "retirados" | "todos";
 
 const PESTANAS: [Pestana, string][] = [
@@ -64,6 +65,8 @@ const PESTANAS: [Pestana, string][] = [
   ["preguntas_filtro", "Filtro inicial"],
   ["arbol", "Árbol de aplicabilidad"],
   ["historial", "Historial de versiones"],
+  // Correcciones 05-11: los rubros se gestionan aquí (no pasan por el borrador)
+  ["rubros", "Rubros"],
 ];
 
 type ErrorVista = ErrorAdmin & { problemas?: Problema[]; usado_por?: string[] };
@@ -79,6 +82,8 @@ export function MantenedorMatriz() {
   const [ocupado, setOcupado] = useState(false);
   const [editando, setEditando] = useState<{ entidad: Entidad; item: Record<string, unknown> | null } | null>(null);
   const [publicando, setPublicando] = useState(false);
+  // Correcciones 05-11: "Actualizar" de la barra también recarga la pestaña Rubros
+  const [recarga, setRecarga] = useState(0);
 
   const manejarError = useCallback(
     (e: unknown): ErrorVista => {
@@ -142,28 +147,14 @@ export function MantenedorMatriz() {
   const editable = Boolean(borrador);
   const revision = borrador?.revision ?? 0;
 
-  async function salir() {
-    await pedir("/bff/admin/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/admin/login?motivo=salida");
-  }
-
   return (
     <div className={a.pagina}>
-      <header className={a.barra}>
-        <div className={a.marca}>
-          <BrandMark aria-hidden="true" />
-          <span>
-            ComplianceAI
-            <span className={a.marcaSub}>Panel interno · Therion Labs</span>
-          </span>
-        </div>
-        <nav className={s.nav} aria-label="Secciones del panel interno">
-          <Link className={s.navLink} href="/admin/clientes">Empresas cliente</Link>
-          <Link className={s.navLink} href="/admin/matriz" aria-current="page">Matriz normativa</Link>
-          <Link className={s.navLink} href="/admin/revision">Bandeja de revisión</Link>
-        </nav>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>Cerrar sesión</button>
-      </header>
+      <BarraAdmin
+        onActualizar={async () => {
+          setRecarga((n) => n + 1);
+          await cargar();
+        }}
+      />
 
       <main id="contenido" className={a.contenido}>
         <div>
@@ -212,7 +203,8 @@ export function MantenedorMatriz() {
              }}>
           {PESTANAS.map(([clave, texto]) => {
             const conCambios =
-              clave !== "arbol" && clave !== "historial" && Boolean(borrador?.conteo_cambios?.[clave as Entidad]);
+              clave !== "arbol" && clave !== "historial" && clave !== "rubros" &&
+              Boolean(borrador?.conteo_cambios?.[clave as Entidad]);
             return (
               <button key={clave} id={`tab-${clave}`} role="tab" type="button" className={s.pestana}
                       aria-selected={pestana === clave} aria-controls={`panel-${clave}`}
@@ -226,7 +218,9 @@ export function MantenedorMatriz() {
         </div>
 
         <section id={`panel-${pestana}`} role="tabpanel" aria-labelledby={`tab-${pestana}`}>
-          {!contenido ? null : pestana === "arbol" ? (
+          {pestana === "rubros" ? (
+            <RubrosMatriz recarga={recarga} onAviso={setAviso} onError={(e) => setError(e)} />
+          ) : !contenido ? null : pestana === "arbol" ? (
             <ArbolAplicabilidad
               contenido={contenido}
               editable={editable}
@@ -360,7 +354,7 @@ function FranjaVersiones({
           <dt>Evaluaciones</dt>
           <dd>{v.evaluaciones === 1 ? "1 evaluación cerrada la usa" : `${v.evaluaciones} evaluaciones cerradas la usan`}</dd>
         </dl>
-        {v.nota_cambio ? <p className={s.nota}>{v.nota_cambio}</p> : null}
+        {notaVisible(v.nota_cambio) ? <p className={s.nota}>{v.nota_cambio}</p> : null}
       </div>
 
       {b ? (
@@ -892,7 +886,7 @@ function Historial({
                   Publicada el {fechaCorta(v.fecha_publicacion)}{v.publicado_por?.email ? ` por ${v.publicado_por.email}` : ""}.{" "}
                   {v.evaluaciones === 1 ? "La usa 1 evaluación cerrada." : `La usan ${v.evaluaciones} evaluaciones cerradas.`}
                 </p>
-                {v.nota_cambio ? <p className={s.nota}>{v.nota_cambio}</p> : null}
+                {notaVisible(v.nota_cambio) ? <p className={s.nota}>{v.nota_cambio}</p> : null}
                 <div className={a.acciones}>
                   <button type="button" className="link-btn" aria-expanded={abierta === v.id} onClick={() => void alternar(v.id)}>
                     {abierta === v.id ? "Ocultar cambios" : "Ver qué cambió"}

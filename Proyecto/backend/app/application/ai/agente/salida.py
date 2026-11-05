@@ -13,6 +13,10 @@ revisa con reglas deterministas:
   url            enlaces: el tutor no deriva a sitios externos.
   alcance        una respuesta "fuera_de_alcance" que igual trae pasos o brechas.
 
+Correcciones 05-11: humanizar_codigos() reemplaza en el texto visible los códigos internos
+(de control y de brecha) por el nombre de la brecha, y los estados del sistema por su
+lectura ("no_cumplido" -> "no cumplido"). No es una advertencia: es presentación.
+
 Las dos fugas BLOQUEAN la respuesta completa (se reemplaza por un rechazo fijo). Lo demás
 se limpia (se quita el código, el enlace o el contenido sobrante) y queda la advertencia.
 """
@@ -149,3 +153,70 @@ def aplicar(r: TutorRespuesta, encontrados: list[str]) -> TutorRespuesta:
     if "alcance" in encontrados:
         data = data.model_copy(update={"pasos": [], "brechas_referenciadas": []})
     return data
+
+
+# ------------------------------------------------------------- correcciones 05-11
+# Cualquier código con forma de identificador interno (DAT-001, GOB-003, BR-012, ERR-GOB-003).
+_CODIGO_INTERNO = re.compile(r"\[?\b[A-Z]{2,5}(?:-[A-Z]{2,5})?-\d{2,4}\b\]?")
+_ESTADOS_SISTEMA = {
+    "parcialmente_cumplido": "parcialmente cumplido", "no_cumplido": "no cumplido",
+    "requiere_revision": "en revisión", "no_aplica": "no aplica",
+}
+_ESTADO = re.compile(r"\b(" + "|".join(_ESTADOS_SISTEMA) + r")\b")
+
+
+def humanizar_codigos(texto: str, nombres: dict[str, str]) -> str:
+    """
+    Reemplaza los códigos internos por el nombre de su brecha («…») y quita los que no
+    corresponden a ninguna brecha conocida; los estados del sistema pasan a texto normal.
+    `nombres` va de código (ref, código del catálogo o del control) a nombre legible.
+    """
+    if not texto:
+        return texto
+
+    def _cambiar(m: re.Match) -> str:
+        codigo = m.group(0).strip("[]")
+        nombre = nombres.get(codigo) or nombres.get(codigo.upper())
+        return f"«{nombre}»" if nombre else "esta brecha"
+
+    limpio = _CODIGO_INTERNO.sub(_cambiar, texto)
+    limpio = _ESTADO.sub(lambda m: _ESTADOS_SISTEMA[m.group(1)], limpio)
+    # "la brecha esta brecha" o "(esta brecha)" quedan raros: se ordenan sin tocar el resto
+    limpio = re.sub(r"\b(la |una )?brecha\s+esta brecha\b", "esta brecha", limpio, flags=re.IGNORECASE)
+    limpio = re.sub(r"\s*\(\s*(esta brecha)?\s*\)", "", limpio)
+    limpio = re.sub(r"[ \t]+([.,;:])", r"\1", limpio)
+    limpio = re.sub(r"[ \t]{2,}", " ", limpio).strip()
+    if limpio and texto.lstrip()[:1].isupper():
+        limpio = limpio[0].upper() + limpio[1:]
+    return limpio
+
+
+def nombre_legible(descripcion: str | None, maximo: int = 80) -> str:
+    t = re.sub(r"\s+", " ", (descripcion or "")).strip().rstrip(".")
+    if not t:
+        return "brecha de tu evaluación"
+    t = t[0].lower() + t[1:] if len(t) > 1 and not t[:2].isupper() else t
+    return t if len(t) <= maximo else t[: maximo - 1].rstrip() + "…"
+
+
+# Correcciones 05-11 (2.ª ronda): el NER que pasa por la respuesta del modelo (defensa en
+# profundidad) a veces marca como nombre una palabra de saludo ("Adiós") o el modelo repite la
+# etiqueta que vio en el mensaje del usuario. Una etiqueta usada como vocativo no aporta nada y
+# se veía en el chat ("[NOMBRE_ANON], recuerda..."): se quita. Las demás etiquetas se dejan.
+_ETIQUETA = r"\[[A-Z_]+_ANON\]"
+_SALUDO = r"(?:hola|buenas|buenos d[ií]as|buenas tardes|chao|adi[oó]s|hasta (?:luego|pronto)|gracias)"
+
+
+def sin_vocativos_anonimizados(texto: str | None) -> str | None:
+    if not texto or "_ANON]" not in texto:
+        return texto
+    limpio = re.sub(rf"¡\s*{_ETIQUETA}\s*!\s*", "", texto)
+    limpio = re.sub(rf",\s*{_ETIQUETA}(?=\s*[.!?,;]|\s*$)", "", limpio)
+    limpio = re.sub(rf"(¡?{_SALUDO})\s+{_ETIQUETA}", r"\1", limpio, flags=re.IGNORECASE)
+    limpio = re.sub(rf"^(\W*){_ETIQUETA}\s*[,:!]?\s*", r"\1", limpio)
+    limpio = re.sub(rf"([.!?]\s+){_ETIQUETA}\s*[,:]\s*", r"\1", limpio)
+    limpio = limpio.strip()
+    i = next((k for k, c in enumerate(limpio) if c.isalpha()), None)
+    if i is not None:
+        limpio = limpio[:i] + limpio[i].upper() + limpio[i + 1:]
+    return limpio

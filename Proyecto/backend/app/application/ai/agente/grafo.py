@@ -217,9 +217,20 @@ async def nodo_anclar_contexto(estado: EstadoAgente, config: RunnableConfig) -> 
     # v1.1: la fuente normativa NO la escribe el modelo (inventaba números de artículo): es el
     # framework y el artículo reales de los controles que cita, tomados de la matriz.
     normativas = contexto.referencias_normativas(refs) if contexto else []
+    # Correcciones 05-11: el cliente nunca ve códigos internos; se nombran las brechas
+    nombres: dict[str, str] = {}
+    for b in (contexto.brechas if contexto else ()):
+        nombre = validacion.nombre_legible(b.descripcion)
+        for codigo in (b.ref, b.codigo, b.control_codigo):
+            if codigo:
+                nombres.setdefault(codigo, nombre)
+    h = lambda texto: validacion.humanizar_codigos(texto, nombres) if texto else texto  # noqa: E731
+    pasos = [p.model_copy(update={"accion": h(p.accion), "evidencia_esperada": h(p.evidencia_esperada)})
+             for p in pasos]
+    sugerencias = [h(s) for s in sugerencias]
     limpio = data.model_copy(update={
         "brechas_referenciadas": refs, "pasos": pasos, "sugerencias": sugerencias,
-        "referencias_normativas": normativas, "respuesta": (data.respuesta or "").strip(),
+        "referencias_normativas": normativas, "respuesta": h((data.respuesta or "").strip()),
     })
     return {"resultado": _resultado(resultado, limpio)}
 

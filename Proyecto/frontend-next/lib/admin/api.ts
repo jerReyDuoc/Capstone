@@ -219,6 +219,18 @@ export function rutValido(rut: string): boolean {
   return dv === m[2];
 }
 
+/**
+ * Correcciones 05-11 · Formatea el RUT mientras se escribe: deja solo dígitos y K, toma el
+ * último carácter como dígito verificador y pone los puntos y el guion solo.
+ * "760864285" → "76.086.428-5"; "7" → "7"; "76" → "7-6".
+ */
+export function rutMientrasEscribe(valor: string): string {
+  const limpio = valor.replace(/[^0-9kK]/g, "").toUpperCase().replace(/K(?=.)/g, "").slice(0, 9);
+  if (limpio.length <= 1) return limpio;
+  const cuerpo = limpio.slice(0, -1).replace(/^0+(?=\d)/, "");
+  return `${cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}-${limpio.slice(-1)}`;
+}
+
 /** 76086428-5 → 76.086.428-5 */
 export function formatearRut(rut: string): string {
   const [cuerpo, dv] = rut.split("-");

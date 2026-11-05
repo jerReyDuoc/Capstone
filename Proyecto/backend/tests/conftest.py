@@ -19,6 +19,12 @@ os.environ.setdefault("ENTITY_MAP_KEY", "dGVzdC1rZXktc29sby1wYXJhLXB5dGVzdC0xMjM
 # desarrollo (que docker compose pasa como variables) tenga EXIGIR_TOKEN_EVALUACIONES=false
 # para probar el frontend. Se fuerza (no setdefault) antes de importar app.core.config.
 os.environ["EXIGIR_TOKEN_EVALUACIONES"] = "true"
+# Correcciones 05-11: las suites existentes (HU-02, HU-12, HU-29…) se escribieron con la regla
+# original (justificación obligatoria y "cumplido" sin evidencia). Se fuerzan esos valores;
+# las reglas nuevas, que son el valor por defecto de la app, se prueban con monkeypatch en
+# tests/test_correcciones_cuestionario.py.
+os.environ["JUSTIFICACION_OBLIGATORIA"] = "true"
+os.environ["EVIDENCIA_OBLIGATORIA_CUMPLIDO"] = "false"
 
 # Las pruebas de API en proceso suben archivos: que no ensucien ./storage
 import tempfile  # noqa: E402

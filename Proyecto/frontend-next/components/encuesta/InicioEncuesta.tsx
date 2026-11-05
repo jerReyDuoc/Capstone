@@ -3,7 +3,7 @@
 /**
  * HU-19 · Zona de la evaluación del encuestado (/encuesta).
  * Muestra su evaluación (y solo la suya: el BFF y el backend lo garantizan), los límites
- * del día, el cuestionario adaptativo (HU-01/02) y el email opcional. Al completar el
+ * del día y el cuestionario adaptativo (HU-01/02); el email opcional se pide al comenzar. Al completar el
  * cuestionario se pasa al panel de resultados (/panel?evaluacion=ID).
  */
 import Link from "next/link";
@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Cuestionario } from "@/components/cuestionario/Cuestionario";
 import { AvisoError } from "@/components/inicio/AvisoError";
-import { FormEmailOpcional } from "@/components/inicio/FormEmailOpcional";
 import { useLimitesEncuesta } from "@/hooks/useLimitesEncuesta";
 import { useSesionEncuestado } from "@/hooks/useSesionEncuestado";
 import { BannerLimites } from "./BannerLimites";
@@ -42,9 +41,7 @@ export function InicioEncuesta() {
 
       <Cuestionario evaluacionId={estado.evaluacionId} onLimites={() => void refrescar()} />
 
-      <section className="card" aria-label="Correo opcional" style={{ maxWidth: 720 }}>
-        <FormEmailOpcional compacto />
-      </section>
+      {/* Correcciones 05-11: el correo ya se pide al comenzar (/comenzar, paso "Tu clave"); no se repite aquí */}
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
         <Link href="/" className="btn btn-ghost btn-sm">Ir al inicio</Link>

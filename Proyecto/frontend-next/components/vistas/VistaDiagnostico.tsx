@@ -7,7 +7,6 @@ import { VistasFijadas } from "@/components/brechas/VistasFijadas";
 import { CtaContratar } from "@/components/contratacion/CtaContratar";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
-import { BarrasDominio } from "@/components/charts/BarrasDominio";
 import { RadarMadurez } from "@/components/charts/RadarMadurez";
 import { AvisoCohorte } from "@/components/sector/AvisoCohorte";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -15,7 +14,6 @@ import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
 import { formatoPuntaje, NIVELES } from "@/lib/madurez";
-import { notaIndustria } from "@/lib/adaptadores";
 import { slug } from "@/lib/slug";
 import { ResumenBrechas } from "./ResumenBrechas";
 
@@ -107,18 +105,8 @@ export function VistaDiagnostico() {
                 </div>
               </div>
 
-              <div className="grid">
-                <div className="card col-6 md-col-12">
-                  <BarrasDominio
-                    dominios={p.dominios}
-                    notaIndustria={notaIndustria(p) ?? undefined}
-                    onSeleccionar={(d) => router.push(`${href("/panel/dominios")}#${slug(d.nombre)}`)}
-                  />
-                </div>
-                <div className="col-6 md-col-12" style={{ display: "grid" }}>
-                  <ResumenBrechas brechas={p.brechas} />
-                </div>
-              </div>
+              {/* Correcciones 05-11: la comparativa meta/rubro vive solo en Dominios */}
+              <ResumenBrechas brechas={p.brechas} />
 
               {/* HU-31: después de los resultados, el siguiente paso (solo para el encuestado) */}
               <CtaContratar brechas={p.brechas.length} />

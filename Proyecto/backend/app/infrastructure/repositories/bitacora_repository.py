@@ -119,6 +119,9 @@ class Accion:
     MATRIZ_BORRADOR_DESCARTADO = "matriz.borrador_descartado"
     MATRIZ_PUBLICADA = "matriz.version_publicada"             # detalle: etiqueta, huella y conteo de cambios
     MATRIZ_PUBLICACION_RECHAZADA = "matriz.publicacion_rechazada"  # errores de validación o sin cambios
+    # Correcciones 05-11: rubros desde el panel interno (detalle: el nombre del rubro)
+    RUBRO_CREADO = "rubro.creado"
+    RUBRO_RENOMBRADO = "rubro.renombrado"
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -178,6 +181,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MATRIZ_BORRADOR_EDITADO: Categoria.MODIFICACION,      # HU-24
     Accion.MATRIZ_PUBLICADA: Categoria.MODIFICACION,
     Accion.MATRIZ_PUBLICACION_RECHAZADA: Categoria.MODIFICACION,
+    Accion.RUBRO_RENOMBRADO: Categoria.MODIFICACION,             # correcciones 05-11
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -193,6 +197,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.FORMACION_MODULO_INICIADO: Categoria.CREACION,
     Accion.AUDITOR_CREADO: Categoria.CREACION,
     Accion.MATRIZ_BORRADOR_CREADO: Categoria.CREACION,           # HU-24
+    Accion.RUBRO_CREADO: Categoria.CREACION,                     # correcciones 05-11
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

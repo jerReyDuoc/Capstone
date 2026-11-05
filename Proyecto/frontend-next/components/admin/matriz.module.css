@@ -167,3 +167,9 @@ textarea.control { min-height: 96px; resize: vertical; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   .medidor span { transition: none; }
 }
+
+/* Correcciones 05-11 · pestaña Rubros */
+.formRubro { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-3); }
+.formRubro > :first-child { flex: 1 1 280px; max-width: 420px; }
+.formRubroFila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.formRubroFila input { max-width: 280px; }

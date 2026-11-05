@@ -71,22 +71,17 @@ describe("filtro F1–F7 · adapta el cuestionario", () => {
 });
 
 describe("respuestas · reglas de HU-02", () => {
-  it("justificación obligatoria (≥ 20 con letras) solo en parcial y requiere revisión", () => {
-    expect(errorJustificacion("cumplido", "")).toBeNull();
-    expect(errorJustificacion("no_cumplido", "")).toBeNull();
-    expect(errorJustificacion("parcialmente_cumplido", "corto")).toMatch(/20 caracteres/);
-    expect(errorJustificacion("requiere_revision", "1234567890 1234567890 123")).toMatch(/caracteres/);
-    expect(errorJustificacion("parcialmente_cumplido", "   Tenemos política pero sin aprobar   ")).toBeNull();
+  // Correcciones 05-11: justificación opcional en todos los estados; "cumplido" exige evidencia
+  it("justificación opcional en todos los estados (solo se controla el largo máximo)", () => {
+    for (const e of ESTADOS) expect(errorJustificacion(e.valor, "")).toBeNull();
+    expect(errorJustificacion("parcialmente_cumplido", "corto")).toBeNull();
+    expect(ESTADOS.some((e) => e.justificacionObligatoria)).toBe(false);
   });
 
-  it("cuenta como el backend: colapsa espacios antes de medir", () => {
-    expect(errorJustificacion("parcialmente_cumplido", "a          b          c")).toMatch(/llevas 5/);
-  });
-
-  it("evidencia: admitida en cumplido, parcial y revisión; obligatoria solo en revisión", () => {
+  it("evidencia: admitida en cumplido, parcial y revisión; obligatoria en cumplido y revisión", () => {
     const admite = ESTADOS.filter((e) => e.admiteEvidencia).map((e) => e.valor);
     expect(admite.sort()).toEqual(["cumplido", "parcialmente_cumplido", "requiere_revision"]);
-    expect(ESTADOS.filter((e) => e.evidenciaObligatoria).map((e) => e.valor)).toEqual(["requiere_revision"]);
+    expect(ESTADOS.filter((e) => e.evidenciaObligatoria).map((e) => e.valor)).toEqual(["cumplido", "requiere_revision"]);
   });
 
   it("formatos de evidencia que el worker puede leer", () => {
@@ -151,6 +146,9 @@ describe("orden y cierre", () => {
       "revision-sin-evidencia:A-2",
     ]);
     expect(bloqueosParaCompletar({ pendientes: [], respondidos: [progreso.respondidos[2]] }, evidencias)).toEqual([]);
+    // Correcciones 05-11: "cumplido" sin evidencia también bloquea
+    const sinEv = bloqueosParaCompletar({ pendientes: [], respondidos: [progreso.respondidos[1]] }, new Map());
+    expect(sinEv.map((x) => x.tipo)).toEqual(["cumplido-sin-evidencia"]);
   });
 });
 

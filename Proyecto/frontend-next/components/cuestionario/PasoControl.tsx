@@ -2,8 +2,8 @@
 
 /**
  * HU-01 / HU-02 · Un control de la matriz: estado de cumplimiento (5 estados), justificación
- * (obligatoria en "Parcialmente cumplido" y "Requiere revisión") y evidencia opcional que
- * valida la IA. "Guardar y continuar" hace upsert de la respuesta y, si hay archivo, lo sube;
+ * (opcional en todos los estados desde las correcciones 05-11) y evidencia que valida la IA
+ * (obligatoria en "Cumplido" y, para completar, en "Requiere revisión"). "Guardar y continuar" hace upsert de la respuesta y, si hay archivo, lo sube;
  * la validación con IA sigue en segundo plano y su resultado se ve al volver al control.
  *
  * Distribución (para no tener que bajar con la rueda a cada rato):
@@ -111,6 +111,8 @@ export function PasoControl({ c, control, onLimites }: Props) {
   const largo = normalizarJustificacion(justificacion).length;
   const tieneEvidencias = (detalle?.evidencias.length ?? 0) > 0;
   const faltaEvidenciaRevision = estado === "requiere_revision" && !archivo && !tieneEvidencias;
+  // Correcciones 05-11: "Cumplido" no se guarda sin un documento que lo respalde
+  const faltaEvidenciaCumplido = estado === "cumplido" && !archivo && !tieneEvidencias;
   const posicion = c.controles.findIndex((x) => x.id_control === control.id_control);
   const total = c.controles.length;
   const todosRespondidos = (c.progreso?.controles_pendientes ?? 1) === 0;
@@ -143,6 +145,11 @@ export function PasoControl({ c, control, onLimites }: Props) {
     setError(null);
     setGuardadoSinAvanzar(false);
     if (!estado || errJust) return;
+    if (faltaEvidenciaCumplido) {
+      setErrorArchivo("Adjunta un documento que respalde que esto se cumple, o elige otro estado.");
+      document.getElementById(ids.archivo)?.closest(`.${s.evidencia}`)?.scrollIntoView({ block: "nearest" });
+      return;
+    }
     setGuardando(true);
     try {
       const idRespuesta = await c.guardar(control, estado, justificacion);
@@ -359,7 +366,13 @@ export function PasoControl({ c, control, onLimites }: Props) {
               <div className={s.campoEtiqueta}>
                 <span>
                   Evidencia{" "}
-                  {opcion.evidenciaObligatoria ? <span className={s.requerido}>(necesaria para completar)</span> : <span className={s.opcional}>(opcional, mejora la precisión)</span>}
+                  {estado === "cumplido" ? (
+                    <span className={s.requerido}>(obligatoria)</span>
+                  ) : opcion.evidenciaObligatoria ? (
+                    <span className={s.requerido}>(necesaria para completar)</span>
+                  ) : (
+                    <span className={s.opcional}>(opcional, mejora la precisión)</span>
+                  )}
                 </span>
               </div>
               <div className={s.archivo}>

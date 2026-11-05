@@ -8,6 +8,7 @@
  * Esta pantalla es interna: aquí sí se muestran los códigos (DAT-001, ERR-GOB-003, F1),
  * porque son el identificador con que el admin trabaja la matriz. El cliente nunca los ve.
  */
+import { fechaChile, fechaHoraChile } from "@/lib/fechas";
 import { pedir } from "@/lib/encuesta/cliente";
 
 export type Entidad = "controles" | "brechas" | "rutas" | "preguntas_filtro";
@@ -329,8 +330,10 @@ export function controlesPorDimension(contenido: Contenido): { dominio: Dominio;
     .filter((g) => g.controles.length > 0);
 }
 
+/** Correcciones 05-11: fecha y hora de Chile (el backend entrega UTC sin zona). */
 export function fechaCorta(iso?: string | null): string {
-  return iso ? new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  if (!iso) return "—";
+  return iso.trim().length === 10 ? fechaChile(iso) : fechaHoraChile(iso);
 }
 
 export function huellaCorta(h?: string | null): string {

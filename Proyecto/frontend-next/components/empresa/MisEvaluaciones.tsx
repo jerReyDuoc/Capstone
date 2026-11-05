@@ -152,7 +152,8 @@ export function MisEvaluaciones() {
         </div>
       ) : null}
 
-      {r.completadas ? (
+      {/* Correcciones 05-11: con una sola evaluación completada no hay evolución que mostrar */}
+      {r.completadas >= 2 ? (
         <section className="card" aria-label="Evolución de la madurez">
           <EvolucionMadurez evolucion={datos.evolucion} />
         </section>

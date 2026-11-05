@@ -14,6 +14,7 @@ from app.api.routes import tutor  # HU-15: Agente IA Tutor del panel de formaci√
 from app.api.routes import borradores  # HU-16: borradores de cumplimiento adaptados por el Agente IA
 from app.api.routes import auditoria  # HU-09: log inmutable para el Auditor Externo
 from app.api.routes import admin_matriz  # HU-24: mantenedor de la matriz normativa con versionado
+from app.api.routes import admin_rubros  # correcciones 05-11: rubros desde el panel interno
 from app.api.routes import admin_revision  # HU-22: bandeja de revisi√≥n del Oficial de Cumplimiento
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
@@ -67,6 +68,7 @@ app.include_router(borradores.router)
 app.include_router(auditoria.router)
 app.include_router(auditoria.router_admin)
 app.include_router(admin_matriz.router)
+app.include_router(admin_rubros.router)
 app.include_router(admin_revision.router)
 
 @app.get("/health")

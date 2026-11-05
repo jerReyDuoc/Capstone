@@ -1,4 +1,3 @@
-import { Icon } from "@/components/ui/Icon";
 import { describirTira, enEscala } from "@/lib/sector";
 import s from "./sector.module.css";
 
@@ -40,13 +39,7 @@ export function TiraSector({
     <div>
       <div className={clases} role="img" aria-label={describirTira({ nombre, puntaje, promedio, p25, p75, meta, k })}>
         <span className={s.pista} aria-hidden="true" />
-        {oculta ? (
-          // El sello va del lado opuesto a tu punto para no taparlo
-          <span className={s.sello} aria-hidden="true" style={puntaje < 50 ? { left: "auto", right: 10 } : undefined}>
-            <Icon name="candado" />
-            Oculto: menos de {k} empresas
-          </span>
-        ) : null}
+        {/* Correcciones 05-11: sin sello "Oculto" en cada tira; el aviso de la página lo explica */}
         {!oculta && p25 != null && p75 != null ? (
           <span
             className={s.banda}

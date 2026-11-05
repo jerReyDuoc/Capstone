@@ -47,7 +47,9 @@
 .rubro input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; flex: none; }
 
 .verificacion { margin-top: var(--sp-6); display: grid; gap: var(--sp-2); }
-.verificacionEstado { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); }
+.verificacionEstado { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); }
+/* Correcciones 05-11 */
+.verificacionAyuda { flex-basis: 100%; font-size: var(--fs-xs); color: var(--text-subtle); }
 .verificacionEstado svg { width: 18px; height: 18px; color: var(--accent); }
 .widget { min-height: 0; }
 

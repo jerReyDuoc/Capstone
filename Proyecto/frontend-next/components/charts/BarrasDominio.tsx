@@ -5,7 +5,8 @@ import { formatoDiferencia, formatoDiferenciaMeta, formatoPuntaje, NIVELES } fro
 import type { DominioVista } from "@/lib/types";
 import { ChartFrame, posicionEnContenedor, Tooltip, type TooltipState } from "./ChartFrame";
 
-const W = 600;
+/** Ancho del viewBox por defecto (tarjetas de media columna). */
+const W_BASE = 600;
 const FILA = 64;
 const M = { top: 30, right: 56, bottom: 40, left: 168 };
 
@@ -18,8 +19,15 @@ export function BarrasDominio({
   dominios,
   onSeleccionar,
   notaIndustria,
+  ancho = false,
 }: {
   dominios: DominioVista[];
+  /**
+   * Correcciones 05-11: el gráfico ocupa todo el ancho de su tarjeta. Con el viewBox de 600 y
+   * el alto máximo de .chart-svg quedaba centrado con márgenes vacíos a los lados; en modo
+   * ancho el viewBox es más amplio (las barras se estiran, el texto conserva su tamaño).
+   */
+  ancho?: boolean;
   onSeleccionar?: (d: DominioVista) => void;
   /** Por qué no aparece el promedio del rubro (se muestra si no hay benchmark). */
   notaIndustria?: string;
@@ -27,6 +35,7 @@ export function BarrasDominio({
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<TooltipState>(null);
   const hayIndustria = dominios.some((d) => d.promedioIndustria != null);
+  const W = ancho ? 1100 : W_BASE;
 
   const H = M.top + M.bottom + FILA * dominios.length;
   const iw = W - M.left - M.right;
@@ -94,7 +103,7 @@ export function BarrasDominio({
     >
       <svg
         ref={svgRef}
-        className="chart-svg"
+        className={ancho ? "chart-svg chart-svg-ancho" : "chart-svg"}
         viewBox={`0 0 ${W} ${H}`}
         role="group"
         aria-label="Barras horizontales por dominio"

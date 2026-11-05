@@ -17,14 +17,18 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { RadarMadurez } from "@/components/charts/RadarMadurez";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { BadgeSeveridad } from "@/components/ui/Basicos";
+import { BadgeNivel, BadgeSeveridad } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
 import { esSinServicio, hrefModulo } from "@/lib/formacion";
 import { SEVERIDAD_TONO } from "@/lib/severidad";
-import { formatoPuntaje } from "@/lib/madurez";
+import { fechaCorta } from "@/lib/empresa";
+import { formatoPuntaje, nivelDesdePuntaje } from "@/lib/madurez";
 import {
   ACCEPT,
+  avancePorDimension,
+  etiquetaEstado,
+  recortar,
   cargarRemediacion,
   consultarEvidencia,
   deltaTexto,
@@ -38,7 +42,7 @@ import {
   TONO_ESTADO,
   validarArchivo,
 } from "@/lib/remediacion";
-import type { ControlRemediacionApi, EvidenciaRemediacionApi, RemediacionApi } from "@/lib/types";
+import type { ControlRemediacionApi, DominioVista, EvidenciaRemediacionApi, RemediacionApi } from "@/lib/types";
 
 type Estado =
   | { tipo: "cargando" }
@@ -176,13 +180,17 @@ export function VistaRemediacion() {
 
 /**
  * HU-17 C3 · Madurez en vivo: el radar y el puntaje general se redibujan apenas una evidencia
- * mejora un control (la vista recarga el panel al recibir el resultado), con lo que subió desde
- * la primera remediación y cada mejora en orden.
+ * mejora un control (la vista recarga el panel al recibir el resultado).
+ *
+ * Correcciones 05-11: además del puntaje, muestra en qué dimensiones subió la empresa (cuántos
+ * puntos aportó cada una y cuántas preguntas mejoraron), lo que queda abierto en cada una y
+ * las últimas mejoras con su pregunta y su cambio de estado.
  */
-function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: import("@/lib/types").DominioVista[] }) {
+function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: DominioVista[] }) {
   const inicial = datos.puntaje_inicial ?? datos.puntaje_general;
   const delta = deltaTexto(inicial, datos.puntaje_general);
   const subio = datos.puntaje_general > inicial;
+  const mejoradas = datos.controles_mejorados ?? 0;
   const [destello, setDestello] = useState(false);
   const previo = useRef(datos.puntaje_general);
   useEffect(() => {
@@ -194,33 +202,106 @@ function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: i
     }
   }, [datos.puntaje_general]);
 
+  const avance = useMemo(
+    () => avancePorDimension(dominios, datos.evolucion, datos.controles),
+    [dominios, datos.evolucion, datos.controles],
+  );
+  const conSubida = avance.filter((a) => a.aporte > 0);
+  const ultimas = [...(datos.evolucion ?? [])].reverse().slice(0, 4);
+  const nivel = nivelDesdePuntaje(datos.puntaje_general);
+
   return (
     <section className="remed-madurez" aria-labelledby="madurez-titulo">
       <div className="card remed-puntaje-card" data-destello={destello || undefined}>
-        <h2 className="card-title" id="madurez-titulo">Tu madurez ahora</h2>
+        <div className="remed-puntaje-cabeza">
+          <h2 className="card-title" id="madurez-titulo">Tu madurez ahora</h2>
+          <BadgeNivel nivel={nivel} />
+        </div>
         <p className="remed-cifra" aria-live="polite">
           <strong className="remed-puntaje">{formatoPuntaje(datos.puntaje_general)}</strong>
           <span className="remed-de"> / 100</span>
           {subio ? <span className="badge tone-ok remed-delta">{delta}</span> : null}
         </p>
-        <p className="card-sub">
-          {subio
-            ? `Subió desde ${formatoPuntaje(inicial)} con ${datos.controles_mejorados ?? 0} ${
-                (datos.controles_mejorados ?? 0) === 1 ? "brecha mejorada" : "brechas mejoradas"
-              } por evidencia, sin repetir el autodiagnóstico.`
-            : "Cada evidencia que la IA valide actualiza este puntaje y el radar al instante."}
+        <p className="remed-frase">
+          {subio ? (
+            <>
+              Partiste en <strong>{formatoPuntaje(inicial)}</strong>. {mejoradas}{" "}
+              {mejoradas === 1 ? "pregunta mejoró" : "preguntas mejoraron"} con evidencia
+              {conSubida.length ? (
+                <>
+                  , sobre todo en <strong>{conSubida.slice(0, 2).map((a) => a.dominio).join(" y ")}</strong>
+                </>
+              ) : null}
+              .
+            </>
+          ) : (
+            <>Aún no hay mejoras por evidencia. Cada evidencia que la IA valide sube este puntaje al instante.</>
+          )}
         </p>
-        {datos.evolucion?.length ? (
-          <ol className="remed-evolucion" aria-label="Mejoras del puntaje por evidencia">
-            {datos.evolucion.map((m, i) => (
-              <li key={i}>
-                <span className="remed-evolucion-paso">
-                  {formatoPuntaje(m.antes)} → <strong>{formatoPuntaje(m.despues)}</strong>
-                </span>
-                <span className="remed-evolucion-delta">{deltaTexto(m.antes, m.despues)}</span>
-              </li>
-            ))}
-          </ol>
+
+        {avance.length ? (
+          <div className="remed-dims">
+            <h3 className="remed-subtitulo">Por dimensión</h3>
+            <ul>
+              {avance.map((a) => (
+                <li key={a.dominio} className="remed-dim">
+                  <div className="remed-dim-cabeza">
+                    <span className="remed-dim-nombre">{a.dominio}</span>
+                    <span className="remed-dim-cifra">{formatoPuntaje(a.puntaje)}</span>
+                  </div>
+                  <div
+                    className="remed-dim-barra"
+                    role="meter"
+                    aria-label={`${a.dominio}: ${formatoPuntaje(a.puntaje)} de 100`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(a.puntaje)}
+                  >
+                    <span className="fill" style={{ width: `${Math.max(0, Math.min(100, a.puntaje))}%` }} />
+                    <span className="meta" style={{ left: `${a.meta}%` }} title={`Meta ${formatoPuntaje(a.meta)}`} />
+                  </div>
+                  <p className="remed-dim-detalle">
+                    {a.aporte > 0 ? (
+                      <span className="remed-dim-sube">
+                        <Icon name="subir" />
+                        {deltaTexto(0, a.aporte)} al total · {a.mejoradas} {a.mejoradas === 1 ? "pregunta mejorada" : "preguntas mejoradas"}
+                      </span>
+                    ) : (
+                      <span>Sin mejoras todavía</span>
+                    )}
+                    <span>
+                      {a.abiertas === 0 ? "Sin brechas abiertas" : `${a.abiertas} ${a.abiertas === 1 ? "brecha abierta" : "brechas abiertas"}`}
+                    </span>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {ultimas.length ? (
+          <div className="remed-ultimas">
+            <h3 className="remed-subtitulo">Últimas mejoras</h3>
+            <ol aria-label="Últimas mejoras del puntaje por evidencia">
+              {ultimas.map((m, i) => {
+                const de = etiquetaEstado(m.estado_previo);
+                const a = etiquetaEstado(m.estado_resultante);
+                return (
+                  <li key={`${m.fecha}-${i}`}>
+                    <span className="remed-ultima-texto">
+                      <strong>{m.pregunta ? recortar(m.pregunta, 80) : "Pregunta de la evaluación"}</strong>
+                      <span>
+                        {[m.dominio, de && a ? `${de} → ${a}` : null, m.fecha ? fechaCorta(m.fecha) : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <span className="remed-evolucion-delta">{deltaTexto(m.antes, m.despues)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         ) : null}
       </div>
       <div className="card remed-radar">

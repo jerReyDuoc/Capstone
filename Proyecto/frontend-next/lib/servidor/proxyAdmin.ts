@@ -46,6 +46,10 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "PATCH", patron: /^respuestas\/\d{1,9}\/revision$/ },
   { metodo: "PATCH", patron: /^seguridad\/eventos\/\d{1,9}\/revision$/ },
   { metodo: "GET", patron: /^dominios$/ },
+  // Correcciones 05-11: rubros desde la matriz normativa
+  { metodo: "GET", patron: /^admin\/rubros$/ },
+  { metodo: "POST", patron: /^admin\/rubros$/ },
+  { metodo: "PATCH", patron: /^admin\/rubros\/\d{1,9}$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

@@ -523,13 +523,24 @@ export interface ControlRemediacionApi {
   historial?: EvidenciaRemediacionApi[];
 }
 
+/** Una evidencia que subió el puntaje (correcciones 05-11: con su dimensión y pregunta). */
+export interface MejoraRemediacionApi {
+  fecha: string | null;
+  antes: number;
+  despues: number;
+  dominio?: string | null;
+  pregunta?: string | null;
+  estado_previo?: string | null;
+  estado_resultante?: string | null;
+}
+
 /** GET /api/remediacion/evaluaciones/{id} */
 export interface RemediacionApi {
   evaluacion_id: number;
   puntaje_general: number;
   /** Puntaje antes de la primera remediación que lo mejoró (o el actual si no hay ninguna). */
   puntaje_inicial?: number;
-  evolucion?: { fecha: string | null; antes: number; despues: number }[];
+  evolucion?: MejoraRemediacionApi[];
   controles_mejorados?: number;
   dominios: { dominio: string; puntaje: number | null }[];
   controles: ControlRemediacionApi[];
@@ -616,6 +627,8 @@ export interface BrechaCitadaApi {
   estado: string;
   ruta_id: number | null;
   respuesta_id: number;
+  /** Correcciones 05-11: descripción del catálogo (los mensajes guardados antes no la traen). */
+  descripcion?: string | null;
 }
 
 export interface MensajeTutorApi {

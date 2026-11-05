@@ -23,7 +23,8 @@ import type { PanelVista } from "@/lib/types";
  *
  * 1. Puntaje general frente al sector (criterio 1).
  * 2. Advertencia si la cohorte tiene menos de k empresas (criterio 3); las métricas ya
- *    vienen suprimidas desde el backend (criterio 2) y aquí se dibujan como "ocultas".
+ *    vienen suprimidas desde el backend (criterio 2). Correcciones 05-11: un solo aviso
+ *    breve; las tiras y cifras sin promedio quedan en blanco (—) sin repetir la explicación.
  * 3. Cada dimensión en su tira, ordenadas de mayor a menor distancia bajo el sector.
  * 4. Cómo protegemos a las empresas del sector (las reglas, en lenguaje simple).
  */
@@ -34,7 +35,7 @@ export function VistaSector() {
       <PageHeader
         eyebrow="Comparativa sectorial"
         titulo="Tu sector"
-        subtitulo="Compara la madurez de tu empresa con la de otras empresas de tu rubro. Si el grupo es pequeño, ocultamos sus datos para que nadie pueda deducir el resultado de una empresa en particular."
+        subtitulo="Compara la madurez de tu empresa con la de otras de tu rubro. Los promedios aparecen solo cuando hay suficientes empresas, así ningún resultado individual queda expuesto."
       />
       <EstadoPanel>
         {(p) => (
@@ -75,24 +76,17 @@ function ResumenSector({ panel: p }: { panel: PanelVista }) {
             ) : p.sinRubro ? (
               <>Tu puntaje general es {formatoPuntaje(tu)}. Sin un sector asociado, lo comparamos solo con la meta.</>
             ) : (
-              <>
-                Tu puntaje general es {formatoPuntaje(tu)}. El promedio de tu sector se mostrará cuando haya al menos {k}{" "}
-                empresas evaluadas.
-              </>
+              // Correcciones 05-11: el aviso de arriba ya explica por qué aún no hay promedio
+              <>Tu puntaje general es {formatoPuntaje(tu)}.</>
             )}
           </p>
         </div>
-        {p.sinRubro ? null : visible ? (
+        {!p.sinRubro && visible ? (
           <span className={`${s.cohorte} ${s.cohorteOk}`}>
             <Icon name="escudo" />
             {sec?.empresas} empresas en la comparación
           </span>
-        ) : (
-          <span className={`${s.cohorte} ${s.cohorteOculta}`}>
-            <Icon name="candado" />
-            Grupo de menos de {k} empresas
-          </span>
-        )}
+        ) : null}
       </div>
 
       <TiraSector
@@ -106,7 +100,7 @@ function ResumenSector({ panel: p }: { panel: PanelVista }) {
         grande
         conEscala
       />
-      <LeyendaSector conSector={visible} conBanda={visible && sec!.p25 != null} conMeta conOculta={!visible && !p.sinRubro} />
+      <LeyendaSector conSector={visible} conBanda={visible && sec!.p25 != null} conMeta conOculta={false} />
 
       <dl className={s.cifras}>
         <div>
@@ -118,7 +112,7 @@ function ResumenSector({ panel: p }: { panel: PanelVista }) {
         </div>
         <div>
           <dt>Promedio del sector</dt>
-          <dd className={visible ? undefined : s.vacio}>{visible ? sec!.promedio : "Oculto"}</dd>
+          <dd className={visible ? undefined : s.vacio}>{visible ? sec!.promedio : "—"}</dd>
         </div>
         <div>
           <dt>Diferencia</dt>
@@ -139,7 +133,6 @@ function PorDimension({ panel: p, hrefDominios }: { panel: PanelVista; hrefDomin
   const k = p.sector?.kMinimo ?? p.muestrasMinimas;
   const dominios = ordenarParaComparar(p.dominios);
   const conBanda = dominios.some((d) => d.p25Industria != null);
-  const conOculta = dominios.some((d) => !d.cohorteSuficiente);
   const conSector = dominios.some((d) => d.cohorteSuficiente);
 
   return (
@@ -156,7 +149,7 @@ function PorDimension({ panel: p, hrefDominios }: { panel: PanelVista; hrefDomin
           <Icon name="flecha" />
         </Link>
       </div>
-      <LeyendaSector conSector={conSector} conBanda={conBanda} conMeta conOculta={conOculta} />
+      <LeyendaSector conSector={conSector} conBanda={conBanda} conMeta conOculta={false} />
 
       <ul className={s.filas}>
         {dominios.map((d) => {
@@ -184,7 +177,7 @@ function PorDimension({ panel: p, hrefDominios }: { panel: PanelVista; hrefDomin
                 <div>
                   <dt>Sector</dt>
                   <dd className={d.promedioIndustria == null ? s.vacio : undefined}>
-                    {d.promedioIndustria ?? "Oculto"}
+                    {d.promedioIndustria ?? "—"}
                   </dd>
                 </div>
                 <div>

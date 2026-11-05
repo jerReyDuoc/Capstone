@@ -47,12 +47,20 @@ async def verificar_captcha(token: str, ip: str | None, accion: str = ACCION_INI
     }
     if ip and ip != "desconocida":
         datos["remoteip"] = ip
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as cliente:
-            r = await cliente.post(settings.TURNSTILE_VERIFY_URL, data=datos)
-            cuerpo = r.json()
-    except (httpx.HTTPError, ValueError) as e:
-        logger.error("Turnstile no respondió (%s)", type(e).__name__)
+    # Correcciones 05-11: un corte de red puntual con Cloudflare hacía fallar la verificación
+    # de personas reales (y había que recargar la página). Se reintenta una vez con la MISMA
+    # idempotency_key, que Cloudflare no cuenta como reutilización del token.
+    cuerpo = None
+    for intento in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as cliente:
+                r = await cliente.post(settings.TURNSTILE_VERIFY_URL, data=datos)
+                cuerpo = r.json()
+            break
+        except (httpx.HTTPError, ValueError) as e:
+            logger.warning("Turnstile no respondió (%s, intento %s)", type(e).__name__, intento + 1)
+    if cuerpo is None:
+        logger.error("Turnstile no respondió tras reintentar")
         return ResultadoCaptcha(False, "verificador_no_disponible")
 
     if not cuerpo.get("success"):

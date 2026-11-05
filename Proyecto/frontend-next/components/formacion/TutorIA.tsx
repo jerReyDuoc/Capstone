@@ -4,7 +4,7 @@
  * HU-15 · Agente IA Tutor en el panel de formación (solo el usuario definitivo).
  *
  *   ┌ Tutor IA ───────────────────────── [historial] [nueva] [×] ┐
- *   │ Basado en tus 12 brechas · Evaluación N.º 34                │
+ *   │ Tus 12 brechas de la evaluación del 28 de octubre de 2026    │
  *   │ Nivel  (Inicial) (Intermedio) (Avanzado)                    │
  *   ├─────────────────────────────────────────────────────────────┤
  *   │ conversación (role=log): explicaciones, planes de acción    │
@@ -30,10 +30,13 @@ import {
   cuotaTexto,
   horaCorta,
   MAX_CARACTERES_TUTOR,
+  esCharla,
+  nombreBrecha,
   NIVEL_TUTOR_INFO,
   NIVELES_TUTOR,
   parrafos,
   preguntaPaso,
+  subtituloTutor,
   sugerenciasIniciales,
   TIPO_RESPUESTA,
   validarMensaje,
@@ -126,7 +129,7 @@ function PanelTutor({ rutaId, onCerrar }: { rutaId: number | null; onCerrar: () 
             </h2>
             <p className={s.subtitulo}>
               {ctx
-                ? `Basado en ${ctx.brechas_total === 1 ? "tu brecha" : `tus ${ctx.brechas_total} brechas`} de la evaluación N.º ${ctx.evaluacion_id}${ctx.fecha_evaluacion ? ` (${fechaLarga(ctx.fecha_evaluacion)})` : ""}`
+                ? subtituloTutor(ctx.brechas_total, ctx.fecha_evaluacion ? fechaLarga(ctx.fecha_evaluacion) : null)
                 : "Cargando tus brechas…"}
             </p>
           </div>
@@ -177,11 +180,20 @@ function PanelTutor({ rutaId, onCerrar }: { rutaId: number | null; onCerrar: () 
                   disabled={soloLectura || estado.enviando}
                 >
                   {n}
-                  {ctx?.nivel_sugerido === n ? <span className={s.sugerido}> · sugerido</span> : null}
+                  {/* Correcciones 05-11: un punto en vez de "· sugerido", que no cabía y se cortaba */}
+                  {ctx?.nivel_sugerido === n ? (
+                    <>
+                      <span className={s.sugerido} aria-hidden="true" title="Sugerido para tu empresa" />
+                      <span className="sr-only"> (sugerido para tu empresa)</span>
+                    </>
+                  ) : null}
                 </button>
               ))}
             </div>
-            <p className={s.nivelInfo}>{NIVEL_TUTOR_INFO[estado.nivel]}</p>
+            <p className={s.nivelInfo}>
+              {NIVEL_TUTOR_INFO[estado.nivel]}
+              {ctx?.nivel_sugerido === estado.nivel ? " Es el nivel sugerido para tu empresa." : ""}
+            </p>
           </div>
         ) : null}
 
@@ -420,7 +432,8 @@ function Mensaje({
   return (
     <article className={`${s.mensaje} ${s.tutor}`} data-tipo={m.tipo} aria-label={`Respuesta del tutor: ${tipo.etiqueta}`}>
       <p className={s.meta}>
-        <span className={`badge tone-${tipo.tono}`}>{tipo.etiqueta}</span>
+        {/* Correcciones 05-11: un saludo o un "gracias" no lleva etiqueta de tipo */}
+        {esCharla(m) ? null : <span className={`badge tone-${tipo.tono}`}>{tipo.etiqueta}</span>}
         {m.nivel ? <span className={s.metaNivel}>Nivel {m.nivel}</span> : null}
         {m.fecha ? <span className={s.hora}>{horaCorta(m.fecha)}</span> : null}
       </p>
@@ -465,15 +478,16 @@ function Mensaje({
           <ul>
             {m.brechas.map((b) => (
               <li key={b.ref} className={s.citada}>
+                {/* Correcciones 05-11: la brecha se nombra por su descripción, no por su código */}
                 <Link href={hrefBrecha(b.codigo)} className={s.citadaCodigo}>
-                  <span className="code">{b.ref}</span>
+                  {b.descripcion ? nombreBrecha(b.descripcion) : `Brecha de ${b.dominio}`}
                   <span className="sr-only">: ver en el listado de brechas</span>
                 </Link>
                 <BadgeSeveridad severidad={b.severidad} />
                 <span className={s.citadaDominio}>{b.dominio}</span>
                 <span className={s.citadaLinks}>
                   {b.ruta_id ? <Link href={hrefRuta(b.ruta_id)}>Módulo</Link> : null}
-                  <Link href={hrefEvidencia(b.respuesta_id)}>Subir evidencia<span className="sr-only"> para {b.ref}</span></Link>
+                  <Link href={hrefEvidencia(b.respuesta_id)}>Subir evidencia<span className="sr-only"> para {b.descripcion ? nombreBrecha(b.descripcion, 60) : b.dominio}</span></Link>
                 </span>
               </li>
             ))}

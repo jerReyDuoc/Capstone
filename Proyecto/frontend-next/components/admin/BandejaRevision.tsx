@@ -11,10 +11,8 @@
  *     y debajo el formulario para confirmar o corregir con comentario.
  * Al resolver, se abre solo el siguiente pendiente. Cada decisión queda en el audit log (backend).
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { BrandMark, Icon } from "@/components/ui/Icon";
 import { comoErrorAdmin, type ErrorAdmin } from "@/lib/admin/api";
 import {
   apiRevision,
@@ -50,9 +48,8 @@ import {
   type Resolutiva,
   type ResumenReferencia,
 } from "@/lib/admin/revision";
-import { pedir } from "@/lib/encuesta/cliente";
+import { BarraAdmin } from "./BarraAdmin";
 import a from "./admin.module.css";
-import m from "./matriz.module.css";
 import s from "./revision.module.css";
 
 type Seleccion = { tipo: "respuesta" | "evento"; id: number } | null;
@@ -118,6 +115,12 @@ export function BandejaRevision() {
     apiRevision.dominios().then(setDominios).catch(() => setDominios([]));
   }, [cargarResumen]);
 
+  // Correcciones 05-11: botón "Actualizar" de la barra (y al volver a la pestaña del navegador)
+  const actualizarTodo = useCallback(async () => {
+    setError(null);
+    await Promise.all([cargar(filtros), cargarResumen()]);
+  }, [cargar, cargarResumen, filtros]);
+
   function cambiar(parcial: Partial<FiltrosBandeja>) {
     setSeleccion(null);
     setFiltros((f) => ({ ...f, page: 1, ...parcial }));
@@ -134,30 +137,11 @@ export function BandejaRevision() {
     setSeleccion(sigue && seleccion ? { tipo: seleccion.tipo, id: siguiente.id } : null);
   }
 
-  async function salir() {
-    await pedir("/bff/admin/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/admin/login?motivo=salida");
-  }
-
   const pend = bandeja?.pendientes;
 
   return (
     <div className={`${a.pagina} ${s.raiz}`}>
-      <header className={a.barra}>
-        <div className={a.marca}>
-          <BrandMark aria-hidden="true" />
-          <span>
-            ComplianceAI
-            <span className={a.marcaSub}>Panel interno · Therion Labs</span>
-          </span>
-        </div>
-        <nav className={m.nav} aria-label="Secciones del panel interno">
-          <Link className={m.navLink} href="/admin/clientes">Empresas cliente</Link>
-          <Link className={m.navLink} href="/admin/matriz">Matriz normativa</Link>
-          <Link className={m.navLink} href="/admin/revision" aria-current="page">Bandeja de revisión</Link>
-        </nav>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>Cerrar sesión</button>
-      </header>
+      <BarraAdmin onActualizar={actualizarTodo} alVolver />
 
       <main id="contenido" className={a.contenido}>
         <div>

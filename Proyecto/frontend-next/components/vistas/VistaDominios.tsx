@@ -37,7 +37,7 @@ export function VistaDominios() {
             {/* HU-10: si el sector está oculto (k < 5), se advierte junto al gráfico */}
             <AvisoCohorte panel={p} compacto hrefSector={href("/panel/sector")} />
             <div className="card">
-              <BarrasDominio dominios={p.dominios} notaIndustria={notaIndustria(p) ?? undefined} />
+              <BarrasDominio dominios={p.dominios} notaIndustria={notaIndustria(p) ?? undefined} ancho />
             </div>
 
             <div className="grid">

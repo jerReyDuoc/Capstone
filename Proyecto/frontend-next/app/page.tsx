@@ -5,8 +5,9 @@
  * carga el CAPTCHA. El flujo interactivo vive en /comenzar, que se carga solo al hacer
  * clic (prefetch desactivado para no bajar su JavaScript en segundo plano).
  *
- * Correcciones 29-10: el héroe es centrado y muestra un ejemplo del resultado
- * (components/publico/HeroePortada.tsx) en lugar del mapa topográfico, que no se entendía.
+ * Correcciones 29-10: el héroe es centrado (components/publico/HeroePortada.tsx) en lugar del
+ * mapa topográfico, que no se entendía. Correcciones 05-11: sin imagen de ejemplo; las ondas
+ * del fondo se mueven como oleaje.
  */
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
@@ -38,10 +39,11 @@ const DOMINIOS: { nombre: string; icono: IconName; texto: string }[] = [
 function CTAs() {
   return (
     <div className={s.acciones}>
-      <Link href="/comenzar" prefetch={false} className={`btn btn-primary ${s.btnGrande}`}>
+      {/* Correcciones 05-11: carga completa (no <Link>), ver HeroePortada.tsx */}
+      <a href="/comenzar" className={`btn btn-primary ${s.btnGrande}`}>
         Comenzar autodiagnóstico
         <Icon name="flecha" />
-      </Link>
+      </a>
       <Link href="/retomar" prefetch={false} className={`btn btn-ghost ${s.btnGrande}`}>
         Ya empecé: retomar
       </Link>

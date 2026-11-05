@@ -11,6 +11,22 @@
 .marcaSub { display: block; font-family: var(--font-body); font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
 .contenido { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-8) var(--sp-6) var(--sp-12); display: grid; gap: var(--sp-6); }
 
+/* Correcciones 05-11 · barra común (BarraAdmin.tsx): secciones, Actualizar y Cerrar sesión */
+.nav { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.navLink {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--sp-3);
+  border-radius: var(--radius-sm); color: var(--text-muted); font-weight: 600; font-size: var(--fs-sm); text-decoration: none;
+}
+.navLink:hover { color: var(--text); background: var(--surface-2); }
+.navLink[aria-current="page"] { color: var(--text); background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.navLink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.barraAcciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.actualizado { font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; min-width: 9ch; text-align: right; }
+.girando { animation: girar 900ms linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .girando { animation: none; } }
+@media (max-width: 900px) { .barra .nav { order: 3; width: 100%; } }
+
 .pestanas { display: flex; flex-wrap: wrap; gap: var(--sp-2); border-bottom: 1px solid var(--line); }
 .pestana {
   min-height: var(--target); padding: 0 var(--sp-4); border: 0; border-bottom: 2px solid transparent;

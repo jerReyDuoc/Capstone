@@ -98,6 +98,9 @@ def validar_justificacion(estado_clasificacion: str, justificacion: str | None) 
     obligatoria: al menos JUSTIFICACION_MIN_CARACTERES caracteres (sin contar espacios
     repetidos ni de los extremos) y con texto, no solo signos o números.
     """
+    # Correcciones 05-11: por defecto la justificación es opcional en todos los estados
+    if not settings.JUSTIFICACION_OBLIGATORIA:
+        return
     if not EstadoClasificacion.requiere_justificacion(estado_clasificacion):
         return
     minimo = settings.JUSTIFICACION_MIN_CARACTERES

@@ -12,6 +12,7 @@
  *
  * Correcciones 29-10: ya no se muestra cuántos controles aplican ni qué activa cada respuesta
  * (es metodología interna): el usuario solo responde sí o no.
+ * Correcciones 05-11: la respuesta queda marcada y se avanza con el botón "Seguir".
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
@@ -54,17 +55,19 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
   const enResumen = paso >= total;
   const pregunta = enResumen ? null : preguntas[paso];
 
+  // Correcciones 05-11: marcar una respuesta ya no salta sola a la siguiente; queda marcada
+  // y la persona avanza con "Seguir" (o Enter). Así puede corregir antes de continuar.
   function responder(codigo: string, valor: boolean) {
     if (!filtro) return;
-    const nuevas = { ...resp, [codigo]: valor };
-    setRespuestasFiltro(nuevas);
+    setRespuestasFiltro({ ...resp, [codigo]: valor });
     setError(null);
-    // Pequeña pausa para que se vea la selección antes de pasar a la siguiente
-    window.setTimeout(() => {
-      const visibles = preguntasVisibles(filtro.preguntas, nuevas);
-      const actual = visibles.findIndex((p) => p.codigo === codigo);
-      setPaso(actual + 1);
-    }, 180);
+  }
+
+  function seguir() {
+    if (!filtro || !pregunta || resp[pregunta.codigo] === undefined) return;
+    const visibles = preguntasVisibles(filtro.preguntas, resp);
+    const actual = visibles.findIndex((p) => p.codigo === pregunta.codigo);
+    setPaso(actual + 1);
   }
 
   // Atajos S / N (fuera de un campo de texto). Se lee la pregunta vigente desde una ref.
@@ -72,6 +75,8 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
   preguntaVigente.current = pregunta?.codigo ?? null;
   const responderVigente = useRef(responder);
   responderVigente.current = responder;
+  const seguirVigente = useRef(seguir);
+  seguirVigente.current = seguir;
   useEffect(() => {
     function alTeclear(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey || !preguntaVigente.current) return;
@@ -79,6 +84,11 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
       if (destino?.tagName === "TEXTAREA" || destino?.isContentEditable ||
           (destino?.tagName === "INPUT" && (destino as HTMLInputElement).type !== "radio")) return;
       const tecla = e.key.toLowerCase();
+      if (tecla === "enter" && destino?.tagName !== "BUTTON" && destino?.tagName !== "A") {
+        e.preventDefault();
+        seguirVigente.current();
+        return;
+      }
       if (tecla === "s" || tecla === "n") {
         e.preventDefault();
         responderVigente.current(preguntaVigente.current, tecla === "s");
@@ -158,15 +168,18 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
                   <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
                   Anterior
                 </button>
-                {resp[pregunta.codigo] !== undefined ? (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p + 1)}>
-                    Siguiente
-                    <Icon name="flecha" />
-                  </button>
-                ) : null}
                 <span className={s.atajos} aria-hidden="true">
-                  Atajos: <kbd>S</kbd> sí, <kbd>N</kbd> no.
+                  Atajos: <kbd>S</kbd> sí, <kbd>N</kbd> no, <kbd>Enter</kbd> seguir.
                 </span>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={seguir}
+                  disabled={resp[pregunta.codigo] === undefined}
+                >
+                  Seguir
+                  <Icon name="flecha" />
+                </button>
               </div>
             </>
           ) : (

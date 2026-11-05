@@ -82,14 +82,22 @@ function cspFlujo(nonce: string): string {
   ].join("; ");
 }
 
+/**
+ * Correcciones 05-11: la base también admite Turnstile (script y frame de
+ * challenges.cloudflare.com). La CSP es del DOCUMENTO: al pasar de la portada o del panel a
+ * /comenzar o /panel/contratar con un <Link> (navegación del lado del cliente) seguía rigiendo
+ * esta política, que bloqueaba el script de Cloudflare; la verificación fallaba y solo
+ * funcionaba tras recargar (F5), que trae la CSP del flujo.
+ */
 function cspBase(): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${DEV ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline' ${TURNSTILE}${DEV ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
     `connect-src 'self'${DEV ? " ws:" : ""}`,
+    `frame-src ${TURNSTILE}`,
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

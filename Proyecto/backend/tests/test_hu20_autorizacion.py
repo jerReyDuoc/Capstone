@@ -575,6 +575,15 @@ RUTAS_HU24 = [
 ]
 
 
+# Correcciones 05-11: rubros desde el panel interno, solo admin. Sus pruebas de 401, 403 y 2xx
+# están en tests/test_admin_rubros.py.
+RUTAS_RUBROS = [
+    ("GET", "/api/admin/rubros"),
+    ("POST", "/api/admin/rubros"),
+    ("PATCH", "/api/admin/rubros/{rubro_id}"),
+]
+
+
 # ===================================================================== C3: cobertura de la matriz
 def test_todas_las_rutas_estan_clasificadas():
     """
@@ -594,6 +603,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | set(RUTAS_ADMIN_HU27)
         | set(RUTAS_HU09)
         | set(RUTAS_HU24)
+        | set(RUTAS_RUBROS)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"

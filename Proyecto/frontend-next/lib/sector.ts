@@ -68,11 +68,11 @@ export function textoAviso(codigo: CodigoAdvertenciaSector, k: number, s: Sector
   switch (codigo) {
     case "COHORTE_INSUFICIENTE":
       return {
-        titulo: "Comparación sectorial oculta para proteger a las empresas",
+        // Correcciones 05-11: texto breve; la razón de fondo queda en "Cómo protegemos…"
+        titulo: "Aún no hay suficientes empresas de tu sector",
         cuerpo:
-          `Tu sector tiene menos de ${k} empresas evaluadas. Con un grupo tan pequeño, el promedio permitiría ` +
-          `deducir el resultado de una empresa en particular, así que lo ocultamos. Aparecerá solo cuando ` +
-          `${k} o más empresas de tu sector hayan completado la evaluación; mientras tanto, compárate con la meta.`,
+          `Tu sector tiene menos de ${k} empresas evaluadas. El promedio aparecerá cuando sean ${k} o más; ` +
+          `mientras tanto, compárate con la meta.`,
         tono: "aviso",
       };
     case "COHORTE_PARCIAL": {
@@ -81,8 +81,8 @@ export function textoAviso(codigo: CodigoAdvertenciaSector, k: number, s: Sector
       return {
         titulo: n === 1 ? "Una dimensión sin comparación sectorial" : `${n} dimensiones sin comparación sectorial`,
         cuerpo:
-          `En ${n === 1 ? "1 dimensión" : `${n} dimensiones`} de ${total} hay menos de ${k} empresas con puntaje. ` +
-          `Ocultamos esas comparaciones para que nadie pueda deducir resultados individuales.`,
+          `En ${n === 1 ? "1 dimensión" : `${n} dimensiones`} de ${total} hay menos de ${k} empresas con puntaje, ` +
+          `así que aún no se comparan.`,
         tono: "aviso",
       };
     }

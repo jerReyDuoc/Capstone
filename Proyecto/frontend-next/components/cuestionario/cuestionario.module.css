@@ -273,6 +273,8 @@
 .filtroAcciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 .filtroAcciones .atajos { margin: 0 0 0 auto; }
 .filtroAcciones :global(.btn-primary) { margin-left: auto; }
+/* Correcciones 05-11: los atajos quedan junto a "Seguir" */
+.filtroAcciones .atajos + :global(.btn-primary) { margin-left: 0; }
 
 /* "Tus respuestas": lo ya respondido (correcciones 29-10: sin el contador de controles) */
 .filtroResumenTitulo { margin: 0; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-subtle); }

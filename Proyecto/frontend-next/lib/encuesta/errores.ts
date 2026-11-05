@@ -147,6 +147,12 @@ const TEXTOS: Record<string, Omit<MensajeError, "esperaS">> = {
     detalle: "Adjunta una evidencia en esas preguntas o elige otro estado para poder completar.",
     accion: "ninguna",
   },
+  // Correcciones 05-11
+  CUMPLIDO_SIN_EVIDENCIA: {
+    titulo: "Hay preguntas en 'Cumplido' sin evidencia",
+    detalle: "Adjunta un documento que respalde esas preguntas o elige otro estado para poder completar.",
+    accion: "ninguna",
+  },
   ANONIMIZACION_NO_DISPONIBLE: {
     titulo: "Servicio de privacidad no disponible",
     detalle: "Por seguridad no guardamos datos sin anonimizarlos. Intenta de nuevo en unos minutos.",

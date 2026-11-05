@@ -171,22 +171,26 @@ export interface OpcionEstado {
   evidenciaObligatoria: boolean;
 }
 
+// Correcciones 05-11: la justificación es opcional en todos los estados (el backend lo
+// controla con JUSTIFICACION_OBLIGATORIA=false) y "cumplido" exige evidencia
+// (EVIDENCIA_OBLIGATORIA_CUMPLIDO=true).
 export const ESTADOS: OpcionEstado[] = [
   {
     valor: "cumplido",
     etiqueta: "Cumplido",
-    ayuda: "Está implementado y se puede demostrar.",
+    ayuda: "Está implementado y se puede demostrar con un documento.",
     tono: "ok",
     justificacionObligatoria: false,
     admiteEvidencia: true,
-    evidenciaObligatoria: false,
+    // Correcciones 05-11: "cumplido" se respalda siempre con evidencia
+    evidenciaObligatoria: true,
   },
   {
     valor: "parcialmente_cumplido",
     etiqueta: "Parcialmente cumplido",
     ayuda: "Hay avances, pero falta formalizarlo o cubrir todos los casos.",
     tono: "medio",
-    justificacionObligatoria: true,
+    justificacionObligatoria: false,
     admiteEvidencia: true,
     evidenciaObligatoria: false,
   },
@@ -204,7 +208,7 @@ export const ESTADOS: OpcionEstado[] = [
     etiqueta: "Requiere revisión",
     ayuda: "¿No estás seguro? Adjunta una evidencia y la IA decidirá si se cumple, se cumple en parte o no.",
     tono: "info",
-    justificacionObligatoria: true,
+    justificacionObligatoria: false,
     admiteEvidencia: true,
     evidenciaObligatoria: true,
   },
@@ -304,7 +308,7 @@ export function errorArchivoEvidencia(archivo: { name: string; size: number }): 
 /* ------------------------------------------------------------------ revisión antes de completar */
 
 export interface Bloqueo {
-  tipo: "pendiente" | "revision-sin-evidencia" | "evidencia-en-curso";
+  tipo: "pendiente" | "revision-sin-evidencia" | "cumplido-sin-evidencia" | "evidencia-en-curso";
   idControl: number;
   codigo: string;
 }
@@ -325,6 +329,9 @@ export function bloqueosParaCompletar(
     }
     if (r.estado_clasificacion === "requiere_revision" && ev.length === 0) {
       bloqueos.push({ tipo: "revision-sin-evidencia", idControl: r.id_control, codigo: r.codigo_control });
+    }
+    if (r.estado_clasificacion === "cumplido" && ev.length === 0) {
+      bloqueos.push({ tipo: "cumplido-sin-evidencia", idControl: r.id_control, codigo: r.codigo_control });
     }
   }
   return bloqueos;
