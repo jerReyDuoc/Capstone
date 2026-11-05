@@ -46,6 +46,12 @@ class EstadoClasificacion(str, Enum):
         menos 'requiere_revision' (revisar es justamente resolverlo)."""
         return [v for v in cls.declarables() if v != cls.REQUIERE_REVISION.value]
 
+class DecisionRevision(str, Enum):
+    """HU-22: qué hizo el Oficial de Cumplimiento con la clasificación vigente."""
+    CONFIRMADA = "confirmada"   # la deja igual (valida lo que decidió el LLM, el usuario o la seguridad)
+    CORREGIDA = "corregida"     # la cambia
+
+
 class FuenteClasificacion(str, Enum):
     USUARIO = "usuario"
     LLM = "llm"
@@ -110,6 +116,13 @@ class Respuesta(Base):
     )
     fecha_revision: Mapped[date | None] = mapped_column(
         "fecha_revision", Date, nullable=True
+    )
+    # HU-22: la revisión queda con su comentario (anonimizado, HU-06), si CONFIRMÓ o CORRIGIÓ la
+    # clasificación vigente y quién la hizo. El historial completo está en el audit_log (HU-09).
+    comentario_revision: Mapped[str | None] = mapped_column("comentario_revision", Text, nullable=True)
+    decision_revision: Mapped[str | None] = mapped_column("decision_revision", String(10), nullable=True)
+    revisor_admin_id: Mapped[int | None] = mapped_column(
+        "revisor_admin_id", Integer, ForeignKey("usuarios_admin.id_admin"), nullable=True
     )
 
     def sincronizar_brecha(self, control) -> None:

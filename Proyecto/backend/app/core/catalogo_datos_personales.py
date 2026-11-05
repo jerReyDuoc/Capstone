@@ -211,7 +211,10 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         **_sin_dp("id_respuesta", "estado_clasificacion", "Matriz_controles_id_control",
                   "Catalogo_brechas_id_brecha", "Evaluacion_id", "estado_clasificacion_final",
                   "fuente_clasificacion", "confianza_clasificacion", "fecha_validacion",
-                  "clasificacion_revisada", "fecha_revision"),
+                  "clasificacion_revisada", "fecha_revision",
+                  "decision_revision", "revisor_admin_id"),  # HU-22
+        # HU-22: lo escribe el Oficial de Cumplimiento; se anonimiza igual por si cita a alguien
+        "comentario_revision": Dato(SIN_DP, ANONIMIZADO, escaneo="pii"),
         "justificacion_usuario": Dato(
             TEXTO_LIBRE, ANONIMIZADO,
             finalidad="Sustentar la clasificación del control (HU-02); la PII se reemplaza por etiquetas",
@@ -284,7 +287,9 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     },
     "eventos_seguridad": {
         **_sin_dp("id_evento", "fecha", "tipo", "origen", "Evaluacion_id", "Matriz_controles_id_control",
-                  "Respuestas_id_respuesta", "Evidencias_id_evidencia", "revisado"),
+                  "Respuestas_id_respuesta", "Evidencias_id_evidencia", "revisado",
+                  "resolucion", "fecha_revision", "revisor_admin_id"),  # HU-22
+        "comentario_revision": Dato(SIN_DP, ANONIMIZADO, escaneo="pii"),  # HU-22: nota del oficial
         "extracto": Dato(
             TEXTO_LIBRE, ANONIMIZADO,
             finalidad="Que el Oficial de Cumplimiento revise el intento de prompt injection",

@@ -604,7 +604,7 @@ def test_modificacion_de_respuesta_y_revision_quedan_en_el_log_sin_texto():
         assert "política" not in json.dumps(d, ensure_ascii=False).lower()   # nunca el texto
         assert mods[0].actor_rol == "admin_therion" and mods[0].ip == "127.0.0.1"
 
-        r = await c.patch(f"/api/respuestas/{rid}/revision", headers=admin(), json={"clasificacion_revisada": "cumplido"})
+        r = await c.patch(f"/api/respuestas/{rid}/revision", headers=admin(), json={"clasificacion_revisada": "cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r.status_code == 200
         rev = (await _filas("respuesta.revision_humana"))[-1]
         assert rev.detalle["estado_final_anterior"] == "parcialmente_cumplido" and rev.detalle["estado_final_nuevo"] == "cumplido"

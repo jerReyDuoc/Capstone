@@ -13,6 +13,16 @@ class OrigenEvento(str, Enum):
     BORRADOR = "borrador"  # HU-16: instrucciones de redacción de un borrador
 
 
+class ResolucionEvento(str, Enum):
+    """HU-22: veredicto del Oficial de Cumplimiento sobre un evento de seguridad."""
+    ATAQUE_CONFIRMADO = "ataque_confirmado"   # la detección acertó
+    FALSO_POSITIVO = "falso_positivo"         # el texto era legítimo: sirve para afinar las reglas
+
+    @classmethod
+    def valores(cls) -> list[str]:
+        return [v.value for v in cls]
+
+
 class EventoSeguridad(Base):
     """
     Registro de intentos de prompt injection detectados por la capa de seguridad.
@@ -43,3 +53,11 @@ class EventoSeguridad(Base):
     extracto: Mapped[str | None] = mapped_column("extracto", Text, nullable=True)
     hash_texto: Mapped[str] = mapped_column("hash_texto", String(64), nullable=False, index=True)
     revisado: Mapped[bool] = mapped_column("revisado", Boolean, nullable=False, default=False)
+
+    # HU-22: resultado de la revisión (NULL en los eventos revisados antes de HU-22)
+    resolucion: Mapped[str | None] = mapped_column("resolucion", String(20), nullable=True)
+    comentario_revision: Mapped[str | None] = mapped_column("comentario_revision", Text, nullable=True)
+    fecha_revision: Mapped[datetime | None] = mapped_column("fecha_revision", DateTime, nullable=True)
+    revisor_admin_id: Mapped[int | None] = mapped_column(
+        "revisor_admin_id", Integer, ForeignKey("usuarios_admin.id_admin"), nullable=True
+    )

@@ -297,7 +297,7 @@ async def _live():
 
             # ------------------------------------------------ 3. revisión humana
             r = await client.patch(f"/api/respuestas/{r1}/revision",
-                                   json={"clasificacion_revisada": "parcialmente_cumplido"})
+                                   json={"clasificacion_revisada": "parcialmente_cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."})
             assert r.status_code == 200, r.text
             fila = (await bd.filas('SELECT clasificacion_revisada, fuente_clasificacion FROM respuestas '
                                    'WHERE id_respuesta = :r', r=r1))[0]

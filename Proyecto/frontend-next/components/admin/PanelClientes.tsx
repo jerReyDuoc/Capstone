@@ -200,6 +200,7 @@ export function PanelClientes() {
         <nav className={m.nav} aria-label="Secciones del panel interno">
           <Link className={m.navLink} href="/admin/clientes" aria-current="page">Empresas cliente</Link>
           <Link className={m.navLink} href="/admin/matriz">Matriz normativa</Link>
+          <Link className={m.navLink} href="/admin/revision">Bandeja de revisión</Link>
         </nav>
         <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>
           Cerrar sesión

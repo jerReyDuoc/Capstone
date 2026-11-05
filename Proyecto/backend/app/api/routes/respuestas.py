@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -20,8 +21,14 @@ from app.infrastructure.repositories.respuesta_repository import RespuestaReposi
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 from app.infrastructure.llm.factory import crear_anonimizador
-from app.domain.models.respuesta import EstadoClasificacion, FuenteClasificacion
+from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion
+from app.domain.models.evaluacion import Evaluacion
+from app.application.ai.anonimizador import AnonimizacionError
+from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.core.cliente import huella
 from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
 
@@ -163,6 +170,46 @@ async def get_respuesta(respuesta_id: int, db: AsyncSession = Depends(get_db)):
 
 class RevisionRequest(BaseModel):
     clasificacion_revisada: str
+    # HU-22 criterio 2: confirmar o corregir SIEMPRE lleva un comentario del oficial
+    comentario: str | None = None
+
+
+# HU-22: largo del comentario de revisión (se valida a mano para responder {codigo, mensaje})
+COMENTARIO_MIN = 10
+COMENTARIO_MAX = 1000
+
+
+def validar_comentario(comentario: str | None) -> str:
+    texto = " ".join((comentario or "").split())
+    if len(texto) < COMENTARIO_MIN:
+        raise HTTPException(status_code=422, detail={
+            "codigo": "COMENTARIO_REQUERIDO", "campo": "comentario",
+            "mensaje": f"Explica la decisión en al menos {COMENTARIO_MIN} caracteres."})
+    if len(texto) > COMENTARIO_MAX:
+        raise HTTPException(status_code=422, detail={
+            "codigo": "COMENTARIO_DEMASIADO_LARGO", "campo": "comentario",
+            "mensaje": f"El comentario admite hasta {COMENTARIO_MAX} caracteres."})
+    return texto
+
+
+async def anonimizar_comentario(texto: str) -> str:
+    """HU-06: el comentario se guarda sin PII (fail-closed: si el motor NER falla, no se guarda)."""
+    try:
+        return await crear_anonimizador().anonimizar(texto)
+    except AnonimizacionError:
+        raise HTTPException(status_code=503, detail={
+            "codigo": "ANONIMIZACION_NO_DISPONIBLE",
+            "mensaje": "No se pudo anonimizar el comentario; por seguridad no se guardó la revisión. "
+                       "Intenta nuevamente en unos minutos."})
+
+
+def _ultima_clasificacion_llm(respuesta) -> str | None:
+    """Clasificación que propuso el LLM en la evidencia procesada más reciente (o None)."""
+    con_llm = [e for e in (respuesta.evidencias or []) if e.clasificacion_llm]
+    if not con_llm:
+        return None
+    con_llm.sort(key=lambda e: (e.fecha_procesada or date.min, e.id_evidencia))
+    return con_llm[-1].clasificacion_llm
 
 
 @router.patch("/{respuesta_id}/revision")
@@ -178,6 +225,11 @@ async def revisar_respuesta(
 
     HU-20: solo administradores de Therion Labs (401 sin token, 403 para el encuestado
     o el referente, que nunca revisan su propio diagnóstico).
+
+    HU-22: exige un `comentario` (10 a 1000 caracteres, se guarda anonimizado). La revisión
+    es **confirmada** si deja la clasificación vigente igual y **corregida** si la cambia;
+    puede repetirse (cada una queda en el audit_log). Si la evaluación ya está cerrada, se
+    recalculan sus puntajes con la clasificación revisada.
     """
     valores = EstadoClasificacion.resolutivos()
     if payload.clasificacion_revisada not in valores:
@@ -185,23 +237,41 @@ async def revisar_respuesta(
             status_code=400,
             detail=f"Clasificación inválida. Debe ser una de: {', '.join(valores)}",
         )
+    comentario = validar_comentario(payload.comentario)
     repo = RespuestaRepository(db)
     respuesta = await repo.get(respuesta_id)
     if not respuesta:
         raise HTTPException(status_code=404, detail="Respuesta no encontrada")
+    comentario = await anonimizar_comentario(comentario)
 
-    # HU-09: la revisión cambia la clasificación final: queda en el audit_log (misma transacción)
+    anterior = respuesta.estado_clasificacion_final or respuesta.estado_clasificacion
+    decision = (DecisionRevision.CONFIRMADA if payload.clasificacion_revisada == anterior
+                else DecisionRevision.CORREGIDA).value
+    clasificacion_llm = _ultima_clasificacion_llm(respuesta)
+
+    # HU-09: la revisión cambia la clasificación final: queda en el audit_log (misma transacción).
+    # HU-22: con la decisión, lo que había declarado el usuario y propuesto el LLM (la verdad de
+    # referencia) y solo la huella HMAC y el largo del comentario: el log nunca guarda texto libre.
     BitacoraRepository(db).registrar(
         accion=Accion.RESPUESTA_REVISADA, entidad="respuestas", entidad_id=respuesta.id, actor=_admin,
         detalle={"evaluacion_id": respuesta.evaluacion_id,
                  "estado_final_anterior": respuesta.estado_clasificacion_final,
                  "fuente_anterior": respuesta.fuente_clasificacion,
-                 "estado_final_nuevo": payload.clasificacion_revisada},
+                 "estado_final_nuevo": payload.clasificacion_revisada,
+                 "decision": decision,
+                 "estado_declarado": respuesta.estado_clasificacion,
+                 "clasificacion_llm": clasificacion_llm,
+                 "revision_previa": respuesta.clasificacion_revisada,
+                 "comentario_huella": huella(comentario),
+                 "comentario_largo": len(comentario)},
     )
     respuesta.clasificacion_revisada = payload.clasificacion_revisada
     respuesta.fecha_revision = date.today()
     respuesta.estado_clasificacion_final = payload.clasificacion_revisada
     respuesta.fuente_clasificacion = FuenteClasificacion.REVISION.value
+    respuesta.comentario_revision = comentario
+    respuesta.decision_revision = decision
+    respuesta.revisor_admin_id = _admin.id
     # HU-02: la brecha sigue al estado vigente (se asigna en no_cumplido y se quita
     # en cualquier otro), también cuando la revisión corrige una decisión del LLM.
     control = None
@@ -209,9 +279,26 @@ async def revisar_respuesta(
         control = await repo.get_control(respuesta.matriz_controles_id_control)
     respuesta.sincronizar_brecha(control)
     await repo.update(respuesta)
+
+    # HU-22: una corrección sobre una evaluación ya cerrada cambia su puntaje (como HU-17)
+    puntajes_recalculados = False
+    if decision == DecisionRevision.CORREGIDA.value and respuesta.evaluacion_id:
+        evaluacion = await db.get(Evaluacion, respuesta.evaluacion_id)
+        if evaluacion is not None and evaluacion.esta_cerrada:
+            try:
+                await GenerateResumenUseCase(db).execute(respuesta.evaluacion_id)
+                puntajes_recalculados = True
+            except Exception:  # noqa: BLE001 - la revisión ya quedó; el resumen se puede regenerar
+                await db.rollback()
+                logger.exception("[HU-22] no se pudo recalcular el resumen de la evaluación %s",
+                                 respuesta.evaluacion_id)
     return {
         "id_respuesta": respuesta.id,
         "clasificacion_revisada": respuesta.clasificacion_revisada,
         "estado_clasificacion_final": respuesta.estado_clasificacion_final,
         "fuente_clasificacion": respuesta.fuente_clasificacion,
+        "decision": decision,
+        "comentario": comentario,
+        "fecha_revision": respuesta.fecha_revision.isoformat(),
+        "puntajes_recalculados": puntajes_recalculados,
     }

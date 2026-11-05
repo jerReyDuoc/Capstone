@@ -40,6 +40,12 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "PATCH", patron: new RegExp(`^admin/matriz/borrador/${ENTIDADES_MATRIZ}/-?\\d{1,9}$`) },
   { metodo: "POST", patron: new RegExp(`^admin/matriz/borrador/${ENTIDADES_MATRIZ}/-?\\d{1,9}/(retirar|restaurar)$`) },
   { metodo: "PATCH", patron: /^admin\/matriz\/borrador\/controles\/-?\d{1,9}\/aplicabilidad$/ },
+  // HU-22: bandeja de revisión del Oficial de Cumplimiento
+  { metodo: "GET", patron: /^admin\/revision\/(bandeja|resumen)$/ },
+  { metodo: "GET", patron: /^admin\/revision\/respuestas\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^respuestas\/\d{1,9}\/revision$/ },
+  { metodo: "PATCH", patron: /^seguridad\/eventos\/\d{1,9}\/revision$/ },
+  { metodo: "GET", patron: /^dominios$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
@@ -56,8 +62,16 @@ export function autorizarRutaAdmin(metodo: string, segmentos: string[]): Autoriz
 
 const QUERY_ADMIN = new Map<string, RegExp>([
   // estados de la bandeja (HU-31) y de las evaluaciones (HU-28)
-  ["estado", /^(nueva|contactada|contratada|migrada|descartada|en_progreso|completada)$/],
-  ["origen", /^(publica|invitacion)$/],
+  // HU-22: + pendiente | revisada | todas (bandeja de revisión)
+  ["estado", /^(nueva|contactada|contratada|migrada|descartada|en_progreso|completada|pendiente|revisada|todas)$/],
+  // HU-22: + origen de los eventos de seguridad
+  ["origen", /^(publica|invitacion|justificacion|evidencia|tutor|tutor_antecedente|borrador)$/],
+  ["vista", /^(clasificaciones|eventos)$/],
+  ["motivo", /^(seguridad|divergencia|sin_resolver|baja_confianza|resuelta_por_llm|concordante)$/],
+  ["evaluacion_id", /^\d{1,9}$/],
+  ["dominio_id", /^\d{1,9}$/],
+  ["criticidad", /^[A-Za-zÁÉÍÓÚáéíóú]{1,20}$/],
+  ["orden", /^(prioridad|reciente)$/],
   ["empresa_id", /^\d{1,9}$/],
   ["incluir_prueba", /^(true|false)$/],
   ["page", /^\d{1,4}$/],

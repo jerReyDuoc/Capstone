@@ -278,9 +278,9 @@ def test_requiere_revision_con_llm_inseguro_queda_para_revision_humana():
         assert d["estado_clasificacion_final"] == REV and d["confianza_clasificacion"] == 0.3
 
         # El Oficial de Cumplimiento la resuelve; no puede "resolverla" como requiere_revision
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": REV})
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": REV, "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r.status_code == 400
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": PARC})
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": PARC, "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r.status_code == 200 and r.json()["fuente_clasificacion"] == "revision"
         assert (await c.get(f"/api/respuestas/{rid}")).json()["estado_clasificacion_final"] == PARC
     _correr(esc)
@@ -362,7 +362,7 @@ def test_revision_humana_quita_la_brecha_que_puso_el_llm(revisada):
         await _procesar_con_llm(await _subir(c, rid), NOC, confianza=0.95)
         assert await _brecha_y_estado(rid) == (1, NOC)
 
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": revisada})
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": revisada, "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r.status_code == 200
         assert await _brecha_y_estado(rid) == (None, revisada)
     _correr(esc)
@@ -373,7 +373,7 @@ def test_revision_humana_a_no_cumplido_asigna_la_brecha():
     async def esc(c):
         await c.post(f"/api/evaluaciones/{EVAL_ID}/filtro", json=SOLO_BASE)
         rid = (await c.post("/api/respuestas/", json=_body("GOB-001", CUMP))).json()["id_respuesta"]
-        await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": NOC})
+        await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": NOC, "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert await _brecha_y_estado(rid) == (1, NOC)
     _correr(esc)
 

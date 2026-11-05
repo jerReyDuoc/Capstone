@@ -160,6 +160,7 @@ export function MantenedorMatriz() {
         <nav className={s.nav} aria-label="Secciones del panel interno">
           <Link className={s.navLink} href="/admin/clientes">Empresas cliente</Link>
           <Link className={s.navLink} href="/admin/matriz" aria-current="page">Matriz normativa</Link>
+          <Link className={s.navLink} href="/admin/revision">Bandeja de revisión</Link>
         </nav>
         <button className="btn btn-ghost btn-sm" type="button" onClick={salir}>Cerrar sesión</button>
       </header>

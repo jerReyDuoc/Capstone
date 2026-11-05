@@ -306,7 +306,7 @@ RUTAS_SOLO_ADMIN = [
     ("PATCH", "/api/seguridad/eventos/{evento_id}/revisado",
      lambda m: (f"/api/seguridad/eventos/{m.evento}/revisado", {})),
     ("PATCH", "/api/respuestas/{respuesta_id}/revision",
-     lambda m: (f"/api/respuestas/{m.resp['publica']}/revision", {"json": {"clasificacion_revisada": "cumplido"}})),
+     lambda m: (f"/api/respuestas/{m.resp['publica']}/revision", {"json": {"clasificacion_revisada": "cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."}})),
     ("PATCH", "/api/evaluaciones/{evaluacion_id}/prueba",
      lambda m: (f"/api/evaluaciones/{m.ev['publica']}/prueba", {"json": {"es_prueba": True}})),
     ("POST", "/api/auth/encuestado/clave",
@@ -318,6 +318,14 @@ RUTAS_SOLO_ADMIN = [
     ("GET", "/api/admin/bitacora/verificacion", lambda m: ("/api/admin/bitacora/verificacion", {})),  # HU-18
     # HU-28: evaluaciones del panel interno
     ("GET", "/api/admin/evaluaciones", lambda m: ("/api/admin/evaluaciones", {})),
+    # HU-22: bandeja de revisión del Oficial de Cumplimiento
+    ("GET", "/api/admin/revision/bandeja", lambda m: ("/api/admin/revision/bandeja", {})),
+    ("GET", "/api/admin/revision/resumen", lambda m: ("/api/admin/revision/resumen", {})),
+    ("GET", "/api/admin/revision/respuestas/{respuesta_id}",
+     lambda m: (f"/api/admin/revision/respuestas/{m.resp['publica']}", {})),
+    ("PATCH", "/api/seguridad/eventos/{evento_id}/revision",
+     lambda m: (f"/api/seguridad/eventos/{m.evento}/revision",
+                {"json": {"resolucion": "falso_positivo", "comentario": "Texto legítimo del encuestado."}})),
 ]
 
 # HU-27: también solo admin, pero necesitan una solicitud o empresa creadas. Sus pruebas de
@@ -360,17 +368,17 @@ def test_revision_humana_del_admin_cambia_la_clasificacion_final():
     async def esc(c):
         m = await _armar(c)
         rid = m.resp["publica"]
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "no_cumplido"},
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "no_cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."},
                           headers=m.cab["encuestado"])
         assert r.status_code == 403
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "no_cumplido"},
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "no_cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."},
                           headers=m.cab["admin"])
         assert r.status_code == 200 and r.json()["fuente_clasificacion"] == "revision"
         # el encuestado ve el resultado de la revisión en SU respuesta
         r = await c.get(f"/api/respuestas/{rid}", headers=m.cab["encuestado"])
         assert r.json()["estado_clasificacion_final"] == "no_cumplido"
         # inexistente: el admin recibe 404; sin token sigue siendo 401
-        assert (await c.patch("/api/respuestas/987654/revision", json={"clasificacion_revisada": "cumplido"},
+        assert (await c.patch("/api/respuestas/987654/revision", json={"clasificacion_revisada": "cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."},
                               headers=m.cab["admin"])).status_code == 404
     _correr(esc)
 

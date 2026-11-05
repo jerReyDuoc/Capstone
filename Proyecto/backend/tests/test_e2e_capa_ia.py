@@ -358,11 +358,11 @@ async def _flujo_completo(monkeypatch):
 
         # ------------------------------------------------------------ 5. revisión humana
         r = await env.c.patch(f"/api/respuestas/{r1}/revision",
-                              json={"clasificacion_revisada": "parcialmente_cumplido"})
+                              json={"clasificacion_revisada": "parcialmente_cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r.status_code == 200, r.text
         assert r.json()["fuente_clasificacion"] == "revision"
         r_mal = await env.c.patch(f"/api/respuestas/{r1}/revision",
-                                  json={"clasificacion_revisada": "requiere_revision"})
+                                  json={"clasificacion_revisada": "requiere_revision", "comentario": "Revisado por el Oficial de Cumplimiento."})
         assert r_mal.status_code == 400
         paso("5. Oficial de Cumplimiento revisa la respuesta 1", resultado=r.json())
 

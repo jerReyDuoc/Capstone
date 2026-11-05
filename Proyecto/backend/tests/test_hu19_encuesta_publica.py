@@ -221,7 +221,7 @@ def test_encuestado_no_puede_hacer_la_revision_humana():
             "estado_clasificacion": "cumplido", "justificacion": JUST})
         assert r.status_code == 201, r.text
         rid = r.json()["id_respuesta"]
-        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "cumplido"}, headers=h)
+        r = await c.patch(f"/api/respuestas/{rid}/revision", json={"clasificacion_revisada": "cumplido", "comentario": "Revisado por el Oficial de Cumplimiento."}, headers=h)
         assert r.status_code == 403
     _correr(esc)
 

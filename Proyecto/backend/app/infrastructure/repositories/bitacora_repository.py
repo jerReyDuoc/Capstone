@@ -88,6 +88,8 @@ class Accion:
     # HU-09: modificaciones y supresiones de datos que faltaban en el log
     RESPUESTA_MODIFICADA = "respuesta.modificada"            # cambió la declaración (estado/justificación)
     RESPUESTA_REVISADA = "respuesta.revision_humana"         # el admin fijó la clasificación final
+    # HU-22: el Oficial de Cumplimiento resolvió un evento de seguridad (ataque o falso positivo)
+    EVENTO_SEGURIDAD_REVISADO = "seguridad.evento_revisado"
     EVALUACION_PRUEBA = "evaluacion.marcada_prueba"          # entra o sale del benchmark
     ENCUESTADO_CLAVE_GENERADA = "encuestado.clave_generada"  # el admin regeneró la clave de acceso
     EVIDENCIA_ORIGINAL_SUPRIMIDO = "evidencia.original_suprimido"  # HU-06: queda solo el texto anonimizado
@@ -150,6 +152,7 @@ _CATEGORIAS: dict[str, str] = {
     # modificaciones
     Accion.RESPUESTA_MODIFICADA: Categoria.MODIFICACION,
     Accion.RESPUESTA_REVISADA: Categoria.MODIFICACION,
+    Accion.EVENTO_SEGURIDAD_REVISADO: Categoria.MODIFICACION,   # HU-22
     Accion.EVALUACION_PRUEBA: Categoria.MODIFICACION,
     Accion.ENCUESTADO_CLAVE_GENERADA: Categoria.MODIFICACION,
     Accion.ARCOP_ESTADO: Categoria.MODIFICACION,
