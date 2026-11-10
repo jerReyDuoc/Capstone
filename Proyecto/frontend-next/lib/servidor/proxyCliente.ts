@@ -17,6 +17,10 @@
  * HU-16: borradores de cumplimiento (generar, revisar, editar con PATCH, descargar en
  * Markdown o PDF, consolidar y descartar). Generar espera al Agente IA: hasta 90 s.
  *
+ * HU-32: derechos ARCOP del usuario definitivo (con o sin contrato vigente, HU-30): crear,
+ * consultar, cancelar, aportar información y descargar sus datos (JSON o CSV) cuando una
+ * solicitud de acceso o portabilidad está resuelta.
+ *
  * La autorización real la hace FastAPI (app/core/alcance.py): el rol cliente solo ve las
  * evaluaciones migradas a SU empresa (404 en cualquier otra).
  */
@@ -44,6 +48,9 @@ export const TIPOS_DOCUMENTO = [
 
 /** HU-16: la descarga previa de un borrador es Markdown o PDF. */
 export const TIPOS_BORRADOR = ["application/pdf", "text/markdown"] as const;
+
+/** HU-32: la exportación de datos del titular ARCOP es JSON (portabilidad) o CSV (planilla). */
+export const TIPOS_EXPORTACION_ARCOP_CLIENTE = ["application/json", "text/csv"] as const;
 
 const REGLAS: Regla[] = [
   // Espacio de la empresa (HU-28; HU-29 lo amplía)
@@ -102,6 +109,13 @@ const REGLAS: Regla[] = [
   { metodo: "DELETE", patron: /^borradores\/\d{1,9}$/ },
   { metodo: "GET", patron: /^borradores\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_BORRADOR, timeoutMs: 30_000 },
   { metodo: "POST", patron: /^borradores\/\d{1,9}\/consolidacion$/, timeoutMs: 30_000 },
+  // HU-32: derechos ARCOP del usuario definitivo (disponibles siempre, también sin contrato)
+  { metodo: "GET", patron: /^arcop\/catalogo$/ },
+  { metodo: "GET", patron: /^arcop\/solicitudes$/ },
+  { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^arcop\/solicitudes$/ },
+  { metodo: "POST", patron: /^arcop\/solicitudes\/\d{1,9}\/(cancelacion|informacion)$/ },
+  { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}\/exportacion$/, binario: true, tipos: TIPOS_EXPORTACION_ARCOP_CLIENTE, timeoutMs: 30_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

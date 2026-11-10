@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Correcciones 05-11 · Barra común del panel interno (Empresas cliente, Matriz normativa y
- * Bandeja de revisión). Antes cada página tenía su copia.
+ * Correcciones 05-11 · Barra común del panel interno (Empresas cliente, Matriz normativa,
+ * Bandeja de revisión y, desde HU-32, Solicitudes ARCOP). Antes cada página tenía su copia.
  *
  *  - "Actualizar" vuelve a pedir los datos de la sección abierta sin recargar la página (F5):
  *    no se pierde la pestaña, el filtro ni lo que se está escribiendo. Muestra la hora de la
@@ -23,6 +23,8 @@ const SECCIONES = [
   { href: "/admin/clientes", texto: "Empresas cliente" },
   { href: "/admin/matriz", texto: "Matriz normativa" },
   { href: "/admin/revision", texto: "Bandeja de revisión" },
+  // HU-32: solicitudes de derechos ARCOP de los titulares
+  { href: "/admin/arcop", texto: "Solicitudes ARCOP" },
 ] as const;
 
 const MIN_ENTRE_AUTOMATICAS_MS = 30_000;

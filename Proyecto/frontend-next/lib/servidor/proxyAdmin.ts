@@ -50,6 +50,12 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "GET", patron: /^admin\/rubros$/ },
   { metodo: "POST", patron: /^admin\/rubros$/ },
   { metodo: "PATCH", patron: /^admin\/rubros\/\d{1,9}$/ },
+  // HU-32: gestión de las solicitudes de derechos ARCOP (la autorización real: solo admin_therion)
+  { metodo: "GET", patron: /^arcop\/catalogo$/ },
+  { metodo: "GET", patron: /^arcop\/solicitudes$/ },
+  { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^arcop\/solicitudes\/\d{1,9}\/estado$/ },
+  { metodo: "POST", patron: /^arcop\/solicitudes\/\d{1,9}\/(prorroga|resolucion)$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
@@ -67,7 +73,11 @@ export function autorizarRutaAdmin(metodo: string, segmentos: string[]): Autoriz
 const QUERY_ADMIN = new Map<string, RegExp>([
   // estados de la bandeja (HU-31) y de las evaluaciones (HU-28)
   // HU-22: + pendiente | revisada | todas (bandeja de revisión)
-  ["estado", /^(nueva|contactada|contratada|migrada|descartada|en_progreso|completada|pendiente|revisada|todas)$/],
+  // HU-32: + estados de las solicitudes ARCOP
+  ["estado", /^(nueva|contactada|contratada|migrada|descartada|en_progreso|completada|pendiente|revisada|todas|recibida|en_revision|pendiente_informacion|en_proceso|resuelta|rechazada|cancelada)$/],
+  // HU-32: tipo de derecho y solo solicitudes con plazo vencido
+  ["tipo", /^(acceso|rectificacion|supresion|oposicion|portabilidad|bloqueo)$/],
+  ["vencidas", /^(true|false)$/],
   // HU-22: + origen de los eventos de seguridad
   ["origen", /^(publica|invitacion|justificacion|evidencia|tutor|tutor_antecedente|borrador)$/],
   ["vista", /^(clasificaciones|eventos)$/],

@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 22-oct-2026 (HU-20: confidencialidad del diagnóstico · limpieza: un solo `.env`, prototipo y documentos de cambios a `Extras/`) |
+| **Última actualización** | 10-nov-2026 (HU-32: derechos ARCOP en la página web para el usuario temporal, el definitivo y el admin) |
 
 ---
 
@@ -92,6 +92,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `Extras/Cambios/CAMBIOS_HU12.md` |
 | Informe PDF y envío por correo | ✅ Hecho | El servidor genera el PDF (resultado, comparativa, brechas priorizadas y plan formativo): se **descarga directo** desde el panel (ya no abre la impresión) y se **envía por correo** como adjunto (SMTP, p. ej. Gmail). Ver [5.11](#511-informe-pdf-y-envío-por-correo) y la guía `frontend-next/docs/Guia_envio_informe_por_correo.pdf` |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
+| Derechos ARCOP en la página web (HU-32) | ✅ Hecho | Usuario temporal (N.º de evaluación + clave) en `/panel/mis-derechos`, usuario definitivo en `/empresa/mis-derechos` (con o sin contrato), bandeja del admin en `/admin/arcop`, seguimiento público en `/mis-derechos` y descarga de datos en JSON/CSV al resolverse un acceso o una portabilidad. Ver `Extras/Cambios/frontend/CAMBIOS_HU32.md` |
 | Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios; un solo `Proyecto/.env` para todo, con los puertos del host configurables (ver 12.1) |
 | Suite de pruebas (pytest) | ✅ Hecho | 133 funciones de prueba (212 casos) + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
 | Panel web (HU-13, HU-11, HU-12) | ✅ Hecho | `frontend-next/` (Next.js 15 + React 19): diagnóstico, dominios, brechas priorizadas por severidad (HU-11) y capacitación (HU-12), con radar y barras interactivos, meta de cumplimiento, descarga del informe PDF y envío por correo; conectado a la API real; responsivo ≥ 1024 px y WCAG 2.1 AA. Ver [sección 10.1](#101-panel-web-hu-13-hu-11-hu-12) |
@@ -414,6 +415,7 @@ stateDiagram-v2
 - Cada solicitud tiene un **código de seguimiento único** (`ARC-XXXX-XXXX`); el estado se consulta sin login en `GET /api/arcop/seguimiento/{codigo}`, sin datos personales.
 - **Plazos legales por defecto (Ley 21.719):** respuesta en 30 días corridos, prórroga única de 30 días con motivo, bloqueo temporal en 2 días hábiles (configurables con `ARCOP_PLAZO_*`). Se informa `plazo_vencido` y el filtro `?vencidas=true`.
 - El titular puede ser un **invitado** o un **encuestado anónimo** de la encuesta pública (entra con la clave de su evaluación).
+- **HU-32:** con una solicitud de **acceso** o **portabilidad** resuelta, el titular descarga sus datos en JSON (estructurado, para traspasarlos) o CSV (`GET /api/arcop/solicitudes/{id}/exportacion?formato=json|csv`); cada descarga queda en el audit log. La rectificación la aplica el admin a mano y la cierra con su respuesta. Páginas web en la [sección 10.1](#101-panel-web-hu-13-hu-11-hu-12).
 - Detalle completo, tabla de anonimización y decisiones pendientes: [`Extras/Cambios/backend/CAMBIOS_ARCOP.md`](../Extras/Cambios/backend/CAMBIOS_ARCOP.md).
 
 ### 5.9 Autenticación y roles
@@ -714,6 +716,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/arcop/solicitudes/{id}/resolucion` | 🛡️ | `{resultado: resuelta\|rechazada, respuesta}` |
 | POST | `/api/arcop/solicitudes/{id}/cancelacion` | 👤 | `{motivo?}` |
 | POST | `/api/arcop/solicitudes/{id}/informacion` | 👤 | `{informacion}` → vuelve a `en_revision` |
+| GET | `/api/arcop/solicitudes/{id}/exportacion?formato=json\|csv` | 👤 | HU-32: descarga de los datos del titular; solo acceso/portabilidad `resuelta` (si no, 409 `EXPORTACION_NO_DISPONIBLE`) |
 
 ### Contratación (HU-31) y empresas cliente (HU-27, con la base de HU-09)
 
@@ -893,6 +896,10 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | `/panel/remediacion` | Usuario definitivo | HU-17: cerrar brechas subiendo evidencia; el puntaje y el radar se actualizan si el control mejora |
 | `/admin/login` → `/admin/clientes` | Administrador de Therion Labs | Panel interno con pestañas **Solicitudes de contratación**, **Empresas**, **Evaluaciones** y **Bitácora**, y **Cerrar sesión** |
 | `/admin/matriz` | Administrador de Therion Labs | HU-24: mantenedor de la matriz normativa: versión vigente frente al borrador, controles, brechas, rutas, filtro inicial, árbol de aplicabilidad con simulador, historial de versiones y publicación |
+| `/mis-derechos` | Cualquiera | HU-32: puerta pública a los derechos ARCOP: ingreso con N.º de evaluación + clave, acceso de clientes y consulta del estado con el código `ARC-XXXX-XXXX` |
+| `/panel/mis-derechos` | Usuario temporal | HU-32: enviar solicitudes de los 6 derechos, seguir su avance, responder pedidos de información, cancelar y descargar sus datos |
+| `/empresa/mis-derechos` | Usuario definitivo | HU-32: lo mismo desde la interfaz contratada, con o sin contrato vigente |
+| `/admin/arcop` | Administrador de Therion Labs | HU-32: bandeja de solicitudes ARCOP con cifras por atender, filtros, detalle con historial y acciones (revisión, pedir información, proceso, prórroga, resolver o rechazar; la supresión pide confirmación) |
 | `/recuperar` (`?tipo=admin`) | Ambos | "¿Olvidaste tu contraseña?": pide el enlace por correo (misma respuesta exista o no la cuenta) |
 | `/restablecer#token=…` | Ambos | Define la contraseña nueva; cierra todas las sesiones abiertas de la cuenta |
 

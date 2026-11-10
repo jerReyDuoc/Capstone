@@ -49,6 +49,8 @@ const VENTANAS: Record<string, Ventana> = {
   "/bff/recuperacion/solicitar": { limite: 5, ms: 60_000 },
   "/bff/recuperacion/verificar": { limite: 20, ms: 60_000 },
   "/bff/recuperacion/restablecer": { limite: 10, ms: 60_000 },
+  // HU-32: consulta pública del estado de una solicitud ARCOP por su código de seguimiento
+  "/bff/arcop/seguimiento": { limite: 20, ms: 60_000 },
 };
 const golpes = new Map<string, number[]>();
 const MAX_CLAVES = 10_000;
@@ -127,7 +129,8 @@ const SOLO_BFF = [
 ];
 
 // HU-28: páginas de acceso y del espacio del cliente: nunca en caché compartida
-const SIN_CACHE = ["/activar", "/ingresar", "/recuperar", "/restablecer", "/empresa"];
+// HU-32: + /mis-derechos (la página pública de derechos ARCOP)
+const SIN_CACHE = ["/activar", "/ingresar", "/recuperar", "/restablecer", "/empresa", "/mis-derechos"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

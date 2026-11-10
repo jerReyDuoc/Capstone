@@ -475,6 +475,8 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("POST", "/api/arcop/solicitudes/{solicitud_id}/cancelacion", "/api/arcop/solicitudes/1/cancelacion", {}),
     ("POST", "/api/arcop/solicitudes/{solicitud_id}/informacion", "/api/arcop/solicitudes/1/informacion",
      {"json": {"informacion": "x" * 30}}),
+    # HU-32: descarga de los datos del titular (roles en test_hu32_exportacion_arcop.py)
+    ("GET", "/api/arcop/solicitudes/{solicitud_id}/exportacion", "/api/arcop/solicitudes/1/exportacion", {}),
     # HU-27/31: el usuario temporal pide contratar (sus roles se prueban en test_hu27)
     ("POST", "/api/contratacion/solicitudes", "/api/contratacion/solicitudes",
      {"json": {"evaluacion_id": 1, "nombre": "Ana", "email": "a@b.cl", "autoriza_migracion": True}}),

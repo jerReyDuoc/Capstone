@@ -114,7 +114,10 @@ export default function Landing() {
               <li><Icon name="check" /> Anonimizamos RUT, nombres, correos, teléfonos y direcciones antes de guardar o enviar al modelo de IA.</li>
               <li><Icon name="check" /> El correo es opcional y solo sirve para retomar o recibir tu informe.</li>
               <li><Icon name="check" /> En la comparación con tu rubro solo entran evaluaciones completas y de forma agregada.</li>
-              <li><Icon name="check" /> Puedes ejercer tus derechos de acceso, rectificación y supresión con tu clave.</li>
+              <li>
+                <Icon name="check" /> Puedes ejercer tus derechos de acceso, rectificación, supresión y portabilidad con tu
+                clave: <Link href="/mis-derechos" prefetch={false}>Mis derechos</Link>.
+              </li>
             </ul>
           </div>
         </section>

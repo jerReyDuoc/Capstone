@@ -22,11 +22,16 @@ interface Regla {
   conIp?: boolean;
   /** Respuesta binaria (PDF): se reenvía tal cual, con su Content-Disposition. */
   binario?: boolean;
+  /** HU-32: tipos de contenido admitidos en la respuesta binaria (por defecto solo PDF). */
+  tipos?: readonly string[];
   /** Tiempo máximo de espera del backend (ms). */
   timeoutMs?: number;
   /** El cuerpo JSON lleva evaluacion_id: debe ser el de la sesión. */
   cuerpoConEvaluacion?: boolean;
 }
+
+/** HU-32: la exportación de datos del titular ARCOP es JSON (portabilidad) o CSV (planilla). */
+export const TIPOS_EXPORTACION_ARCOP = ["application/json", "text/csv"] as const;
 
 const REGLAS: Regla[] = [
   // Evaluación y cuestionario (HU-01/02)
@@ -53,6 +58,8 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^arcop\/solicitudes(\/\d+)?$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes\/\d+\/(cancelacion|informacion)$/ },
+  // HU-32: descarga de sus datos (acceso/portabilidad resuelta) en JSON o CSV
+  { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}\/exportacion$/, binario: true, tipos: TIPOS_EXPORTACION_ARCOP, timeoutMs: 30_000 },
   // HU-31: "Contratar la plataforma" desde los resultados (CAPTCHA y límites por IP en el backend)
   { metodo: "GET", patron: /^contratacion\/consentimiento$/ },
   { metodo: "GET", patron: /^contratacion\/evaluaciones\/(\d+)\/solicitud$/, conEvaluacion: true },
@@ -68,6 +75,8 @@ export type Autorizacion =
       archivo: boolean;
       conIp: boolean;
       binario: boolean;
+      /** HU-32: tipos admitidos de la respuesta binaria (si falta, solo PDF). */
+      tipos?: readonly string[];
       timeoutMs?: number;
       cuerpoConEvaluacion: boolean;
     }
@@ -92,6 +101,7 @@ export function autorizarRuta(metodo: string, segmentos: string[], evaluacionSes
       archivo: Boolean(regla.archivo),
       conIp: Boolean(regla.conIp || regla.archivo),
       binario: Boolean(regla.binario),
+      ...(regla.tipos ? { tipos: regla.tipos } : {}),
       timeoutMs: regla.timeoutMs,
       // POST /respuestas y POST /contratacion/solicitudes llevan evaluacion_id en el cuerpo
       cuerpoConEvaluacion: Boolean(regla.cuerpoConEvaluacion) || destino === "respuestas/",

@@ -43,6 +43,9 @@ export function PiePublico() {
         <span>© {new Date().getFullYear()} TherionLabs · ComplianceAI</span>
         <span>
           Autodiagnóstico orientativo; no reemplaza una auditoría legal. <Link href="/aviso-legal" prefetch={false}>Aviso legal</Link>
+          {" · "}
+          {/* HU-32 */}
+          <Link href="/mis-derechos" prefetch={false}>Mis derechos (ARCOP)</Link>
         </span>
       </div>
     </footer>

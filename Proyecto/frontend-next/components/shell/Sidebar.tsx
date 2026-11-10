@@ -11,6 +11,9 @@
  *   "Mis documentos" ni "Mi evaluación" una vez completada: le quedan sus resultados y "Contratar".
  *   Si su evaluación sigue en curso, conserva "Mi evaluación" para volver a ella.
  * Fuera de <PanelProvider> (páginas de /empresa) se asume el modo "cliente".
+ *
+ * HU-32: grupo "Privacidad" con "Mis derechos" (derechos ARCOP) para el encuestado
+ * (/panel/mis-derechos) y para el cliente (/empresa/mis-derechos, con o sin contrato).
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -51,6 +54,12 @@ const EMPRESA: Item[] = [
 // HU-16: borradores de cumplimiento adaptados por el Agente IA. Correcciones 05-11: pasan al
 // grupo "Gobernanza de IA" (servicio contratado: solo el cliente los ve).
 const BORRADORES: Item = { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" };
+
+// HU-32: derechos ARCOP. Cada titular tiene su página (la del cliente no depende del contrato).
+const MIS_DERECHOS: Record<"encuestado" | "cliente", Item> = {
+  encuestado: { ruta: "/panel/mis-derechos", etiqueta: "Mis derechos", icono: "escudo" },
+  cliente: { ruta: "/empresa/mis-derechos", etiqueta: "Mis derechos", icono: "escudo" },
+};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -125,6 +134,13 @@ export function Sidebar() {
           )}
         </ul>
       </nav>
+
+      {modo === "encuestado" || modo === "cliente" ? (
+        <nav className="nav" aria-labelledby="nav-privacidad">
+          <p className="nav-heading" id="nav-privacidad">Privacidad</p>
+          <ul className="nav-list">{enlace(MIS_DERECHOS[modo])}</ul>
+        </nav>
+      ) : null}
 
       {modo === "encuestado" ? (
         <nav className="nav" aria-label="Siguiente paso">

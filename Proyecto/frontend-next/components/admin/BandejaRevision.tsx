@@ -123,6 +123,9 @@ export function BandejaRevision() {
 
   function cambiar(parcial: Partial<FiltrosBandeja>) {
     setSeleccion(null);
+    // Al cambiar de pestaña se descarta la lista anterior: si no, mientras llegan los datos
+    // nuevos se dibujaban clasificaciones como eventos (o al revés) y la página se caía.
+    if (parcial.vista && parcial.vista !== filtros.vista) setBandeja(null);
     setFiltros((f) => ({ ...f, page: 1, ...parcial }));
   }
 
@@ -138,6 +141,9 @@ export function BandejaRevision() {
   }
 
   const pend = bandeja?.pendientes;
+  // Solo los elementos del tipo de la pestaña abierta (segunda barrera contra la carrera anterior)
+  const itemsRespuesta = (bandeja?.items ?? []).filter((x) => x.tipo_item === "respuesta") as ItemRespuesta[];
+  const itemsEvento = (bandeja?.items ?? []).filter((x) => x.tipo_item === "evento") as ItemEvento[];
 
   return (
     <div className={`${a.pagina} ${s.raiz}`}>
@@ -189,10 +195,10 @@ export function BandejaRevision() {
         <div className={s.paneles} data-abierto={seleccion ? "true" : "false"}>
           <div className={s.columnaLista}>
             {filtros.vista === "clasificaciones" ? (
-              <ListaRespuestas items={(bandeja?.items ?? []) as ItemRespuesta[]} cargando={cargando && !bandeja}
+              <ListaRespuestas items={itemsRespuesta} cargando={cargando && !bandeja}
                                filtros={filtros} seleccion={seleccion} abrir={(id) => setSeleccion({ tipo: "respuesta", id })} />
             ) : (
-              <ListaEventos items={(bandeja?.items ?? []) as ItemEvento[]} cargando={cargando && !bandeja}
+              <ListaEventos items={itemsEvento} cargando={cargando && !bandeja}
                             filtros={filtros} seleccion={seleccion} abrir={(id) => setSeleccion({ tipo: "evento", id })} />
             )}
             {bandeja && bandeja.pages > 1 ? (
@@ -213,10 +219,11 @@ export function BandejaRevision() {
                               onResuelta={alResolver} />
             ) : seleccion?.tipo === "evento" ? (
               <PanelEvento key={seleccion.id}
-                           evento={((bandeja?.items ?? []) as ItemEvento[]).find((x) => x.id === seleccion.id) ?? null}
+                           evento={itemsEvento.find((x) => x.id === seleccion.id) ?? null}
                            volver={() => setSeleccion(null)} onError={(e) => setError(manejarError(e))}
                            onResuelto={alResolver}
                            irARespuesta={(rid) => {
+                             setBandeja(null);
                              setFiltros({ ...FILTROS_INICIALES, estado: "todas", vista: "clasificaciones" });
                              setSeleccion({ tipo: "respuesta", id: rid });
                            }} />
@@ -454,7 +461,7 @@ function ListaEventos({ items, cargando, filtros, seleccion, abrir }: {
             </span>
             <span className={s.filaPregunta}>{ev.extracto ?? "Extracto eliminado por la política de retención"}</span>
             <span className={s.filaMotivos}>
-              <span className="badge tone-alto">{ev.tipo.replace(/_/g, " ")}</span>
+              <span className="badge tone-alto">{(ev.tipo ?? "evento").replace(/_/g, " ")}</span>
               {ev.revision?.resolucion ? (
                 <span className={`badge tone-${ev.revision.resolucion === "falso_positivo" ? "info" : "ok"}`}>
                   {NOMBRE_RESOLUCION[ev.revision.resolucion]}

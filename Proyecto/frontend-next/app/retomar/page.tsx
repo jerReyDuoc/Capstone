@@ -28,6 +28,11 @@ export default async function Retomar({ searchParams }: { searchParams: Promise<
           ¿Aún no tienes una evaluación?{" "}
           <Link href="/comenzar" prefetch={false}>Comienza una nueva</Link>.
         </p>
+        {/* HU-32: con el mismo número y clave se ejercen los derechos ARCOP */}
+        <p style={{ marginTop: 8, color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>
+          ¿Quieres ver, corregir o eliminar tus datos?{" "}
+          <Link href="/mis-derechos" prefetch={false}>Ejerce tus derechos</Link>.
+        </p>
       </div>
     </PaginaPublica>
   );

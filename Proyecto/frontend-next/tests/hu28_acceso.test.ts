@@ -62,7 +62,8 @@ describe("proxy del cliente · lista blanca", () => {
     expect(autorizarRutaCliente("POST", ["evaluaciones", "12", "cerrar"]).ok).toBe(false);
     expect(autorizarRutaCliente("PATCH", ["evaluaciones", "12", "prueba"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["admin", "empresas"]).ok).toBe(false);
-    expect(autorizarRutaCliente("GET", ["arcop", "solicitudes"]).ok).toBe(false);
+    // HU-32: los derechos ARCOP del usuario definitivo ahora pasan (se prueban en hu32_arcop.test.ts)
+    expect(autorizarRutaCliente("PATCH", ["arcop", "solicitudes", "1", "estado"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["ia", "metricas"]).ok).toBe(false);
     expect(autorizarRutaCliente("DELETE", ["evaluaciones", "12"]).ok).toBe(false);
     expect(autorizarRutaCliente("GET", ["evaluaciones", "..", "admin"]).ok).toBe(false);

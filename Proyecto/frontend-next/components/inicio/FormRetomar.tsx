@@ -4,6 +4,9 @@
  * HU-19 · Retomar desde cualquier dispositivo con N.º de evaluación + clave.
  * Ambos van en el cuerpo de un POST al BFF (nunca en la URL). Acepta la clave con o
  * sin guiones, en minúsculas y con O/0, I/L/1 confundidos (igual que el backend).
+ *
+ * HU-32: con destino="derechos" el mismo ingreso lleva a /panel/mis-derechos (derechos ARCOP
+ * del usuario temporal) en vez de al cuestionario.
  */
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -12,7 +15,12 @@ import { formatearClave, parseRetomarEntrada, type ErrorEncuesta } from "@/lib/e
 import { AvisoError } from "./AvisoError";
 import s from "./inicio.module.css";
 
-export function FormRetomar({ motivo }: { motivo?: string }) {
+const DESTINOS = {
+  encuesta: { ruta: "/encuesta", boton: "Continuar mi evaluación" },
+  derechos: { ruta: "/panel/mis-derechos", boton: "Ingresar a mis derechos" },
+} as const;
+
+export function FormRetomar({ motivo, destino = "encuesta" }: { motivo?: string; destino?: keyof typeof DESTINOS }) {
   const router = useRouter();
   const id = useId();
   const [evaluacion, setEvaluacion] = useState("");
@@ -35,7 +43,7 @@ export function FormRetomar({ motivo }: { motivo?: string }) {
     try {
       await pedir("/bff/encuesta/retomar", { method: "POST", json: entrada.valor });
       setClave(""); // no dejar la clave en memoria más de lo necesario
-      router.replace("/encuesta");
+      router.replace(DESTINOS[destino].ruta);
     } catch (err) {
       setError(comoErrorEncuesta(err));
       setEnviando(false);
@@ -46,7 +54,9 @@ export function FormRetomar({ motivo }: { motivo?: string }) {
     <form className={s.formRetomar} onSubmit={enviar} noValidate>
       {motivo === "sesion" ? (
         <p className="callout" role="status">
-          Tu sesión en este navegador terminó o no existe. Ingresa con tus datos para continuar: tus respuestas están guardadas.
+          {destino === "derechos"
+            ? "Tu sesión en este navegador terminó o no existe. Ingresa con tus datos para seguir con tus solicitudes."
+            : "Tu sesión en este navegador terminó o no existe. Ingresa con tus datos para continuar: tus respuestas están guardadas."}
         </p>
       ) : null}
       <div className={s.campo}>
@@ -86,7 +96,7 @@ export function FormRetomar({ motivo }: { motivo?: string }) {
       {error ? <AvisoError error={error} onReintentar={() => setError(null)} /> : null}
       <div>
         <button type="submit" className="btn btn-primary" disabled={enviando || !evaluacion || !clave}>
-          {enviando ? "Verificando…" : "Continuar mi evaluación"}
+          {enviando ? "Verificando…" : DESTINOS[destino].boton}
         </button>
       </div>
     </form>

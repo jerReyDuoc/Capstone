@@ -102,14 +102,18 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
 
   if (!res.ok) return errorDesdeBackend(res);
   if (permiso.binario) {
-    // HU-12: el PDF pasa tal cual (res.text() corrompería los bytes)
-    const tipo = res.headers.get("content-type") ?? "";
-    if (!tipo.startsWith("application/pdf")) return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un PDF." });
+    // HU-12: el PDF pasa tal cual (res.text() corrompería los bytes).
+    // HU-32: la exportación ARCOP admite además JSON y CSV (permiso.tipos).
+    const tipo = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const admitidos: readonly string[] = permiso.tipos ?? ["application/pdf"];
+    if (!admitidos.includes(tipo)) {
+      return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un archivo válido." });
+    }
     const disposicion = res.headers.get("content-disposition");
     return new NextResponse(await res.arrayBuffer(), {
       status: 200,
       headers: {
-        "Content-Type": "application/pdf",
+        "Content-Type": tipo === "application/pdf" ? tipo : `${tipo}; charset=utf-8`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),

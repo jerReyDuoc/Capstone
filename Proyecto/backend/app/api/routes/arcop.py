@@ -8,11 +8,13 @@ Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.
   cliente        -> usuario de una empresa cliente (POST /api/auth/cliente). HU-30: con o sin
                     contrato vigente, en todo momento.
                     Los tres crean, consultan, cancelan y aportan información a SUS solicitudes.
+                    HU-32: con una solicitud de acceso o portabilidad resuelta, descargan
+                    sus datos (GET /solicitudes/{id}/exportacion?formato=json|csv).
   admin_therion  -> administrador (POST /api/auth/login): consulta todas, cambia estados
                     intermedios y registra la resolución. Una supresión resuelta
                     anonimiza los datos del titular.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.autenticacion import Actor, Rol, requerir_rol
@@ -36,6 +38,10 @@ from app.application.use_cases.gestionar_solicitud_arcop import (
     SolicitudNoEncontradaError,
     TransicionInvalidaError,
     plazo_vencido,
+)
+from app.application.use_cases.exportar_datos_arcop import (
+    ExportacionNoDisponibleError,
+    ExportarDatosARCOP,
 )
 from app.domain.models.solicitud_arcop import (
     TRANSICIONES_ARCOP,
@@ -289,3 +295,27 @@ async def aportar_informacion(
     """El titular responde a 'pendiente_informacion'; la solicitud vuelve a 'en_revision'."""
     s = await _ejecutar(_use_case(db).aportar_informacion(actor, solicitud_id, payload.informacion))
     return _detalle(s, actor)
+
+
+@router.get("/solicitudes/{solicitud_id}/exportacion")
+async def exportar_datos(
+    solicitud_id: int,
+    formato: str = Query("json", description="json (portabilidad, lectura mecánica) o csv (planilla)"),
+    actor: Actor = Depends(solo_titular),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    HU-32: el titular descarga sus datos personales cuando su solicitud de ACCESO o
+    PORTABILIDAD está resuelta. Ajena -> 404; otro tipo o aún no resuelta -> 409
+    EXPORTACION_NO_DISPONIBLE. Cada descarga queda en el audit_log (sin datos personales).
+    """
+    try:
+        exp = await _ejecutar(ExportarDatosARCOP(db, _use_case(db)).ejecutar(actor, solicitud_id, formato))
+    except ExportacionNoDisponibleError as e:
+        raise HTTPException(status_code=409, detail={"codigo": "EXPORTACION_NO_DISPONIBLE", "mensaje": str(e)})
+    return Response(content=exp.contenido, media_type=exp.media_type, headers={
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+        "Content-Disposition": f'attachment; filename="{exp.nombre_archivo}"',
+        "X-Content-Type-Options": "nosniff",
+    })
