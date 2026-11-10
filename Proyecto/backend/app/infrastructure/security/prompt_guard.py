@@ -8,7 +8,7 @@ Adaptador de PromptGuardPort basado en el módulo `seguridad.py`
 import os
 
 from app.core.config import settings
-from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION, PromptGuardPort, ResultadoGuard
 from app.infrastructure.security import seguridad
 from app.application.ai.prompts.base import escapar_para_prompt  # noqa: F401  (re-export)
 
@@ -18,10 +18,15 @@ if settings.REQUIERE_NER:
 
 
 class ReglasPromptGuard(PromptGuardPort):
-    def detectar_inyeccion(self, texto: str) -> bool:
+    def detectar_inyeccion(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> bool:
+        return self.analizar(texto, perfil).bloquear
+
+    def analizar(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> ResultadoGuard:
+        """HU-33: perfil "justificacion" (estricto) o "evidencia" (reglas con contexto)."""
         if not texto:
-            return False
-        return seguridad.detectar_inyeccion(texto)
+            return ResultadoGuard(False)
+        d = seguridad.analizar(texto, perfil)
+        return ResultadoGuard(d.bloquear, d.regla, d.categoria)
 
     def anonimizar(self, texto: str) -> str:
         """

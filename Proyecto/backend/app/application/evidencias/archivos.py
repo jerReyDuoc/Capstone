@@ -23,6 +23,8 @@ import unicodedata
 import zipfile
 from xml.etree import ElementTree
 
+from app.infrastructure.security.seguridad import normalizar_vinetas
+
 PDF, DOCX, TXT = "pdf", "docx", "txt"
 MIME = {PDF: "application/pdf",
         DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -144,13 +146,19 @@ def _texto_plano(contenido: bytes) -> str:
 
 
 def extraer_texto(contenido: bytes) -> str:
-    """Texto plano del archivo según su contenido real (sirve también para el .txt ya anonimizado)."""
+    """Texto plano del archivo según su contenido real (sirve también para el .txt ya anonimizado).
+
+    HU-33: las viñetas de PDF y Word (\\x7f y los caracteres del área privada de Symbol/Wingdings),
+    el guion blando y el BOM se normalizan aquí, para que el detector de prompt injection no
+    los confunda con caracteres de control. Los caracteres bidi y "tag" NO se tocan."""
     if contenido.startswith(b"%PDF-"):
         texto = _texto_pdf(contenido)
     elif _es_docx(contenido):
         texto = _texto_docx(contenido)
     else:
-        return _texto_plano(contenido)  # el texto plano llega tal cual (como antes de HU-17)
+        # el texto plano llega tal cual (como antes de HU-17), salvo las viñetas
+        return normalizar_vinetas(_texto_plano(contenido))
+    texto = normalizar_vinetas(texto)
     # Espacios repetidos y líneas vacías de más (los PDF suelen traer muchos)
     texto = re.sub(r"[ \t\f\v]+", " ", texto)
     texto = re.sub(r"\n\s*\n+", "\n\n", texto)

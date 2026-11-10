@@ -288,7 +288,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     "eventos_seguridad": {
         **_sin_dp("id_evento", "fecha", "tipo", "origen", "Evaluacion_id", "Matriz_controles_id_control",
                   "Respuestas_id_respuesta", "Evidencias_id_evidencia", "revisado",
-                  "resolucion", "fecha_revision", "revisor_admin_id"),  # HU-22
+                  "resolucion", "fecha_revision", "revisor_admin_id",  # HU-22
+                  "regla"),  # HU-33: identificador de la regla del detector (sin texto)
         "comentario_revision": Dato(SIN_DP, ANONIMIZADO, escaneo="pii"),  # HU-22: nota del oficial
         "extracto": Dato(
             TEXTO_LIBRE, ANONIMIZADO,

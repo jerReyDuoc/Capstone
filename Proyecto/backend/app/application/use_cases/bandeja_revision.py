@@ -319,6 +319,7 @@ class BandejaRevision:
             "id": ev.id_evento,
             "fecha": _iso(ev.fecha),
             "tipo": ev.tipo,
+            "regla": ev.regla,  # HU-33: qué regla bloqueó (para decidir si fue un falso positivo)
             "origen": ev.origen,
             "evaluacion_id": ev.evaluacion_id,
             "respuesta_id": ev.respuesta_id,

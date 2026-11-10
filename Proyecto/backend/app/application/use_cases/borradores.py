@@ -228,10 +228,11 @@ class Borradores:
                 return None
         return reserva
 
-    async def _evento(self, texto: str, tipo: str | None, evaluacion_id: int | None) -> None:
+    async def _evento(self, texto: str, tipo: str | None, evaluacion_id: int | None,
+                      regla: str | None = None) -> None:
         if self.registrar_evento is not None:
             await self.registrar_evento.execute(texto, OrigenEvento.BORRADOR.value, evaluacion_id=evaluacion_id,
-                                                tipo=tipo or "prompt_injection")
+                                                tipo=tipo or "prompt_injection", regla=regla)
 
     async def _adaptar(self, plantilla, ctx, instrucciones: str) -> tuple[AdaptacionIA, dict]:
         """Llama al Agente IA. Devuelve la adaptación (vacía si no se pudo) y lo que se audita."""
@@ -264,7 +265,7 @@ class Borradores:
             return AdaptacionIA(), info
 
         if salida.bloqueado:
-            await self._evento(instrucciones, salida.motivo, ctx.evaluacion_id)
+            await self._evento(instrucciones, salida.motivo, ctx.evaluacion_id, regla=salida.regla)
             self.bitacora.registrar(
                 accion=Accion.BORRADOR_INSTRUCCIONES_BLOQUEADAS, entidad="borrador_documento", entidad_id=None,
                 actor=self.cliente.actor, resultado=RESULTADO_RECHAZADO,
@@ -282,7 +283,7 @@ class Borradores:
                     advertencias=list(salida.advertencias), entidades_anonimizadas=resultado.entidades_anonimizadas)
         if salida.salida_bloqueada:
             # HU-18: la salida filtró el system prompt; es un ataque logrado. Se usa la plantilla base.
-            await self._evento(instrucciones, "fuga_prompt_salida", ctx.evaluacion_id)
+            await self._evento(instrucciones, "fuga_prompt_salida", ctx.evaluacion_id, regla="salida.fuga_prompt")
             info["motivo_sin_ia"] = "salida_ia_descartada"
             return AdaptacionIA(), info
         data = resultado.data

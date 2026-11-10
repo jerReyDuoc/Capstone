@@ -34,6 +34,9 @@ class EventoSeguridad(Base):
     id_evento: Mapped[int] = mapped_column("id_evento", Integer, primary_key=True)
     fecha: Mapped[datetime] = mapped_column("fecha", DateTime, nullable=False)
     tipo: Mapped[str] = mapped_column("tipo", String(30), nullable=False, default="prompt_injection")
+    # HU-33: identificador de la regla del detector que disparó ("manipulacion.aprueba",
+    # "codificado.base64>inyeccion.ignorar_instrucciones"...). Nunca contiene texto del usuario.
+    regla: Mapped[str | None] = mapped_column("regla", String(80), nullable=True, index=True)
     origen: Mapped[str] = mapped_column("origen", String(20), nullable=False)
 
     evaluacion_id: Mapped[int | None] = mapped_column(

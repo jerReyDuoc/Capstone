@@ -41,6 +41,7 @@ from app.domain.models.evidencia import ORIGEN_REMEDIACION, EstadoValidacion, Ev
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
+from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION
 from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 
 ESTADOS_CON_BRECHA = (EstadoClasificacion.NO_CUMPLIDO.value, EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value,
@@ -224,11 +225,13 @@ class Remediacion:
                                    "Ya hay una evidencia de este control en análisis. Espera su resultado.")
 
         # Seguridad: la justificación llega al prompt del LLM (igual que en el cuestionario)
-        if justificacion and guard is not None and guard.detectar_inyeccion(justificacion):
+        #    HU-33: texto corto escrito por el usuario -> revisión estricta
+        deteccion = guard.analizar(justificacion, PERFIL_JUSTIFICACION) if justificacion and guard is not None else None
+        if deteccion is not None and deteccion.bloquear:
             if registrar_evento is not None:
                 from app.domain.models.evento_seguridad import OrigenEvento
                 await registrar_evento.execute(texto=justificacion, origen=OrigenEvento.JUSTIFICACION.value,
-                                               evaluacion_id=ev.id, respuesta_id=respuesta_id)
+                                               evaluacion_id=ev.id, respuesta_id=respuesta_id, regla=deteccion.regla)
             raise RemediacionError(422, "PROMPT_INJECTION",
                                    "La justificación contiene instrucciones no permitidas. Describe solo cómo "
                                    "cumple ahora tu organización el control.")

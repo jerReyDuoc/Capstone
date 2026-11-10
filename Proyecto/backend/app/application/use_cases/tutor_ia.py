@@ -373,7 +373,8 @@ class TutorIA:
         if salida.bloqueado:
             return await self._bloqueado(c, ctx, texto, salida.motivo, salida.regla, ahora)
         for n in salida.neutralizados:  # antecedente de la empresa con inyección: se omitió
-            await self._evento(n.get("texto") or "", n.get("categoria"), ctx, origen=OrigenEvento.TUTOR_ANTECEDENTE.value)
+            await self._evento(n.get("texto") or "", n.get("categoria"), ctx, origen=OrigenEvento.TUTOR_ANTECEDENTE.value,
+                              regla=n.get("regla"))
 
         r: TutorRespuesta = salida.resultado.data
         try:
@@ -390,7 +391,7 @@ class TutorIA:
         # HU-18: la salida filtró el system prompt -> se mostró un rechazo fijo; es un ataque logrado
         advertencia = None
         if salida.salida_bloqueada:
-            await self._evento(texto, "fuga_prompt_salida", ctx)
+            await self._evento(texto, "fuga_prompt_salida", ctx, regla="salida.fuga_prompt")
             advertencia = await self._contar_bloqueo(c, ctx)
 
         m_usuario = MensajeTutor(
@@ -439,10 +440,12 @@ class TutorIA:
             t = " ".join(titulo_base.split())
             c.titulo = t if len(t) <= MAX_TITULO else t[:MAX_TITULO - 1].rstrip() + "…"
 
-    async def _evento(self, texto: str, tipo: str | None, ctx: ContextoTutor, origen: str | None = None) -> None:
+    async def _evento(self, texto: str, tipo: str | None, ctx: ContextoTutor, origen: str | None = None,
+                      regla: str | None = None) -> None:
         if self.registrar_evento is not None:
             await self.registrar_evento.execute(texto, origen or OrigenEvento.TUTOR.value,
-                                                evaluacion_id=ctx.evaluacion_id, tipo=tipo or "prompt_injection")
+                                                evaluacion_id=ctx.evaluacion_id, tipo=tipo or "prompt_injection",
+                                                regla=regla)
 
     async def _contar_bloqueo(self, c: ConversacionTutor, ctx: ContextoTutor) -> str | None:
         """
@@ -470,7 +473,7 @@ class TutorIA:
     async def _bloqueado(self, c: ConversacionTutor, ctx: ContextoTutor, texto: str, motivo: str | None,
                          regla: str | None, ahora: datetime) -> dict:
         """Ataque detectado por el filtro: no se llamó al NER ni al LLM. Queda el evento (extracto anonimizado)."""
-        await self._evento(texto, motivo, ctx)
+        await self._evento(texto, motivo, ctx, regla=regla)
         respuesta, sugerencias = respuesta_de_bloqueo(motivo)
         m_usuario = MensajeTutor(
             conversacion_id=c.id, rol=RolMensajeTutor.USUARIO.value, tipo=TipoMensajeTutor.PREGUNTA.value,

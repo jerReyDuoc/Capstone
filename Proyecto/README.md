@@ -849,15 +849,15 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | Datos personales enviados a un tercero (LLM) | Anonimización NER obligatoria, fail-closed; recorte después de sanitizar para no cortar PII a medias | `ner_sanitizer.py`, `gateway.py` |
 | Re-identificación desde la auditoría | Mapa de entidades sin valores originales (solo huellas HMAC y conteos, HU-06); métricas sin texto del usuario | `cifrado.py`, `registro_ia_repository.py` |
 | PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `cifrado_columnas.py`, `test_hu06_regresion_pii.py` |
-| Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); bloqueo 422 y registro | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
-| Prompt injection en evidencias | `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `process_evidence.py` |
+| Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); perfil **estricto**; bloqueo 422 y registro con la regla que disparó | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
+| Prompt injection en evidencias | Perfil **evidencia** (HU-33): el vocabulario de cumplimiento (aprobar, ejecutar, registrar, marcar...) solo bloquea si va dirigido a la IA o al resultado; las señales fuertes (texto oculto, bidi/"tag", codificado, "si eres una IA", delimitadores, cambio de rol) siempre. `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `seguridad.py`, `process_evidence.py`, `test_hu33_*.py` |
 | Que una inyección suba el puntaje | `requiere_revision` vale 0 y cuenta en el denominador | `generate_resumen.py` |
 | Derechos del titular | Solicitudes ARCOP con trazabilidad completa y anonimización irreversible al aprobar una supresión | `gestionar_solicitud_arcop.py`, `anonimizacion_repository.py` |
 | Credenciales | PBKDF2-SHA256 600k, tokens HMAC con expiración, revocación inmediata, errores genéricos | `autenticacion.py` |
 | Configuración insegura en producción | La app no arranca con `APP_ENV=production` si `SANITIZER_ENABLED=false`, falta `ENTITY_MAP_KEY` o `AUTH_SECRET` < 32 caracteres | `config.py` |
 | Exposición de servicios | Puertos publicados solo en `127.0.0.1`; contenedor con usuario sin privilegios | `docker-compose.yml`, `Dockerfile` |
 
-> `infrastructure/security/seguridad.py` es una copia del repositorio separado **ComplianceAI-Prompt-Injection**. Si se actualiza allá (nuevos patrones o tests), hay que volver a copiarlo aquí.
+> `infrastructure/security/seguridad.py` nació en el proyecto **ComplianceAI-Prompt-Injection** (ver `Extras/Guia_ComplianceAI_PromptInjection.docx.pdf`), que no está publicado: hoy la única copia vigente es la de este repositorio (HU-33). Si ese proyecto se publica, copiar este archivo allá y verificar que son idénticos con `RUTA_REPO_PROMPT_INJECTION=<carpeta del repo> pytest tests/test_hu33_detector_contexto.py -k copia`.
 
 ---
 

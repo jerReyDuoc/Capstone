@@ -658,6 +658,7 @@ function PanelRespuesta({ id, umbral, volver, onError, onResuelta }: {
                 <span className={s.nota}>{NOMBRE_ORIGEN_EVENTO[ev.origen] ?? ev.origen} · {fechaCorta(ev.fecha)}
                   {ev.revision?.resolucion ? ` · ${NOMBRE_RESOLUCION[ev.revision.resolucion]}` : " · sin resolver"}</span>
                 <blockquote className={s.extracto}>{ev.extracto ?? "Extracto eliminado por la política de retención."}</blockquote>
+                {ev.regla ? <p className={s.nota}>Regla que bloqueó: <code>{ev.regla}</code></p> : null}
               </div>
             ))}
           </section>
@@ -742,6 +743,12 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
         <section className={s.seccion}>
           <p className={s.texto}>Texto detectado (ya anonimizado). No se envió a la IA.</p>
           <blockquote className={s.extracto}>{ev.extracto ?? "Extracto eliminado por la política de retención."}</blockquote>
+          {ev.regla ? (
+            <p className={s.texto}>
+              Regla que bloqueó: <code>{ev.regla}</code>. Si el texto era legítimo, márcalo como falso positivo
+              para afinar esta regla.
+            </p>
+          ) : null}
           {ev.control?.pregunta ? <p className={s.texto}>Pregunta: {ev.control.pregunta}</p> : null}
           {ev.respuesta_id ? (
             <p>

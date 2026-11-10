@@ -26,7 +26,7 @@ from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.domain.ports.file_storage_port import FileStoragePort
 from app.domain.ports.evidence_validator_port import EvidenceValidatorPort
-from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.prompt_guard_port import PERFIL_EVIDENCIA, PERFIL_JUSTIFICACION, PromptGuardPort
 from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.application.ai.gateway import CapaIAError
 from app.domain.models.evento_seguridad import OrigenEvento
@@ -231,32 +231,38 @@ class ProcessEvidenceUseCase:
 
             evidencia_sospechosa = False
             if self.guard:
+                # HU-33: la justificación (texto corto del usuario) mantiene la revisión
+                # ESTRICTA; la evidencia (documento formal) usa las reglas con contexto: el
+                # vocabulario de cumplimiento solo cuenta si va dirigido a la IA o al resultado.
                 # La justificación ya se revisó al crear la respuesta; se revisa de
                 # nuevo por defensa en profundidad (filas antiguas, ediciones directas).
-                if self.guard.detectar_inyeccion(justificacion):
+                det = self.guard.analizar(justificacion, PERFIL_JUSTIFICACION)
+                if det.bloquear:
                     if remediacion:
                         return await self._rechazar_remediacion(respuesta, evidencia, OrigenEvento.JUSTIFICACION.value,
-                                                                justificacion, control)
+                                                                justificacion, control, det.regla)
                     await self._bloquear_por_seguridad(
-                        respuesta, evidencia, OrigenEvento.JUSTIFICACION.value, justificacion, control
+                        respuesta, evidencia, OrigenEvento.JUSTIFICACION.value, justificacion, control, det.regla
                     )
                     await self.respuesta_repo.update(respuesta)
                     return await self.evidencia_repo.update(evidencia)
 
-                if self.guard.detectar_inyeccion(fragmento):
+                det = self.guard.analizar(fragmento, PERFIL_EVIDENCIA)
+                if det.bloquear:
                     if remediacion:
                         return await self._rechazar_remediacion(respuesta, evidencia, OrigenEvento.EVIDENCIA.value,
-                                                                fragmento, control)
+                                                                fragmento, control, det.regla)
                     if settings.MODO_SEGURIDAD_EVIDENCIA == "bloquear":
                         # Bloqueo preventivo: NO se llama al LLM
                         await self._bloquear_por_seguridad(
-                            respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control
+                            respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control, det.regla
                         )
                         await self.respuesta_repo.update(respuesta)
                         return await self.evidencia_repo.update(evidencia)
                     # Modo "marcar": se registra y se sigue, pero sin fallback al usuario
                     evidencia_sospechosa = True
-                    await self._registrar(respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control)
+                    await self._registrar(respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control,
+                                          det.regla)
 
             # 3. Validar con LLM a través de la capa de Políticas e IA.
             #    Ley 21.719: el validador sanitiza (NER) antes de que algo salga al
@@ -327,7 +333,8 @@ class ProcessEvidenceUseCase:
         evidencia.fecha_procesada = date.today()
         return await self.evidencia_repo.update(evidencia)
 
-    async def _rechazar_remediacion(self, respuesta, evidencia: Evidencia, origen: str, texto: str, control) -> Evidencia:
+    async def _rechazar_remediacion(self, respuesta, evidencia: Evidencia, origen: str, texto: str, control,
+                                    regla: str | None = None) -> Evidencia:
         """
         HU-17: posible prompt injection en una remediación. La evidencia se rechaza sin pasar
         por el LLM y se registra el evento, pero la respuesta NO cambia (a diferencia del
@@ -341,7 +348,7 @@ class ProcessEvidenceUseCase:
             "enviada al LLM y el control conserva su estado."
         ]
         evidencia.fecha_procesada = date.today()
-        await self._registrar(respuesta, evidencia, origen, texto, control)
+        await self._registrar(respuesta, evidencia, origen, texto, control, regla)
         return await self.evidencia_repo.update(evidencia)
 
     @staticmethod
@@ -378,7 +385,8 @@ class ProcessEvidenceUseCase:
         evidencia.estado_validacion = EstadoValidacion.VALIDATED.value
 
     async def _bloquear_por_seguridad(
-        self, respuesta: Respuesta, evidencia: Evidencia, origen: str, texto: str, control
+        self, respuesta: Respuesta, evidencia: Evidencia, origen: str, texto: str, control,
+        regla: str | None = None,
     ) -> None:
         """
         Posible prompt injection: la evidencia se rechaza sin pasar por el LLM y la
@@ -399,9 +407,10 @@ class ProcessEvidenceUseCase:
         respuesta.confianza_clasificacion = None
         respuesta.fecha_validacion = date.today()
         respuesta.sincronizar_brecha(control)
-        await self._registrar(respuesta, evidencia, origen, texto, control)
+        await self._registrar(respuesta, evidencia, origen, texto, control, regla)
 
-    async def _registrar(self, respuesta, evidencia, origen: str, texto: str, control) -> None:
+    async def _registrar(self, respuesta, evidencia, origen: str, texto: str, control,
+                         regla: str | None = None) -> None:
         if self.registrar_evento:
             await self.registrar_evento.execute(
                 texto=texto,
@@ -410,6 +419,7 @@ class ProcessEvidenceUseCase:
                 matriz_control_id=getattr(control, "id_control", None),
                 respuesta_id=respuesta.id,
                 evidencia_id=evidencia.id_evidencia,
+                regla=regla,
             )
 
     async def _apply_classification_decision(

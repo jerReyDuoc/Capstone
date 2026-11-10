@@ -48,6 +48,8 @@ export interface ItemEvento {
   id: number;
   fecha: string | null;
   tipo: string;
+  /** HU-33: identificador de la regla del detector que bloqueó (null en eventos anteriores). */
+  regla?: string | null;
   origen: string;
   evaluacion_id: number | null;
   respuesta_id: number | null;

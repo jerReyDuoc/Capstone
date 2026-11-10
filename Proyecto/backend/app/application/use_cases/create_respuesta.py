@@ -22,7 +22,7 @@ from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
 from app.core.config import settings
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
-from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION, PromptGuardPort
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.respuesta_repository import (
     RespuestaDuplicadaError,
@@ -234,13 +234,16 @@ class CreateRespuestaUseCase:
 
         # 4. SEGURIDAD (bloqueo preventivo): la justificación es texto libre que luego
         #    llega al prompt del LLM. Si parece una inyección, no se guarda.
-        if self.guard and self.guard.detectar_inyeccion(justificacion or ""):
+        #    HU-33: la justificación es texto corto del usuario -> revisión ESTRICTA.
+        deteccion = self.guard.analizar(justificacion or "", PERFIL_JUSTIFICACION) if self.guard else None
+        if deteccion is not None and deteccion.bloquear:
             if self.registrar_evento:
                 await self.registrar_evento.execute(
                     texto=justificacion,
                     origen=OrigenEvento.JUSTIFICACION.value,
                     evaluacion_id=evaluacion_id,
                     matriz_control_id=matriz_control_id,
+                    regla=deteccion.regla,
                 )
             raise InyeccionDetectadaError(
                 "La justificación contiene instrucciones o contenido no permitido "
