@@ -51,7 +51,18 @@ docker compose run --rm --no-deps api pytest tests/test_hu23_semilla_staging.py 
 docker compose build api && bash .github/scripts/verificar_imagen.sh complianceai-backend:latest
 ```
 
+## Primer run del CI (PR de esta historia, 11-nov-2026)
+
+| Job | Resultado | Causa | Corrección |
+|---|---|---|---|
+| Backend | ✅ 1001 pruebas aprobadas y 4 omitidas, incluidas las 5 de la semilla | — | — |
+| Imagen api | ✅ Construida, sin secretos, `app.main` y el worker importan bien | — | — |
+| Frontend | ❌ 224 de 225 aprobadas. TypeScript sin errores | `hu31_contratacion.test.ts` esperaba que el BFF descartara `estado=pendiente`, pero HU-22 (4-nov) lo volvió a permitir para la bandeja de revisión. La lista blanca de parámetros es una sola para todo el panel admin. La prueba estaba en rojo desde el 4-nov y nadie lo había notado porque vitest no corría en CI | Se actualizó la prueba: `pendiente` es válido y un valor desconocido (`abierta`) se descarta. No cambia el código de la aplicación |
+| Imagen web | ❌ `next build` se cayó en `next/font` | Falla intermitente conocida de Next 15.5 ([vercel/next.js#99114](https://github.com/vercel/next.js/issues/99114)): a veces Google Fonts responde con direcciones de fuente sin extensión y el cargador de `next/font/google` se cae | `frontend-next/Dockerfile` reintenta `next build` hasta 3 veces. Definitivo (pendiente): servir Inter y Space Grotesk con `next/font/local` |
+
 ## Pendiente / riesgos
+
+- **Fuentes del frontend:** cambiar `next/font/google` por `next/font/local` con los `.woff2` de Inter y Space Grotesk en el repositorio (licencia SIL OFL). Así la construcción deja de depender de Google Fonts y desaparece la falla intermitente.
 
 - **Proteger `main`** (sección 3 de la guía): lo tiene que activar un administrador del repositorio. Sin esto el pipeline avisa, pero no bloquea.
 - **Primer run del CI del frontend:** `npm run typecheck` nunca había corrido en CI. Si el código tiene errores de tipos, el primer PR quedará en rojo y habrá que corregirlos.
