@@ -299,7 +299,7 @@ def test_rutas_del_servicio_pagado_usan_la_guarda():
         return vistos
 
     pagadas = [r for r in app.routes if isinstance(r, APIRoute) and (
-        r.path.startswith(("/api/formacion", "/api/remediacion", "/api/tutor", "/api/borradores"))
+        r.path.startswith(("/api/formacion", "/api/remediacion", "/api/tutor", "/api/borradores", "/api/mapa-datos"))
         or r.path == "/api/cliente/empresa")]
     assert pagadas
     for r in pagadas:

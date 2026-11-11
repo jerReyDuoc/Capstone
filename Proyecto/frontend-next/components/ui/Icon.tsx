@@ -52,6 +52,18 @@ const PATHS = {
   flechaIzq: "M19 12H5m6 6-6-6 6-6",
   // HU-10: comparativa sectorial (tu barra frente a las del grupo)
   sector: "M3 21h18M6 21v-6M10.5 21V9M15 21v-9M19.5 21V6",
+  // Mapa de datos personales
+  mapa: "M6 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm12 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM12 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM8 7h8M7.2 8.6l3.6 6.8M16.8 8.6l-3.6 6.8",
+  baseDatos: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  sistemaApp: "M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm4 16h8M12 17v4",
+  globo: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-9-9h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z",
+  filtro: "M4 5h16l-6 7.5V19l-4 2v-8.5L4 5Z",
+  imagen: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm4.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM21 15l-5-5L5 19",
+  lupaMas: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 3-4.35-4.35M11 8v6M8 11h6",
+  lupaMenos: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 3-4.35-4.35M8 11h6",
+  ajustar: "M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4",
+  editar: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Zm9.5-13.5 4 4",
+  flujo: "M4 12h12m0 0-4-4m4 4-4 4M20 5v14",
 } as const;
 
 export type IconName = keyof typeof PATHS;

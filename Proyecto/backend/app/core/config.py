@@ -313,6 +313,14 @@ class Settings(BaseSettings):
     BORRADOR_TIMEOUT_S: float = 60.0
     BORRADOR_TEMPERATURA: float = 0.2
 
+    # ------------------------------------------------ HU-34: mapa de datos personales
+    # Tamaño máximo del mapa de una empresa (elementos y flujos). El mapa completo viaja en cada
+    # respuesta del panel y se dibuja en el navegador: con esto se mantiene ágil.
+    MAPA_MAX_ELEMENTOS: int = 300
+    MAPA_MAX_FLUJOS: int = 800
+    # Envíos del informe del mapa por correo por empresa y día.
+    MAPA_CORREOS_DIA_EMPRESA: int = 5
+
     # HU-09: log inmutable (audit_log) para el Auditor Externo (Ley 21.719, art. 14 ter)
     # Filas por lote sellado. Cada lote recibe un hash SHA-256 que un tercero puede
     # recalcular con el archivo exportado (verificación de integridad por hash en lote).
@@ -450,6 +458,10 @@ class Settings(BaseSettings):
             raise ValueError("BORRADORES_MAX_CHARS_INSTRUCCIONES debe estar entre 100 y 4000 (HU-16).")
         if not 0 <= self.BORRADOR_TEMPERATURA <= 1:
             raise ValueError("BORRADOR_TEMPERATURA debe estar entre 0 y 1 (HU-16).")
+        if not 1 <= self.MAPA_MAX_ELEMENTOS <= 2000 or not 1 <= self.MAPA_MAX_FLUJOS <= 5000:
+            raise ValueError("MAPA_MAX_ELEMENTOS (1-2000) y MAPA_MAX_FLUJOS (1-5000) fuera de rango (HU-34).")
+        if self.MAPA_CORREOS_DIA_EMPRESA < 1:
+            raise ValueError("MAPA_CORREOS_DIA_EMPRESA debe ser mayor que 0 (HU-34).")
         if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
             raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

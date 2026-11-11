@@ -120,6 +120,10 @@ const QUERY_PERMITIDOS = new Map<string, number>([
   ["severidad", 80], ["dominio", 80], ["estado", 30], ["q", 80],
   // HU-16: formato de la descarga previa de un borrador (md | pdf)
   ["formato", 5],
+  // Mapa de datos personales: versión del mapa en las eliminaciones, página del historial y
+  // filtros del informe PDF
+  ["version", 9], ["pagina", 6], ["sensibles", 5], ["nna", 5], ["internacional", 5], ["tercero", 12],
+  ["pais", 2], ["tipo", 20],
 ]);
 
 export function filtrarQuery(params: URLSearchParams): string {

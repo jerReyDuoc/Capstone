@@ -127,6 +127,23 @@ class Accion:
     # Correcciones 05-11: rubros desde el panel interno (detalle: el nombre del rubro)
     RUBRO_CREADO = "rubro.creado"
     RUBRO_RENOMBRADO = "rubro.renombrado"
+    # HU-34: mapa de datos personales del cliente. Cada cambio deja además una versión completa
+    # en mapa_datos_version; el detalle aquí solo lleva ids, tipos, campos cambiados y conteos
+    # (nunca los nombres ni los textos que escribe la empresa).
+    MAPA_ELEMENTO_CREADO = "mapa_datos.elemento_creado"
+    MAPA_ELEMENTO_EDITADO = "mapa_datos.elemento_editado"
+    MAPA_ELEMENTO_ELIMINADO = "mapa_datos.elemento_eliminado"
+    MAPA_FLUJO_CREADO = "mapa_datos.flujo_creado"
+    MAPA_FLUJO_EDITADO = "mapa_datos.flujo_editado"
+    MAPA_FLUJO_ELIMINADO = "mapa_datos.flujo_eliminado"
+    MAPA_PLANTILLA_APLICADA = "mapa_datos.plantilla_aplicada"
+    MAPA_SUGERENCIA_ACEPTADA = "mapa_datos.sugerencia_aceptada"
+    MAPA_SUGERENCIA_DESCARTADA = "mapa_datos.sugerencia_descartada"
+    MAPA_REVISION_CONFIRMADA = "mapa_datos.revision_confirmada"
+    MAPA_VERSION_RESTAURADA = "mapa_datos.version_restaurada"
+    MAPA_CAMBIO_RECHAZADO = "mapa_datos.cambio_rechazado"     # versión desactualizada o límite
+    MAPA_INFORME_DESCARGADO = "mapa_datos.informe_descargado"
+    MAPA_INFORME_ENVIADO = "mapa_datos.informe_enviado"
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -158,6 +175,8 @@ _CATEGORIAS: dict[str, str] = {
     Accion.EVIDENCIA_ORIGINAL_SUPRIMIDO: Categoria.SUPRESION,
     Accion.USUARIO_TEMPORAL_CERRADO: Categoria.SUPRESION,  # se anonimiza al migrar (HU-27)
     Accion.MATRIZ_BORRADOR_DESCARTADO: Categoria.SUPRESION,  # HU-24
+    Accion.MAPA_ELEMENTO_ELIMINADO: Categoria.SUPRESION,     # HU-34
+    Accion.MAPA_FLUJO_ELIMINADO: Categoria.SUPRESION,
     # modificaciones
     Accion.RESPUESTA_MODIFICADA: Categoria.MODIFICACION,
     Accion.RESPUESTA_REVISADA: Categoria.MODIFICACION,
@@ -189,6 +208,12 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MATRIZ_PUBLICACION_RECHAZADA: Categoria.MODIFICACION,
     Accion.RUBRO_RENOMBRADO: Categoria.MODIFICACION,             # correcciones 05-11
     Accion.RETENCION_CONFIGURACION: Categoria.MODIFICACION,      # HU-25
+    Accion.MAPA_ELEMENTO_EDITADO: Categoria.MODIFICACION,        # HU-34
+    Accion.MAPA_FLUJO_EDITADO: Categoria.MODIFICACION,
+    Accion.MAPA_REVISION_CONFIRMADA: Categoria.MODIFICACION,
+    Accion.MAPA_VERSION_RESTAURADA: Categoria.MODIFICACION,
+    Accion.MAPA_SUGERENCIA_DESCARTADA: Categoria.MODIFICACION,
+    Accion.MAPA_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -205,6 +230,10 @@ _CATEGORIAS: dict[str, str] = {
     Accion.AUDITOR_CREADO: Categoria.CREACION,
     Accion.MATRIZ_BORRADOR_CREADO: Categoria.CREACION,           # HU-24
     Accion.RUBRO_CREADO: Categoria.CREACION,                     # correcciones 05-11
+    Accion.MAPA_ELEMENTO_CREADO: Categoria.CREACION,             # HU-34
+    Accion.MAPA_FLUJO_CREADO: Categoria.CREACION,
+    Accion.MAPA_PLANTILLA_APLICADA: Categoria.CREACION,
+    Accion.MAPA_SUGERENCIA_ACEPTADA: Categoria.CREACION,
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

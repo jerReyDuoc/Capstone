@@ -55,6 +55,9 @@ const EMPRESA: Item[] = [
 // grupo "Gobernanza de IA" (servicio contratado: solo el cliente los ve).
 const BORRADORES: Item = { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" };
 
+// Mapa de datos personales del cliente (servicio contratado): va en "Privacidad", antes de sus derechos.
+const MAPA_DATOS: Item = { ruta: "/empresa/mapa-datos", etiqueta: "Mapa de datos", icono: "mapa" };
+
 // HU-32: derechos ARCOP. Cada titular tiene su página (la del cliente no depende del contrato).
 const MIS_DERECHOS: Record<"encuestado" | "cliente", Item> = {
   encuestado: { ruta: "/panel/mis-derechos", etiqueta: "Mis derechos", icono: "escudo" },
@@ -138,7 +141,10 @@ export function Sidebar() {
       {modo === "encuestado" || modo === "cliente" ? (
         <nav className="nav" aria-labelledby="nav-privacidad">
           <p className="nav-heading" id="nav-privacidad">Privacidad</p>
-          <ul className="nav-list">{enlace(MIS_DERECHOS[modo])}</ul>
+          <ul className="nav-list">
+            {modo === "cliente" ? enlace(MAPA_DATOS) : null}
+            {enlace(MIS_DERECHOS[modo])}
+          </ul>
         </nav>
       ) : null}
 

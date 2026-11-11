@@ -100,6 +100,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
 | Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `Extras/Cambios/backend/CAMBIOS_HU20.md` |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
+| Mapa de datos personales (HU-34) | ✅ Hecho | `/empresa/mapa-datos` (contrato vigente): sistemas, bases de datos, terceros y flujos con proveedor, país de alojamiento y responsable interno; categorías de datos (sensibles) y de titulares (NNA) de un **catálogo común con el RAT/RoPA**; transferencias internacionales calculadas; mapa navegable con filtros, hallazgos de riesgo, inicio desde plantilla por rubro o desde la evaluación, versiones inalterables con restauración, audit log, informe PDF, PNG, CSV y envío por correo. Ver [5.17](#517-mapa-de-datos-personales-hu-34) y `Extras/Cambios/backend/CAMBIOS_HU34.md` |
 | Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
@@ -489,6 +490,14 @@ El administrador mantiene la matriz desde `/admin/matriz` sin tocar código. Tra
 
 Cada versión se guarda completa en `matriz_version` (JSON + huella SHA-256). Retirar no borra: deja `activo=false`, porque las evaluaciones anteriores siguen referenciando ese elemento; el código de un elemento publicado no se cambia. `POST /completar` guarda en `evaluacion.matriz_version_id` la versión con que se respondió, y el informe, el plan formativo, los borradores y el recálculo por remediación de una evaluación cerrada leen **esa** versión. Las evaluaciones en curso pasan a la nueva al publicar. Cada creación, edición, descarte, publicación e intento rechazado queda en el `audit_log` (acciones `matriz.*`). Detalle en `Extras/Cambios/backend/CAMBIOS_HU24.md`.
 
+### 5.17 Mapa de datos personales (HU-34)
+
+El usuario definitivo (con contrato vigente) registra en `/empresa/mapa-datos` **dónde trata datos personales su empresa**: sistemas, bases de datos y terceros (nombre, categoría, proveedor, país de alojamiento ISO 3166 y responsable interno como cargo o área) y los **flujos** entre ellos. Cada elemento y flujo lleva categorías de datos y de titulares de `app/domain/catalogo_tratamiento.py`, el **catálogo común con el RAT y el RoPA** (mismos códigos; las sensibles siguen la Ley 21.719 y los titulares marcan a niños, niñas y adolescentes). Las **transferencias internacionales no se declaran: se calculan** con el país de cada extremo.
+
+El backend (`app/domain/mapa_datos/`) calcula el resumen, la completitud y **10 reglas de hallazgos de riesgo** priorizados (transferencias sin garantía, proveedor de IA con datos sensibles, terceros sin contrato, sensibles sin cifrar, NNA, sin responsable, sin país…), con recomendación y referencia. El panel dibuja un **mapa navegable** (disposición por capas con puntos de paso, zoom, arrastre, teclado) con filtros por dato sensible, NNA, transferencia, tercero, país y tipo, y lo exporta a **PDF** (A4 horizontal, generado por el servidor con diagrama, inventario, transferencias, riesgos y base para el RAT), **PNG**, **CSV** y por **correo**.
+
+Se inicia desde una **plantilla por rubro** (8, más una base común) o desde las **respuestas de la evaluación** (F2–F7: si declaró usar un LLM externo se sugiere el flujo hacia ese proveedor). Todo lo agregado así queda «por confirmar». **Cada cambio crea una versión** (`mapa_datos_version`: instantánea completa + huella SHA-256 + diferencias; un trigger impide modificarla) y queda en el `audit_log` en la misma transacción; las versiones se pueden ver y restaurar. Toda edición envía la versión que vio el usuario (409 si cambió). Detalle en `Extras/Cambios/backend/CAMBIOS_HU34.md` y `Extras/Cambios/frontend/CAMBIOS_HU34.md`.
+
 ---
 
 ## 6. Base de datos
@@ -767,6 +776,15 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET / PATCH / DELETE | `/api/borradores/{id}` | 🏢 | HU-16: borrador con su Markdown / guarda la edición `{contenido, version}` (409 si la versión cambió) / lo descarta |
 | GET | `/api/borradores/{id}/descarga?formato=md\|pdf` | 🏢 | HU-16: descarga previa (PDF con marca «BORRADOR») |
 | POST | `/api/borradores/{id}/consolidacion` | 🏢 | HU-16: `{version, confirmar_pendientes}` → solo lectura y PDF final en Mis documentos (409 `CAMPOS_PENDIENTES` sin confirmar) |
+| GET | `/api/mapa-datos/catalogo` | 🏢 | HU-34: catálogo común con el RAT (categorías de datos con sensibles, titulares con NNA, tipos, roles, garantías, países) |
+| GET | `/api/mapa-datos` | 🏢 | HU-34: el mapa (elementos, flujos con transferencias calculadas, resumen, hallazgos, completitud) |
+| POST / PATCH / DELETE | `/api/mapa-datos/elementos[/{id}]` | 🏢 | HU-34: sistema, base de datos o tercero `{version, …}` (DELETE con `?version=`; 409 `MAPA_DESACTUALIZADO`) |
+| POST / PATCH / DELETE | `/api/mapa-datos/flujos[/{id}]` | 🏢 | HU-34: flujo entre elementos `{version, origen_id, destino_id, …}` |
+| POST | `/api/mapa-datos/revision` | 🏢 | HU-34: confirma lo que vino de plantillas o sugerencias |
+| GET / POST | `/api/mapa-datos/plantillas[/aplicar]` | 🏢 | HU-34: plantillas por rubro / aplica una `{codigo, version}` |
+| GET / POST | `/api/mapa-datos/sugerencias[/{clave}/aceptar\|descartar, /restablecer]` | 🏢 | HU-34: propuestas desde la evaluación |
+| GET / POST | `/api/mapa-datos/versiones[/{n}[/restaurar]]` | 🏢 | HU-34: historial, instantánea con diferencias y restauración |
+| GET / POST | `/api/mapa-datos/informe/pdf` · `/informe/enviar` | 🏢 | HU-34: informe PDF con los filtros del mapa / el mismo PDF por correo |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 

@@ -577,6 +577,39 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # HU-25: plazo de retención configurable (fila única). Quién lo cambió va al audit_log.
     "configuracion_retencion": _sin_dp("id", "fuente_plazo", "plazo_titular_dias", "fecha_actualizacion",
                                        "ejecucion_desde"),
+    # ------------------------------------------------------------ HU-34: mapa de datos personales
+    # Describe los sistemas, bases de datos, terceros y flujos de la ORGANIZACIÓN: no guarda datos
+    # de titulares (solo CATEGORÍAS del catálogo común). El responsable interno es un cargo o un
+    # área; los textos libres se rechazan al guardar si traen correos, RUT o teléfonos
+    # (app/domain/mapa_datos/modelo.py) y la auditoría de contenido los vuelve a revisar ("pii").
+    "mapa_datos": {
+        **_sin_dp("id", "empresa_id", "version", "plantilla_inicial", "fecha_creacion", "fecha_actualizacion"),
+        "sugerencias_descartadas": Dato(SIN_DP, escaneo="pii"),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa cambió el mapa por última vez (HU-34)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    "mapa_elemento": {
+        **_sin_dp("id", "mapa_id", "tipo", "subtipo", "pais", "nna_declarado", "rol_tercero", "contrato_firmado",
+                  "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("nombre", "descripcion", "proveedor", "responsable",
+                                                     "categorias_datos", "categorias_titulares")},
+    },
+    "mapa_flujo": {
+        **_sin_dp("id", "mapa_id", "origen_id", "destino_id", "nna_declarado", "frecuencia", "medio", "cifrado",
+                  "garantia", "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("finalidad", "categorias_datos", "categorias_titulares")},
+    },
+    # Versiones de solo inserción (criterio 5): la instantánea repite los textos del mapa.
+    "mapa_datos_version": {
+        **_sin_dp("id", "mapa_id", "empresa_id", "numero", "fecha", "accion", "huella", "elementos", "flujos"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("resumen", "cambios", "contenido")},
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa hizo cada cambio del mapa (HU-34)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
 }
 
 

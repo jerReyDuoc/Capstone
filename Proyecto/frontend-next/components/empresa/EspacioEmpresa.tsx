@@ -63,6 +63,9 @@ export function EspacioEmpresa() {
         <Acceso href="/empresa/borradores" icono="documento" titulo="Borradores de cumplimiento">
           Política de uso de IA, aviso de privacidad y PIA adaptados a tus brechas.
         </Acceso>
+        <Acceso href="/empresa/mapa-datos" icono="mapa" titulo="Mapa de datos personales">
+          Qué datos tratas, de quién, dónde están y con quién los compartes.
+        </Acceso>
       </nav>
 
       <section className="card" aria-labelledby="titulo-empresa">
