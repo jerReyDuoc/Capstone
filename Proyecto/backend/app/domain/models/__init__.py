@@ -57,6 +57,8 @@ from app.domain.models.tutor import (
     RolMensajeTutor,
     TipoMensajeTutor,
 )
+# HU-25: plazo de retención de usuarios temporales configurable desde el panel
+from app.domain.models.configuracion_retencion import ConfiguracionRetencion
 
 __all__ = [
     "BorradorDocumento",
@@ -109,4 +111,5 @@ __all__ = [
     "MensajeTutor",
     "RolMensajeTutor",
     "TipoMensajeTutor",
+    "ConfiguracionRetencion",
 ]

@@ -33,17 +33,37 @@ y los ids afectados en R3 y R4.
 
 Lo ejecuta el worker una vez al día (app/worker/tasks.py) y se puede correr a mano en
 modo simulación con scripts/retencion_datos.py.
+
+HU-25 (retención de usuarios temporales vencidos):
+  - Criterio 1: el plazo de R1 lo fija el Oficial de Privacidad en /admin/retencion
+    (configurar_retencion.py); si no lo ha fijado, rige RETENCION_DATOS_TITULAR_DIAS.
+  - Criterio 2: R1 reutiliza AnonimizacionRepository (la misma rutina de una supresión ARCOP
+    aprobada) y no toca respuestas.estado_clasificacion*, resumen ni benchmark: los puntajes
+    siguen en la comparativa sectorial.
+  - Criterio 3: cada EJECUCIÓN deja un registro retencion.ejecucion (origen cron/manual/cli,
+    simulación o no, plazos, fecha de corte, conteos, fallidos y duración), también cuando
+    no hubo nada que anonimizar, cuando se omitió por otra en curso o cuando falló.
+  - Una ejecución real marca "en curso" en configuracion_retencion: el cron y una ejecución
+    manual no se cruzan (la segunda queda registrada como omitida).
 """
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.use_cases.configurar_retencion import (
+    liberar_bloqueo,
+    plazo_titular_vigente,
+    tomar_bloqueo,
+)
+from app.core.autenticacion import Actor
 from app.core.config import settings
+from app.domain.models.bitacora_auditoria import RESULTADO_ERROR, RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.solicitud_arcop import (
@@ -65,6 +85,13 @@ logger = logging.getLogger(__name__)
 
 ACTOR_SISTEMA = "sistema"
 
+# HU-25: quién disparó la ejecución
+ORIGEN_CRON = "cron"
+ORIGEN_MANUAL = "manual"     # el Oficial de Privacidad desde /admin/retencion
+ORIGEN_CLI = "cli"           # scripts/retencion_datos.py
+ORIGENES = (ORIGEN_CRON, ORIGEN_MANUAL, ORIGEN_CLI)
+FUENTE_PARAMETRO = "parametro"  # plazos pasados al constructor (pruebas)
+
 
 def _ahora() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -80,6 +107,15 @@ class ResultadoRetencion:
     conversaciones_tutor: int = 0
     archivos_borrados: int = 0
     reglas_desactivadas: list[str] = field(default_factory=list)
+    # HU-25
+    origen: str = ORIGEN_CRON
+    plazo_titular_dias: int | None = None
+    fuente_plazo_titular: str = FUENTE_PARAMETRO
+    titulares_fallidos: int = 0
+    omitida_por_ejecucion_en_curso: bool = False
+    error: str | None = None
+    duracion_ms: int = 0
+    ejecucion_id: int | None = None   # id del registro retencion.ejecucion en el audit_log
 
     def como_dict(self) -> dict:
         return dict(self.__dict__)
@@ -87,10 +123,17 @@ class ResultadoRetencion:
 
 class AplicarRetencionUseCase:
     def __init__(self, session: AsyncSession, storage=None, hoy: date | None = None,
-                 plazos: dict[str, int | None] | None = None):
+                 plazos: dict[str, int | None] | None = None,
+                 origen: str = ORIGEN_CRON, actor: Actor | None = None):
+        if origen not in ORIGENES:
+            raise ValueError(f"origen inválido: {origen}")
         self.s = session
         self.storage = storage
         self.hoy = hoy or date.today()
+        self.origen = origen
+        self.actor = actor
+        # HU-25: sin plazos explícitos, el de titulares se lee de la BD al ejecutar
+        self._plazos_explicitos = plazos is not None
         self.plazos = plazos if plazos is not None else {
             "titulares": settings.RETENCION_DATOS_TITULAR_DIAS,
             "arcop": settings.RETENCION_ARCOP_CERRADAS_DIAS,
@@ -113,19 +156,106 @@ class AplicarRetencionUseCase:
         dias = self.plazos.get(regla)
         return None if dias is None else self.hoy - timedelta(days=dias)
 
-    async def execute(self, aplicar: bool = True) -> ResultadoRetencion:
-        r = ResultadoRetencion(simulacion=not aplicar)
-        for regla, metodo in (("titulares", self._titulares), ("arcop", self._arcop),
-                              ("eventos", self._eventos), ("tutor", self._tutor)):
-            if regla == "tutor" and regla not in self.plazos:
-                continue  # R4 es de HU-15: quien pasa sus propios plazos sin ella no la usa
-            limite = self._limite(regla)
-            if limite is None:
-                r.reglas_desactivadas.append(regla)
-                continue
-            await metodo(limite, aplicar, r)
+    async def execute(self, aplicar: bool = True, registrar: bool = True) -> ResultadoRetencion:
+        """
+        aplicar=False simula (solo cuenta). registrar=False no deja el registro de la
+        ejecución: solo para vistas previas que no son una ejecución (GET del panel).
+        """
+        inicio, t0 = _ahora(), time.monotonic()
+        r = ResultadoRetencion(simulacion=not aplicar, origen=self.origen)
+        if not self._plazos_explicitos:
+            plazo = await plazo_titular_vigente(self.s)
+            self.plazos["titulares"] = plazo.dias
+            r.fuente_plazo_titular = plazo.fuente
+        r.plazo_titular_dias = self.plazos.get("titulares")
+
+        marca = None
+        if aplicar:
+            if not await tomar_bloqueo(self.s, inicio):
+                r.omitida_por_ejecucion_en_curso = True
+                logger.warning("HU-25 retención: omitida, hay otra ejecución en curso")
+                if registrar:
+                    await self._registrar_ejecucion(r, inicio, t0)
+                return r
+            marca = inicio
+
+        error: Exception | None = None
+        try:
+            for regla, metodo in (("titulares", self._titulares), ("arcop", self._arcop),
+                                  ("eventos", self._eventos), ("tutor", self._tutor)):
+                if regla == "tutor" and regla not in self.plazos:
+                    continue  # R4 es de HU-15: quien pasa sus propios plazos sin ella no la usa
+                limite = self._limite(regla)
+                if limite is None:
+                    r.reglas_desactivadas.append(regla)
+                    continue
+                await metodo(limite, aplicar, r)
+        except Exception as e:  # noqa: BLE001 — se registra la ejecución fallida y se relanza
+            error = e
+            r.error = type(e).__name__
+            await self.s.rollback()
+            logger.error("HU-25 retención: la ejecución falló (%s)", r.error)
+        finally:
+            if marca is not None:
+                try:
+                    await liberar_bloqueo(self.s, marca)
+                except Exception as e:  # noqa: BLE001 — la marca vence sola (RETENCION_BLOQUEO_MAX_MIN)
+                    await self.s.rollback()
+                    logger.error("HU-25 retención: no se pudo liberar la marca de ejecución (%s)", type(e).__name__)
+
+        if registrar:
+            await self._registrar_ejecucion(r, inicio, t0)
         logger.info("T-06 retención %s: %s", "simulada" if not aplicar else "aplicada", r.como_dict())
+        if error is not None:
+            raise error
         return r
+
+    async def _registrar_ejecucion(self, r: ResultadoRetencion, inicio: datetime, t0: float) -> None:
+        """HU-25 criterio 3: un registro por ejecución, en su propia transacción."""
+        r.duracion_ms = int((time.monotonic() - t0) * 1000)
+        if r.omitida_por_ejecucion_en_curso:
+            resultado = RESULTADO_OMITIDO
+        elif r.error or r.titulares_fallidos:
+            resultado = RESULTADO_ERROR
+        else:
+            resultado = RESULTADO_OK
+        corte = self._limite("titulares")
+        detalle = {
+            "origen": r.origen,
+            "simulacion": r.simulacion,
+            "inicio": inicio.isoformat(timespec="seconds"),
+            "duracion_ms": r.duracion_ms,
+            "plazos_dias": {k: self.plazos.get(k) for k in ("titulares", "arcop", "eventos", "tutor")},
+            "fuente_plazo_titulares": r.fuente_plazo_titular,
+            "fecha_corte_titulares": corte.isoformat() if corte else None,
+            "reglas_desactivadas": list(r.reglas_desactivadas),
+            "conteos": {
+                "titulares": r.titulares,
+                "titulares_omitidos_por_arcop_abierta": r.titulares_omitidos_por_arcop_abierta,
+                "titulares_fallidos": r.titulares_fallidos,
+                "solicitudes_arcop": r.solicitudes_arcop,
+                "eventos_seguridad": r.eventos_seguridad,
+                "conversaciones_tutor": r.conversaciones_tutor,
+                "archivos_borrados": r.archivos_borrados,
+            },
+            "omitida_por_ejecucion_en_curso": r.omitida_por_ejecucion_en_curso,
+            "error": r.error,
+        }
+        bitacora = BitacoraRepository(self.s)
+        if self.actor is not None:
+            fila = bitacora.registrar(accion=Accion.RETENCION_EJECUCION, entidad="retencion",
+                                      actor=self.actor, resultado=resultado, detalle=detalle)
+        else:
+            fila = bitacora.registrar(accion=Accion.RETENCION_EJECUCION, entidad="retencion",
+                                      actor_rol=ACTOR_SISTEMA, resultado=resultado, detalle=detalle)
+        try:
+            await self.s.flush()
+            r.ejecucion_id = fila.id
+            await self.s.commit()
+        except Exception:
+            await self.s.rollback()
+            logger.error("HU-25 retención: no se pudo registrar la ejecución en el audit_log")
+            raise
 
     # ------------------------------------------------------------------ R1
     async def _titulares(self, limite: date, aplicar: bool, r: ResultadoRetencion) -> None:
@@ -177,6 +307,7 @@ class AplicarRetencionUseCase:
             except Exception as e:  # noqa: BLE001 — un titular fallido no detiene al resto
                 await self.s.rollback()
                 logger.error("T-06 retención: no se pudo anonimizar un titular (%s)", type(e).__name__)
+                r.titulares_fallidos += 1  # HU-25: queda en el registro de la ejecución
                 continue
             r.titulares += 1
             r.archivos_borrados += await self._borrar(rutas)

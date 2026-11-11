@@ -25,6 +25,8 @@ const SECCIONES = [
   { href: "/admin/revision", texto: "Bandeja de revisión" },
   // HU-32: solicitudes de derechos ARCOP de los titulares
   { href: "/admin/arcop", texto: "Solicitudes ARCOP" },
+  // HU-25: plazo de retención de usuarios temporales y ejecuciones de la anonimización
+  { href: "/admin/retencion", texto: "Retención de datos" },
 ] as const;
 
 const MIN_ENTRE_AUTOMATICAS_MS = 30_000;

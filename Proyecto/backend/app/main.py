@@ -16,6 +16,7 @@ from app.api.routes import auditoria  # HU-09: log inmutable para el Auditor Ext
 from app.api.routes import admin_matriz  # HU-24: mantenedor de la matriz normativa con versionado
 from app.api.routes import admin_rubros  # correcciones 05-11: rubros desde el panel interno
 from app.api.routes import admin_revision  # HU-22: bandeja de revisión del Oficial de Cumplimiento
+from app.api.routes import admin_retencion  # HU-25: retención de usuarios temporales vencidos
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ app.include_router(auditoria.router_admin)
 app.include_router(admin_matriz.router)
 app.include_router(admin_rubros.router)
 app.include_router(admin_revision.router)
+app.include_router(admin_retencion.router)
 
 @app.get("/health")
 async def health():

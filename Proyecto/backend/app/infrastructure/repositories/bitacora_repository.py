@@ -104,6 +104,11 @@ class Accion:
     RETENCION_ARCOP = "retencion.arcop_anonimizada"          # T-06 R2
     RETENCION_EVENTOS = "retencion.extractos_eliminados"     # T-06 R3
     RETENCION_TUTOR = "retencion.conversaciones_eliminadas"  # T-06 R4
+    # HU-25: cada ejecución de la retención (cron, manual o CLI, también la simulación y la
+    # omitida por otra en curso) deja UN registro con plazos, conteos y duración; y cada
+    # cambio del plazo desde el panel, el valor anterior y el nuevo.
+    RETENCION_EJECUCION = "retencion.ejecucion"
+    RETENCION_CONFIGURACION = "retencion.configuracion_cambiada"
     # HU-09: Auditor Externo
     AUDITOR_CREADO = "auditor.cuenta_creada"
     AUDITOR_ACTUALIZADO = "auditor.cuenta_actualizada"       # vigencia, desactivación o contraseña
@@ -146,6 +151,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RETENCION_ARCOP: Categoria.SUPRESION,
     Accion.RETENCION_EVENTOS: Categoria.SUPRESION,
     Accion.RETENCION_TUTOR: Categoria.SUPRESION,
+    Accion.RETENCION_EJECUCION: Categoria.SUPRESION,         # HU-25: el resumen de cada corrida
     Accion.DOCUMENTO_ELIMINADO: Categoria.SUPRESION,
     Accion.TUTOR_CONVERSACION_ELIMINADA: Categoria.SUPRESION,
     Accion.BORRADOR_DESCARTADO: Categoria.SUPRESION,
@@ -182,6 +188,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MATRIZ_PUBLICADA: Categoria.MODIFICACION,
     Accion.MATRIZ_PUBLICACION_RECHAZADA: Categoria.MODIFICACION,
     Accion.RUBRO_RENOMBRADO: Categoria.MODIFICACION,             # correcciones 05-11
+    Accion.RETENCION_CONFIGURACION: Categoria.MODIFICACION,      # HU-25
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,

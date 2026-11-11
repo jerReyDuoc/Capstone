@@ -1,4 +1,4 @@
-from arq import cron
+from arq import cron, func
 from arq.connections import RedisSettings
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -83,11 +83,19 @@ async def update_benchmark_task(ctx):
         print(f"[benchmark] actualizado: {result}")
         return result
 
-async def aplicar_retencion_task(ctx):
-    """T-06: anonimiza los datos personales cuyo plazo de conservación venció.
-    Sin RETENCION_* configurados no hace nada (reglas desactivadas)."""
+async def aplicar_retencion_task(ctx, origen: str = "cron", admin_id: int | None = None):
+    """T-06 / HU-25: anonimiza los datos personales cuyo plazo de conservación venció.
+
+    Lo corre el cron diario (origen "cron") y, cuando el Oficial de Privacidad pide una
+    ejecución desde /admin/retencion, la API la encola con origen "manual" y su id (queda
+    como actor en el audit_log). Sin plazos configurados no anonimiza nada, pero la
+    ejecución igual queda registrada (HU-25 criterio 3)."""
+    from app.core.autenticacion import Actor, Rol
+    actor = Actor(id=admin_id, rol=Rol.ADMIN_THERION.value) if origen == "manual" and admin_id else None
     async with AsyncSessionLocal() as session:
-        resultado = await AplicarRetencionUseCase(session, storage=crear_storage_evidencias()).execute()
+        resultado = await AplicarRetencionUseCase(
+            session, storage=crear_storage_evidencias(), origen=origen, actor=actor,
+        ).execute()
         return resultado.como_dict()
 
 async def sellar_audit_log_task(ctx):
@@ -110,11 +118,17 @@ async def startup(ctx):
 
 
 class WorkerSettings:
-    functions = [process_evidence_task]
+    # HU-25: aplicar_retencion_task también se encola a mano (con un timeout más largo). La API
+    # la encola con un id fijo para no acumular duplicados; keep_result=0 libera ese id al
+    # terminar (el resultado ya queda en el audit_log).
+    functions = [process_evidence_task,
+                 func(aplicar_retencion_task, timeout=settings.RETENCION_TIMEOUT_S, keep_result=0)]
     on_startup = startup
     cron_jobs = [
         cron(update_benchmark_task, hour=2, minute=0),  # 02:00 UTC diario
-        cron(aplicar_retencion_task, hour=3, minute=0),  # 03:00 UTC diario (T-06)
+        # T-06 / HU-25: diario a RETENCION_HORA_UTC (03:00 UTC por defecto); unique evita duplicados
+        cron(aplicar_retencion_task, hour=settings.RETENCION_HORA_UTC, minute=0,
+             timeout=settings.RETENCION_TIMEOUT_S, unique=True),
         # HU-09: sellado por lote del audit_log cada AUDIT_SELLO_CADA_MIN minutos
         cron(sellar_audit_log_task, minute=set(range(0, 60, settings.AUDIT_SELLO_CADA_MIN)), run_at_startup=True),
     ]

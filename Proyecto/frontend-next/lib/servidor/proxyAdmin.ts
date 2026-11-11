@@ -56,6 +56,11 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}$/ },
   { metodo: "PATCH", patron: /^arcop\/solicitudes\/\d{1,9}\/estado$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes\/\d{1,9}\/(prorroga|resolucion)$/ },
+  // HU-25: retención de usuarios temporales vencidos (plazo, vista previa, simulación y ejecución)
+  { metodo: "GET", patron: /^admin\/retencion$/ },
+  { metodo: "PATCH", patron: /^admin\/retencion$/ },
+  { metodo: "GET", patron: /^admin\/retencion\/(vista-previa|ejecuciones)$/ },
+  { metodo: "POST", patron: /^admin\/retencion\/(simulacion|ejecuciones)$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
@@ -93,6 +98,8 @@ const QUERY_ADMIN = new Map<string, RegExp>([
   ["entidad", /^[a-z_]{1,40}$/],
   ["entidad_id", /^\d{1,9}$/],
   ["accion", /^[a-z_.]{1,60}$/],
+  // HU-25: plazo a previsualizar (días)
+  ["dias", /^\d{1,5}$/],
 ]);
 
 export function filtrarQueryAdmin(params: URLSearchParams): string {

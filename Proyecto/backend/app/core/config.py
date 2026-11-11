@@ -170,6 +170,22 @@ class Settings(BaseSettings):
     RETENCION_ARCOP_CERRADAS_DIAS: int | None = None
     #   Eventos de seguridad: días después del evento, solo si ya fue revisado.
     RETENCION_EVENTOS_SEGURIDAD_DIAS: int | None = None
+    # ------------------------------------------------ HU-25: retención de usuarios temporales
+    # El Oficial de Privacidad cambia el plazo de RETENCION_DATOS_TITULAR_DIAS desde el panel
+    # interno (/admin/retencion). Lo que fije allí queda en la tabla configuracion_retencion y
+    # manda sobre la variable de entorno; la variable es el valor inicial y el de respaldo.
+    # Límites del plazo que acepta el panel (días). El mínimo evita que un error de tipeo
+    # ("1" en vez de "100") anonimice de un día para otro a todos los titulares vencidos.
+    RETENCION_TITULAR_MIN_DIAS: int = 30
+    RETENCION_TITULAR_MAX_DIAS: int = 3650
+    # Hora UTC (0-23) del cron diario de retención (03:00 UTC = 00:00 en Chile en verano).
+    RETENCION_HORA_UTC: int = 3
+    # Tiempo máximo de una ejecución en el worker (segundos). El resto de las tareas usa 300.
+    RETENCION_TIMEOUT_S: int = 3600
+    # Una ejecución marca "en curso" en la BD para que otra (cron y manual a la vez) no se
+    # cruce. Si el worker muere a mitad de camino, la marca se considera abandonada pasados
+    # estos minutos. Debe ser mayor que RETENCION_TIMEOUT_S.
+    RETENCION_BLOQUEO_MAX_MIN: int = 120
 
     # ------------------------------------------------ HU-27: empresa cliente y usuario definitivo
     # Horas de validez del enlace de activación (un solo uso). Vencido, un admin lo reenvía.
@@ -340,6 +356,13 @@ class Settings(BaseSettings):
             valor = getattr(self, nombre)
             if valor is not None and valor < 1:
                 raise ValueError(f"{nombre} debe ser un número de días mayor que 0 (o vacío).")
+        # HU-25
+        if not 1 <= self.RETENCION_TITULAR_MIN_DIAS <= self.RETENCION_TITULAR_MAX_DIAS:
+            raise ValueError("RETENCION_TITULAR_MIN_DIAS debe ser >= 1 y <= RETENCION_TITULAR_MAX_DIAS.")
+        if not 0 <= self.RETENCION_HORA_UTC <= 23:
+            raise ValueError("RETENCION_HORA_UTC debe ser una hora entre 0 y 23.")
+        if self.RETENCION_TIMEOUT_S < 60 or self.RETENCION_BLOQUEO_MAX_MIN * 60 <= self.RETENCION_TIMEOUT_S:
+            raise ValueError("RETENCION_TIMEOUT_S debe ser >= 60 y menor que RETENCION_BLOQUEO_MAX_MIN (en segundos).")
         if self.APP_ENV == "production" and not self.ENTITY_MAP_KEY:
             raise ValueError("ENTITY_MAP_KEY es obligatoria con APP_ENV=production.")
         if self.APP_ENV == "production" and (not self.AUTH_SECRET or len(self.AUTH_SECRET) < 32):

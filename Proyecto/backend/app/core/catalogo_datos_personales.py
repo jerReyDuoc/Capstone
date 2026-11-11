@@ -54,7 +54,8 @@ B_CONTRATO_CLIENTE = "Ejecución del contrato del servicio pagado con la empresa
 B_CONSENTIMIENTO_CONTRATACION = "Consentimiento: el usuario temporal pidió ser contactado para contratar (HU-31)"
 
 # --------------------------------------------------------------------- plazos (config)
-C_TITULAR = "Hasta la supresión ARCOP o RETENCION_DATOS_TITULAR_DIAS después de vencer el acceso"
+C_TITULAR = ("Hasta la supresión ARCOP o el plazo de retención de titulares después de vencer el acceso "
+             "(HU-25: lo fija el Oficial de Privacidad en /admin/retencion; por defecto RETENCION_DATOS_TITULAR_DIAS)")
 C_ARCOP = "RETENCION_ARCOP_CERRADAS_DIAS después del cierre de la solicitud (luego solo metadatos)"
 C_EVENTOS = "RETENCION_EVENTOS_SEGURIDAD_DIAS después de revisado el evento"
 C_ADMIN = "Mientras la cuenta esté activa"
@@ -573,6 +574,9 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                                  base=B_SEGURIDAD, conservacion=C_AUDITOR),
         "ultimo_acceso": Dato(METADATO, finalidad="Detectar accesos indebidos", base=B_SEGURIDAD, conservacion=C_AUDITOR),
     },
+    # HU-25: plazo de retención configurable (fila única). Quién lo cambió va al audit_log.
+    "configuracion_retencion": _sin_dp("id", "fuente_plazo", "plazo_titular_dias", "fecha_actualizacion",
+                                       "ejecucion_desde"),
 }
 
 

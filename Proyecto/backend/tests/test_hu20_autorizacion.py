@@ -586,6 +586,18 @@ RUTAS_RUBROS = [
 ]
 
 
+# HU-25: retención de usuarios temporales vencidos, solo admin. Sus pruebas de 401, 403 y 2xx
+# están en tests/test_hu25_retencion.py::test_api_retencion_solo_admin.
+RUTAS_RETENCION = [
+    ("GET", "/api/admin/retencion"),
+    ("PATCH", "/api/admin/retencion"),
+    ("GET", "/api/admin/retencion/vista-previa"),
+    ("POST", "/api/admin/retencion/simulacion"),
+    ("POST", "/api/admin/retencion/ejecuciones"),
+    ("GET", "/api/admin/retencion/ejecuciones"),
+]
+
+
 # ===================================================================== C3: cobertura de la matriz
 def test_todas_las_rutas_estan_clasificadas():
     """
@@ -606,6 +618,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | set(RUTAS_HU09)
         | set(RUTAS_HU24)
         | set(RUTAS_RUBROS)
+        | set(RUTAS_RETENCION)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"
