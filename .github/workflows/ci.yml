@@ -1,0 +1,252 @@
+# HU-23 · Integración continua de ComplianceIA (reemplaza a ci-backend.yml de T-08)
+#
+# Se ejecuta en cada pull request hacia main, en cada push a main y a mano (Actions >
+# CI > Run workflow). GitHub corre todo en sus servidores: nadie tiene que ejecutar
+# nada en su computador.
+#
+#   backend    pytest con cobertura >= 70 % (.coveragerc) + SonarQube opcional
+#   frontend   tipos de TypeScript (tsc) + pruebas vitest
+#   imagenes   construye las imágenes api y web (sin publicarlas) y comprueba que no
+#              llevan secretos adentro (.github/scripts/verificar_imagen.sh)
+#   ci-ok      "CI aprobado": resume todo en UN check. Es el que se marca como
+#              obligatorio en la protección de la rama main (ver
+#              Proyecto/docs/DESPLIEGUE_STAGING.md, sección 3).
+#
+# En los pull requests solo corren los jobs de la parte que cambió (un PR que solo toca
+# el frontend no espera a pytest). En push a main y a mano corre todo, y si termina en
+# verde lanza el despliegue a staging (deploy-staging.yml).
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------ qué cambió
+  cambios:
+    name: Detectar cambios
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.todo.outputs.si == 'true' || steps.filtro.outputs.backend == 'true' }}
+      frontend: ${{ steps.todo.outputs.si == 'true' || steps.filtro.outputs.frontend == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Hay que correr todo?
+        id: todo
+        run: echo "si=${{ github.event_name != 'pull_request' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Archivos modificados en el pull request
+        id: filtro
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            comun: &comun
+              - ".github/workflows/ci.yml"
+              - ".github/scripts/**"
+            backend:
+              - *comun
+              - "Proyecto/backend/**"
+            frontend:
+              - *comun
+              - "Proyecto/frontend-next/**"
+
+  # ------------------------------------------------------------------ backend
+  backend:
+    name: Backend · pytest + cobertura (>= 70 %)
+    needs: cambios
+    if: needs.cambios.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: Proyecto/backend
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SonarQube necesita el historial para el análisis de código nuevo
+
+      - name: Python 3.13 (misma versión que la imagen Docker)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: Proyecto/backend/requirements.txt
+
+      - name: Instalar dependencias (incluye spaCy + es_core_news_md)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -c "import spacy; spacy.load('es_core_news_md')"
+
+      # Sin PostgreSQL, Redis ni Groq: la suite usa SQLite en memoria y dobles de prueba
+      # (tests/conftest.py). test_live_capa_ia.py se omite solo (no hay LIVE_BASE_URL).
+      - name: Ejecutar la suite con cobertura
+        env:
+          APP_ENV: test
+        run: |
+          mkdir -p reports
+          pytest tests -v -rxX \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --junitxml=reports/junit.xml
+
+      - name: Resumen de cobertura en la página del workflow
+        if: always()
+        run: |
+          if [ -f .coverage ]; then
+            echo "## Cobertura del backend" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            coverage report --skip-covered >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Guardar reportes (HTML de cobertura, XML y JUnit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-cobertura-backend
+          path: |
+            Proyecto/backend/htmlcov/
+            Proyecto/backend/coverage.xml
+            Proyecto/backend/reports/junit.xml
+          retention-days: 30
+
+      # Opcional: solo corre si existe el secreto SONAR_TOKEN
+      - name: Análisis SonarQube Cloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v5
+        with:
+          projectBaseDir: Proyecto/backend
+
+  # ------------------------------------------------------------------ frontend
+  frontend:
+    name: Frontend · tipos + vitest
+    needs: cambios
+    if: needs.cambios.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Proyecto/frontend-next
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node 22 (misma versión que la imagen Docker)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Proyecto/frontend-next/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Revisar tipos (TypeScript)
+        run: npm run typecheck
+
+      - name: Pruebas (vitest)
+        run: npm test
+
+  # ------------------------------------------------------------------ imágenes
+  imagenes:
+    name: Imagen ${{ matrix.nombre }} · construir y revisar secretos
+    needs: cambios
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: api
+            contexto: Proyecto/backend
+            parte: backend
+            argumentos: ""
+          - nombre: web
+            contexto: Proyecto/frontend-next
+            parte: frontend
+            # Igual que en Azure: Next fija el destino de /api/* al compilar
+            argumentos: |
+              API_URL=http://api
+              NEXT_PUBLIC_DEMO=0
+    steps:
+      - name: ¿Cambió esta parte?
+        id: aplica
+        run: |
+          if [ "${{ matrix.parte }}" = "backend" ]; then v="${{ needs.cambios.outputs.backend }}"; else v="${{ needs.cambios.outputs.frontend }}"; fi
+          echo "si=$v" >> "$GITHUB_OUTPUT"
+          [ "$v" = "true" ] || echo "Sin cambios en ${{ matrix.contexto }}: no se construye esta imagen."
+
+      - uses: actions/checkout@v4
+        if: steps.aplica.outputs.si == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.aplica.outputs.si == 'true'
+
+      - name: Construir la imagen (sin publicarla)
+        if: steps.aplica.outputs.si == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.contexto }}
+          push: false
+          load: true
+          tags: complianceia-${{ matrix.nombre }}:ci
+          build-args: ${{ matrix.argumentos }}
+          cache-from: type=gha,scope=${{ matrix.nombre }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.nombre }}
+
+      - name: Revisar que la imagen no lleve secretos
+        if: steps.aplica.outputs.si == 'true'
+        run: bash .github/scripts/verificar_imagen.sh complianceia-${{ matrix.nombre }}:ci
+
+      - name: Prueba de arranque (la app importa sin errores)
+        if: steps.aplica.outputs.si == 'true'
+        run: |
+          if [ "${{ matrix.nombre }}" = "api" ]; then
+            docker run --rm \
+              -e APP_ENV=test -e GROQ_API_KEY=ci \
+              -e DATABASE_URL=postgresql+asyncpg://ci:ci@127.0.0.1:5432/ci \
+              -e DATABASE_URL_SYNC=postgresql://ci:ci@127.0.0.1:5432/ci \
+              -e REDIS_URL=redis://127.0.0.1:6379 \
+              complianceia-api:ci python -c "import app.main, app.worker.tasks; print('api y worker importan bien')"
+          else
+            docker run --rm --entrypoint node complianceia-web:ci -e "require('fs').accessSync('server.js'); console.log('server.js presente')"
+          fi
+
+  # ------------------------------------------------------------------ resumen
+  ci-ok:
+    name: CI aprobado
+    needs: [cambios, backend, frontend, imagenes]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resultado de los jobs
+        run: |
+          echo "cambios=${{ needs.cambios.result }} backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} imagenes=${{ needs.imagenes.result }}"
+          # "skipped" es válido (esa parte no cambió); failure o cancelled bloquean
+          for r in "${{ needs.cambios.result }}" "${{ needs.backend.result }}" "${{ needs.frontend.result }}" "${{ needs.imagenes.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::Hay un job en rojo: revisa los detalles más arriba."
+              exit 1
+            fi
+          done
+          echo "Todo en verde."

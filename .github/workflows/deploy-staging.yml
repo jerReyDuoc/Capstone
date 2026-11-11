@@ -1,0 +1,148 @@
+# HU-23 · Despliegue continuo al ambiente de staging (Azure Container Apps)
+#
+# Reemplaza a los dos workflows que generó el portal de Azure (api-AutoDeployTrigger-* y
+# web-AutoDeployTrigger-*), que desplegaban en cada push aunque las pruebas fallaran y no
+# actualizaban ni el worker ni las migraciones.
+#
+# Cuándo corre:
+#   - Solo, cuando el workflow "CI" termina EN VERDE después de un push a main
+#     (es decir, después de integrar un pull request aprobado).
+#   - A mano: Actions > Deploy staging > Run workflow (por ejemplo para cargar los datos
+#     semilla o volver a una versión anterior indicando su etiqueta).
+#
+# Qué hace (detalle en .github/scripts/desplegar_staging.sh):
+#   construye y publica api:<commit> y web:<commit> en el ACR -> ejecuta el job migrate ->
+#   (opcional) el job seed -> actualiza api, worker y web -> prueba de humo por HTTPS ->
+#   si algo falla después de tocar las apps, vuelve solas a la versión anterior.
+#
+# Secretos y variables del repositorio (Settings > Secrets and variables > Actions):
+#   secretos   API_AZURE_CLIENT_ID, API_AZURE_TENANT_ID, API_AZURE_SUBSCRIPTION_ID (OIDC; ya existen)
+#              API_REGISTRY_USERNAME, API_REGISTRY_PASSWORD (opcionales; sin ellos se usa la identidad)
+#   variables  AZ_RESOURCE_GROUP (rg-complainceia), AZ_ACR_NAME (acrcomplainceia)
+#              MIGRACIONES_AUTOMATICAS (true), SEMBRAR_AL_DESPLEGAR (false)
+# Ningún secreto de la aplicación pasa por aquí: viven como secretos de cada Container App.
+
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta ya publicada a desplegar (vacío = construir el commit actual de main)"
+        required: false
+        default: ""
+      migrar:
+        description: "Ejecutar las migraciones de base de datos"
+        type: boolean
+        default: true
+      sembrar:
+        description: "Cargar los datos semilla (administrador y evaluaciones de ejemplo)"
+        type: boolean
+        default: false
+
+# Un despliegue a la vez y sin cancelar uno a medias
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # login en Azure con OIDC, sin contraseñas
+  contents: read
+
+env:
+  RG: ${{ vars.AZ_RESOURCE_GROUP || 'rg-complainceia' }}
+  ACR: ${{ vars.AZ_ACR_NAME || 'acrcomplainceia' }}
+
+jobs:
+  desplegar:
+    name: Desplegar en staging
+    # Automático: solo si CI pasó en un push a main. Manual: solo desde main.
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      REGISTRY_USERNAME: ${{ secrets.API_REGISTRY_USERNAME }}
+    steps:
+      - name: Qué versión se despliega
+        id: version
+        run: |
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          etiqueta="${{ inputs.etiqueta }}"
+          if [ -n "$etiqueta" ]; then construir=false; else etiqueta="$sha"; construir=true; fi
+          migrar="${{ vars.MIGRACIONES_AUTOMATICAS || 'true' }}"
+          sembrar="${{ vars.SEMBRAR_AL_DESPLEGAR || 'false' }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            migrar="${{ inputs.migrar }}"; sembrar="${{ inputs.sembrar }}"
+          fi
+          {
+            echo "sha=$sha"; echo "etiqueta=$etiqueta"; echo "construir=$construir"
+            echo "migrar=$migrar"; echo "sembrar=$sembrar"
+          } >> "$GITHUB_OUTPUT"
+          echo "Etiqueta: $etiqueta · construir: $construir · migrar: $migrar · sembrar: $sembrar"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.sha }}
+
+      - name: Iniciar sesión en Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.API_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.API_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.API_AZURE_SUBSCRIPTION_ID }}
+
+      # ---------------------------------------------------------------- imágenes
+      - name: Iniciar sesión en el registro (usuario del ACR)
+        if: steps.version.outputs.construir == 'true' && env.REGISTRY_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR }}.azurecr.io
+          username: ${{ secrets.API_REGISTRY_USERNAME }}
+          password: ${{ secrets.API_REGISTRY_PASSWORD }}
+
+      - name: Iniciar sesión en el registro (identidad de Azure)
+        if: steps.version.outputs.construir == 'true' && env.REGISTRY_USERNAME == ''
+        run: az acr login --name "$ACR"
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.version.outputs.construir == 'true'
+
+      - name: Construir y publicar api:${{ steps.version.outputs.etiqueta }}
+        if: steps.version.outputs.construir == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: Proyecto/backend
+          push: true
+          tags: ${{ env.ACR }}.azurecr.io/api:${{ steps.version.outputs.etiqueta }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Construir y publicar web:${{ steps.version.outputs.etiqueta }}
+        if: steps.version.outputs.construir == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: Proyecto/frontend-next
+          push: true
+          tags: ${{ env.ACR }}.azurecr.io/web:${{ steps.version.outputs.etiqueta }}
+          build-args: |
+            API_URL=http://api
+            NEXT_PUBLIC_DEMO=0
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # ---------------------------------------------------------------- despliegue
+      - name: Migrar, actualizar las apps y probar
+        env:
+          MIGRAR: ${{ steps.version.outputs.migrar }}
+          SEMBRAR: ${{ steps.version.outputs.sembrar }}
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          bash .github/scripts/desplegar_staging.sh "${{ steps.version.outputs.etiqueta }}"
