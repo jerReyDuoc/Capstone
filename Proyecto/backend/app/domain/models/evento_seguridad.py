@@ -11,6 +11,7 @@ class OrigenEvento(str, Enum):
     TUTOR = "tutor"  # HU-15: mensaje al Agente IA Tutor
     TUTOR_ANTECEDENTE = "tutor_antecedente"  # HU-18: justificación guardada con inyección (se omitió)
     BORRADOR = "borrador"  # HU-16: instrucciones de redacción de un borrador
+    SALIDA_LLM = "salida_llm"  # HU-07: la verificación de la salida del modelo retuvo su propuesta
 
 
 class ResolucionEvento(str, Enum):

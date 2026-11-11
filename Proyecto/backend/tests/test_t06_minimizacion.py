@@ -195,7 +195,9 @@ def test_h2_datos_extraidos_por_el_llm_no_se_persisten():
             )
 
     storage, _ = _storage()
-    ruta = asyncio.run(storage.save(b"Acta de directorio", "acta.txt"))
+    # HU-07: el dato extraído tiene que estar en la evidencia; si no, la verificación de la salida
+    # lo toma como alucinación y la propuesta no se aplica (ver test_hu07_*).
+    ruta = asyncio.run(storage.save("Acta de directorio firmada por Juan Pérez Soto".encode(), "acta.txt"))
     evidencia = Evidencia(id_evidencia=99, respuesta_id=10, nombre_archivo="acta.txt", storage_path=ruta,
                           mime_type="text/plain", hash_archivo="0" * 64,
                           estado_validacion=EstadoValidacion.PENDING.value)

@@ -152,6 +152,19 @@ services:
       api:
         condition: service_healthy
 
+  # HU-07 (opcional): modelo LOCAL con Ollama. No se levanta con "docker compose up": se activa con
+  #     docker compose --profile modelo-local up -d
+  #     docker compose exec ollama ollama pull qwen2.5:7b-instruct
+  # y en Proyecto/.env: LLM_PROVIDER=ollama, LLM_MODEL=qwen2.5:7b-instruct (OLLAMA_URL ya apunta aquí).
+  # Sin puerto publicado: solo lo usan la API y el worker por la red interna.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["modelo-local"]
+    restart: unless-stopped
+    volumes:
+      - ollama_modelos:/root/.ollama
+
 volumes:
   postgres_data:   # mismo nombre que antes: se conservan los datos que ya tienes
   storage:
+  ollama_modelos:  # HU-07: modelos descargados por Ollama (perfil modelo-local)

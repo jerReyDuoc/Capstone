@@ -7,6 +7,7 @@ Cálculo de métricas de la capa de IA (funciones puras, sin BD).
   del Oficial de Cumplimiento (accuracy, precisión/recall/F1 por clase, matriz de
   confusión). Sin revisiones no hay precisión: se informa n=0.
 - Tutor IA (HU-15): tipos de respuesta, tasa fuera de alcance, advertencias de la salida
+- Verificación de la salida en evidencias (HU-07): tasa de alucinación y hallazgos por categoría
   (p. ej. brechas citadas fuera del contexto) y mensajes bloqueados por prompt injection.
 - Precisión del motor NER: contra un set etiquetado (gold set). Además de P/R/F1
   por tipo se reporta la "cobertura de PII": % de entidades reales que quedaron
@@ -101,6 +102,41 @@ def resumen_tutor(filas: list[FilaLlamada], tipos: list[str | None], bloqueados:
         "tasa_fuera_de_alcance": round(por_tipo["fuera_de_alcance"] / n, 4) if n else None,
         "advertencias_por_tipo": dict(sorted(adv.items())),
         "latencia_ms": {"p50": _percentil(latencias, 0.5), "p95": _percentil(latencias, 0.95)},
+    }
+
+
+# ---------------------------------------------------------------- verificación de la salida (HU-07)
+UMBRAL_TASA_ALUCINACION = 0.02
+
+
+def resumen_verificacion(filas: list[FilaLlamada], umbral: float = UMBRAL_TASA_ALUCINACION) -> dict:
+    """
+    `filas` son solo de la tarea validar_evidencia. Cada llamada exitosa guarda en `advertencias`
+    los códigos del verificador de salida; aquí se cuentan las salidas con al menos un hallazgo
+    GRAVE por categoría. La tasa de alucinación es la de las salidas del modelo (antes de que el
+    backend las retenga): es la que hay que mantener bajo el umbral.
+    """
+    from app.application.ai.verificacion_salida import CATEGORIA_POR_PREFIJO, CODIGOS_NO_BLOQUEANTES
+
+    exitosas = [f for f in filas if f.exito]
+    por_categoria = {c: 0 for c in CATEGORIA_POR_PREFIJO.values()}
+    por_codigo: dict[str, int] = {}
+    for f in exitosas:
+        graves = [c for c in (f.advertencias or []) if c not in CODIGOS_NO_BLOQUEANTES]
+        for c in graves:
+            por_codigo[c] = por_codigo.get(c, 0) + 1
+        for cat in {cat for pref, cat in CATEGORIA_POR_PREFIJO.items() if any(c.startswith(pref) for c in graves)}:
+            por_categoria[cat] += 1
+    n = len(exitosas)
+    tasa = round(por_categoria["alucinacion"] / n, 4) if n else None
+    return {
+        "salidas_verificadas": n,
+        "salidas_con_alucinacion": por_categoria["alucinacion"],
+        "tasa_alucinacion": tasa,
+        "umbral_tasa_alucinacion": umbral,
+        "cumple_umbral": (tasa <= umbral) if tasa is not None else None,
+        "salidas_por_categoria": por_categoria,
+        "hallazgos_por_codigo": dict(sorted(por_codigo.items())),
     }
 
 

@@ -31,9 +31,15 @@ from pydantic import BaseModel
 from app.application.ai.prompts import borrador as prompt_borrador
 from app.application.ai.prompts import tutor, validar_evidencia
 from app.application.ai.prompts.base import PromptRenderizado
+from app.application.ai.verificacion_salida import verificar_evidencia
 from app.application.schemas.borrador import BorradorIA
 from app.application.schemas.evidence_validation import EvidenceValidation
 from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
+
+
+# HU-07: el gateway agrega a los datos de `validar_salida` los textos no confiables tal como
+# salieron hacia el LLM (ya anonimizados), para verificar el respaldo de la salida.
+TEXTOS_ENVIADOS = "_textos_enviados"
 
 
 class TareaIA(str, Enum):
@@ -79,14 +85,25 @@ def _prompt_validar_evidencia(textos: dict[str, str], datos: dict[str, Any]) -> 
     )
 
 
-def _validar_salida_evidencia(r: EvidenceValidation, _datos: dict[str, Any] | None = None) -> list[str]:
-    """Reglas post-LLM que el schema no puede expresar. Generan advertencias auditables."""
-    adv = []
-    if not r.respalda_clasificacion_usuario and not (r.divergencia_explicada or "").strip():
-        adv.append("divergencia_sin_explicar")
-    if not (r.justificacion or "").strip():
-        adv.append("justificacion_vacia")
-    return adv
+def _validar_salida_evidencia(r: EvidenceValidation, datos: dict[str, Any] | None = None) -> list[str]:
+    """
+    Reglas post-LLM que el schema no puede expresar. Generan advertencias auditables (quedan en
+    llamadas_llm.advertencias). HU-07: verificación sintáctica, de alucinaciones (afirmaciones
+    sin respaldo en lo que recibió el modelo) y de fuga de contexto. Aquí solo se REGISTRAN;
+    la decisión (revisión humana y alerta) la toma ProcessEvidenceUseCase con el mismo verificador.
+    """
+    datos = datos or {}
+    textos = datos.get(TEXTOS_ENVIADOS) or {}
+    respuesta = datos.get("respuesta")
+    return verificar_evidencia(
+        r,
+        evidencia=textos.get("evidencia") if textos else None,
+        justificacion=textos.get("justificacion"),
+        control=datos.get("control"),
+        brecha=datos.get("brecha"),
+        declarado=getattr(respuesta, "estado_clasificacion", None),
+        system_prompt=validar_evidencia.SYSTEM,
+    ).codigos
 
 
 # ---------------------------------------------------------------- TUTOR (HU-15)

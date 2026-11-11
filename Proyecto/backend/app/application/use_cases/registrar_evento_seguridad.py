@@ -22,8 +22,9 @@ def _regla_segura(regla: str | None) -> str | None:
 
 class RegistrarEventoSeguridad:
     """
-    Guarda un intento de prompt injection y emite la alerta al Oficial de
-    Cumplimiento (por ahora: log WARNING; aquí se conectaría correo/Slack).
+    Guarda un intento de prompt injection (o, desde HU-07, una salida del modelo retenida por la
+    verificación: origen "salida_llm") y emite la alerta al Oficial de Cumplimiento (por ahora:
+    log WARNING; aquí se conectaría correo/Slack).
     Nunca debe romper el flujo principal: si falla el registro, solo se loguea.
     """
 
@@ -51,7 +52,7 @@ class RegistrarEventoSeguridad:
             extracto = None
 
         logger.warning(
-            "Prompt injection detectada (tipo=%s, regla=%s, origen=%s, evaluacion=%s, respuesta=%s, evidencia=%s, hash=%s)",
+            "Alerta de seguridad registrada (tipo=%s, regla=%s, origen=%s, evaluacion=%s, respuesta=%s, evidencia=%s, hash=%s)",
             tipo, regla, origen, evaluacion_id, respuesta_id, evidencia_id, hash_texto[:12],
         )
         try:

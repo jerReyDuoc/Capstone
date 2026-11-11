@@ -12,6 +12,13 @@ del LLM, y se verifican localmente los términos del control. Las evidencias de 
 (las que sube la empresa cliente sobre una evaluación ya completada) siguen reglas propias:
 nunca bajan un control, no tocan la respuesta si se bloquean por seguridad y, si mejoran el
 control, se recalcula el puntaje (resumen y radar) en el mismo proceso.
+
+HU-07: la SALIDA del modelo se verifica antes de usarla (app/application/ai/verificacion_salida.py):
+formato, afirmaciones sin respaldo en el documento (alucinaciones), fuga de datos personales o del
+system prompt y señales de que una inyección llegó al modelo. Con un hallazgo grave el backend no
+aplica la propuesta: la pregunta queda para revisión humana (en la remediación, el control no
+cambia) y se registra una alerta de seguridad con origen "salida_llm". MODO_VERIFICACION_SALIDA=marcar
+solo registra la alerta.
 """
 import logging
 from datetime import date
@@ -20,6 +27,9 @@ from types import SimpleNamespace
 from typing import Awaitable, Callable
 
 from app.application.ai.anonimizador import AnonimizadorPII
+from app.application.ai.verificacion_salida import (
+    ALUCINACION, FUGA, INYECCION, SINTAXIS, VerificacionSalida, verificar_evidencia,
+)
 from app.application.evidencias.archivos import ArchivoIlegibleError, extraer_texto, recuperar_fragmentos, terminos_control
 from app.core.config import settings
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
@@ -37,6 +47,19 @@ from app.infrastructure.repositories.respuesta_repository import RespuestaReposi
 logger = logging.getLogger("evidencias")
 
 NOMBRE_TEXTO_ANONIMIZADO = "evidencia_anonimizada.txt"
+
+# HU-07: lo que ve la organización cuando la verificación retiene la propuesta del modelo
+MENSAJE_VERIFICACION = {
+    ALUCINACION: "El análisis automático incluyó datos que no aparecen en tu documento (por ejemplo, fechas, "
+                 "cifras o citas).",
+    FUGA: "El análisis automático incluyó información que no debía mostrarse, así que lo ocultamos.",
+    INYECCION: "El análisis automático pudo verse influido por instrucciones escritas dentro del documento.",
+    SINTAXIS: "El análisis automático llegó con un formato que no pudimos validar.",
+}
+PENDIENTE_REVISION = " Para cuidar la calidad del resultado, esta pregunta quedó pendiente de revisión por nuestro equipo."
+CONTROL_SIN_CAMBIO = " El control conserva su estado actual mientras nuestro equipo revisa la evidencia."
+AVISO_VERIFICACION = ("Aviso: al revisar el análisis automático encontramos puntos que nuestro equipo revisará; "
+                      "el resultado podría ajustarse.")
 
 # HU-17: orden de "mejora" de un control en la remediación (no_aplica no es una mejora)
 RANGO_REMEDIACION = {
@@ -61,6 +84,7 @@ class ProcessEvidenceUseCase:
         puntaje_actual: Callable[[int], Awaitable[float | None]] | None = None,
         auditar: Callable[[Evidencia, Respuesta | None], Awaitable[None]] | None = None,
         auditar_supresion: Callable[[Evidencia], None] | None = None,
+        verificador: Callable[..., VerificacionSalida] | None = verificar_evidencia,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
@@ -80,6 +104,8 @@ class ProcessEvidenceUseCase:
         # HU-09: registra en el audit_log (sin commit) que el archivo original se suprimió y
         # quedó solo su texto anonimizado; va en la misma transacción que el cambio de ruta.
         self.auditar_supresion = auditar_supresion
+        # HU-07: verificación de la salida del modelo (None la desactiva; solo para pruebas)
+        self.verificador = verificador
 
     async def execute(self, evidencia_id: int) -> Evidencia:
         evidencia = await self.evidencia_repo.get(evidencia_id)
@@ -284,6 +310,25 @@ class ProcessEvidenceUseCase:
                 evidencia.fecha_procesada = date.today()
                 return await self.evidencia_repo.update(evidencia)
 
+            # 3b. HU-07: verificar la salida del modelo ANTES de usarla o guardarla
+            verificacion = self._verificar(result, contenido, justificacion, control, brecha,
+                                           respuesta_prompt.estado_clasificacion)
+            if verificacion is not None:
+                result = verificacion.salida if verificacion.salida is not None else result
+                if self._retener(verificacion, result):
+                    await self._registrar(
+                        respuesta, evidencia, OrigenEvento.SALIDA_LLM.value, _texto_alerta(result), control,
+                        f"salida.{verificacion.principal.codigo}", tipo=verificacion.principal.categoria,
+                    )
+                    if settings.MODO_VERIFICACION_SALIDA == "bloquear":
+                        self._retener_propuesta(respuesta, evidencia, control, verificacion, remediacion)
+                        if not remediacion:
+                            await self.respuesta_repo.update(respuesta)
+                        return await self.evidencia_repo.update(evidencia)
+                    evidencia_sospechosa = evidencia_sospechosa or verificacion.tiene(INYECCION)
+                else:
+                    verificacion = None  # nada grave: se sigue como siempre
+
             # 4. Persistir el resultado crudo del LLM en Evidencias
             evidencia.clasificacion_llm = result.clasificacion
             evidencia.confianza = result.confianza
@@ -308,6 +353,8 @@ class ProcessEvidenceUseCase:
                     "Advertencia de seguridad: la evidencia contiene texto que parece "
                     "instrucciones para la IA. Evento registrado para revisión."
                 ]
+            if verificacion is not None:  # HU-07 en modo "marcar"
+                evidencia.errores_validacion = list(evidencia.errores_validacion or []) + [AVISO_VERIFICACION]
 
             await self.respuesta_repo.update(respuesta)
             return await self.evidencia_repo.update(evidencia)
@@ -410,7 +457,7 @@ class ProcessEvidenceUseCase:
         await self._registrar(respuesta, evidencia, origen, texto, control, regla)
 
     async def _registrar(self, respuesta, evidencia, origen: str, texto: str, control,
-                         regla: str | None = None) -> None:
+                         regla: str | None = None, tipo: str = "prompt_injection") -> None:
         if self.registrar_evento:
             await self.registrar_evento.execute(
                 texto=texto,
@@ -419,8 +466,63 @@ class ProcessEvidenceUseCase:
                 matriz_control_id=getattr(control, "id_control", None),
                 respuesta_id=respuesta.id,
                 evidencia_id=evidencia.id_evidencia,
+                tipo=tipo,
                 regla=regla,
             )
+
+    # ------------------------------------------------------------------ HU-07
+    def _verificar(self, result, contenido: str, justificacion: str, control, brecha,
+                   declarado: str | None) -> VerificacionSalida | None:
+        """Nunca rompe el flujo: si el verificador falla se registra y se sigue como antes."""
+        if self.verificador is None:
+            return None
+        try:
+            return self.verificador(result, evidencia=contenido, justificacion=justificacion, control=control,
+                                    brecha=brecha, declarado=declarado)
+        except Exception as e:  # noqa: BLE001
+            logger.error("HU-07: no se pudo verificar la salida del modelo (%s)", type(e).__name__)
+            return None
+
+    @staticmethod
+    def _retener(verificacion: VerificacionSalida, result) -> bool:
+        """
+        ¿La salida tiene un hallazgo que impide usarla? Una alucinación con confianza bajo el
+        umbral no se retiene: esa propuesta ya se descarta (fallback a lo declarado). Las fugas,
+        las inyecciones y los errores de formato se retienen siempre (la salida se guarda y se ve).
+        """
+        if not verificacion.bloqueante:
+            return False
+        if any(h.bloqueante and h.categoria != ALUCINACION for h in verificacion.hallazgos):
+            return True
+        confianza = getattr(result, "confianza", None)
+        return isinstance(confianza, (int, float)) and confianza >= settings.UMBRAL_CONFIANZA
+
+    @staticmethod
+    def _retener_propuesta(respuesta: Respuesta, evidencia: Evidencia, control, verificacion: VerificacionSalida,
+                           remediacion: bool) -> None:
+        """
+        La propuesta del modelo no se aplica ni se muestra a la organización (podría ser falsa):
+        la evidencia queda rechazada con un mensaje claro y la alerta lleva lo que dijo el modelo.
+        En el cuestionario la pregunta queda en 'requiere_revision' (bandeja de revisión humana);
+        en la remediación el control no cambia (una evidencia nueva nunca lo baja).
+        """
+        principal = verificacion.principal
+        mensaje = MENSAJE_VERIFICACION.get(principal.categoria, MENSAJE_VERIFICACION[ALUCINACION])
+        evidencia.estado_validacion = EstadoValidacion.REJECTED.value
+        evidencia.clasificacion_llm = None
+        evidencia.confianza = None
+        evidencia.justificacion_llm = None
+        evidencia.datos_extraidos = None
+        evidencia.fecha_procesada = date.today()
+        if remediacion:
+            evidencia.errores_validacion = [mensaje + CONTROL_SIN_CAMBIO]
+            return
+        evidencia.errores_validacion = [mensaje + PENDIENTE_REVISION]
+        respuesta.estado_clasificacion_final = EstadoClasificacion.REQUIERE_REVISION.value
+        respuesta.fuente_clasificacion = FuenteClasificacion.SEGURIDAD.value
+        respuesta.confianza_clasificacion = None
+        respuesta.fecha_validacion = date.today()
+        respuesta.sincronizar_brecha(control)
 
     async def _apply_classification_decision(
         self,
@@ -465,3 +567,10 @@ class ProcessEvidenceUseCase:
         # Regla 3: BRECHA (regla de negocio, no LLM): se asigna si el estado final es
         # no_cumplido y se quita en cualquier otro (p. ej. una evidencia nueva lo mejora)
         respuesta.sincronizar_brecha(control)
+
+def _texto_alerta(result) -> str:
+    """Lo que dijo el modelo, para el Oficial de Cumplimiento (RegistrarEventoSeguridad lo anonimiza)."""
+    conf = getattr(result, "confianza", None)
+    conf_txt = f"{conf:.2f}" if isinstance(conf, (int, float)) and not isinstance(conf, bool) else "sin dato"
+    return (f"Propuesta de la IA: {getattr(result, 'clasificacion', None)} (confianza {conf_txt}). "
+            f"{getattr(result, 'justificacion', '') or ''}")

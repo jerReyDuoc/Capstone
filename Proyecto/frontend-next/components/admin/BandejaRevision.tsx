@@ -19,6 +19,7 @@ import {
   cadenaDecision,
   COMENTARIO_MAX,
   decisionDe,
+  describirHallazgo,
   errorComentario,
   fechaCorta,
   FILTROS_INICIALES,
@@ -27,14 +28,15 @@ import {
   NOMBRE_CLASIFICACION,
   NOMBRE_FUENTE,
   NOMBRE_ORIGEN_EVENTO,
-  NOMBRE_RESOLUCION,
   nombreClasificacion,
+  nombreTipoEvento,
   porcentaje,
   RESOLUTIVAS,
   siguientePendiente,
   sugerida,
   TEXTO_MOTIVO,
   textoBotonDecision,
+  textosEvento,
   TONO_CLASIFICACION,
   TONO_MOTIVO,
   type Bandeja,
@@ -461,10 +463,10 @@ function ListaEventos({ items, cargando, filtros, seleccion, abrir }: {
             </span>
             <span className={s.filaPregunta}>{ev.extracto ?? "Extracto eliminado por la política de retención"}</span>
             <span className={s.filaMotivos}>
-              <span className="badge tone-alto">{(ev.tipo ?? "evento").replace(/_/g, " ")}</span>
+              <span className="badge tone-alto">{nombreTipoEvento(ev.tipo)}</span>
               {ev.revision?.resolucion ? (
                 <span className={`badge tone-${ev.revision.resolucion === "falso_positivo" ? "info" : "ok"}`}>
-                  {NOMBRE_RESOLUCION[ev.revision.resolucion]}
+                  {textosEvento(ev).nombreOpcion[ev.revision.resolucion]}
                 </span>
               ) : ev.revision ? <span className="badge tone-info">Revisado sin veredicto</span> : null}
             </span>
@@ -663,9 +665,10 @@ function PanelRespuesta({ id, umbral, volver, onError, onResuelta }: {
             {d.eventos.map((ev) => (
               <div key={ev.id} className={s.seccion}>
                 <span className={s.nota}>{NOMBRE_ORIGEN_EVENTO[ev.origen] ?? ev.origen} · {fechaCorta(ev.fecha)}
-                  {ev.revision?.resolucion ? ` · ${NOMBRE_RESOLUCION[ev.revision.resolucion]}` : " · sin resolver"}</span>
+                  {ev.revision?.resolucion ? ` · ${textosEvento(ev).nombreOpcion[ev.revision.resolucion]}` : " · sin resolver"}</span>
                 <blockquote className={s.extracto}>{ev.extracto ?? "Extracto eliminado por la política de retención."}</blockquote>
-                {ev.regla ? <p className={s.nota}>Regla que bloqueó: <code>{ev.regla}</code></p> : null}
+                {describirHallazgo(ev.regla) ? <p className={s.nota}>{describirHallazgo(ev.regla)}</p> : null}
+                {ev.regla ? <p className={s.nota}>{textosEvento(ev).etiquetaRegla}: <code>{ev.regla}</code></p> : null}
               </div>
             ))}
           </section>
@@ -715,6 +718,8 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
 
   if (!evento) return <p className={s.vacio}>Este evento ya no está en la lista.</p>;
   const ev = evento;
+  const t = textosEvento(ev);
+  const hallazgo = describirHallazgo(ev.regla);
   const errComentario = errorComentario(comentario);
 
   async function enviar(e: FormEvent) {
@@ -726,7 +731,7 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
       await apiRevision.revisarEvento(ev.id, resolucion, comentario.trim());
       onResuelto(resolucion === "falso_positivo"
         ? "Marcaste el evento como falso positivo." + (ev.respuesta_id ? " Revisa también la clasificación de esa pregunta." : "")
-        : "Confirmaste el ataque.");
+        : t.confirmado);
     } catch (err) {
       onError(err);
     } finally {
@@ -744,16 +749,16 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
           {ev.evaluacion_id ? <span>Evaluación {ev.evaluacion_id}</span> : null}
           {ev.control?.codigo ? <span className={s.codigo}>{ev.control.codigo}</span> : null}
         </div>
-        <h2 ref={titulo} tabIndex={-1} className={s.detalleTitulo}>Posible intento de manipular a la IA</h2>
+        <h2 ref={titulo} tabIndex={-1} className={s.detalleTitulo}>{t.titulo}</h2>
       </div>
       <div className={s.detalleCuerpo}>
         <section className={s.seccion}>
-          <p className={s.texto}>Texto detectado (ya anonimizado). No se envió a la IA.</p>
+          <p className={s.texto}>{t.intro}</p>
           <blockquote className={s.extracto}>{ev.extracto ?? "Extracto eliminado por la política de retención."}</blockquote>
+          {hallazgo ? <p className={s.texto}>{hallazgo}</p> : null}
           {ev.regla ? (
             <p className={s.texto}>
-              Regla que bloqueó: <code>{ev.regla}</code>. Si el texto era legítimo, márcalo como falso positivo
-              para afinar esta regla.
+              {t.etiquetaRegla}: <code>{ev.regla}</code>. {t.ayudaRegla}
             </p>
           ) : null}
           {ev.control?.pregunta ? <p className={s.texto}>Pregunta: {ev.control.pregunta}</p> : null}
@@ -769,13 +774,13 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
         <form className={s.decision} onSubmit={enviar} noValidate>
           <h3 className={s.seccionTitulo}>Tu veredicto</h3>
           <fieldset className={s.opciones}>
-            <legend>¿Era un ataque?</legend>
+            <legend>{t.pregunta}</legend>
             {(["ataque_confirmado", "falso_positivo"] as Resolucion[]).map((op) => (
               <label key={op} className={s.opcion}>
                 <input type="radio" name={`res-${ev.id}`} checked={resolucion === op} onChange={() => setResolucion(op)} />
                 <span className={s.etiquetaOpcion}>
-                  <span>{NOMBRE_RESOLUCION[op]}</span>
-                  <small>{op === "ataque_confirmado" ? "La detección acertó" : "El texto era legítimo"}</small>
+                  <span>{t.nombreOpcion[op]}</span>
+                  <small>{t.ayudaOpcion[op]}</small>
                 </span>
               </label>
             ))}
@@ -784,7 +789,7 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
             <label htmlFor={idComentario}>Comentario</label>
             <textarea id={idComentario} className={s.areaComentario} value={comentario}
                       aria-invalid={intento && Boolean(errComentario)} aria-describedby={`${idComentario}-a`}
-                      placeholder="Por qué lo consideras un ataque o un falso positivo."
+                      placeholder={t.placeholder}
                       onChange={(e) => setComentario(e.target.value)} />
             <div className={s.pieCampo} id={`${idComentario}-a`}>
               <span className={intento && errComentario ? s.errorCampo : undefined}>
@@ -795,7 +800,7 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
           </div>
           <div className={s.acciones}>
             <button type="submit" className="btn btn-primary" disabled={!resolucion || enviando}>
-              {enviando ? "Guardando…" : resolucion ? `Guardar como «${NOMBRE_RESOLUCION[resolucion]}»` : "Elige un veredicto"}
+              {enviando ? "Guardando…" : resolucion ? `Guardar como «${t.nombreOpcion[resolucion]}»` : "Elige un veredicto"}
             </button>
           </div>
         </form>
@@ -804,7 +809,7 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
           <section className={s.seccion}>
             <h3 className={s.seccionTitulo}>Revisión anterior</h3>
             <p className={s.texto}>
-              {ev.revision.resolucion ? NOMBRE_RESOLUCION[ev.revision.resolucion] : "Revisado sin veredicto"} · {fechaCorta(ev.revision.fecha)}
+              {ev.revision.resolucion ? t.nombreOpcion[ev.revision.resolucion] : "Revisado sin veredicto"} · {fechaCorta(ev.revision.fecha)}
               {ev.revision.comentario ? `\n${ev.revision.comentario}` : ""}
             </p>
           </section>

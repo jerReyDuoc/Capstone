@@ -8,7 +8,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { obtenerEvidencia } from "@/lib/cuestionario/api";
-import { ESTADO_EVIDENCIA, ESTADO_POR_VALOR, esEstadoDeclarado, evidenciaEnCurso, type EvidenciaApi } from "@/lib/cuestionario/modelo";
+import {
+  ESTADO_EVIDENCIA, ESTADO_POR_VALOR, esEstadoDeclarado, evidenciaEnCurso, motivoEvidencia, type EvidenciaApi,
+} from "@/lib/cuestionario/modelo";
 import s from "./cuestionario.module.css";
 
 const ESPERA_INICIAL_MS = 2500;
@@ -66,6 +68,7 @@ export function ListaEvidencias({ evidencias }: { evidencias: EvidenciaApi[] }) 
       {evidencias.map((e) => {
         const est = ESTADO_EVIDENCIA[e.estado_validacion] ?? { etiqueta: e.estado_validacion, tono: "bajo" as const };
         const clasif = esEstadoDeclarado(e.clasificacion_llm) ? ESTADO_POR_VALOR[e.clasificacion_llm].etiqueta : null;
+        const motivo = motivoEvidencia(e);
         return (
           <li key={e.id_evidencia} className={s.evidenciaItem}>
             <div className={s.evidenciaFila}>
@@ -79,6 +82,7 @@ export function ListaEvidencias({ evidencias }: { evidencias: EvidenciaApi[] }) 
                 {e.justificacion_llm ? ` ${e.justificacion_llm}` : ""}
               </p>
             ) : null}
+            {motivo ? <p className={s.evidenciaLlm}>{motivo}</p> : null}
           </li>
         );
       })}

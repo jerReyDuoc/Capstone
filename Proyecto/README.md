@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 11-nov-2026 (HU-23: pipeline de CI en cada pull request y despliegue automático a staging en Azure) |
+| **Última actualización** | 11-nov-2026 (HU-07: pruebas de alucinación y verificación de las salidas del modelo, saneamiento de entrada OWASP LLM01 y modelo local opcional) |
 
 ---
 
@@ -87,7 +87,8 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Motor NER de anonimización + cifrado del mapa de entidades | ✅ Hecho | spaCy `es_core_news_md` + reglas; fail-closed. **v1.1.0 optimizada (T-04): 25 ms por página (p95), precisión 0,988, cobertura de PII 100 %** |
 | PII → tokens antes de persistir (HU-06) | ✅ Hecho | Justificaciones y nombres de archivo anonimizados al guardar; evidencias cifradas en disco y reemplazadas por su texto anonimizado; mapa de entidades irreversible; textos ARCOP cifrados (excepción); prueba de regresión sobre BD, disco y logs. Ver `Extras/Cambios/backend/CAMBIOS_HU06.md` |
 | Minimización de datos y plazos de conservación (T-06) | ✅ Hecho | Inventario de las 171 columnas (26 con datos personales, en 9 tablas) con finalidad, base de licitud y plazo; auditoría de solo lectura sobre la BD real (DER, matriz, escaneo de contenido); anonimización por plazo vencido (cron diario, plazos pendientes del PO). Ver `Extras/Cambios/backend/CAMBIOS_T06.md` |
-| Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos |
+| Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos. HU-07: reglas multilenguaje (inglés, portugués, francés, alemán, italiano) e indirectas, y saneamiento de caracteres invisibles, separadores y marcadores de turno antes del prompt |
+| Verificación de las salidas del modelo (HU-07) | ✅ Hecho | Cada propuesta del modelo sobre una evidencia se revisa antes de usarla: formato (LLM05), afirmaciones sin respaldo en el documento (alucinaciones, LLM09), fuga de datos personales o del system prompt (LLM02/LLM07) e inyecciones que llegaron al modelo (LLM01). Con un hallazgo grave la pregunta queda para revisión humana y se registra una alerta (`origen=salida_llm`). Test-set de 124 casos borde (alucinación residual < 2 %), set de 131 ataques/legítimos OWASP, métricas en `GET /api/ia/metricas` y prueba en vivo con `scripts/evaluar_alucinaciones.py` contra Groq o un **modelo local** (Ollama, perfil `modelo-local`). Ver `Extras/Cambios/backend/CAMBIOS_HU07.md` |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado **al completar cada evaluación** y por cron diario; la comparativa trae siempre la **meta de cumplimiento** (75) y el promedio del rubro solo con ≥ 3 evaluaciones (ver [5.7](#57-benchmark-sectorial-y-meta-de-cumplimiento)) |
 | Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `Extras/Cambios/CAMBIOS_HU12.md` |
 | Informe PDF y envío por correo | ✅ Hecho | El servidor genera el PDF (resultado, comparativa, brechas priorizadas y plan formativo): se **descarga directo** desde el panel (ya no abre la impresión) y se **envía por correo** como adjunto (SMTP, p. ej. Gmail). Ver [5.11](#511-informe-pdf-y-envío-por-correo) y la guía `frontend-next/docs/Guia_envio_informe_por_correo.pdf` |
@@ -845,7 +846,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
    3. Auditoría     mapa de entidades CIFRADO en `sanitizaciones` ── no se puede guardar ⇒ ABORTA
    4. Prompt        plantilla versionada (validar_evidencia/1.2.0) SOLO con texto sanitizado
    5. Proveedor     LLMProviderPort → GroqProvider (reintentos 429/5xx, timeout)
-   6. Validación    schema Pydantic + reglas post-salida (p. ej. divergencia sin explicar)
+   6. Validación    schema Pydantic + reglas post-salida (HU-07: formato, alucinaciones, fuga de contexto e inyección)
    7. Métricas      una fila en `llamadas_llm` por ejecución, con éxito o con tipo de error
 ```
 
@@ -861,6 +862,10 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 
 **Cifrado:** Fernet con `ENTITY_MAP_KEY`; las entidades además llevan una huella HMAC que permite buscar coincidencias sin descifrar. Guarda la clave fuera del repositorio: sin ella los mapas ya guardados no se pueden descifrar.
 
+**Verificación de la salida (HU-07):** `app/application/ai/verificacion_salida.py` revisa cada respuesta de `validar_evidencia` contra lo que recibió el modelo. El gateway deja los códigos en `llamadas_llm.advertencias` y `ProcessEvidenceUseCase` decide: con un hallazgo grave (cita, cifra, fecha, artículo o dato sin respaldo; "cumplido" sobre evidencia vacía; datos personales o system prompt en la salida; inyección obedecida; formato inválido) la propuesta no se aplica, la pregunta queda en `requiere_revision` (en la remediación, el control no cambia) y se registra el evento `salida_llm`. Una alucinación con confianza bajo el umbral no se retiene porque esa propuesta ya se descarta. `GET /api/ia/metricas` trae `verificacion_salida` con la tasa de alucinación (umbral 2 %).
+
+**Modelo local (HU-07):** `LLM_PROVIDER=ollama` usa `infrastructure/llm/ollama_provider.py` (salida estructurada con el JSON Schema en `format`). Se levanta con `docker compose --profile modelo-local up -d` y `docker compose exec ollama ollama pull qwen2.5:7b-instruct`.
+
 **Agregar una tarea nueva** (p. ej. recomendación de ruta formativa): crear su prompt en `ai/prompts/<tarea>.py` con `PROMPT_VERSION`, su schema Pydantic y registrar una `PoliticaTarea` en `crear_politicas`. **Cambiar de proveedor:** crear un adaptador de `LLMProviderPort` en `infrastructure/llm/`, registrarlo en `factory.py` y cambiar `LLM_PROVIDER`/`LLM_MODEL`.
 
 ---
@@ -874,6 +879,8 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 | PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `cifrado_columnas.py`, `test_hu06_regresion_pii.py` |
 | Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); perfil **estricto**; bloqueo 422 y registro con la regla que disparó | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
 | Prompt injection en evidencias | Perfil **evidencia** (HU-33): el vocabulario de cumplimiento (aprobar, ejecutar, registrar, marcar...) solo bloquea si va dirigido a la IA o al resultado; las señales fuertes (texto oculto, bidi/"tag", codificado, "si eres una IA", delimitadores, cambio de rol) siempre. `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `seguridad.py`, `process_evidence.py`, `test_hu33_*.py` |
+| Prompt injection multilenguaje e indirecta (HU-07) | Reglas en inglés, portugués, francés, alemán e italiano (notas para la IA, "si eres una IA", ignorar instrucciones, forzar el resultado, cambio de rol), nombres de campos del schema, pedidos de reglas recibidas y de datos anonimizados; antes del prompt se quitan caracteres invisibles, bidi, "tag" y de control y se neutralizan separadores (`═══`) y marcadores de turno (`[INST]`, `<<SYS>>`, `<\|...\|>`) | `seguridad.py`, `prompts/base.py`, `test_hu07_owasp_entrada.py` |
+| Alucinaciones y salidas inseguras del modelo (HU-07) | Verificador determinista de cada salida: formato, citas, cifras, fechas, artículos, códigos de control y datos extraídos sin respaldo; datos personales, reidentificación y system prompt en la salida; señales de inyección obedecida. Salida saneada antes de guardarla; con un hallazgo grave la pregunta queda en `requiere_revision` y se registra la alerta `salida_llm` | `verificacion_salida.py`, `process_evidence.py`, `test_hu07_*.py` |
 | Que una inyección suba el puntaje | `requiere_revision` vale 0 y cuenta en el denominador | `generate_resumen.py` |
 | Derechos del titular | Solicitudes ARCOP con trazabilidad completa y anonimización irreversible al aprobar una supresión | `gestionar_solicitud_arcop.py`, `anonimizacion_repository.py` |
 | Credenciales | PBKDF2-SHA256 600k, tokens HMAC con expiración, revocación inmediata, errores genéricos | `autenticacion.py` |
@@ -1099,8 +1106,9 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backe
 | `DATABASE_URL` | — (obligatoria) | URL async (`postgresql+asyncpg://…`) |
 | `DATABASE_URL_SYNC` | — (obligatoria) | URL síncrona para Alembic (`postgresql+psycopg2://…`) |
 | `REDIS_URL` | — (obligatoria) | Redis para ARQ |
-| `GROQ_API_KEY` | — (obligatoria) | Clave de Groq |
-| `LLM_PROVIDER` | `groq` | Proveedor del LLM |
+| `GROQ_API_KEY` | — (obligatoria con `LLM_PROVIDER=groq`) | Clave de Groq |
+| `LLM_PROVIDER` | `groq` | Proveedor del LLM: `groq` u `ollama` (HU-07: modelo local; con `ollama` no se exige `GROQ_API_KEY`) |
+| `OLLAMA_URL` | `http://ollama:11434` | HU-07: servidor del modelo local (servicio `ollama`, perfil `modelo-local` del compose) |
 | `LLM_MODEL` | `openai/gpt-oss-safeguard-20b` | Modelo (con *structured outputs*) |
 | `LLM_TIMEOUT_S` / `LLM_MAX_REINTENTOS` | `60` / `2` | Timeout por intento y reintentos (429/5xx) |
 | `LLM_MAX_TOKENS_SALIDA` | `1500` | Tope de tokens de respuesta |
@@ -1109,6 +1117,7 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backe
 | `JUSTIFICACION_MIN_CARACTERES` | `20` | HU-02: largo mínimo de la justificación en `parcialmente_cumplido` y `requiere_revision` |
 | `MAX_CHARS_EVIDENCIA_LLM` / `MAX_CHARS_JUSTIFICACION_LLM` | `8000` / `4000` | Caracteres enviados al LLM (tras sanitizar) |
 | `MODO_SEGURIDAD_EVIDENCIA` | `bloquear` | `bloquear` o `marcar` ante posible inyección en evidencias |
+| `MODO_VERIFICACION_SALIDA` | `bloquear` | HU-07: `bloquear` (la propuesta del modelo con un hallazgo grave no se aplica y la pregunta queda para revisión) o `marcar` (solo se registra la alerta) |
 | `SANITIZER_ENABLED` | `true` | Anonimización NER antes del LLM (`false` solo debug) |
 | `ENTITY_MAP_KEY` | — | Clave maestra Fernet: huellas del mapa, cifrado de evidencias y de textos ARCOP (obligatoria) |
 | `GUARDAR_MAPA_ENTIDADES_CIFRADO` | `false` | HU-06: `true` reactiva el mapa reversible (debe documentarse como excepción) |
@@ -1153,6 +1162,9 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
 | `test_capa_ia.py` | 17 | AIGateway contra las reglas R1–R6 |
 | `test_seguridad_integracion.py` | 11 | Capa anti prompt-injection en el backend |
+| `test_hu07_verificacion_salida.py` | 20 (144 casos) | HU-07: test-set de 124 salidas (alucinación residual < 2 %, 100 % de fugas, inyecciones y salidas inseguras, ≤ 5 % de falsos positivos), saneamiento de la salida y métricas |
+| `test_hu07_owasp_entrada.py` | 13 (54 casos) | HU-07: 96 ataques OWASP LLM01 (directos, indirectos, multilenguaje, codificados, ofuscados, delimitadores, fuga y exfiltración) al 100 %, legítimos multilenguaje y frases frontera sin bloqueo, saneamiento antes del prompt |
+| `test_hu07_integracion.py` | 19 (22 casos) | HU-07: revisión humana y alerta al retener una salida, confianza baja, remediación, modo `marcar`, hallazgos en `llamadas_llm`, proveedor local (Ollama) y configuración |
 | `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
 | `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
 | `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |

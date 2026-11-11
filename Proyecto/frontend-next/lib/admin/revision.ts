@@ -170,7 +170,9 @@ export const MOTIVOS: Motivo[] = ["seguridad", "divergencia", "sin_resolver", "b
 export const TEXTO_MOTIVO: Record<Motivo, { corto: string; ayuda: string }> = {
   seguridad: {
     corto: "Bloqueo de seguridad",
-    ayuda: "La capa de seguridad detectó un posible intento de manipular a la IA en la justificación o en una evidencia.",
+    ayuda:
+      "La capa de seguridad detectó un posible intento de manipular a la IA en la justificación o en una evidencia, " +
+      "o la revisión automática de la respuesta de la IA encontró datos sin respaldo en el documento o información que no debía mostrarse.",
   },
   divergencia: {
     corto: "La IA no coincide",
@@ -209,7 +211,83 @@ export const NOMBRE_ORIGEN_EVENTO: Record<string, string> = {
   tutor: "Mensaje al Tutor IA",
   tutor_antecedente: "Antecedente omitido por el Tutor IA",
   borrador: "Instrucciones de un borrador",
+  salida_llm: "Respuesta de la IA retenida por la verificación",
 };
+
+/** Origen de los eventos que nacen al revisar la RESPUESTA de la IA (no un texto de la organización). */
+export const ORIGEN_SALIDA_IA = "salida_llm";
+
+export const NOMBRE_TIPO_EVENTO: Record<string, string> = {
+  prompt_injection: "Intento de manipulación",
+  inyeccion: "Instrucciones a la IA",
+  jailbreak: "Cambio de rol",
+  fuga_prompt: "Pedido de configuración interna",
+  fuga_prompt_salida: "Configuración interna en la respuesta",
+  delimitadores: "Delimitadores falsos",
+  codificado: "Texto codificado",
+  uso_indebido: "Uso indebido",
+  abuso_reiterado: "Intentos reiterados",
+  alucinacion: "Datos sin respaldo",
+  fuga_contexto: "Información que no debía mostrarse",
+  inyeccion_salida: "IA influida por el documento",
+  salida_insegura: "Formato inseguro",
+};
+
+export const nombreTipoEvento = (tipo: string | null | undefined): string =>
+  (tipo && NOMBRE_TIPO_EVENTO[tipo]) || (tipo ?? "evento").replace(/_/g, " ");
+
+/** Qué encontró la verificación de la respuesta de la IA, en palabras (la regla sigue visible para el detalle técnico). */
+export const DESCRIPCION_HALLAZGO: Record<string, string> = {
+  "alucinacion.cumplimiento_sin_evidencia": "Dio por cumplido el control con un documento vacío o que ella misma consideró insuficiente.",
+  "alucinacion.cita_inexistente": "Citó entre comillas un texto que no está en el documento.",
+  "alucinacion.dato_inexistente": "Extrajo un dato que no aparece en el documento.",
+  "alucinacion.cifra_inexistente": "Mencionó una cifra que no aparece en el documento.",
+  "alucinacion.fecha_inexistente": "Mencionó una fecha que no aparece en el documento.",
+  "alucinacion.articulo_inexistente": "Citó un artículo o cláusula que no es del control ni aparece en el documento.",
+  "alucinacion.control_ajeno": "Mencionó el código de otro control.",
+  "fuga.datos_personales": "Incluyó un RUT, correo o teléfono (el documento le llegó anonimizado).",
+  "fuga.reidentificacion": "Intentó adivinar a quién corresponde un dato anonimizado.",
+  "fuga.prompt_sistema": "Reprodujo parte de sus instrucciones internas.",
+  "inyeccion.obediencia": "Dijo haber seguido instrucciones escritas en el documento.",
+  "inyeccion.no_degradada": "Reconoció instrucciones dirigidas a la IA, pero igual dio el control por cumplido.",
+  "sintaxis.clasificacion_invalida": "Devolvió una clasificación que no existe.",
+  "sintaxis.confianza_invalida": "Devolvió una confianza fuera del rango permitido.",
+  "sintaxis.codigo_activo": "Incluyó código HTML o JavaScript.",
+  "sintaxis.enlace_externo": "Incluyó un enlace que no está en el documento.",
+};
+
+export function describirHallazgo(regla: string | null | undefined): string | null {
+  if (!regla) return null;
+  return DESCRIPCION_HALLAZGO[regla.replace(/^salida\./, "")] ?? null;
+}
+
+/** Textos del detalle de un evento: cambian si el evento viene de la respuesta de la IA. */
+export function textosEvento(ev: Pick<ItemEvento, "origen">) {
+  if (ev.origen === ORIGEN_SALIDA_IA) {
+    return {
+      titulo: "La respuesta de la IA no pasó la verificación",
+      intro: "Propuesta de la IA (ya anonimizada). No se aplicó: la pregunta quedó pendiente de tu revisión.",
+      etiquetaRegla: "Hallazgo",
+      ayudaRegla: "Si la respuesta era correcta, márcala como falso positivo para afinar la verificación.",
+      pregunta: "¿La verificación acertó?",
+      ayudaOpcion: { ataque_confirmado: "La respuesta tenía el problema", falso_positivo: "La respuesta era correcta" },
+      nombreOpcion: { ataque_confirmado: "Problema confirmado", falso_positivo: "Falso positivo" },
+      placeholder: "Qué encontraste al comparar la respuesta con el documento.",
+      confirmado: "Confirmaste el problema en la respuesta de la IA.",
+    };
+  }
+  return {
+    titulo: "Posible intento de manipular a la IA",
+    intro: "Texto detectado (ya anonimizado). No se envió a la IA.",
+    etiquetaRegla: "Regla que bloqueó",
+    ayudaRegla: "Si el texto era legítimo, márcalo como falso positivo para afinar esta regla.",
+    pregunta: "¿Era un ataque?",
+    ayudaOpcion: { ataque_confirmado: "La detección acertó", falso_positivo: "El texto era legítimo" },
+    nombreOpcion: NOMBRE_RESOLUCION,
+    placeholder: "Por qué lo consideras un ataque o un falso positivo.",
+    confirmado: "Confirmaste el ataque.",
+  };
+}
 
 export const NOMBRE_RESOLUCION: Record<Resolucion, string> = {
   ataque_confirmado: "Ataque confirmado",

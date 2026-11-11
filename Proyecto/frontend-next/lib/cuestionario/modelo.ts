@@ -288,6 +288,23 @@ export const ESTADO_EVIDENCIA: Record<string, { etiqueta: string; tono: OpcionEs
 };
 
 /**
+ * Por qué una evidencia quedó sin resultado de la IA (rechazada sin clasificación): el aviso de
+ * la revisión automática de la respuesta de la IA o del bloqueo de seguridad, en palabras simples.
+ * null si la evidencia tiene clasificación o no trae un motivo.
+ */
+export function motivoEvidencia(
+  e: Pick<EvidenciaApi, "estado_validacion" | "clasificacion_llm" | "errores_validacion">,
+): string | null {
+  if (e.estado_validacion !== "rejected" || e.clasificacion_llm) return null;
+  const primero = (e.errores_validacion ?? []).find((x): x is string => typeof x === "string" && x.trim() !== "");
+  if (!primero) return null;
+  if (primero.startsWith("Bloqueo preventivo")) {
+    return "Encontramos texto que parece dar instrucciones a la IA (en la justificación o en el archivo), así que no lo analizamos. Esta pregunta quedó pendiente de revisión por nuestro equipo.";
+  }
+  return primero;
+}
+
+/**
  * Formatos de evidencia. El worker (process_evidence.py) lee el archivo como texto UTF-8,
  * así que hoy solo los formatos de texto se validan bien; un PDF o un Word llegarían
  * como bytes ilegibles al LLM. Ampliar esta lista cuando el backend extraiga texto de PDF.

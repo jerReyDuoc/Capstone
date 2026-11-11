@@ -580,16 +580,17 @@ class TestProcesamientoSinEvidencia:
         assert resp.estado_clasificacion_final == CUMP
         assert resp.fuente_clasificacion == FuenteClasificacion.USUARIO.value
 
-    def test_riesgo_evidencia_insuficiente_segun_llm_no_se_considera(self):
+    def test_evidencia_insuficiente_segun_llm_con_cumplido_queda_en_revision(self):
         """
-        RIESGO: EvidenceValidation.evidencia_suficiente=False no participa en la
-        decisión del backend; con confianza alta se acepta 'cumplido'.
+        Antes era un RIESGO documentado: con evidencia_suficiente=False y confianza alta se
+        aceptaba 'cumplido'. HU-07: es una alucinación de cumplimiento (el propio modelo dice que
+        la evidencia no alcanza): la propuesta no se aplica y la pregunta queda para revisión.
         """
         ev, resp = _procesar(FakeStorage(b"Documento de una linea."),
                              FakeValidator(clasificacion=CUMP, confianza=0.95, suficiente=False))
-        assert resp.estado_clasificacion_final == CUMP
-        assert resp.fuente_clasificacion == FuenteClasificacion.LLM.value
-        assert ev.estado_validacion == EstadoValidacion.VALIDATED.value
+        assert resp.estado_clasificacion_final == EstadoClasificacion.REQUIERE_REVISION.value
+        assert resp.fuente_clasificacion == FuenteClasificacion.SEGURIDAD.value
+        assert ev.estado_validacion == EstadoValidacion.REJECTED.value
 
     def test_llm_seguro_de_no_cumplido_por_falta_de_evidencia_baja_y_asigna_brecha(self):
         ev, resp = _procesar(FakeStorage(b"Acta sin relacion con el control."),

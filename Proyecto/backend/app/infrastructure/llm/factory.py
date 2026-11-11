@@ -28,6 +28,13 @@ def crear_proveedor() -> LLMProviderPort:
             reasoning_effort=settings.LLM_REASONING_EFFORT,
             reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
         )
+    if settings.LLM_PROVIDER == "ollama":  # HU-07: modelo local
+        from app.infrastructure.llm.ollama_provider import OllamaProvider
+        return OllamaProvider(
+            url=settings.OLLAMA_URL,
+            modelo_por_defecto=settings.LLM_MODEL,
+            reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
+        )
     raise ValueError(f"LLM_PROVIDER no soportado: {settings.LLM_PROVIDER}")
 
 

@@ -10,7 +10,8 @@ Pipeline de `ejecutar(tarea, textos, datos, contexto)`:
                       Si no se puede guardar => se aborta.
   4. Prompt        -> plantilla versionada, construida SOLO con texto sanitizado.
   5. Proveedor     -> LLMProviderPort (Groq hoy; intercambiable por config).
-  6. Validación    -> schema Pydantic (en el proveedor) + reglas post-salida.
+  6. Validación    -> schema Pydantic (en el proveedor) + reglas post-salida (HU-07: en
+                      evidencias, verificación sintáctica, de alucinaciones y de fuga de contexto).
   7. Métricas      -> una fila en llamadas_llm por ejecución, con éxito o error.
 
 HU-15: el gateway sigue siendo la ÚNICA salida hacia el LLM. El agente de LangGraph
@@ -38,7 +39,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.application.ai.politicas import PoliticaTarea, TareaIA
+from app.application.ai.politicas import TEXTOS_ENVIADOS, PoliticaTarea, TareaIA
 from app.domain.ports.llm_provider_port import LLMProviderError, LLMProviderPort, LLMRequest
 from app.domain.ports.registro_ia_port import (
     ContextoLlamada,
@@ -190,8 +191,9 @@ class AIGateway:
             raise LLMNoDisponibleError("Error inesperado del servicio de IA.", "desconocido") from e
 
         # Reglas post-salida: reciben los datos confiables (p. ej. el tutor comprueba que
-        # solo cite brechas del contexto entregado).
-        advertencias = politica.validar_salida(respuesta.data, datos)
+        # solo cite brechas del contexto entregado) y, desde HU-07, los textos tal como salieron
+        # hacia el LLM, para verificar que lo que afirma la salida tenga respaldo en ellos.
+        advertencias = politica.validar_salida(respuesta.data, {**datos, TEXTOS_ENVIADOS: textos_seguros})
 
         # 7. Métrica de éxito -----------------------------------------------
         await self._metrica(

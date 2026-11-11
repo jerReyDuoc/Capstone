@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_URL_SYNC: str
     REDIS_URL: str
-    GROQ_API_KEY: str
+    # Obligatoria con LLM_PROVIDER=groq (con un modelo local, HU-07, puede quedar vacía)
+    GROQ_API_KEY: str = ""
     # openai/gpt-oss-20b y gpt-oss-120b admiten salida ESTRICTA en Groq (el JSON siempre
     # cumple el schema). gpt-oss-safeguard-20b solo "best effort": falla más seguido.
     LLM_MODEL: str = "openai/gpt-oss-20b"
@@ -42,11 +43,20 @@ class Settings(BaseSettings):
     #   "marcar"   -> se envía (anonimizada y delimitada), se registra el evento y,
     #                 si el LLM no está seguro, queda en requiere_revision (sin fallback al usuario)
     MODO_SEGURIDAD_EVIDENCIA: Literal["bloquear", "marcar"] = "bloquear"
+    # HU-07: qué hacer si la SALIDA del modelo tiene un hallazgo grave (dato inventado, fuga de
+    # datos personales o del system prompt, señal de inyección o formato inválido):
+    #   "bloquear" -> no se aplica la propuesta; la pregunta queda en requiere_revision (en la
+    #                 remediación el control no cambia) y se registra la alerta
+    #   "marcar"   -> se registra la alerta y la propuesta se aplica como siempre
+    MODO_VERIFICACION_SALIDA: Literal["bloquear", "marcar"] = "bloquear"
 
     # ------------------------------------------------ Capa de Políticas e IA
     APP_ENV: Literal["development", "test", "production"] = "development"
     # Proveedor del LLM (cambiarlo no toca la lógica de negocio)
-    LLM_PROVIDER: Literal["groq"] = "groq"
+    # HU-07: "ollama" = modelo local (el texto no sale del servidor); ver OLLAMA_URL
+    LLM_PROVIDER: Literal["groq", "ollama"] = "groq"
+    # HU-07: dirección del servidor Ollama (servicio "ollama" del compose, perfil modelo-local)
+    OLLAMA_URL: str = "http://ollama:11434"
     LLM_TIMEOUT_S: float = 60.0
     LLM_MAX_REINTENTOS: int = 2
     # Incluye los tokens de razonamiento de gpt-oss: con muy pocos el JSON queda cortado.
@@ -349,6 +359,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validar_capa_ia(self):
+        if self.LLM_PROVIDER == "groq" and not self.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY es obligatoria con LLM_PROVIDER=groq (o usa LLM_PROVIDER=ollama).")
         if self.APP_ENV == "production" and not self.SANITIZER_ENABLED:
             raise ValueError(
                 "SANITIZER_ENABLED=false está prohibido con APP_ENV=production "

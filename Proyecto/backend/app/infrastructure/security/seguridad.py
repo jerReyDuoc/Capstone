@@ -391,6 +391,23 @@ _V_ESTADO_IMP = (r"(?:clasifica|clasifique|clasificalo|clasificala|marca|marque|
                  r"asigne|pon|ponga|ponle|fija|fije|cambia|cambie|actualiza|actualice|set|mark|classify|output|"
                  r"return|imprime|escribe|escriba)")
 
+# HU-07: vocabulario multilenguaje (en, pt, fr, de, it) para los ataques indirectos en documentos
+_IA_MULTI = (r"(?:ai|ia|ki|llm|chatbot|assistant|assistente|asistente|language model|modelo de linguagem|"
+             r"modele de langage|sprachmodell|modello linguistico|model|modelo|modele|modell|modello|"
+             r"ai reviewer|ai evaluator|ai auditor|evaluador automatico|avaliador automatico|evaluateur automatique|"
+             r"automated reviewer|intelligence artificielle|kunstliche intelligenz|intelligenza artificiale|"
+             r"inteligencia artificial)")
+_V_IGN_MULTI = (r"(?:ignore|ignores|ignorez|ignorer|oubliez|oublie|oublier|ignoriere|ignorieren|vergiss|vergessen|"
+                r"dimentica|dimenticare|ignora|ignorare|esqueca|esquece|esquecer|desconsidere|desconsidera|"
+                r"disregard|forget|override)")
+_O_IGN_MULTI = (r"(?:instruc\w*|istruzion\w*|anweisung\w*|regras|regles|regeln|regole|rules?|reglas|consignes|"
+                r"vorgaben|direttive|diretrizes|directives|guidelines|evaluation criteria)")
+# "conforme a/al/con..." en español es "de acuerdo con": no cuenta
+_CONFORME_MULTI = (r"(?:compliant|cumprido|cumprida|conforme(?!\s+(?:a|al|con|lo|se|de|en)\b)|konform|approved|aprovado|"
+                   r"approuve|genehmigt|approvato)")
+_IA_ESTRICTA = (r"(?:ai|ia|ki|llm|chatbot|language model|ai reviewer|ai evaluator|ai auditor|evaluador automatico|"
+                r"avaliador automatico|evaluateur automatique|automated reviewer)")
+
 _REGLAS_TXT: list[_R] = [
     # ---- override / olvidar instrucciones
     _R("inyeccion.ignorar_instrucciones", rf"\b{_V_IGN}\b.{{0,60}}\b{_O_IGN}\b",
@@ -621,7 +638,47 @@ _REGLAS_TXT: list[_R] = [
     _R("inyeccion.falso_acuerdo",
        r"\b(como te dije|ya te dije|como acordamos|como hablamos|segun lo acordado)\b.{0,60}\b(autorizacion|permiso|puedes|debes)\b",
        r"\b(como te dije|ya te dije)\b.{0,60}\b(autorizacion|permiso|puedes|debes)\b"),
-    _R("delimitadores.corchetes", r"\[\[\s*(fin|inicio|end|start)\w*\s*\]\]|\[\s*(system|sistema|admin|inst)\s*\]"),
+    _R("delimitadores.corchetes", r"\[\[\s*(fin|inicio|end|start)\b[^\]]{0,40}\]\]|\[\s*(system|sistema|admin|inst)\s*\]"),
+    # ---- HU-07: OWASP LLM01 multilenguaje (inglés, portugués, francés, alemán, italiano) e indirectos.
+    # El texto ya llega en minúsculas y sin tildes ("esqueça" -> "esqueca", "für" -> "fur").
+    _R("inyeccion.nota_para_ia_multi",
+       rf"\b(note|notice|attention|instruction|instructions|message|nota|aviso|mensagem|instrucao|instrucoes|"
+       rf"hinweis|anweisung|nachricht|messaggio|istruzione|istruzioni|mensaje)\s*(to|for|para|pour|fur|an|per|a)?\s*"
+       rf"(the |o |a |l'|la |le |die |den |il |el |al )?\s*{_IA_MULTI}\b"
+       rf"|(?:^|[.\n¶:;!?])\s*(para|for|to|pour|fur|per)\s+(la |the |l'|die |el |il |a )?\s*{_IA_ESTRICTA}\s*[:,]"),
+    _R("inyeccion.si_eres_ia_multi",
+       rf"\b(if you are|if you're|se voce e|se vc e|si vous etes|si tu es|wenn du|falls du|wenn sie|se sei|se lei e)\s+"
+       rf"(an? |uma? |une? |eine?n? |un'?|una )?\s*{_IA_MULTI}\b"),
+    _R("inyeccion.ignorar_multi",
+       rf"\b{_V_IGN_MULTI}\b.{{0,50}}\b{_O_IGN_MULTI}\b",
+       rf"{_INI}(?:please |pls |bitte |per favore |por favor |s'il vous plait )?{_V_IGN_MULTI}\b{_NO_ETIQ}.{{0,50}}\b{_O_IGN_MULTI}\b"),
+    _R("manipulacion.forzar_estado_multi",
+       rf"\b(classify|mark|rate|set|output|return|answer|assign|classifique|classifica|classificalo|marque|segna|classez|"
+       rf"marquez|attribuez|markiere|klassifiziere|bewerte|segnala)\b.{{0,60}}\b{_CONFORME_MULTI}\b",
+       rf"{_INI}(?:please |bitte |per favore |s'il vous plait )?(classify|mark|rate|set|output|return|answer|assign|"
+       rf"classifique|classifica|classificalo|marque|segna|classez|marquez|attribuez|markiere|klassifiziere|bewerte|"
+       rf"segnala)\b{_NO_ETIQ}.{{0,60}}\b{_CONFORME_MULTI}\b"
+       rf"|\b(must|should|shall|deve|devem|doit|doivent|muss|mussen|devono)\s+(classify|mark|rate|classificar|marcar|"
+       rf"classer|marquer|klassifizieren|markieren|classificare|segnare|bewerten)\b.{{0,40}}\b{_CONFORME_MULTI}\b"),
+    _R("manipulacion.respuesta_correcta",
+       rf"\b(the )?(correct|right|expected|final) (answer|classification|result|status|rating)\b.{{0,15}}\b(is|will be|must be)\b"
+       rf".{{0,10}}\b{_CONFORME_MULTI}\b|\b(la )?(respuesta|clasificacion) correcta\b.{{0,15}}\b(es|sera)\b.{{0,10}}\bcumplid"),
+    _R("jailbreak.cambio_de_rol_multi",
+       r"\b(a partir de agora|de agora em diante|daqui em diante|a partir de maintenant|desormais|ab jetzt|von nun an|"
+       r"ab sofort|d'ora in poi|da ora in poi|da adesso)\b.{0,40}\b(voce e|voce sera|vous etes|tu es|du bist|sie sind|sei|"
+       r"you are|seras)\b|\b(voce agora e|agora voce e|vous etes maintenant|tu es maintenant|du bist jetzt|du bist nun|"
+       r"ora sei|adesso sei)\b"),
+    _R("delimitadores.override", r"(?:^|[.\n¶:;!?])\s*override\s*[:\-]|\boverride (the|your|all) (rules|instructions|classification)\b"),
+    _R("delimitadores.campo_schema",
+       r"\b(datos_extraidos|respalda_clasificacion_usuario|divergencia_explicada|evidencia_suficiente|clasificacion_llm)\b"),
+    _R("fuga_prompt.reglas_recibidas",
+       r"\b(revela|muestra|repite|copia|imprime|escribe|reveal|print|show|repeat|output)\w*\b.{0,30}\b(reglas|instrucciones|"
+       r"rules|instructions|prompt|indicaciones)\b.{0,20}\b(que recibiste|que te dieron|que tienes|you received|"
+       r"you were given|you have been given)\b|\b(reveal|print|show|repeat|output)\b.{0,20}\b(your )?(initial|original|hidden)"
+       r" (instructions|prompt|rules)\b"),
+    _R("fuga_contexto.etiqueta_anonimizada",
+       r"\b(muestra|revela|reveal|show|imprime|print|escribe|reconstruye|reconstruct|desanonimiza|completa)\w*\b.{0,40}"
+       r"\[(nombre|rut|correo|tel|direccion|dato_codificado)_anon\]"),
     # ---- AT-10/11 exfiltración por salida
     _R("exfiltracion.imagen_markdown", r"!\[[^\]]*\]\(|\]\(\s*https?://[^)]*\?[^)]*="),
     _R("exfiltracion.servicio_externo", r"webhook\.site|requestbin|ngrok|pastebin|burpcollaborator|interact\.sh|pipedream"),

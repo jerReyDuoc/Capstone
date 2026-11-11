@@ -3,7 +3,9 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.ai.metricas import FilaLlamada, precision_clasificacion, resumen_operacion, resumen_tutor
+from app.application.ai.metricas import (
+    FilaLlamada, precision_clasificacion, resumen_operacion, resumen_tutor, resumen_verificacion,
+)
 from app.domain.models.evento_seguridad import EventoSeguridad, OrigenEvento
 from app.domain.models.llamada_llm import LlamadaLLM
 from app.domain.models.respuesta import Respuesta
@@ -98,8 +100,23 @@ class ObtenerMetricasIAUseCase:
             tutor["salidas_bloqueadas"] = por_categoria.get("fuga_prompt_salida", 0)
             tutor["advertencias_abuso"] = por_categoria.get("abuso_reiterado", 0)
 
+        # HU-07: verificación de la salida del modelo en la validación de evidencias
+        verificacion = None
+        if tarea in (None, "validar_evidencia"):
+            verificacion = resumen_verificacion([f for f, l in zip(filas, llamadas) if l.tarea == "validar_evidencia"])
+            qv = select(EventoSeguridad.tipo, func.count()).where(
+                EventoSeguridad.origen == OrigenEvento.SALIDA_LLM.value)
+            if desde:
+                qv = qv.where(EventoSeguridad.fecha >= desde)
+            if hasta:
+                qv = qv.where(EventoSeguridad.fecha <= hasta)
+            alertas = {t: n for t, n in (await self.session.execute(qv.group_by(EventoSeguridad.tipo))).all()}
+            verificacion["alertas_por_categoria"] = dict(sorted(alertas.items()))
+            verificacion["alertas_registradas"] = sum(alertas.values())
+
         return {
             "periodo": {"desde": desde, "hasta": hasta},
+            "verificacion_salida": verificacion,
             "operacion_modelo": operacion,
             "precision_modelo": precision_clasificacion(pares),
             "tutor": tutor,
