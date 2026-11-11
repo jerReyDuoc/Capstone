@@ -26,6 +26,8 @@
 #   MIGRAR=true          false = no ejecuta migraciones (solo si sabes que no hay cambios de esquema)
 #   SEMBRAR=false        true  = ejecuta el job de datos semilla después de migrar
 #   ESPERA_MAX_S=900     tiempo máximo para cada job y cada revisión
+#   VERIFICAR_IMAGENES=true  false = no comprueba que las imágenes existan (el workflow
+#                        las acaba de publicar)
 set -euo pipefail
 
 TAG="${1:?uso: desplegar_staging.sh <etiqueta-de-imagen>}"
@@ -55,6 +57,17 @@ error() { echo "::error::$*" >&2; }
 
 imagen_actual() {
   az containerapp show -n "$1" -g "$RG" --query "properties.template.containers[0].image" -o tsv
+}
+
+# ¿Está publicada la imagen? Primero con Docker (usa el mismo login con que se publicó:
+# usuario del ACR o `az acr login`); si no hay Docker, con `az acr` (requiere que la
+# identidad tenga permiso de lectura sobre el registro).
+existe_imagen() {
+  local imagen="$1" repo_tag="${1#*/}"
+  if command -v docker >/dev/null 2>&1 && docker manifest inspect "$imagen" >/dev/null 2>&1; then
+    return 0
+  fi
+  az acr repository show -n "$ACR" --image "$repo_tag" -o none >/dev/null 2>&1
 }
 
 existe_job() {
@@ -169,10 +182,15 @@ prueba_humo() {
 
 # ================================================================== principal
 log "Desplegando la etiqueta $TAG en el grupo $RG"
-az acr repository show -n "$ACR" --image "api:${TAG}" -o none \
-  || { error "No existe la imagen api:${TAG} en $ACR."; exit 1; }
-az acr repository show -n "$ACR" --image "web:${TAG}" -o none \
-  || { error "No existe la imagen web:${TAG} en $ACR."; exit 1; }
+if [ "${VERIFICAR_IMAGENES:-true}" = "true" ]; then
+  for img in "$IMG_API" "$IMG_WEB"; do
+    existe_imagen "$img" || {
+      error "No encuentro la imagen $img. Si la etiqueta es correcta, revisa el inicio de sesión en el registro (secretos API_REGISTRY_* o permiso AcrPull de la identidad)."
+      exit 1
+    }
+    log "Imagen encontrada: $img"
+  done
+fi
 
 for app in "$APP_API" "$APP_WORKER" "$APP_WEB"; do
   ANTERIOR[$app]="$(imagen_actual "$app")"

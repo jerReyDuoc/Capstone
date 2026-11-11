@@ -100,8 +100,10 @@ jobs:
           subscription-id: ${{ secrets.API_AZURE_SUBSCRIPTION_ID }}
 
       # ---------------------------------------------------------------- imágenes
+      # El login va siempre (también al desplegar una etiqueta ya publicada): el script
+      # lo usa para comprobar que las imágenes existen.
       - name: Iniciar sesión en el registro (usuario del ACR)
-        if: steps.version.outputs.construir == 'true' && env.REGISTRY_USERNAME != ''
+        if: env.REGISTRY_USERNAME != ''
         uses: docker/login-action@v3
         with:
           registry: ${{ env.ACR }}.azurecr.io
@@ -109,7 +111,7 @@ jobs:
           password: ${{ secrets.API_REGISTRY_PASSWORD }}
 
       - name: Iniciar sesión en el registro (identidad de Azure)
-        if: steps.version.outputs.construir == 'true' && env.REGISTRY_USERNAME == ''
+        if: env.REGISTRY_USERNAME == ''
         run: az acr login --name "$ACR"
 
       - uses: docker/setup-buildx-action@v3
