@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 10-nov-2026 (HU-32: derechos ARCOP en la página web para el usuario temporal, el definitivo y el admin) |
+| **Última actualización** | 11-nov-2026 (HU-23: pipeline de CI en cada pull request y despliegue automático a staging en Azure) |
 
 ---
 
@@ -100,7 +100,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
 | Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `Extras/Cambios/backend/CAMBIOS_HU20.md` |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
-| Pipeline CI/CD y staging | 🔴 Pendiente | Sprint 4 |
+| Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
 
@@ -182,6 +182,8 @@ Capstone/
     ├── README.md                   # ← este documento
     ├── .env.example                # Plantilla del ÚNICO .env (compose, backend y frontend)
     ├── docker-compose.yml          # Sistema completo (6 servicios)
+    ├── docs/DESPLIEGUE_STAGING.md  # HU-23: CI/CD, staging en Azure, secretos, vuelta atrás y verificación
+    ├── infra/azure/preparar_staging.sh  # HU-23: preparación única del staging (Cloud Shell)
     ├── frontend-next/              # Panel web Next.js (HU-13, ver sección 10.1)
     │   ├── app/                    # /panel, /panel/dominios, /panel/brechas, /panel/capacitacion (HU-12),
     │   │                           # landing y cuestionario (/, /comenzar, /encuesta, /retomar), bff/ + globals.css
@@ -1142,6 +1144,7 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_hu19_encuesta_publica.py` | 19 | HU-19: encuesta pública sin invitación, aislamiento entre encuestados, retomar con clave, límites por IP, CAPTCHA, cuota de IA y benchmark |
 | `test_t06_minimizacion.py` | 15 | T-06: inventario de datos personales, plazos de conservación y validaciones de producción |
 | `test_hu20_autorizacion.py` | 15 (75 casos) | HU-20: matriz de autorización **por endpoint** (6 actores), solo-admin, rutas públicas y una prueba que falla si aparece una ruta sin clasificar |
+| `test_hu23_semilla_staging.py` | 5 | HU-23: datos semilla de staging (administrador sin teclado, evaluaciones sintéticas con k ≥ 5 en el benchmark, idempotencia y `--eliminar`) |
 | `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
 
 Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba), `_corpus_ner.py` (corpus sintético etiquetado para medir el NER).
@@ -1175,6 +1178,15 @@ docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE
 - **Prueba en vivo (13-oct-2026):** PASSED con `openai/gpt-oss-safeguard-20b` y spaCy `es_core_news_md` 3.8.0. Sin fugas de PII, mapa cifrado correcto e inyección bloqueada sin llamar al LLM. Falsos positivos del NER observados: "la Ley 21" como dirección y "Presidenta del Directorio" como nombre (**corregidos en T-04**, motor v1.1.0).
 - **Latencia live (11-oct-2026, concurrencia 10):** 12 de 13 endpoints cumplen p95 < 500 ms. No cumplía `GET controles-aplicables` (p95 542,7 ms). Detalle en [`reporte_latencia_live_c10.md`](../Extras/Evidencias/reporte_latencia_live_c10.md).
 - **HU-01 (15-oct-2026):** `controles-aplicables` optimizado (1 consulta + catálogo cacheado). **Latencia live oficial (16-oct-2026, Docker, concurrencia 10): 12/12 endpoints cumplen**; `GET controles-aplicables` p95 24,1 ms (antes 542,7 ms). Detalle en [`Extras/Evidencias/reporte_latencia_live_hu01.md`](../Extras/Evidencias/reporte_latencia_live_hu01.md) y [`Extras/Cambios/backend/CAMBIOS_HU01.md`](../Extras/Cambios/backend/CAMBIOS_HU01.md).
+
+### 14.1 Integración y despliegue continuo (HU-23)
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Cada pull request a `main`, cada push a `main` y a mano | pytest con cobertura ≥ 70 % (y SonarQube si hay `SONAR_TOKEN`); TypeScript + vitest del frontend; construye las imágenes `api` y `web` sin publicarlas y comprueba que no lleven secretos. Resume todo en el check **CI aprobado**, que se marca como obligatorio en `main` |
+| [`.github/workflows/deploy-staging.yml`](../.github/workflows/deploy-staging.yml) | Solo, cuando CI termina en verde en `main`; y a mano | Publica `api:<commit>` y `web:<commit>` en `acrcomplainceia`, ejecuta el job `migrate`, actualiza `api`, `worker` y `web`, hace la prueba de humo por HTTPS y vuelve a la versión anterior si algo falla |
+
+El flujo del equipo pasa a ser **rama → pull request → CI en verde + revisión → merge**. Las pruebas corren en GitHub; nadie tiene que ejecutar nada en su computador. Los datos semilla del piloto (administrador y 20 evaluaciones sintéticas para la comparativa) los carga `backend/scripts/sembrar_staging.py`. La guía completa (preparación, secretos, vuelta atrás, verificación QA y costos) está en [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md).
 
 ---
 
@@ -1255,7 +1267,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | 13 | `seguridad.py` se sincroniza a mano con el repo ComplianceAI-Prompt-Injection: riesgo de divergencia (evaluar paquete compartido o submódulo). Además, su regex de correo no acepta tildes (`matías.díaz@…` queda en parte visible en los extractos de eventos de seguridad): corregirla allá, como se hizo en `ner_sanitizer.py` |
 | 14 | Fechas de respuestas/evidencias en `Date` (sin hora): limita la trazabilidad fina |
 | 15 | Credenciales por defecto de PostgreSQL (`postgres`/`1234`) en el compose: aceptables solo en desarrollo |
-| 16 | Pipeline CI/CD (pytest + build de imagen) y entorno de staging (Sprint 4) |
+| 16 | ~~Pipeline CI/CD y entorno de staging~~ **Resuelto en HU-23** (ver [14.1](#141-integración-y-despliegue-continuo-hu-23)). Queda activar la protección de `main` con el check **CI aprobado** |
 | 17 | Correo del informe con una cuenta Gmail: para el piloto conviene un remitente del dominio (SMTP del proveedor o servicio transaccional) con SPF/DKIM, para que no caiga en spam |
 
 ---
@@ -1279,6 +1291,8 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | `../Extras/Guia_ComplianceAI_PromptInjection.docx.pdf` | Guía del módulo anti prompt-injection |
 | [`../Extras/README.md`](../Extras/README.md) | Qué hay en `Extras/` (documentos de cambios por HU, evidencias y prototipo archivado) y la regla para los documentos nuevos |
 | [`CAMBIOS_HU20.md`](../Extras/Cambios/backend/CAMBIOS_HU20.md) | HU-20: matriz de autorización, interruptor de desarrollo y ajustes a las pruebas |
+| [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) | HU-23: CI/CD, ambiente de staging en Azure, datos semilla, secretos, vuelta atrás, verificación QA y costos |
+| [`CAMBIOS_HU23.md`](../Extras/Cambios/backend/CAMBIOS_HU23.md) | HU-23: estado anterior, archivos, decisiones y pendientes del pipeline |
 
 ---
 

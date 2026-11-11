@@ -169,10 +169,16 @@ describe("HU-31 C3 · bandeja del admin: nueva, contactada, contratada o descart
     expect(destinos("descartada")).toEqual([]);
   });
 
-  it("el filtro por estado acepta los nuevos y ya no 'pendiente'", () => {
+  it("el filtro por estado acepta los nuevos y descarta valores desconocidos", () => {
     expect(filtrarQueryAdmin(new URLSearchParams("estado=contactada"))).toBe("?estado=contactada");
     expect(filtrarQueryAdmin(new URLSearchParams("estado=nueva"))).toBe("?estado=nueva");
-    expect(filtrarQueryAdmin(new URLSearchParams("estado=pendiente"))).toBe("");
+    // HU-22 volvió a permitir "pendiente": la bandeja de revisión usa el mismo parámetro
+    // `estado` (pendiente | revisada | todas) y la lista blanca del BFF es una sola para
+    // todo el panel admin. En la bandeja de contratación el backend no tiene ese estado y
+    // simplemente no devuelve solicitudes, así que basta con que se descarten los valores
+    // que no pertenecen a ninguna bandeja.
+    expect(filtrarQueryAdmin(new URLSearchParams("estado=pendiente"))).toBe("?estado=pendiente");
+    expect(filtrarQueryAdmin(new URLSearchParams("estado=abierta"))).toBe("");
   });
 
   it("solo una contratada (no contactada) se puede elegir para el alta de HU-27", () => {

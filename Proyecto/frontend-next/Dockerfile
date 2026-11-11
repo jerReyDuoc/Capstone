@@ -15,7 +15,15 @@ ENV NEXT_PUBLIC_DEMO=$NEXT_PUBLIC_DEMO
 ARG API_URL=http://api
 ENV API_URL=$API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# next/font/google descarga Inter y Space Grotesk desde Google Fonts AL COMPILAR. A veces
+# Google responde con direcciones de fuente sin extensión y Next 15.5 se cae con
+# "TypeError: Cannot read properties of null (reading '1')" en @next/font/.../loader.js
+# (falla intermitente conocida, vercel/next.js#99114). Se reintenta hasta 3 veces; la
+# solución definitiva es servir las fuentes desde el repositorio con next/font/local.
+RUN for intento in 1 2 3; do \
+      npm run build && exit 0; \
+      echo "next build falló (intento $intento de 3); reintento en 20 s..."; sleep 20; \
+    done; exit 1
 
 FROM node:22-alpine AS run
 WORKDIR /app

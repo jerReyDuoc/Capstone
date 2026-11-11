@@ -1,0 +1,161 @@
+# Despliegue automático de migrate + worker (ComplianceIA)
+#
+# El workflow "Trigger auto deployment for api" (lo generó Azure) construye la imagen api
+# y actualiza SOLO la Container App api. La misma imagen la usan el job migrate y el worker,
+# que antes se actualizaban a mano (doc. de despliegue, secciones 8 y 9.2-9.3).
+#
+# Este workflow corre cuando el de api termina BIEN en main y:
+#   1. apunta el job migrate a la imagen nueva y lo ejecuta (alembic upgrade head);
+#   2. si la migración termina en Succeeded, apunta el worker a la misma imagen y espera
+#      a que la revisión nueva quede lista. Si la migración falla, el worker NO se toca.
+#
+# También se puede lanzar a mano (Actions > este workflow > Run workflow) con un SHA,
+# por ejemplo para repetir una migración o volver a una versión anterior.
+#
+# Usa el mismo inicio de sesión OIDC y los mismos secretos que el workflow de api.
+# La identidad de esos secretos necesita permiso para modificar el job migrate y el
+# worker (rol Contributor sobre el grupo de recursos; ver LEEME.md).
+
+name: Deploy migrate + worker
+
+on:
+  workflow_run:
+    workflows: ["Trigger auto deployment for api"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "SHA completo del commit (vacío = el último de main)"
+        required: false
+        default: ""
+
+# Nunca dos despliegues a la vez: si llegan dos push seguidos, el segundo espera.
+concurrency:
+  group: deploy-migrate-worker
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC con Azure
+  contents: read
+
+env:
+  RG: rg-complainceia
+  ACR: acrcomplainceia
+  TIMEOUT_MIGRATE_S: "900"
+  TIMEOUT_WORKER_S: "600"
+
+jobs:
+  desplegar:
+    name: Migrar base de datos y actualizar worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Solo si el build/deploy de api terminó bien (o si se lanzó a mano)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Elegir el commit
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            SHA="${{ inputs.sha }}"
+            [ -z "$SHA" ] && SHA="${{ github.sha }}"
+          fi
+          if ! echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::SHA inválido: '$SHA' (debe ser el hash completo de 40 caracteres)"; exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "img=${ACR}.azurecr.io/api:$SHA" >> "$GITHUB_OUTPUT"
+          echo "Commit: $SHA"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.API_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.API_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.API_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Preparar Azure CLI
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt extension.dynamic_install_allow_preview=true --only-show-errors
+          az extension add -n containerapp --allow-preview true --upgrade --only-show-errors
+
+      - name: Comprobar que la imagen existe en el registro
+        run: |
+          IMG="${{ steps.sha.outputs.img }}"
+          # La imagen la subió el workflow de api; se comprueba con el propio registro
+          if ! az acr manifest show-metadata "$IMG" -o none 2>/dev/null; then
+            # Respaldo por si la identidad no puede leer el ACR por la API de manifiestos
+            az containerapp show -n api -g "$RG" --query 'properties.template.containers[0].image' -o tsv | grep -qx "$IMG" \
+              || { echo "::error::No se encontró $IMG (¿falló el build de api?)"; exit 1; }
+          fi
+          echo "Imagen: $IMG"
+
+      - name: Migrar la base de datos (job migrate)
+        id: migrate
+        run: |
+          IMG="${{ steps.sha.outputs.img }}"
+          az containerapp job update -n migrate -g "$RG" --image "$IMG" -o none
+          EJEC=$(az containerapp job start -n migrate -g "$RG" --query name -o tsv)
+          echo "ejecucion=$EJEC" >> "$GITHUB_OUTPUT"
+          echo "Ejecución: $EJEC"
+          inicio=$SECONDS
+          while :; do
+            ESTADO=$(az containerapp job execution show -n migrate -g "$RG" --job-execution-name "$EJEC" \
+                     --query properties.status -o tsv 2>/dev/null || echo "Desconocido")
+            echo "  estado: $ESTADO"
+            case "$ESTADO" in
+              Succeeded) break ;;
+              Failed|Stopped|Degraded)
+                echo "::error::La migración terminó en $ESTADO. El worker no se actualizó."; exit 1 ;;
+            esac
+            if [ $((SECONDS - inicio)) -gt "$TIMEOUT_MIGRATE_S" ]; then
+              echo "::error::La migración sigue en $ESTADO después de ${TIMEOUT_MIGRATE_S}s."; exit 1
+            fi
+            sleep 15
+          done
+
+      - name: Logs de la migración
+        if: always() && steps.migrate.outputs.ejecucion != ''
+        continue-on-error: true
+        run: |
+          # Los logs pueden tardar unos segundos en estar disponibles
+          sleep 5
+          az containerapp job logs show -n migrate -g "$RG" --container migrate \
+            --execution "${{ steps.migrate.outputs.ejecucion }}" 2>/dev/null \
+            | grep -o '"Log":"[^"]*"' | sed 's/"Log":"//; s/"$//; s/\\u003E/>/g' || true
+
+      - name: Actualizar el worker
+        run: |
+          IMG="${{ steps.sha.outputs.img }}"
+          az containerapp update -n worker -g "$RG" --image "$IMG" -o none
+          NUEVA=$(az containerapp show -n worker -g "$RG" --query properties.latestRevisionName -o tsv)
+          echo "Revisión: $NUEVA"
+          inicio=$SECONDS
+          until [ "$(az containerapp show -n worker -g "$RG" --query properties.latestReadyRevisionName -o tsv)" = "$NUEVA" ]; do
+            if [ $((SECONDS - inicio)) -gt "$TIMEOUT_WORKER_S" ]; then
+              echo "::error::La revisión $NUEVA del worker no quedó lista en ${TIMEOUT_WORKER_S}s."; exit 1
+            fi
+            sleep 10
+          done
+          echo "Revisión $NUEVA lista"
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "## Despliegue de migrate + worker"
+            echo ""
+            echo "Commit: \`${{ steps.sha.outputs.sha }}\`"
+            echo ""
+            echo "| Servicio | Imagen |"
+            echo "|---|---|"
+            for APP in api worker web; do
+              echo "| $APP | \`$(az containerapp show -n $APP -g "$RG" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null)\` |"
+            done
+            echo "| migrate | \`$(az containerapp job show -n migrate -g "$RG" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
