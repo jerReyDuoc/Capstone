@@ -556,6 +556,20 @@ RUTAS_CON_TOKEN_PROPIO = [
      {"json": {"version": 0}}),
     ("GET", "/api/mapa-datos/informe/pdf", "/api/mapa-datos/informe/pdf", {}),
     ("POST", "/api/mapa-datos/informe/enviar", "/api/mapa-datos/informe/enviar", {"json": {}}),
+    # HU-35: registro de actividades de tratamiento (solo cliente con contrato vigente; roles en test_hu35_rat.py)
+    ("GET", "/api/registro-actividades/catalogo", "/api/registro-actividades/catalogo", {}),
+    ("GET", "/api/registro-actividades", "/api/registro-actividades", {}),
+    ("POST", "/api/registro-actividades/actividades", "/api/registro-actividades/actividades",
+     {"json": {"nombre": "Ventas en línea"}}),
+    ("GET", "/api/registro-actividades/actividades/{actividad_id}", "/api/registro-actividades/actividades/1", {}),
+    ("PATCH", "/api/registro-actividades/actividades/{actividad_id}", "/api/registro-actividades/actividades/1",
+     {"json": {"revision": 1}}),
+    ("POST", "/api/registro-actividades/actividades/{actividad_id}/estado",
+     "/api/registro-actividades/actividades/1/estado", {"json": {"revision": 1, "accion": "enviar_revision"}}),
+    ("GET", "/api/registro-actividades/actividades/{actividad_id}/versiones",
+     "/api/registro-actividades/actividades/1/versiones", {}),
+    ("GET", "/api/registro-actividades/actividades/{actividad_id}/versiones/{numero}",
+     "/api/registro-actividades/actividades/1/versiones/1", {}),
 ]
 
 
