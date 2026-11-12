@@ -211,10 +211,12 @@ class InformeRatCasos:
         if ultima is not None and not forzar and ultima.huella == inf.huella and ultima.borrador == inf.borrador:
             vista = await self._vista_emision(ultima)
             if vista["documentos"]["pdf"] and vista["documentos"]["xlsx"]:
-                await self.db.rollback()
-                return {"informe": vista, "reutilizado": True,
-                        "mensaje": f"Tu registro no cambió desde la emisión del {_fecha_txt(ultima.fecha)}: "
-                                   "usamos ese mismo informe."}
+                # El texto se arma ANTES del rollback: después, `ultima` queda expirada y leer su fecha
+                # obligaría a SQLAlchemy a recargarla fuera del contexto async (error 500)
+                mensaje = (f"Tu registro no cambió desde la emisión del {_fecha_txt(ultima.fecha)}: "
+                           "usamos ese mismo informe.")
+                await self.db.rollback()        # libera el bloqueo de la empresa
+                return {"informe": vista, "reutilizado": True, "mensaje": mensaje}
         inicio_dia = datetime.combine(generado.astimezone(ZONA).date(), dtime.min, tzinfo=ZONA)
         hoy = (await self.db.execute(
             select(func.count()).select_from(RatInforme)

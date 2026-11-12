@@ -570,6 +570,16 @@ RUTAS_CON_TOKEN_PROPIO = [
      "/api/registro-actividades/actividades/1/versiones", {}),
     ("GET", "/api/registro-actividades/actividades/{actividad_id}/versiones/{numero}",
      "/api/registro-actividades/actividades/1/versiones/1", {}),
+    # HU-36: informe del registro de actividades (solo cliente con contrato vigente; roles en
+    # test_hu36_informe_rat.py)
+    ("GET", "/api/registro-actividades/informes", "/api/registro-actividades/informes", {}),
+    ("POST", "/api/registro-actividades/informes", "/api/registro-actividades/informes", {"json": {}}),
+    ("GET", "/api/registro-actividades/informes/verificacion",
+     "/api/registro-actividades/informes/verificacion?codigo=CIA-REG-2026-000045-0", {}),
+    ("GET", "/api/registro-actividades/informes/{informe_id}/descarga",
+     "/api/registro-actividades/informes/1/descarga?formato=pdf", {}),
+    ("POST", "/api/registro-actividades/informes/{informe_id}/enviar",
+     "/api/registro-actividades/informes/1/enviar", {"json": {"formatos": ["pdf"]}}),
 ]
 
 
