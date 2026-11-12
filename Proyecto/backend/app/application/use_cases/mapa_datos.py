@@ -99,6 +99,7 @@ class MapaDatosCasos:
         self.email_usuario: str = cliente.usuario.email
         self.limitador = limitador
         self.bitacora = BitacoraRepository(db)
+        self.ultimo_id: int | None = None   # HU-39: id del último elemento o flujo creado
 
     # ================================================================ lectura
     async def _mapa(self, bloquear: bool = False) -> MapaDatos | None:
@@ -263,7 +264,9 @@ class MapaDatosCasos:
             base["rol_tercero"] = base["contrato_firmado"] = None
         return MapaElemento(mapa_id=mapa_id, fecha_creacion=ahora, fecha_actualizacion=ahora, **base)
 
-    async def crear_elemento(self, datos: dict, version: int) -> dict:
+    async def crear_elemento(self, datos: dict, version: int, origen: str = "manual",
+                             propuesta_ia_id: int | None = None) -> dict:
+        """HU-39: `origen="ia"` y `propuesta_ia_id` cuando el usuario acepta una propuesta del asistente."""
         try:
             campos = normalizar_elemento(datos)
         except ErrorValidacion as e:
@@ -273,11 +276,13 @@ class MapaDatosCasos:
             raise MapaDatosError(422, "LIMITE_ELEMENTOS",
                                  f"El mapa admite hasta {settings.MAPA_MAX_ELEMENTOS} elementos.")
         self._nombre_libre(el, campos["nombre"], campos["tipo"])
-        fila = self._nuevo_elemento(mapa.id, campos)
+        fila = self._nuevo_elemento(mapa.id, campos, origen=origen)
+        fila.propuesta_ia_id = propuesta_ia_id
         self.db.add(fila)
         await self.db.flush()
+        self.ultimo_id = fila.id
         return await self._guardar(mapa, "elemento_creado", Accion.MAPA_ELEMENTO_CREADO, antes,
-                                   {"elemento_id": fila.id, "tipo": fila.tipo})
+                                   {"elemento_id": fila.id, "tipo": fila.tipo, "origen": origen})
 
     async def editar_elemento(self, elemento_id: int, datos: dict, version: int) -> dict:
         mapa, el, _fl, antes = await self._iniciar(version)
@@ -321,7 +326,9 @@ class MapaDatosCasos:
                                  "Ya existe un flujo entre esos elementos con la misma finalidad. Edita el existente o "
                                  "describe una finalidad distinta.", campo="finalidad")
 
-    async def crear_flujo(self, datos: dict, version: int) -> dict:
+    async def crear_flujo(self, datos: dict, version: int, origen: str = "manual",
+                          propuesta_ia_id: int | None = None) -> dict:
+        """HU-39: `origen="ia"` y `propuesta_ia_id` cuando el usuario acepta una propuesta del asistente."""
         try:
             campos = normalizar_flujo(datos)
         except ErrorValidacion as e:
@@ -338,11 +345,13 @@ class MapaDatosCasos:
         base = {"finalidad": None, "categorias_datos": [], "categorias_titulares": [], "nna_declarado": False,
                 "frecuencia": None, "medio": None, "cifrado": None, "garantia": None, "pendiente_revision": False}
         base.update(campos)
-        fila = MapaFlujo(mapa_id=mapa.id, origen="manual", clave=None, fecha_creacion=ahora, fecha_actualizacion=ahora,
-                         **base)
+        fila = MapaFlujo(mapa_id=mapa.id, origen=origen, clave=None, fecha_creacion=ahora, fecha_actualizacion=ahora,
+                         propuesta_ia_id=propuesta_ia_id, **base)
         self.db.add(fila)
         await self.db.flush()
-        return await self._guardar(mapa, "flujo_creado", Accion.MAPA_FLUJO_CREADO, antes, {"flujo_id": fila.id})
+        self.ultimo_id = fila.id
+        return await self._guardar(mapa, "flujo_creado", Accion.MAPA_FLUJO_CREADO, antes,
+                                   {"flujo_id": fila.id, "origen": origen})
 
     async def editar_flujo(self, flujo_id: int, datos: dict, version: int) -> dict:
         mapa, el, fl, antes = await self._iniciar(version)

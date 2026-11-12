@@ -73,6 +73,13 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
             timeout_borrador_s=settings.BORRADOR_TIMEOUT_S,
             modelo_borrador=settings.BORRADOR_MODELO,
             temperatura_borrador=settings.BORRADOR_TEMPERATURA,
+            # HU-39: tarea asistente_rat
+            max_chars_respuesta_asistente=settings.ASISTENTE_MAX_CHARS_RESPUESTA,
+            max_chars_documento_asistente=settings.ASISTENTE_MAX_CHARS_DOCUMENTO_LLM,
+            max_tokens_asistente=settings.ASISTENTE_MAX_TOKENS_SALIDA,
+            timeout_asistente_s=settings.ASISTENTE_TIMEOUT_S,
+            modelo_asistente=settings.ASISTENTE_MODELO,
+            temperatura_asistente=settings.ASISTENTE_TEMPERATURA,
         ),
         sanitizer_enabled=settings.SANITIZER_ENABLED,
         precios=PreciosModelo(settings.LLM_PRECIO_ENTRADA_USD_1M, settings.LLM_PRECIO_SALIDA_USD_1M),

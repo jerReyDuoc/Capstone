@@ -580,6 +580,21 @@ RUTAS_CON_TOKEN_PROPIO = [
      "/api/registro-actividades/informes/1/descarga?formato=pdf", {}),
     ("POST", "/api/registro-actividades/informes/{informe_id}/enviar",
      "/api/registro-actividades/informes/1/enviar", {"json": {"formatos": ["pdf"]}}),
+    # HU-39: asistente de IA del mapa y del RAT (solo cliente con contrato vigente; roles y flujo
+    # completo en test_hu39_asistente_rat.py)
+    ("GET", "/api/asistente", "/api/asistente", {}),
+    ("POST", "/api/asistente/sesiones", "/api/asistente/sesiones", {"json": {}}),
+    ("POST", "/api/asistente/sesiones/{sesion_id}/area", "/api/asistente/sesiones/1/area",
+     {"json": {"area": "clientes"}}),
+    ("POST", "/api/asistente/sesiones/{sesion_id}/respuestas", "/api/asistente/sesiones/1/respuestas",
+     {"json": {"texto": "Usamos un CRM"}}),
+    ("POST", "/api/asistente/sesiones/{sesion_id}/cerrar", "/api/asistente/sesiones/1/cerrar", {}),
+    ("POST", "/api/asistente/documentos", "/api/asistente/documentos",
+     {"files": {"file": ("politica.txt", b"Politica de datos", "text/plain")}}),
+    ("POST", "/api/asistente/propuestas/{propuesta_id}/aceptar", "/api/asistente/propuestas/1/aceptar",
+     {"json": {}}),
+    ("POST", "/api/asistente/propuestas/{propuesta_id}/descartar", "/api/asistente/propuestas/1/descartar",
+     {"json": {}}),
 ]
 
 

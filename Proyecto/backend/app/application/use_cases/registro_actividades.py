@@ -175,6 +175,7 @@ class RegistroActividadesCasos:
             "motivos_revision": list(f.motivos_revision or []),
             "resumen": self._resumen(deriv, f.contenido),
             "area": modelo.completar(f.contenido).get("area"),
+            "origen": getattr(f, "origen", None) or "manual",   # HU-39: "ia" = propuesta del asistente aceptada
             "fecha_creacion": _iso(f.fecha_creacion),
             "fecha_actualizacion": _iso(f.fecha_actualizacion),
             "fecha_vigencia": _iso(f.fecha_vigencia),
@@ -261,7 +262,9 @@ class RegistroActividadesCasos:
         return contenido
 
     # ---------------------------------------------------------------- crear y editar
-    async def crear(self, datos: dict) -> dict:
+    async def crear(self, datos: dict, origen: str = "manual", propuesta_ia_id: int | None = None) -> dict:
+        """HU-39: `origen="ia"` y `propuesta_ia_id` cuando el usuario acepta una propuesta del asistente
+        (la actividad entra igual como BORRADOR: nunca queda vigente sin pasar por su revisión)."""
         try:
             contenido = modelo.normalizar(datos)
         except ErrorValidacion as e:
@@ -282,13 +285,14 @@ class RegistroActividadesCasos:
         f = RatActividad(
             empresa_id=self.empresa_id, nombre=contenido["nombre"], estado=cat.BORRADOR, contenido=contenido,
             revision=1, completitud=_evaluar(contenido, elementos, flujos)[1]["porcentaje"], motivos_revision=[],
-            usuario_definitivo_id=self.usuario_id, fecha_creacion=ahora, fecha_actualizacion=ahora)
+            usuario_definitivo_id=self.usuario_id, fecha_creacion=ahora, fecha_actualizacion=ahora,
+            origen=origen, propuesta_ia_id=propuesta_ia_id)
         self.db.add(f)
         await self.db.flush()
         self.bitacora.registrar(
             accion=Accion.RAT_ACTIVIDAD_CREADA, entidad="rat_actividad", entidad_id=f.id, actor=self.actor,
             detalle={"campos": modelo.campos_cambiados(modelo.contenido_vacio(), contenido),
-                     "completitud": f.completitud, "version_mapa": version_mapa})
+                     "completitud": f.completitud, "version_mapa": version_mapa, "origen": origen})
         await self.db.commit()
         return {"actividad": self._vista(f, elementos, flujos, detalle=True), "cambio": "creada"}
 

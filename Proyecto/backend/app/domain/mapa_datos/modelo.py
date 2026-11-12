@@ -27,7 +27,7 @@ LARGOS = {
     "responsable": (0, 120),
     "finalidad": (0, 300),
 }
-ORIGENES = ("manual", "plantilla", "evaluacion")
+ORIGENES = ("manual", "plantilla", "evaluacion", "ia")
 
 CAMPOS_ELEMENTO = (
     "tipo", "subtipo", "nombre", "descripcion", "proveedor", "pais", "responsable", "categorias_datos",

@@ -12,6 +12,8 @@ class OrigenEvento(str, Enum):
     TUTOR_ANTECEDENTE = "tutor_antecedente"  # HU-18: justificación guardada con inyección (se omitió)
     BORRADOR = "borrador"  # HU-16: instrucciones de redacción de un borrador
     SALIDA_LLM = "salida_llm"  # HU-07: la verificación de la salida del modelo retuvo su propuesta
+    ASISTENTE = "asistente"  # HU-39: respuesta a la entrevista del asistente de registro
+    ASISTENTE_DOCUMENTO = "asistente_documento"  # HU-39: documento subido al asistente
 
 
 class ResolucionEvento(str, Enum):

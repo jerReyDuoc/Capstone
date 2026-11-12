@@ -28,7 +28,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
 TIPOS_ELEMENTO = ("sistema", "base_datos", "tercero")
-ORIGENES = ("manual", "plantilla", "evaluacion")
+ORIGENES = ("manual", "plantilla", "evaluacion", "ia")  # HU-39: "ia" = propuesta del asistente aceptada
 ACCIONES_VERSION = (
     "elemento_creado", "elemento_editado", "elemento_eliminado", "flujo_creado", "flujo_editado",
     "flujo_eliminado", "plantilla_aplicada", "sugerencia_aceptada", "revision_confirmada", "version_restaurada",
@@ -88,6 +88,9 @@ class MapaElemento(Base):
     origen: Mapped[str] = mapped_column("origen", String(15), nullable=False, default="manual")
     clave: Mapped[str | None] = mapped_column("clave", String(60), nullable=True)
     pendiente_revision: Mapped[bool] = mapped_column("pendiente_revision", Boolean, nullable=False, default=False)
+    # HU-39: la propuesta del asistente de IA que lo creó (origen "ia")
+    propuesta_ia_id: Mapped[int | None] = mapped_column(
+        "propuesta_ia_id", Integer, ForeignKey("asistente_propuesta.id", ondelete="SET NULL"), nullable=True)
     fecha_creacion: Mapped[datetime] = mapped_column("fecha_creacion", DateTime, nullable=False)
     fecha_actualizacion: Mapped[datetime] = mapped_column("fecha_actualizacion", DateTime, nullable=False)
 
@@ -117,6 +120,9 @@ class MapaFlujo(Base):
     origen: Mapped[str] = mapped_column("origen", String(15), nullable=False, default="manual")
     clave: Mapped[str | None] = mapped_column("clave", String(60), nullable=True)
     pendiente_revision: Mapped[bool] = mapped_column("pendiente_revision", Boolean, nullable=False, default=False)
+    # HU-39: la propuesta del asistente de IA que lo creó (origen "ia")
+    propuesta_ia_id: Mapped[int | None] = mapped_column(
+        "propuesta_ia_id", Integer, ForeignKey("asistente_propuesta.id", ondelete="SET NULL"), nullable=True)
     fecha_creacion: Mapped[datetime] = mapped_column("fecha_creacion", DateTime, nullable=False)
     fecha_actualizacion: Mapped[datetime] = mapped_column("fecha_actualizacion", DateTime, nullable=False)
 

@@ -39,6 +39,7 @@ class RatActividad(Base):
         CheckConstraint("completitud BETWEEN 0 AND 100", name="ck_rat_actividad_completitud"),
         # Una vigente siempre tiene su versión guardada
         CheckConstraint("estado <> 'vigente' OR version_vigente IS NOT NULL", name="ck_rat_actividad_vigente"),
+        CheckConstraint("origen IN ('manual', 'ia')", name="ck_rat_actividad_origen"),  # HU-39
     )
 
     id: Mapped[int] = mapped_column("id", Integer, primary_key=True)
@@ -58,6 +59,10 @@ class RatActividad(Base):
     motivos_revision: Mapped[list] = mapped_column("motivos_revision", JSON, nullable=False, default=list)
     usuario_definitivo_id: Mapped[int | None] = mapped_column(
         "usuario_definitivo_id", Integer, ForeignKey("usuario_definitivo.id"), nullable=True)
+    # HU-39: "manual" o "ia" (propuesta del asistente aceptada por el usuario) y qué propuesta la creó
+    origen: Mapped[str] = mapped_column("origen", String(10), nullable=False, default="manual")
+    propuesta_ia_id: Mapped[int | None] = mapped_column(
+        "propuesta_ia_id", Integer, ForeignKey("asistente_propuesta.id", ondelete="SET NULL"), nullable=True)
     fecha_creacion: Mapped[datetime] = mapped_column("fecha_creacion", DateTime, nullable=False)
     fecha_actualizacion: Mapped[datetime] = mapped_column("fecha_actualizacion", DateTime, nullable=False)
     fecha_vigencia: Mapped[datetime | None] = mapped_column("fecha_vigencia", DateTime, nullable=True)

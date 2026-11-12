@@ -323,6 +323,29 @@ class Settings(BaseSettings):
     BORRADOR_TIMEOUT_S: float = 60.0
     BORRADOR_TEMPERATURA: float = 0.2
 
+    # ------------------------------------------------ HU-39: asistente de IA del mapa y del RAT
+    # false = la entrevista sigue sin IA (preguntas del banco y sugerencias de la evaluación) y los
+    # documentos no se analizan con el LLM. Todo se puede completar a mano igual (degradación HU-16).
+    ASISTENTE_IA_HABILITADA: bool = True
+    # Respuestas de la entrevista analizadas con IA por empresa y día, y ráfaga por minuto. 0 = sin límite.
+    ASISTENTE_RESPUESTAS_DIA_EMPRESA: int = 60
+    ASISTENTE_RESPUESTAS_MINUTO_EMPRESA: int = 6
+    # Documentos analizados con IA por empresa y día (cada uno es una llamada al LLM)
+    ASISTENTE_DOCUMENTOS_DIA_EMPRESA: int = 10
+    ASISTENTE_MAX_CHARS_RESPUESTA: int = 2000
+    # Lo que se envía al LLM de un documento (pasajes BM25 más relevantes, HU-17)
+    ASISTENTE_MAX_CHARS_DOCUMENTO_LLM: int = 12000
+    ASISTENTE_DOCUMENTO_MAX_MB: int = 5
+    # Entidades personales (NER) por cada 1.000 caracteres sobre las que un documento se rechaza:
+    # parece una planilla o listado de personas, no una política, un contrato ni un aviso.
+    ASISTENTE_MAX_DENSIDAD_PII: float = 8.0
+    # Propuestas pendientes de revisar por empresa (las decididas no cuentan)
+    ASISTENTE_MAX_PENDIENTES: int = 60
+    ASISTENTE_MODELO: str | None = None   # vacío = LLM_MODEL
+    ASISTENTE_MAX_TOKENS_SALIDA: int = 6000
+    ASISTENTE_TIMEOUT_S: float = 60.0
+    ASISTENTE_TEMPERATURA: float = 0.1
+
     # ------------------------------------------------ HU-34: mapa de datos personales
     # Tamaño máximo del mapa de una empresa (elementos y flujos). El mapa completo viaja en cada
     # respuesta del panel y se dibuja en el navegador: con esto se mantiene ágil.
@@ -483,6 +506,18 @@ class Settings(BaseSettings):
             raise ValueError("MAPA_CORREOS_DIA_EMPRESA debe ser mayor que 0 (HU-34).")
         if not 1 <= self.RAT_INFORMES_DIA_EMPRESA <= 500 or self.RAT_CORREOS_DIA_EMPRESA < 1:
             raise ValueError("RAT_INFORMES_DIA_EMPRESA (1-500) y RAT_CORREOS_DIA_EMPRESA (1 o más) fuera de rango (HU-36).")
+        for nombre in ("ASISTENTE_RESPUESTAS_DIA_EMPRESA", "ASISTENTE_RESPUESTAS_MINUTO_EMPRESA",
+                       "ASISTENTE_DOCUMENTOS_DIA_EMPRESA"):
+            if getattr(self, nombre) < 0:
+                raise ValueError(f"{nombre} no puede ser negativo (HU-39).")
+        if not 200 <= self.ASISTENTE_MAX_CHARS_RESPUESTA <= 4000:
+            raise ValueError("ASISTENTE_MAX_CHARS_RESPUESTA debe estar entre 200 y 4000 (HU-39).")
+        if not 1000 <= self.ASISTENTE_MAX_CHARS_DOCUMENTO_LLM <= 40000 or not 1 <= self.ASISTENTE_DOCUMENTO_MAX_MB <= 20:
+            raise ValueError("ASISTENTE_MAX_CHARS_DOCUMENTO_LLM (1000-40000) o ASISTENTE_DOCUMENTO_MAX_MB (1-20) fuera de rango (HU-39).")
+        if not 0 < self.ASISTENTE_MAX_DENSIDAD_PII <= 100 or not 1 <= self.ASISTENTE_MAX_PENDIENTES <= 500:
+            raise ValueError("ASISTENTE_MAX_DENSIDAD_PII (0-100) o ASISTENTE_MAX_PENDIENTES (1-500) fuera de rango (HU-39).")
+        if not 0 <= self.ASISTENTE_TEMPERATURA <= 1:
+            raise ValueError("ASISTENTE_TEMPERATURA debe estar entre 0 y 1 (HU-39).")
         if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
             raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

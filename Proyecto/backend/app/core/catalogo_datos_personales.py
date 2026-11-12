@@ -592,13 +592,15 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     },
     "mapa_elemento": {
         **_sin_dp("id", "mapa_id", "tipo", "subtipo", "pais", "nna_declarado", "rol_tercero", "contrato_firmado",
-                  "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion"),
+                  "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion",
+                  "propuesta_ia_id"),  # HU-39
         **{c: Dato(SIN_DP, escaneo="pii") for c in ("nombre", "descripcion", "proveedor", "responsable",
                                                      "categorias_datos", "categorias_titulares")},
     },
     "mapa_flujo": {
         **_sin_dp("id", "mapa_id", "origen_id", "destino_id", "nna_declarado", "frecuencia", "medio", "cifrado",
-                  "garantia", "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion"),
+                  "garantia", "origen", "clave", "pendiente_revision", "fecha_creacion", "fecha_actualizacion",
+                  "propuesta_ia_id"),  # HU-39
         **{c: Dato(SIN_DP, escaneo="pii") for c in ("finalidad", "categorias_datos", "categorias_titulares")},
     },
     # Versiones de solo inserción (criterio 5): la instantánea repite los textos del mapa.
@@ -617,7 +619,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # teléfonos (app/domain/rat/modelo.py) y la auditoría de contenido los vuelve a revisar ("pii").
     "rat_actividad": {
         **_sin_dp("id", "empresa_id", "estado", "estado_previo", "revision", "completitud", "version_vigente",
-                  "fecha_creacion", "fecha_actualizacion", "fecha_vigencia", "fecha_archivo"),
+                  "fecha_creacion", "fecha_actualizacion", "fecha_vigencia", "fecha_archivo",
+                  "origen", "propuesta_ia_id"),  # HU-39
         **{c: Dato(SIN_DP, escaneo="pii") for c in ("nombre", "contenido", "motivos_revision")},
         "usuario_definitivo_id": Dato(
             METADATO, finalidad="Saber qué usuario de la empresa creó la actividad (HU-35)",
@@ -643,6 +646,53 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         **{c: Dato(SIN_DP, escaneo="pii") for c in ("motivos_borrador", "resumen", "versiones")},
         "usuario_definitivo_id": Dato(
             METADATO, finalidad="Trazabilidad: qué usuario de la empresa emitió cada informe del registro (HU-36)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    # ------------------------------------------------------------ HU-39: asistente de IA del mapa y del RAT
+    # La entrevista describe PROCESOS de la empresa, no personas. Lo que escribe el usuario se guarda
+    # anonimizado (el mismo texto que vio el LLM) y las propuestas pasan por el NER antes de guardarse.
+    # Los documentos subidos NO se guardan: solo su huella y sus metadatos.
+    "asistente_sesion": {
+        **_sin_dp("id", "empresa_id", "area_actual", "paso", "estado", "fecha_creacion", "fecha_actualizacion"),
+        "areas_completadas": Dato(SIN_DP, escaneo="pii"),   # lista de códigos de área
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa hizo la entrevista del asistente (HU-39)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    "asistente_mensaje": {
+        **_sin_dp("id", "sesion_id", "rol", "area", "pregunta_codigo", "bloqueado", "motivo_bloqueo", "motivo_sin_ia",
+                  "traza_id", "prompt_version", "fecha"),
+        "contenido": Dato(
+            TEXTO_LIBRE, ANONIMIZADO, finalidad="Respuestas de la entrevista con que el asistente propuso el registro",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
+    },
+    "asistente_documento": {
+        **_sin_dp("id", "empresa_id", "sesion_id", "tipo_archivo", "tipo_documento", "huella_sha256", "estado",
+                  "regla_detector", "lineas_omitidas", "pasajes_total", "pasajes_usados", "entidades_anonimizadas",
+                  "motivo_sin_ia", "traza_id", "fecha"),
+        "nombre_archivo": Dato(
+            TEXTO_LIBRE, ANONIMIZADO, finalidad="Reconocer el documento analizado en la lista (HU-39)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa subió el documento (HU-39)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    "asistente_propuesta": {
+        "campos_editados": Dato(SIN_DP, escaneo="pii"),     # lista de nombres de campos
+        **_sin_dp("id", "empresa_id", "sesion_id", "documento_id", "origen", "area", "tipo", "clave", "estado",
+                  "riesgo_nivel", "confianza", "modelo", "prompt_version", "traza_id",
+                  "version_mapa_base", "entidad_destino", "entidad_destino_id", "fecha_decision", "motivo_descarte",
+                  "fecha_creacion"),
+        **{c: Dato(DERIVADO_IA, ANONIMIZADO, finalidad="Propuesta del asistente y lo que confirmó el usuario (HU-39)",
+                   base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii")
+           for c in ("payload_propuesto", "payload_final", "explicaciones", "inconsistencias")},
+        "decidido_por": Dato(
+            METADATO, finalidad="Human-in-the-Loop: qué usuario aceptó, editó o descartó la propuesta (HU-39)",
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },

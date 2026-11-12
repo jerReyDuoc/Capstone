@@ -18,6 +18,8 @@ Tareas registradas:
                      de acción por nivel sobre las brechas de la empresa).
   REDACTAR_BORRADOR  HU-16: adapta cláusulas de una plantilla de cumplimiento (Política de uso
                      de LLM, Aviso de privacidad, PIA) al rubro y a las brechas de la empresa.
+  ASISTENTE_RAT      HU-39: interpreta la entrevista guiada o un documento de la empresa y propone
+                     elementos y flujos del mapa y actividades del RAT (el usuario las confirma).
 """
 from __future__ import annotations
 
@@ -28,10 +30,12 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 
+from app.application.ai.prompts import asistente_rat as prompt_asistente
 from app.application.ai.prompts import borrador as prompt_borrador
 from app.application.ai.prompts import tutor, validar_evidencia
 from app.application.ai.prompts.base import PromptRenderizado
 from app.application.ai.verificacion_salida import verificar_evidencia
+from app.application.schemas.asistente_rat import AsistenteRatRespuesta
 from app.application.schemas.borrador import BorradorIA
 from app.application.schemas.evidence_validation import EvidenceValidation
 from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
@@ -46,6 +50,7 @@ class TareaIA(str, Enum):
     VALIDAR_EVIDENCIA = "validar_evidencia"
     TUTOR = "tutor"  # HU-15
     REDACTAR_BORRADOR = "redactar_borrador"  # HU-16
+    ASISTENTE_RAT = "asistente_rat"  # HU-39
 
 
 def _sin_advertencias(_r: BaseModel, _datos: dict[str, Any] | None = None) -> list[str]:
@@ -174,6 +179,27 @@ def _etiqueta_borrador(r: BorradorIA) -> str:
     return f"secciones:{len(r.secciones)}"
 
 
+# ---------------------------------------------------------------- ASISTENTE_RAT (HU-39)
+def _prompt_asistente(textos: dict[str, str], datos: dict[str, Any]) -> PromptRenderizado:
+    return prompt_asistente.construir(
+        respuesta=textos.get("respuesta") or "",
+        documento=textos.get("documento") or "",
+        mapa=textos.get("mapa") or "",
+        contexto=datos["contexto"],
+        canario=datos.get("canario"),
+    )
+
+
+def _validar_salida_asistente(r: AsistenteRatRespuesta, datos: dict[str, Any] | None = None) -> list[str]:
+    """Solo REGISTRA en la métrica; el nodo "validar_asistente" del agente aplica las reglas."""
+    from app.application.asistente.salida_ia import problemas
+    return problemas(r, (datos or {}).get("canario"), prompt_asistente.SYSTEM)
+
+
+def _etiqueta_asistente(r: AsistenteRatRespuesta) -> str:
+    return "fuera_de_alcance" if r.fuera_de_alcance else f"propuestas:{len(r.propuestas)}"
+
+
 def crear_politicas(
     *,
     max_chars_evidencia: int,
@@ -192,6 +218,13 @@ def crear_politicas(
     timeout_borrador_s: float | None = None,
     modelo_borrador: str | None = None,
     temperatura_borrador: float = 0.2,
+    max_chars_respuesta_asistente: int = 2000,
+    max_chars_documento_asistente: int = 12000,
+    max_chars_mapa_asistente: int = 8000,
+    max_tokens_asistente: int | None = None,
+    timeout_asistente_s: float | None = None,
+    modelo_asistente: str | None = None,
+    temperatura_asistente: float = 0.1,
 ) -> dict[TareaIA, PoliticaTarea]:
     return {
         TareaIA.VALIDAR_EVIDENCIA: PoliticaTarea(
@@ -239,5 +272,23 @@ def crear_politicas(
             modelo=modelo_borrador or modelo,
             validar_salida=_validar_salida_borrador,
             etiqueta_metrica=_etiqueta_borrador,
+        ),
+        TareaIA.ASISTENTE_RAT: PoliticaTarea(
+            tarea=TareaIA.ASISTENTE_RAT,
+            schema=AsistenteRatRespuesta,
+            prompt_version=prompt_asistente.PROMPT_VERSION,
+            construir_prompt=_prompt_asistente,
+            # Todo lo que escribió la empresa: su respuesta, los pasajes de su documento y los nombres
+            # de su mapa. Los tres pasan por el filtro del agente (HU-18/HU-33) y por el NER del gateway:
+            # ningún dato de titulares llega al LLM. Los catálogos y la pregunta los arma el backend.
+            campos_no_confiables={"respuesta": max_chars_respuesta_asistente,
+                                  "documento": max_chars_documento_asistente,
+                                  "mapa": max_chars_mapa_asistente},
+            max_tokens_salida=max_tokens_asistente or max_tokens_salida,
+            timeout_s=timeout_asistente_s or timeout_s,
+            temperatura=temperatura_asistente,
+            modelo=modelo_asistente or modelo,
+            validar_salida=_validar_salida_asistente,
+            etiqueta_metrica=_etiqueta_asistente,
         ),
     }

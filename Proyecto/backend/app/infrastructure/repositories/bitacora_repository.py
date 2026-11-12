@@ -159,6 +159,15 @@ class Accion:
     RAT_INFORME_DESCARGADO = "rat.informe_descargado"
     RAT_INFORME_ENVIADO = "rat.informe_enviado"
     RAT_INFORME_VERIFICADO = "rat.informe_verificado"
+    # HU-39: asistente de IA para el mapa de datos y el RAT (sin texto: huellas, códigos y conteos)
+    ASISTENTE_SESION_CREADA = "asistente.sesion_creada"
+    ASISTENTE_RESPUESTA = "asistente.respuesta"                     # detalle: area, propuestas, motivo_sin_ia
+    ASISTENTE_RESPUESTA_BLOQUEADA = "asistente.respuesta_bloqueada"  # filtro de entrada (HU-18)
+    ASISTENTE_SALIDA_BLOQUEADA = "asistente.salida_bloqueada"        # la salida filtró el system prompt
+    ASISTENTE_DOCUMENTO_ANALIZADO = "asistente.documento_analizado"  # detalle: tipo, estado, regla
+    ASISTENTE_PROPUESTA_ACEPTADA = "asistente.propuesta_aceptada"
+    ASISTENTE_PROPUESTA_EDITADA = "asistente.propuesta_editada"      # aceptada con cambios del usuario
+    ASISTENTE_PROPUESTA_DESCARTADA = "asistente.propuesta_descartada"
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -234,6 +243,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RAT_VERSION_VIGENTE: Categoria.MODIFICACION,
     Accion.RAT_MARCADA_REVISION: Categoria.MODIFICACION,
     Accion.RAT_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
+    Accion.ASISTENTE_PROPUESTA_DESCARTADA: Categoria.MODIFICACION,  # HU-39
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -256,6 +266,9 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MAPA_SUGERENCIA_ACEPTADA: Categoria.CREACION,
     Accion.RAT_ACTIVIDAD_CREADA: Categoria.CREACION,             # HU-35
     Accion.RAT_INFORME_GENERADO: Categoria.CREACION,             # HU-36 (descargas y envíos: acceso)
+    Accion.ASISTENTE_SESION_CREADA: Categoria.CREACION,          # HU-39
+    Accion.ASISTENTE_PROPUESTA_ACEPTADA: Categoria.CREACION,
+    Accion.ASISTENTE_PROPUESTA_EDITADA: Categoria.CREACION,
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,
@@ -265,6 +278,8 @@ _CATEGORIAS: dict[str, str] = {
     Accion.TUTOR_SALIDA_BLOQUEADA: Categoria.SEGURIDAD,
     Accion.TUTOR_ADVERTENCIA_ABUSO: Categoria.SEGURIDAD,
     Accion.BORRADOR_INSTRUCCIONES_BLOQUEADAS: Categoria.SEGURIDAD,
+    Accion.ASISTENTE_RESPUESTA_BLOQUEADA: Categoria.SEGURIDAD,   # HU-39
+    Accion.ASISTENTE_SALIDA_BLOQUEADA: Categoria.SEGURIDAD,
     # actividad del propio log
     Accion.AUDITORIA_CONSULTA: Categoria.AUDITORIA,
     Accion.AUDITORIA_VERIFICACION: Categoria.AUDITORIA,

@@ -30,10 +30,15 @@ class SkillIA(str, Enum):
     VALIDAR_EVIDENCIA = "validar_evidencia"
     TUTOR = "tutor"
     BORRADOR = "borrador"  # HU-16: adaptar un borrador de cumplimiento
+    ASISTENTE_RAT = "asistente_rat"  # HU-39: proponer mapa de datos y RAT
 
 
 BLOQUEAR = "bloquear"        # un ataque en el campo corta la ejecución (sin NER ni LLM)
 NEUTRALIZAR = "neutralizar"  # se quita la línea con el ataque y la ejecución sigue
+# HU-39: igual que NEUTRALIZAR pero con el detector con contexto de HU-33 (perfil "evidencia"): un
+# documento formal (política, contrato, aviso) usa vocabulario de cumplimiento que el filtro estricto
+# del chat confundiría con un ataque. Solo cuenta si va dirigido a la IA.
+NEUTRALIZAR_DOCUMENTO = "neutralizar_documento"
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,13 @@ SKILLS: dict[SkillIA, SpecSkill] = {
     # HU-16: las instrucciones de la empresa se bloquean si traen un ataque (no se llama al NER
     # ni al LLM y el borrador se arma solo con la plantilla). Mismos estándares que el tutor (HU-18).
     SkillIA.BORRADOR: SpecSkill(TareaIA.REDACTAR_BORRADOR, {"instrucciones": BLOQUEAR}, canario=True),
+    # HU-39: la respuesta a la entrevista se bloquea si trae un ataque (sin NER ni LLM); el documento y
+    # los nombres del mapa (texto guardado por la empresa) se neutralizan línea por línea.
+    SkillIA.ASISTENTE_RAT: SpecSkill(
+        TareaIA.ASISTENTE_RAT,
+        {"respuesta": BLOQUEAR, "documento": NEUTRALIZAR_DOCUMENTO, "mapa": NEUTRALIZAR},
+        canario=True,
+    ),
 }
 
 MOTIVO_INYECCION = CategoriaAtaque.INYECCION.value
@@ -125,10 +137,18 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
             r = filtro.evaluar(texto, datos.get("previos_usuario"))
             if r.bloquear:
                 return {"bloqueado": True, "motivo": r.categoria.value, "regla": r.regla, "campo_bloqueado": campo}
-        else:  # NEUTRALIZAR: línea por línea ("[REF] antecedente")
+        else:  # NEUTRALIZAR / NEUTRALIZAR_DOCUMENTO: línea por línea ("[REF] antecedente")
+            guard: PromptGuardPort | None = _deps(config).get("guard")
             lineas = []
             for linea in texto.splitlines():
-                r = filtro.evaluar(linea)
+                if politica == NEUTRALIZAR_DOCUMENTO and guard is not None:
+                    from app.domain.ports.prompt_guard_port import PERFIL_EVIDENCIA
+
+                    g = guard.analizar(linea, PERFIL_EVIDENCIA)
+                    r = ResultadoFiltro(g.bloquear, _categoria(g.categoria), g.regla) if g.bloquear \
+                        else ResultadoFiltro.limpio()
+                else:
+                    r = filtro.evaluar(linea)
                 if r.bloquear:
                     ref = linea.split("]", 1)[0].lstrip("[") if linea.startswith("[") else None
                     neutralizados.append({"campo": campo, "ref": ref, "categoria": r.categoria.value, "regla": r.regla,
@@ -142,6 +162,14 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
         # HU-18: código de control (canario) distinto en cada llamada; nunca debe salir en la respuesta
         cambios["datos"] = {**datos, "canario": validacion.generar_canario()}
     return cambios
+
+
+def _categoria(valor: str | None) -> CategoriaAtaque:
+    """Categoría del detector de HU-33 como categoría del filtro del agente (inyeccion si no calza)."""
+    try:
+        return CategoriaAtaque(valor)
+    except ValueError:
+        return CategoriaAtaque.INYECCION
 
 
 def _router(estado: EstadoAgente) -> str:
@@ -170,6 +198,29 @@ async def nodo_tutor(estado: EstadoAgente, config: RunnableConfig) -> dict:
 
 async def nodo_borrador(estado: EstadoAgente, config: RunnableConfig) -> dict:
     return await _ejecutar_tarea(estado, config)
+
+
+async def nodo_asistente(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    return await _ejecutar_tarea(estado, config)
+
+
+async def nodo_validar_asistente(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    """
+    HU-39: misma revisión de salida que el tutor (HU-18). Una fuga del system prompt (canario o frases
+    del prompt) descarta TODAS las propuestas; código y enlaces se limpian; "fuera de alcance" no puede
+    traer propuestas. El anclaje a catálogos y al mapa lo hace la capa de aplicación (anclaje.py), que
+    conoce el mapa de la empresa.
+    """
+    from app.application.ai.prompts.asistente_rat import SYSTEM
+    from app.application.asistente import salida_ia
+
+    resultado: ResultadoIA = estado["resultado"]
+    canario = (estado.get("datos") or {}).get("canario")
+    encontrados = salida_ia.problemas(resultado.data, canario, SYSTEM)
+    if not encontrados:
+        return {}
+    limpio, bloqueada = salida_ia.aplicar(resultado.data, encontrados)
+    return {"resultado": _resultado(resultado, limpio), "salida_bloqueada": bloqueada}
 
 
 def _resultado(base: ResultadoIA, data) -> ResultadoIA:
@@ -266,6 +317,8 @@ def construir_grafo():
     g.add_node(SkillIA.TUTOR.value, nodo_tutor)
     g.add_node(SkillIA.BORRADOR.value, nodo_borrador)
     g.add_node("validar_borrador", nodo_validar_borrador)
+    g.add_node(SkillIA.ASISTENTE_RAT.value, nodo_asistente)
+    g.add_node("validar_asistente", nodo_validar_asistente)
     g.add_node("validar_salida", nodo_validar_salida)
     g.add_node("anclar_contexto", nodo_anclar_contexto)
     g.add_edge(START, "guardia")
@@ -274,6 +327,7 @@ def construir_grafo():
         SkillIA.VALIDAR_EVIDENCIA.value: SkillIA.VALIDAR_EVIDENCIA.value,
         SkillIA.TUTOR.value: SkillIA.TUTOR.value,
         SkillIA.BORRADOR.value: SkillIA.BORRADOR.value,
+        SkillIA.ASISTENTE_RAT.value: SkillIA.ASISTENTE_RAT.value,
     })
     g.add_edge(SkillIA.VALIDAR_EVIDENCIA.value, END)
     g.add_edge(SkillIA.TUTOR.value, "validar_salida")
@@ -281,6 +335,8 @@ def construir_grafo():
     g.add_edge("anclar_contexto", END)
     g.add_edge(SkillIA.BORRADOR.value, "validar_borrador")
     g.add_edge("validar_borrador", END)
+    g.add_edge(SkillIA.ASISTENTE_RAT.value, "validar_asistente")
+    g.add_edge("validar_asistente", END)
     return g.compile()
 
 
@@ -324,7 +380,7 @@ class AgenteIA:
             "neutralizados": [], "salida_bloqueada": None,
         }
         final = await grafo().ainvoke(
-            estado, config={"configurable": {"gateway": self.gateway, "filtro": self.filtro}},
+            estado, config={"configurable": {"gateway": self.gateway, "filtro": self.filtro, "guard": self.guard}},
         )
         resultado: ResultadoIA | None = final.get("resultado")
         return SalidaAgente(

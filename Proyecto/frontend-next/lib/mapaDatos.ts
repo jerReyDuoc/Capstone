@@ -59,7 +59,7 @@ export interface CatalogoMapa {
   pais_local: string;
 }
 
-export type OrigenRegistro = "manual" | "plantilla" | "evaluacion";
+export type OrigenRegistro = "manual" | "plantilla" | "evaluacion" | "ia";
 
 export interface ElementoMapa {
   id: number;
@@ -398,6 +398,7 @@ export const ETIQUETA_ORIGEN: Record<OrigenRegistro, string> = {
   manual: "Agregado por tu empresa",
   plantilla: "Desde una plantilla",
   evaluacion: "Sugerido por tu evaluación",
+  ia: "Sugerido por IA y aceptado por tu equipo",
 };
 
 export const SEVERIDADES: Severidad[] = ["Crítica", "Alta", "Media", "Baja"];

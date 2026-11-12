@@ -49,7 +49,8 @@ _Q_FUGA = (r"(tus|te (dieron|entregaron|pasaron|configuraron|dijeron|programaron
 _REGLAS: list[tuple[CategoriaAtaque, str, re.Pattern]] = [
     # ---------------------------------------------------------- delimitadores / roles falsos
     (C.DELIMITADORES, "etiqueta_prompt", re.compile(
-        r"<\s*/?\s*(mensaje_usuario|historial|antecedentes_empresa|contexto|system|sistema|instrucciones|"
+        r"<\s*/?\s*(mensaje_usuario|historial|antecedentes_empresa|respuesta_usuario|documento_empresa|mapa_empresa|"
+        r"contexto|system|sistema|instrucciones|"
         r"assistant|asistente|user|developer)\s*>")),
     (C.DELIMITADORES, "rol_falso", re.compile(
         r"(^|\n)\s*\[?(sistema|system|assistant|asistente|developer|desarrollador|tutor|ia)\]?\s*:\s*\S")),
