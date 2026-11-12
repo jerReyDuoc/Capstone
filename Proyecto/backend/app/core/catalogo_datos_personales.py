@@ -633,6 +633,19 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
+    # ------------------------------------------------------------ HU-36: informe del RAT
+    # Cada emisión del informe (PDF y XLSX en "Mis documentos"): código verificable, versión del RAT,
+    # huella y cifras del resumen. Sin datos de titulares; los textos (motivos del borrador y el
+    # resumen con nombres de categorías) se revisan igual en la auditoría de contenido ("pii").
+    "rat_informe": {
+        **_sin_dp("id", "empresa_id", "codigo", "version_rat", "huella", "borrador", "actividades",
+                  "aviso_version", "fecha", "documento_pdf_id", "documento_xlsx_id"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("motivos_borrador", "resumen", "versiones")},
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa emitió cada informe del registro (HU-36)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
 }
 
 

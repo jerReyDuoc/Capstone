@@ -167,3 +167,100 @@
 @media print {
   .acciones, .pasos, .navPasos, .filtros { display: none !important; }
 }
+
+/* =====================================================================
+   Informe del registro (ventana)
+   ===================================================================== */
+.accionesInforme { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.accionesSecundarias { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-left: auto; }
+.pieAviso { display: inline-flex; gap: 6px; align-items: flex-start; font-size: var(--fs-xs); color: var(--text-subtle); max-width: 46ch; }
+.pieAviso svg { flex: none; width: 14px; height: 14px; margin-top: 1px; }
+
+.informeVacio { display: flex; gap: var(--sp-4); align-items: flex-start; padding: var(--sp-6); border: 1px dashed var(--line-control); border-radius: var(--radius-lg); }
+.informeVacio > svg { flex: none; width: 32px; height: 32px; color: var(--text-subtle); }
+.informeVacio h3 { font-size: var(--fs-md); }
+.informeVacio p { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+
+.estadoInforme {
+  --c: var(--ok);
+  display: flex; gap: var(--sp-4); align-items: flex-start; padding: var(--sp-4) var(--sp-5);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%), var(--surface-2);
+}
+.estadoInforme[data-tono="borrador"] { --c: var(--medio); }
+.estadoInformeIcono { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+.estadoInformeIcono svg { width: 22px; height: 22px; }
+.estadoInformeTexto { display: grid; gap: 6px; min-width: 0; }
+.estadoInformeTexto h3 { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: baseline; font-size: var(--fs-lg); font-weight: 600; }
+.estadoInformeTexto p { font-size: var(--fs-sm); color: var(--text-muted); }
+.estadoInformeTexto ul { margin: 0; padding-left: var(--sp-5); display: grid; gap: 2px; font-size: var(--fs-sm); }
+.estadoInformeTexto :global(.link-btn) { justify-self: start; }
+.versionInforme { padding: 2px 10px; border-radius: var(--radius-pill); background: var(--surface-3); font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+
+.cifrasInforme { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+
+.bloqueInforme { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.bloqueCabeza { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: center; justify-content: space-between; }
+.bloqueCabeza h3 { display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-sm); font-weight: 700; }
+.bloqueCabeza h3 svg { width: 18px; height: 18px; color: var(--accent); }
+
+.matrizRiesgos { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-6); align-items: center; }
+.mapaCalor { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto auto; gap: 4px 8px; align-items: center; }
+.ejeY { grid-row: 1; grid-column: 1; writing-mode: vertical-rl; transform: rotate(180deg); font-size: var(--fs-xs); font-weight: 600; color: var(--text-subtle); }
+.ejeX { grid-row: 2; grid-column: 2; text-align: center; font-size: var(--fs-xs); font-weight: 600; color: var(--text-subtle); }
+.leyendaCalor { grid-row: 3; grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--sp-3); font-size: var(--fs-xs); color: var(--text-muted); }
+.leyendaCalor span { display: inline-flex; gap: 6px; align-items: center; }
+.leyendaCalor i { width: 12px; height: 12px; border-radius: 3px; }
+.rejillaCalor { grid-row: 1; grid-column: 2; display: grid; grid-template-columns: 18px repeat(5, 40px); grid-auto-rows: 34px; gap: 3px; }
+.etiquetaEje { display: grid; place-items: center; font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; }
+.celdaCalor, .leyendaCalor i {
+  --fondo: rgba(20, 216, 158, 0.16); --tinta: var(--ok);
+}
+.celdaCalor { display: grid; place-items: center; border-radius: 6px; background: var(--fondo); color: var(--tinta); font-weight: 700; font-variant-numeric: tabular-nums; }
+.celdaCalor[data-vacia="true"] { opacity: 0.55; }
+.celdaCalor[data-nivel="Medio"], .leyendaCalor i[data-nivel="Medio"] { --fondo: rgba(242, 181, 63, 0.18); --tinta: var(--medio); }
+.celdaCalor[data-nivel="Alto"], .leyendaCalor i[data-nivel="Alto"] { --fondo: rgba(245, 138, 75, 0.22); --tinta: var(--naranja); }
+.celdaCalor[data-nivel="Crítico"], .leyendaCalor i[data-nivel="Crítico"] { --fondo: rgba(255, 92, 122, 0.26); --tinta: var(--critico); }
+.leyendaCalor i { background: var(--fondo); border: 1px solid var(--tinta); }
+.celdaCalor:not([data-vacia="true"]) { box-shadow: inset 0 0 0 1.5px var(--tinta); }
+.topRiesgos { display: grid; gap: var(--sp-2); align-content: start; min-width: 0; }
+.topRiesgosTitulo { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-subtle); }
+.topRiesgos ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.topRiesgos li { display: flex; gap: var(--sp-2); align-items: center; padding: 6px var(--sp-3); border-radius: var(--radius-sm); background: var(--surface); }
+.nivelRiesgo { flex: none; min-width: 64px; padding: 2px 8px; border-radius: var(--radius-pill); text-align: center; font-size: var(--fs-xs); font-weight: 700; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.topNombre { flex: 1; min-width: 0; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topPuntaje { flex: none; font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; }
+
+.incluye { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.incluye li { display: flex; gap: var(--sp-3); align-items: flex-start; font-size: var(--fs-sm); color: var(--text-muted); }
+.incluye li svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+.incluye strong { display: block; color: var(--text); }
+
+.ultimoInforme { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border: 1px solid rgba(20, 216, 158, 0.3); border-radius: var(--radius-md); background: var(--accent-soft); }
+.ultimoCabeza { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.ultimoCabeza h3 { font-size: var(--fs-sm); font-weight: 700; margin-right: auto; }
+.datosEmision { margin: 0; display: grid; grid-template-columns: minmax(230px, 1.6fr) repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.datosEmision div { display: grid; gap: 2px; min-width: 0; }
+.datosEmision dt { font-size: var(--fs-xs); color: var(--text-subtle); font-weight: 600; }
+.datosEmision dd { margin: 0; font-size: var(--fs-sm); font-weight: 600; }
+.codigo { display: flex; gap: 4px; align-items: center; font-family: var(--font-mono); font-size: var(--fs-sm) !important; white-space: nowrap; }
+.formCorreo { display: grid; gap: var(--sp-3); }
+.formatos { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); }
+.formatos legend { width: 100%; margin-bottom: 6px; }
+.descargasFila { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.formVerificar { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.formVerificar input { flex: 1 1 260px; font-family: var(--font-mono); text-transform: uppercase; }
+
+@media (max-width: 900px) {
+  .cifrasInforme { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .matrizRiesgos { grid-template-columns: 1fr; justify-items: start; }
+  .datosEmision { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .datosEmision > div:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .incluye { grid-template-columns: 1fr; }
+  .accionesInforme > :global(.btn) { flex: 1 1 100%; justify-content: center; }
+  .accionesSecundarias { margin-left: 0; width: 100%; }
+  .rejillaCalor { grid-template-columns: 16px repeat(5, minmax(30px, 1fr)); grid-auto-rows: 30px; }
+  .estadoInforme { flex-direction: column; }
+}

@@ -331,6 +331,13 @@ class Settings(BaseSettings):
     # Envíos del informe del mapa por correo por empresa y día.
     MAPA_CORREOS_DIA_EMPRESA: int = 5
 
+    # ------------------------------------------------ HU-36: informe del registro de actividades
+    # Emisiones nuevas del informe (PDF + XLSX, guardados en "Mis documentos") por empresa y día.
+    # Si el registro no cambió, se reutiliza la última emisión y no cuenta.
+    RAT_INFORMES_DIA_EMPRESA: int = 20
+    # Envíos del informe por correo por empresa y día.
+    RAT_CORREOS_DIA_EMPRESA: int = 5
+
     # HU-09: log inmutable (audit_log) para el Auditor Externo (Ley 21.719, art. 14 ter)
     # Filas por lote sellado. Cada lote recibe un hash SHA-256 que un tercero puede
     # recalcular con el archivo exportado (verificación de integridad por hash en lote).
@@ -474,6 +481,8 @@ class Settings(BaseSettings):
             raise ValueError("MAPA_MAX_ELEMENTOS (1-2000) y MAPA_MAX_FLUJOS (1-5000) fuera de rango (HU-34).")
         if self.MAPA_CORREOS_DIA_EMPRESA < 1:
             raise ValueError("MAPA_CORREOS_DIA_EMPRESA debe ser mayor que 0 (HU-34).")
+        if not 1 <= self.RAT_INFORMES_DIA_EMPRESA <= 500 or self.RAT_CORREOS_DIA_EMPRESA < 1:
+            raise ValueError("RAT_INFORMES_DIA_EMPRESA (1-500) y RAT_CORREOS_DIA_EMPRESA (1 o más) fuera de rango (HU-36).")
         if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
             raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

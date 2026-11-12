@@ -4,8 +4,10 @@
  * /empresa/mapa-datos — Mapa de datos personales de la empresa.
  *
  * Qué datos personales trata la empresa, de quiénes, dónde están y con quién los comparte:
- *   Mapa          diagrama navegable con filtros (dato sensible, NNA, transferencia, tercero,
- *                 país, tipo) y la ficha del elemento o flujo elegido.
+ *   Guía          los pasos recomendados para armar el mapa, cuáles están listos y el siguiente.
+ *   Mapa          el diagrama primero (con filtros plegables) y, debajo, los indicadores y la
+ *                 completitud. Al elegir un recuadro o una flecha se abre su ficha en una ventana
+ *                 centrada (components/empresa/mapa/PanelDetalle.tsx).
  *   Inventario    las mismas piezas en tablas, con búsqueda.
  *   Riesgos       hallazgos priorizados y lo que falta completar.
  *   Sugerencias   propuestas según la evaluación y plantillas por rubro.
@@ -37,7 +39,9 @@ import { FormElemento } from "./FormElemento";
 import { FormFlujo } from "./FormFlujo";
 import { GrafoMapa, type Seleccion } from "./GrafoMapa";
 import { Inventario } from "./Inventario";
-import { PanelDetalle } from "./PanelDetalle";
+import { pasosGuia } from "@/lib/guiaMapa";
+import { GuiaMapa } from "./GuiaMapa";
+import { FichaDetalle } from "./PanelDetalle";
 import { Historial, InicioMapa, Riesgos, Sugerencias } from "./Secciones";
 import s from "./mapa.module.css";
 
@@ -74,6 +78,9 @@ export function MapaDatos() {
   const [pestana, setPestana] = useState<Pestana>("mapa");
   const [filtros, setFiltros] = useState<FiltrosMapa>(SIN_FILTROS);
   const [seleccion, setSeleccion] = useState<Seleccion | null>(null);
+  // La ficha (ventana centrada) se abre al elegir algo en el mapa; al cerrarla, lo elegido sigue resaltado
+  const [fichaAbierta, setFichaAbierta] = useState(false);
+  const [filtrosVisibles, setFiltrosVisibles] = useState(false);
   const [dialogo, setDialogo] = useState<DialogoAbierto | null>(null);
   const [aviso, setAviso] = useState<Aviso>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -194,12 +201,21 @@ export function MapaDatos() {
     const existe = seleccion.tipo === "elemento"
       ? vista.elementos.some((e) => e.id === seleccion.id)
       : vista.flujos.some((f) => f.id === seleccion.id);
-    if (!existe) setSeleccion(null);
+    if (!existe) {
+      setSeleccion(null);
+      setFichaAbierta(false);
+    }
   }, [vista, seleccion]);
+
+  const elegir = (sel: Seleccion | null) => {
+    setSeleccion(sel);
+    setFichaAbierta(Boolean(sel));
+  };
 
   const verEnMapa = (tipo: "elemento" | "flujo", id: number) => {
     setPestana("mapa");
     setSeleccion({ tipo, id });
+    setFichaAbierta(true);
     requestAnimationFrame(() => document.getElementById("zona-mapa")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
@@ -373,6 +389,41 @@ export function MapaDatos() {
     { etiqueta: "Riesgos críticos o altos", valor: graves, icono: "brechas", tono: graves ? "alerta" : undefined },
   ];
 
+  const resumenMapa = (
+    <section className={s.resumenMapa} aria-labelledby="titulo-resumen-mapa">
+      <div className={s.seccionCabeza}>
+        <h2 id="titulo-resumen-mapa">Resumen del mapa</h2>
+        <span className="card-sub">
+          Versión {vista.mapa.version}
+          {vista.mapa.fecha_actualizacion ? ` · actualizado ${fechaHoraChile(vista.mapa.fecha_actualizacion)}` : ""}
+        </span>
+      </div>
+      <div className={s.kpis}>
+        {kpis.map((k) => (
+          <div key={k.etiqueta} className={s.kpi} data-tono={k.tono}>
+            <span className={s.kpiEtiqueta}><Icon name={k.icono} />{k.etiqueta}</span>
+            <span className={s.kpiValor}>{k.valor}</span>
+            {k.pie ? <span className={s.kpiPie}>{k.pie}</span> : null}
+          </div>
+        ))}
+      </div>
+      <div className={s.completitud}>
+        <div className={s.completitudFila}>
+          <span className="card-sub">
+            <strong style={{ color: "var(--text)" }}>Completitud del mapa: {vista.completitud.porcentaje} %</strong>
+            {r.pendientes_revision ? ` · ${plural(r.pendientes_revision, "registro por confirmar", "registros por confirmar")}` : ""}
+          </span>
+          {vista.completitud.pendientes.length ? (
+            <button type="button" className="link-btn" onClick={() => setPestana("riesgos")}>Ver qué falta</button>
+          ) : null}
+        </div>
+        <div className={s.barra} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={vista.completitud.porcentaje} aria-label="Completitud del mapa">
+          <span style={{ width: `${vista.completitud.porcentaje}%` }} />
+        </div>
+      </div>
+    </section>
+  );
+
   const contadorPestana = (id: Pestana) => {
     if (id === "riesgos" && vista.hallazgos.length) return { n: vista.hallazgos.length, tono: graves ? "alerta" : undefined };
     if (id === "sugerencias" && sugerencias?.sugerencias.length) return { n: sugerencias.sugerencias.length, tono: undefined };
@@ -404,32 +455,15 @@ export function MapaDatos() {
       ) : (
         <>
           {!vacio ? (
-            <section aria-label="Resumen del mapa" style={{ display: "grid", gap: 16 }}>
-              <div className={s.kpis}>
-                {kpis.map((k) => (
-                  <div key={k.etiqueta} className={s.kpi} data-tono={k.tono}>
-                    <span className={s.kpiEtiqueta}><Icon name={k.icono} />{k.etiqueta}</span>
-                    <span className={s.kpiValor}>{k.valor}</span>
-                    {k.pie ? <span className={s.kpiPie}>{k.pie}</span> : null}
-                  </div>
-                ))}
-              </div>
-              <div className={s.completitud}>
-                <div className={s.completitudFila}>
-                  <span className="card-sub">
-                    <strong style={{ color: "var(--text)" }}>Completitud del mapa: {vista.completitud.porcentaje} %</strong>
-                    {r.pendientes_revision ? ` · ${plural(r.pendientes_revision, "registro por confirmar", "registros por confirmar")}` : ""}
-                  </span>
-                  <span className="card-sub">
-                    Versión {vista.mapa.version}
-                    {vista.mapa.fecha_actualizacion ? ` · actualizado ${fechaHoraChile(vista.mapa.fecha_actualizacion)}` : ""}
-                  </span>
-                </div>
-                <div className={s.barra} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={vista.completitud.porcentaje} aria-label="Completitud del mapa">
-                  <span style={{ width: `${vista.completitud.porcentaje}%` }} />
-                </div>
-              </div>
-            </section>
+            <GuiaMapa
+              pasos={pasosGuia(vista)}
+              onAccion={(a) => {
+                if (a === "agregar_sistema") setDialogo({ tipo: "elemento", tipoInicial: "sistema" });
+                else if (a === "agregar_tercero") setDialogo({ tipo: "elemento", tipoInicial: "tercero" });
+                else if (a === "agregar_flujo") setDialogo({ tipo: "flujo" });
+                else if (a === "ver_riesgos") setPestana("riesgos");
+              }}
+            />
           ) : null}
 
           <div className={s.pestanas} role="tablist" aria-label="Secciones del mapa" ref={refPestanas}>
@@ -457,7 +491,7 @@ export function MapaDatos() {
           </div>
 
           <div role="tabpanel" id={`panel-${pestana}`} aria-labelledby={`tab-${pestana}`}>
-            {(pestana === "mapa" || pestana === "inventario") && !vacio ? (
+            {pestana === "inventario" && !vacio ? (
               <BarraFiltros catalogo={catalogo} vista={vista} filtros={filtros} terceros={terceros} visibles={visibles} onCambiar={setFiltros} />
             ) : null}
 
@@ -465,36 +499,53 @@ export function MapaDatos() {
               vacio ? (
                 <p className="callout"><Icon name="info" /><span>Tu mapa está vacío. Agrega un elemento o usa una plantilla.</span></p>
               ) : (
-                <div id="zona-mapa" style={{ display: "grid", gap: 12, marginTop: 16, scrollMarginTop: 16 }}>
-                  <div className={s.zonaMapa}>
-                    <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
-                      <GrafoMapa
-                        vista={vista}
-                        filtros={filtros}
-                        seleccion={seleccion}
-                        onSeleccionar={setSeleccion}
-                        nombrePaisDe={(c) => nombrePais(catalogo, c)}
-                      />
-                      <Leyenda />
+                <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
+                  <section id="zona-mapa" className={s.tarjetaMapa} aria-label="Diagrama del mapa" style={{ scrollMarginTop: 16 }}>
+                    <div className={s.mapaBarra}>
+                      <p className={s.mapaPista}>
+                        <Icon name="info" />
+                        <span>
+                          <strong>Haz clic en un recuadro o en una flecha</strong> para ver su ficha completa. Arrastra para
+                          moverte y usa los botones + y − para acercar.
+                        </span>
+                      </p>
+                      <div className={s.mapaBarraAcciones}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setFiltrosVisibles((v) => !v)}
+                          aria-expanded={filtrosVisibles}
+                          aria-controls="filtros-mapa"
+                        >
+                          <Icon name="filtro" />
+                          {filtrosVisibles ? "Ocultar filtros" : "Filtrar"}
+                          {nFiltros ? <span className={s.contador} data-tono="acento">{nFiltros}</span> : null}
+                        </button>
+                        {nFiltros ? (
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFiltros(SIN_FILTROS)}>
+                            <Icon name="cerrar" />
+                            Quitar filtros
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <PanelDetalle
-                      catalogo={catalogo}
+                    {filtrosVisibles ? (
+                      <div id="filtros-mapa">
+                        <BarraFiltros catalogo={catalogo} vista={vista} filtros={filtros} terceros={terceros} visibles={visibles} onCambiar={setFiltros} compacta />
+                      </div>
+                    ) : nFiltros ? (
+                      <p className={s.filtroResumen} aria-live="polite">Filtrando por {descripcionFiltros}: lo demás queda atenuado.</p>
+                    ) : null}
+                    <GrafoMapa
                       vista={vista}
+                      filtros={filtros}
                       seleccion={seleccion}
-                      ocupado={ocupado}
-                      onSeleccionar={setSeleccion}
-                      onEditarElemento={(e) => setDialogo({ tipo: "elemento", elemento: e })}
-                      onEditarFlujo={(f) => setDialogo({ tipo: "flujo", flujo: f })}
-                      onNuevoFlujo={(o, d) => setDialogo({ tipo: "flujo", origen: o, destino: d })}
-                      onEliminarElemento={(e) => setDialogo({ tipo: "eliminarElemento", elemento: e })}
-                      onEliminarFlujo={(f) => setDialogo({ tipo: "eliminarFlujo", flujo: f })}
-                      onConfirmar={(sel) =>
-                        void cambiar(() => confirmarRevision(version, sel.tipo === "elemento" ? { elementos: [sel.id] } : { flujos: [sel.id] }), {
-                          exito: "Marcado como revisado.",
-                        })
-                      }
+                      onSeleccionar={elegir}
+                      nombrePaisDe={(c) => nombrePais(catalogo, c)}
                     />
-                  </div>
+                    <Leyenda />
+                  </section>
+                  {resumenMapa}
                 </div>
               )
             ) : null}
@@ -507,6 +558,9 @@ export function MapaDatos() {
                   filtros={filtros}
                   ocupado={ocupado}
                   onVer={verEnMapa}
+                  onAbrir={(tipo, id) => elegir({ tipo, id })}
+                  onAgregar={(t) => setDialogo({ tipo: "elemento", tipoInicial: t })}
+                  onAgregarFlujo={() => setDialogo({ tipo: "flujo" })}
                   onEditarElemento={(e) => setDialogo({ tipo: "elemento", elemento: e })}
                   onEditarFlujo={(f) => setDialogo({ tipo: "flujo", flujo: f })}
                   onEliminarElemento={(e) => setDialogo({ tipo: "eliminarElemento", elemento: e })}
@@ -572,7 +626,30 @@ export function MapaDatos() {
         </>
       )}
 
-      {/* ---------------------------------------------------- diálogos */}
+      {/* ---------------------------------------------------- ficha y diálogos */}
+      {fichaAbierta && seleccion && !dialogo ? (
+        <FichaDetalle
+          catalogo={catalogo}
+          vista={vista}
+          seleccion={seleccion}
+          ocupado={ocupado}
+          onSeleccionar={(sel) => {
+            setSeleccion(sel);
+            if (!sel) setFichaAbierta(false);
+          }}
+          onCerrar={() => setFichaAbierta(false)}
+          onEditarElemento={(e) => setDialogo({ tipo: "elemento", elemento: e })}
+          onEditarFlujo={(f) => setDialogo({ tipo: "flujo", flujo: f })}
+          onNuevoFlujo={(o, d) => setDialogo({ tipo: "flujo", origen: o, destino: d })}
+          onEliminarElemento={(e) => setDialogo({ tipo: "eliminarElemento", elemento: e })}
+          onEliminarFlujo={(f) => setDialogo({ tipo: "eliminarFlujo", flujo: f })}
+          onConfirmar={(sel) =>
+            void cambiar(() => confirmarRevision(version, sel.tipo === "elemento" ? { elementos: [sel.id] } : { flujos: [sel.id] }), {
+              exito: "Marcado como revisado.",
+            })
+          }
+        />
+      ) : null}
       {dialogo?.tipo === "elemento" ? (
         <FormElemento
           catalogo={catalogo}
@@ -651,6 +728,7 @@ export function MapaDatos() {
         <DialogoConfirmar
           titulo={`¿Usar la plantilla «${dialogo.plantilla.nombre}»?`}
           textoConfirmar="Agregar al mapa"
+          icono="lista"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async () => {
             const nueva = await cambiar(() => aplicarPlantilla(dialogo.plantilla.codigo, version));
@@ -674,6 +752,7 @@ export function MapaDatos() {
         <DialogoConfirmar
           titulo={`¿Volver a la versión ${dialogo.numero}?`}
           textoConfirmar="Volver a esta versión"
+          icono="historial"
           onCerrar={() => setDialogo(null)}
           onConfirmar={async () => {
             const nueva = await cambiar(() => restaurarVersion(dialogo.numero, version));
@@ -725,6 +804,7 @@ function BarraFiltros({
   terceros,
   visibles,
   onCambiar,
+  compacta = false,
 }: {
   catalogo: CatalogoMapa;
   vista: VistaMapa;
@@ -732,6 +812,8 @@ function BarraFiltros({
   terceros: ElementoMapa[];
   visibles: { elementos: Set<number>; flujos: Set<number> } | null;
   onCambiar: (f: FiltrosMapa) => void;
+  /** Dentro de la tarjeta del mapa: sin marco propio. */
+  compacta?: boolean;
 }) {
   const paises = vista.resumen.paises;
   const n = filtrosActivos(filtros);
@@ -747,7 +829,7 @@ function BarraFiltros({
     </button>
   );
   return (
-    <div className="card" style={{ display: "grid", gap: 12, padding: "var(--sp-4)" }} role="search" aria-label="Filtros del mapa">
+    <div className={compacta ? s.filtrosCompactos : "card"} style={compacta ? undefined : { display: "grid", gap: 12, padding: "var(--sp-4)" }} role="search" aria-label="Filtros del mapa">
       <div className={s.filtros}>
         <div className="field">
           <span className="field-label" id="filtros-rapidos"><Icon name="filtro" width={14} height={14} style={{ verticalAlign: "-2px", marginRight: 4 }} />Mostrar</span>
@@ -784,7 +866,7 @@ function BarraFiltros({
             <option value="tercero">Terceros</option>
           </select>
         </div>
-        {n ? (
+        {n && !compacta ? (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onCambiar(SIN_FILTROS)}>
             <Icon name="cerrar" />
             Quitar filtros ({n})

@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * HU-29 criterio 3 · "Mis documentos": informes PDF, borradores (HU-16), evidencias y
- * constancias (HU-26) de la empresa, con descarga y eliminación.
+ * HU-29 criterio 3 · "Mis documentos": informes PDF, informes del registro de actividades (PDF y
+ * Excel, HU-36), borradores (HU-16), evidencias y constancias (HU-26) de la empresa, con descarga y
+ * eliminación.
  *
  * Eliminar pide una confirmación en la misma fila (sin diálogo modal) y es definitivo; el
  * backend deja cada eliminación en la bitácora de auditoría. Qué se borra en cada caso:
@@ -21,11 +22,12 @@ import {
 import { descargarBlob } from "@/lib/exportar";
 import s from "@/components/admin/admin.module.css";
 
-type Pestana = "informes" | "borradores" | "evidencias" | "constancias";
+type Pestana = "informes" | "registro" | "borradores" | "evidencias" | "constancias";
 type Estado = { tipo: "cargando" } | { tipo: "listo"; datos: DocumentosApi } | { tipo: "error"; mensaje: string };
 
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "informes", titulo: "Informes PDF" },
+  { id: "registro", titulo: "Registro de actividades" },
   { id: "borradores", titulo: "Borradores" },
   { id: "evidencias", titulo: "Evidencias" },
   { id: "constancias", titulo: "Constancias" },
@@ -122,6 +124,14 @@ export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: nu
       detalle: tamanoLegible(x.tamano_bytes),
       fecha: x.fecha_creacion, descargable: true, eliminable: true,
     })),
+    registro: (d.registro_actividades ?? []).map((x) => ({
+      clave: `d${x.id}`, tipo: "documento", id: x.id,
+      titulo: `Informe del registro de actividades${x.rat ? ` · versión ${x.rat.version_rat}` : ""} (${x.tipo === "rat_xlsx" ? "Excel" : "PDF"})`,
+      detalle: [x.rat?.borrador ? "Borrador" : x.rat ? "Oficial" : null, x.rat?.codigo ? `Código ${x.rat.codigo}` : null,
+        tamanoLegible(x.tamano_bytes)].filter(Boolean).join(" · "),
+      fecha: x.fecha_creacion, descargable: true, eliminable: true,
+      nota: x.rat?.borrador ? "Borrador" : undefined,
+    })),
     borradores: d.borradores.map((x) => ({
       clave: `d${x.id}`, tipo: "documento", id: x.id, titulo: x.nombre, detalle: tamanoLegible(x.tamano_bytes),
       fecha: x.fecha_creacion, descargable: true, eliminable: true,
@@ -139,6 +149,7 @@ export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: nu
   };
   const vacios: Record<Pestana, ReactNode> = {
     informes: "Aún no hay informes guardados. Se guardan al completar una reevaluación o con Guardar informe en Mis evaluaciones.",
+    registro: "Aún no hay informes del registro de actividades. Genéralos desde Registro de actividades › Informe del registro.",
     borradores: "Aún no hay borradores de documentos de cumplimiento.",
     evidencias: "Tu empresa no tiene evidencias subidas.",
     constancias: "Aún no hay constancias: se obtienen al completar un módulo formativo.",
@@ -152,7 +163,7 @@ export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: nu
           <div>
             <h2 id="titulo-mis-documentos" className="card-title">Mis documentos</h2>
             <p className="card-sub">
-              Informes, borradores, evidencias y constancias de tu empresa.
+              Informes, informes del registro de actividades, borradores, evidencias y constancias de tu empresa.
               {d.documentos_disponibles_hasta ? ` Puedes descargarlos hasta el ${fechaCorta(d.documentos_disponibles_hasta)}.` : ""}
               {" "}Eliminar un documento es definitivo.
             </p>

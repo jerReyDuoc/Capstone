@@ -11,6 +11,9 @@ Reúne en un solo lugar lo que la empresa tiene guardado en la plataforma:
   evidencias    las de sus evaluaciones (cuestionario y remediación). Tras la validación en el
                 disco solo queda su texto ANONIMIZADO (HU-06): eso es lo que se descarga.
   constancias   las de los módulos formativos completados (HU-26).
+  registro_actividades   HU-36: informes del Registro de Actividades de Tratamiento (PDF y XLSX de
+                cada emisión, con su código verificable). Los guarda app/application/use_cases/informe_rat.py
+                con guardar_documento().
 
 Cada descarga y cada eliminación queda en la bitácora de auditoría (HU-09) con el tipo y
 los ids, nunca con el contenido ni el nombre que subió el usuario.
@@ -39,7 +42,9 @@ from app.application.informes.carga import SinResultadosError, cargar_evaluacion
 from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf
 from app.core.autenticacion import Actor
 from app.core.config import settings
-from app.domain.models.documento_empresa import TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, DocumentoEmpresa
+from app.domain.models.documento_empresa import (
+    TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, TIPOS_RAT, DocumentoEmpresa,
+)
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.formacion import AvanceFormativo
@@ -54,7 +59,8 @@ logger = logging.getLogger(__name__)
 NOMBRE_SEGURO = re.compile(r"^[A-Za-z0-9_.-]{1,150}$")
 _EN_PROCESO = (EstadoValidacion.PENDING.value, EstadoValidacion.PROCESSING.value)
 _EXTENSIONES = {"application/pdf": ".pdf", "text/plain": ".txt",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx"}
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx"}
 
 
 class DocumentoError(Exception):
@@ -193,12 +199,28 @@ async def tras_completar(db: AsyncSession, evaluacion_id: int, actor: Actor | No
 
 
 # ------------------------------------------------------------------ "Mis documentos"
-def _doc_dict(d: DocumentoEmpresa) -> dict:
+def _doc_dict(d: DocumentoEmpresa, extra: dict | None = None) -> dict:
     return {
         "id": d.id, "tipo": d.tipo, "nombre": d.nombre, "evaluacion_id": d.evaluacion_id,
         "mime_type": d.mime_type, "tamano_bytes": d.tamano_bytes, "fecha_creacion": d.fecha_creacion,
         "descarga": f"/api/cliente/documentos/{d.id}/descarga",
+        **(extra or {}),
     }
+
+
+async def _emisiones_rat(db: AsyncSession, empresa_id: int) -> dict[int, dict]:
+    """HU-36: código, versión y estado de la emisión de cada documento del RAT (por id de documento)."""
+    from app.domain.models.rat_informe import RatInforme
+
+    filas = (await db.execute(select(RatInforme).where(RatInforme.empresa_id == empresa_id))).scalars().all()
+    salida: dict[int, dict] = {}
+    for r in filas:
+        datos = {"rat": {"informe_id": r.id, "codigo": r.codigo, "version_rat": r.version_rat,
+                         "borrador": r.borrador, "actividades": r.actividades}}
+        for doc_id in (r.documento_pdf_id, r.documento_xlsx_id):
+            if doc_id:
+                salida[doc_id] = datos
+    return salida
 
 
 class DocumentosEmpresa:
@@ -240,6 +262,9 @@ class DocumentosEmpresa:
             .order_by(Evidencia.id_evidencia.desc())
         )).all()
 
+        emisiones = await _emisiones_rat(self.db, self.empresa.id) if any(
+            d.tipo in TIPOS_RAT for d in documentos) else {}
+
         constancias = (await self.db.execute(
             select(AvanceFormativo, RutaFormativa.nombre)
             .join(RutaFormativa, RutaFormativa.id == AvanceFormativo.ruta_formativa_id)
@@ -252,6 +277,8 @@ class DocumentosEmpresa:
             "informes": [_doc_dict(d) for d in documentos if d.tipo == TIPO_INFORME],
             # HU-16: los borradores se guardan con guardar_documento(tipo="borrador")
             "borradores": [_doc_dict(d) for d in documentos if d.tipo == TIPO_BORRADOR],
+            # HU-36: informes del registro de actividades (PDF y XLSX), con su código verificable
+            "registro_actividades": [_doc_dict(d, emisiones.get(d.id)) for d in documentos if d.tipo in TIPOS_RAT],
             "evidencias": [{
                 "id": e.id_evidencia, "nombre": e.nombre_archivo, "evaluacion_id": ev_id,
                 "control": codigo, "origen": e.origen, "fecha_subida": e.fecha_subida,

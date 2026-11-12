@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 11-nov-2026 (HU-35: registro de actividades de tratamiento sobre el mapa de datos, con versiones vigentes inmutables) |
+| **Última actualización** | 12-nov-2026 (HU-36: informe del registro de actividades en PDF y Excel, con código verificable, matriz de riesgos y marca de agua de borrador; mapa de datos con ficha en ventana, asistentes por pasos y guía) |
 
 ---
 
@@ -103,6 +103,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
 | Mapa de datos personales (HU-34) | ✅ Hecho | `/empresa/mapa-datos` (contrato vigente): sistemas, bases de datos, terceros y flujos con proveedor, país de alojamiento y responsable interno; categorías de datos (sensibles) y de titulares (NNA) de un **catálogo común con el RAT/RoPA**; transferencias internacionales calculadas; mapa navegable con filtros, hallazgos de riesgo, inicio desde plantilla por rubro o desde la evaluación, versiones inalterables con restauración, audit log, informe PDF, PNG, CSV y envío por correo. Ver [5.17](#517-mapa-de-datos-personales-hu-34) y `Extras/Cambios/backend/CAMBIOS_HU34.md` |
 | Registro de actividades de tratamiento (HU-35) | ✅ Hecho | `/empresa/registro-actividades` (contrato vigente): cada actividad con los 11 campos mínimos del reglamento de la Ley 21.719, medidas de seguridad y rol (responsable o encargado); sistemas, bases, terceros y flujos **elegidos del mapa de datos** (sin doble ingreso) y vuelta automática a revisión cuando el mapa cambia; completitud por actividad y global; estados borrador → en revisión → vigente → archivada con **versiones vigentes inmutables** (trigger) y audit log. Textos legales como propuesta pendiente de validación. Ver [5.18](#518-registro-de-actividades-de-tratamiento-hu-35) y `Extras/Cambios/backend/CAMBIOS_HU35.md` |
+| Informe del registro de actividades (HU-36) | ✅ Hecho | Botón **Informe del registro** en `/empresa/registro-actividades`: PDF (motor de informes de HU-21) y Excel armados en el servidor desde la **versión vigente** de cada actividad, con portada, resumen (actividades, datos sensibles, transferencias internacionales, decisiones automatizadas), detalle por actividad y **matriz de riesgos** 5 × 5 (base de HU-38); fecha, **versión del RAT**, **código verificable** `CIA-REG-AAAA-NNNNNN-D` y aviso legal; ambos en **Mis documentos** y cada emisión, descarga, envío y verificación en el audit log; con actividades no vigentes sale como **borrador** con marca de agua. Envío por correo. Ver [5.19](#519-informe-del-registro-de-actividades-hu-36) |
 | Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
@@ -508,6 +509,20 @@ El usuario definitivo (con contrato vigente) lleva en `/empresa/registro-activid
 
 **Completitud** por actividad (13 campos, con condicionales: interés legítimo, base para sensibles, garantías, lógica de decisiones, organización mandante) y global (promedio de las activas). **Estados** borrador → en revisión → vigente → archivada: aprueba el mismo usuario; no queda vigente con datos obligatorios vacíos (422 `ACTIVIDAD_INCOMPLETA`); al quedar vigente se guarda una **versión inmutable** (`rat_actividad_version`, instantánea + huella SHA-256; un trigger impide `UPDATE`/`DELETE`). Editar una vigente abre una nueva versión en borrador y la vigente sigue valiendo; aprobar sin cambios no crea otra versión; una archivada se reactiva sin duplicarla. Cada cambio queda en el `audit_log` (`rat.*`). Los textos de ayuda y el catálogo de bases de licitud (`app/domain/rat/catalogo.py`) son una **propuesta pendiente de validación por asesoría legal**. Detalle en `Extras/Cambios/backend/CAMBIOS_HU35.md`.
 
+### 5.19 Informe del registro de actividades (HU-36)
+
+Desde `/empresa/registro-actividades` › **Informe del registro**, el usuario definitivo (contrato vigente) ve una vista previa (si saldrá **oficial** o **borrador** y por qué, las cifras del resumen y la matriz de riesgos) y descarga el informe en **PDF** o **Excel**, lo envía por correo, revisa el historial de emisiones y **verifica un código**.
+
+- **Armado** (`app/application/rat/informe.py`, lógica pura): entra la **instantánea inmutable** de la versión vigente de cada actividad no archivada (aunque esté en revisión o tenga una nueva versión en preparación); las que nunca estuvieron vigentes entran con su contenido actual, marcadas. Huella SHA-256 de lo que afirma el registro (no de la fecha). Textos legibles de los 13 campos compartidos por el PDF y el Excel.
+- **PDF** (`app/application/rat/pdf_rat.py`) con el motor común `app/application/informes/motor_pdf.py` (paleta, ficha de identificación, aviso legal, pie con «Página X de Y» y marca de agua): portada, resumen ejecutivo, índice, detalle por actividad con plazos por categoría, matriz de riesgos (mapa de calor 5 × 5, factores y tratamientos) y verificación.
+- **Excel** (`app/application/rat/xlsx_rat.py`, openpyxl): Portada, Resumen, Actividades (el RAT), Datos y plazos, Destinatarios, Transferencias, Decisiones, Matriz de riesgos y Verificación. Ningún texto se escribe como fórmula.
+- **Matriz de riesgos** (`app/domain/rat/riesgos.py`): riesgo inherente = probabilidad × impacto (1–5 cada uno) calculado con lo registrado (sensibles, NNA, decisiones automatizadas, transferencias sin garantía, terceros sin contrato, medidas, información incompleta). Pesos en un solo archivo para que HU-38 los ajuste.
+- **Emisión** (`rat_informe`): versión del RAT correlativa por empresa (sube cuando cambia la huella), código verificable con dígito módulo 11, ambos archivos con el mismo código en **Mis documentos** (`documento_empresa` tipos `rat_pdf` y `rat_xlsx`). Si el registro no cambió, se reutiliza la última emisión. Un trigger impide modificar o borrar una emisión. Límites: `RAT_INFORMES_DIA_EMPRESA` (20) y `RAT_CORREOS_DIA_EMPRESA` (5).
+- **Borrador** (criterio 4): si alguna actividad incluida no está vigente, marca de agua «BORRADOR» en todas las páginas, aviso en el encabezado de cada página y recuadro con los motivos en la portada (también en el Excel).
+- **Auditoría**: `rat.informe_generado`, `rat.informe_descargado`, `rat.informe_enviado`, `rat.informe_verificado` (sin textos del registro ni correos).
+
+**Mapa de datos (mejoras de usabilidad):** el diagrama va primero y los indicadores debajo; una **guía** compacta indica el siguiente paso; al elegir un recuadro o una flecha se abre su **ficha en una ventana centrada** (con lo que falta completar, conexiones navegables y riesgos); agregar un elemento o un flujo son **asistentes por pasos** con explicaciones, vista previa del recorrido y los riesgos que se detectarán; el inventario tiene vistas por tipo, estado de cada registro y tarjetas en el teléfono. Las ventanas se ajustan al contenido (sin espacio vacío).
+
 ---
 
 ## 6. Base de datos
@@ -801,6 +816,11 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET / PATCH | `/api/registro-actividades/actividades/{id}` | 🏢 | HU-35: la actividad con lo que toma del mapa / edita `{revision, …}` (409 `ACTIVIDAD_DESACTUALIZADA` o `ACTIVIDAD_NO_EDITABLE`) |
 | POST | `/api/registro-actividades/actividades/{id}/estado` | 🏢 | HU-35: `{revision, accion}` enviar_revision · volver_borrador · aprobar (422 `ACTIVIDAD_INCOMPLETA`) · nueva_version · archivar · reactivar |
 | GET | `/api/registro-actividades/actividades/{id}/versiones[/{n}]` | 🏢 | HU-35: versiones vigentes inmutables e instantánea verificada de una |
+| GET | `/api/registro-actividades/informes` | 🏢 | HU-36: vista previa del informe (oficial o borrador y por qué), última emisión e historial |
+| POST | `/api/registro-actividades/informes` | 🏢 | HU-36: `{forzar?}` genera PDF y Excel con el mismo código y los guarda en Mis documentos (200 si reutiliza la última; 409 `RAT_VACIO`; 429 `LIMITE_INFORMES`) |
+| GET | `/api/registro-actividades/informes/{id}/descarga?formato=pdf\|xlsx` | 🏢 | HU-36: descarga de una emisión (410 `ARCHIVO_ELIMINADO` si se borró de Mis documentos) |
+| POST | `/api/registro-actividades/informes/{id}/enviar` | 🏢 | HU-36: `{email?, formatos}` por correo (429 `LIMITE_CORREOS`) |
+| GET | `/api/registro-actividades/informes/verificacion?codigo=…` | 🏢 | HU-36: confirma un código verificable de la empresa y si el registro cambió desde esa emisión |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 

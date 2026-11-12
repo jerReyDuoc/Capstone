@@ -27,6 +27,7 @@ import {
   type Actividad, type CatalogoRat, type FiltroEstado, type ListaRegistro,
 } from "@/lib/registroActividades";
 import { DetalleActividad } from "./DetalleActividad";
+import { InformeRat } from "./InformeRat";
 import s from "./rat.module.css";
 
 type Aviso = { tono: "ok" | "error"; texto: string } | null;
@@ -51,6 +52,7 @@ export function RegistroActividades() {
   const [filtro, setFiltro] = useState<FiltroEstado>("activas");
   const [busqueda, setBusqueda] = useState("");
   const [creando, setCreando] = useState(false);
+  const [informe, setInforme] = useState(false);
   const [aviso, setAviso] = useState<Aviso>(null);
 
   const listo = espacio.tipo === "listo";
@@ -118,6 +120,10 @@ export function RegistroActividades() {
       </div>
       {registro && abierta === null ? (
         <div className={s.acciones}>
+          <button type="button" className="btn btn-ghost" onClick={() => setInforme(true)} title="Descarga el informe en PDF o Excel">
+            <Icon name="documento" />
+            Informe del registro
+          </button>
           <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
             <Icon name="mas" />
             Nueva actividad
@@ -318,6 +324,17 @@ export function RegistroActividades() {
         </>
       )}
 
+      {informe ? (
+        <InformeRat
+          correoUsuario={espacio.tipo === "listo" ? espacio.datos.usuario.email : null}
+          onCerrar={() => setInforme(false)}
+          onSesionVencida={sesionVencida}
+          onVerPendientes={() => {
+            setInforme(false);
+            setFiltro(g.por_estado.en_revision ? "en_revision" : "borrador");
+          }}
+        />
+      ) : null}
       {creando ? (
         <DialogoNueva
           onCerrar={() => setCreando(false)}

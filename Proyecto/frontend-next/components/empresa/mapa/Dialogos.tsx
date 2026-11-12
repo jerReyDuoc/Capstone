@@ -1,14 +1,21 @@
 "use client";
 
 /**
- * Piezas comunes de los formularios del mapa de datos: el diálogo (<dialog> nativo: foco
- * atrapado y Esc), la confirmación de acciones, el envío del informe por correo y el selector
- * de categorías del catálogo común (datos con las sensibles marcadas y titulares con NNA).
+ * Piezas comunes de las ventanas del mapa de datos (y del registro de actividades):
+ *   Dialogo            ventana centrada (<dialog> nativo: foco atrapado, Esc y la X para cerrar). Se
+ *                      ajusta a su contenido —sin espacio vacío al final—, el cuerpo hace scroll si no
+ *                      cabe y en el teléfono aparece desde abajo, a todo el ancho.
+ *   IndicadorPasos     la barra de pasos de los asistentes (agregar elemento, agregar flujo).
+ *   DialogoConfirmar   confirmación de acciones (eliminar, restaurar, usar una plantilla…).
+ *   DialogoCorreo      envío del informe por correo.
+ *   SelectorCategorias categorías del catálogo común (datos con las sensibles marcadas y titulares con NNA).
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import type { CatalogoMapa } from "@/lib/mapaDatos";
 import s from "./mapa.module.css";
+
+export type TamanoDialogo = "sm" | "md" | "lg" | "xl";
 
 export function Dialogo({
   titulo,
@@ -18,60 +25,191 @@ export function Dialogo({
   pie,
   children,
   estrecho = false,
+  tamano,
+  icono,
+  tonoIcono,
+  antetitulo,
+  cabeceraExtra,
+  cerrarAlHacerClicFuera = false,
+  etiquetaCerrar = "Cerrar",
 }: {
-  titulo: string;
+  titulo: ReactNode;
   descripcion?: ReactNode;
   onCerrar: () => void;
   onEnviar?: () => void;
-  pie: ReactNode;
+  pie?: ReactNode;
   children: ReactNode;
+  /** Compatibilidad: equivale a tamano="sm". */
   estrecho?: boolean;
+  tamano?: TamanoDialogo;
+  icono?: IconName;
+  tonoIcono?: "acento" | "peligro" | "aviso" | "info";
+  antetitulo?: ReactNode;
+  /** Algo que va pegado bajo el título y no hace scroll (p. ej. la barra de pasos). */
+  cabeceraExtra?: ReactNode;
+  /** Las fichas y confirmaciones se cierran al hacer clic fuera; los formularios no (no se pierde lo escrito). */
+  cerrarAlHacerClicFuera?: boolean;
+  etiquetaCerrar?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const idTitulo = useId();
+  const idDescripcion = useId();
+  const pulsoFuera = useRef(false);
+  const t: TamanoDialogo = tamano ?? (estrecho ? "sm" : "lg");
 
   useEffect(() => {
     const d = ref.current;
     if (d && !d.open) d.showModal();
-    // El foco va al primer campo (no al botón Cerrar)
+    // El foco va al primer campo marcado (si no hay, queda en la ventana, no en la X)
     const primero = d?.querySelector<HTMLElement>("[data-autofoco]");
-    primero?.focus();
+    if (primero) primero.focus();
+    else d?.querySelector<HTMLElement>(`.${s.modalCuerpo}`)?.focus();
+    // Mientras está abierta, la página de atrás no se desplaza
+    const html = document.documentElement;
+    const antes = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = antes;
+    };
   }, []);
 
   return (
     <dialog
       ref={ref}
-      className={s.dialogoAncho}
-      style={estrecho ? { width: "min(540px, calc(100vw - 24px))" } : undefined}
+      className={s.modal}
+      data-tamano={t}
       aria-labelledby={idTitulo}
+      aria-describedby={descripcion ? idDescripcion : undefined}
       onCancel={(e) => {
         e.preventDefault();
         onCerrar();
       }}
+      onPointerDown={(e) => {
+        pulsoFuera.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        // Solo si el clic empezó y terminó en el fondo (no al soltar una selección de texto afuera)
+        if (cerrarAlHacerClicFuera && pulsoFuera.current && e.target === e.currentTarget) onCerrar();
+        pulsoFuera.current = false;
+      }}
     >
       <form
-        className={s.dialogoForm}
+        className={s.modalForm}
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
           onEnviar?.();
         }}
       >
-        <div className={s.dialogoCabeza}>
-          <div>
-            <h2 id={idTitulo} className="card-title">{titulo}</h2>
-            {descripcion ? <p className="card-sub">{descripcion}</p> : null}
+        <header className={s.modalCabeza}>
+          {icono ? (
+            <span className={s.modalIcono} data-tono={tonoIcono ?? "acento"} aria-hidden="true">
+              <Icon name={icono} />
+            </span>
+          ) : null}
+          <div className={s.modalTitulos}>
+            {antetitulo ? <span className={s.modalAntetitulo}>{antetitulo}</span> : null}
+            <h2 id={idTitulo} className={s.modalTitulo}>{titulo}</h2>
+            {descripcion ? <p id={idDescripcion} className={s.modalDescripcion}>{descripcion}</p> : null}
           </div>
-          <button type="button" className="icon-btn" onClick={onCerrar} aria-label="Cerrar">
+          <button type="button" className={s.modalCerrar} onClick={onCerrar} aria-label={etiquetaCerrar} title={etiquetaCerrar}>
             <Icon name="cerrar" />
           </button>
-        </div>
-        <div className={s.dialogoCuerpo}>{children}</div>
-        <div className={s.dialogoPie}>{pie}</div>
+        </header>
+        {cabeceraExtra ? <div className={s.modalCabeceraExtra}>{cabeceraExtra}</div> : null}
+        <div className={s.modalCuerpo} tabIndex={-1}>{children}</div>
+        {pie ? <footer className={s.modalPie}>{pie}</footer> : null}
       </form>
     </dialog>
   );
 }
+
+/* ============================================================ pasos de un asistente */
+
+export interface PasoAsistente {
+  titulo: string;
+  /** Texto corto bajo el título del paso (se oculta en pantallas angostas). */
+  resumen?: string;
+  completo?: boolean;
+  conError?: boolean;
+}
+
+export function IndicadorPasos({
+  pasos,
+  actual,
+  onIr,
+  libre = false,
+}: {
+  pasos: PasoAsistente[];
+  actual: number;
+  onIr: (i: number) => void;
+  /** Al editar se puede saltar a cualquier paso; al crear, solo a los ya visitados. */
+  libre?: boolean;
+}) {
+  const [maximo, setMaximo] = useState(actual);
+  useEffect(() => setMaximo((m) => Math.max(m, actual)), [actual]);
+  return (
+    <nav aria-label="Pasos">
+      <ol className={s.pasos}>
+        {pasos.map((p, i) => {
+          // "Listo" solo si el paso tiene lo suyo (visitarlo no basta)
+          const estado = i === actual ? "actual" : p.conError ? "error" : p.completo ? "hecho" : "pendiente";
+          const habilitado = libre || i <= maximo;
+          return (
+            <li key={p.titulo} className={s.paso} data-estado={estado}>
+              <button
+                type="button"
+                className={s.pasoBoton}
+                onClick={() => onIr(i)}
+                disabled={!habilitado}
+                aria-current={i === actual ? "step" : undefined}
+              >
+                <span className={s.pasoNumero} aria-hidden="true">
+                  {estado === "hecho" ? <Icon name="check" /> : estado === "error" ? "!" : i + 1}
+                </span>
+                <span className={s.pasoTexto}>
+                  <span className={s.pasoTitulo}>{p.titulo}</span>
+                  {p.resumen ? <span className={s.pasoResumen}>{p.resumen}</span> : null}
+                </span>
+                <span className="sr-only">
+                  {estado === "hecho" ? " (listo)" : estado === "error" ? " (revisar)" : estado === "actual" ? " (paso actual)" : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className={s.pasosBarra} aria-hidden="true">
+        <span style={{ width: `${((actual + 1) / pasos.length) * 100}%` }} />
+      </div>
+    </nav>
+  );
+}
+
+/** Encabezado de un paso: qué se pide y por qué. */
+export function EncabezadoPaso({ numero, titulo, children }: { numero: number; titulo: string; children?: ReactNode }) {
+  return (
+    <div className={s.encabezadoPaso}>
+      <span className={s.encabezadoNumero} aria-hidden="true">{numero}</span>
+      <div>
+        <h3 className={s.encabezadoTitulo}>{titulo}</h3>
+        {children ? <p className={s.encabezadoTexto}>{children}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+/** Recuadro "¿Por qué lo pedimos?" / consejos al costado de un paso. */
+export function Consejo({ titulo = "¿Por qué lo pedimos?", children, icono = "info" }: { titulo?: string; children: ReactNode; icono?: IconName }) {
+  return (
+    <aside className={s.consejo}>
+      <span className={s.consejoTitulo}><Icon name={icono} />{titulo}</span>
+      <div className={s.consejoTexto}>{children}</div>
+    </aside>
+  );
+}
+
+/* ============================================================ confirmar */
 
 export function DialogoConfirmar({
   titulo,
@@ -80,6 +218,7 @@ export function DialogoConfirmar({
   peligro = false,
   onConfirmar,
   onCerrar,
+  icono,
 }: {
   titulo: string;
   children: ReactNode;
@@ -87,13 +226,17 @@ export function DialogoConfirmar({
   peligro?: boolean;
   onConfirmar: () => Promise<void>;
   onCerrar: () => void;
+  icono?: IconName;
 }) {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
   return (
     <Dialogo
       titulo={titulo}
-      estrecho
+      tamano="sm"
+      icono={icono ?? (peligro ? "basura" : "info")}
+      tonoIcono={peligro ? "peligro" : "acento"}
+      cerrarAlHacerClicFuera={!ocupado}
       onCerrar={onCerrar}
       onEnviar={async () => {
         setOcupado(true);
@@ -108,23 +251,18 @@ export function DialogoConfirmar({
         }
       }}
       pie={
-        <div>
+        <div className={s.modalAcciones}>
           <button type="button" className="btn btn-ghost" onClick={onCerrar} disabled={ocupado}>
             Cancelar
           </button>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={ocupado}
-            data-autofoco
-            style={peligro ? { background: "var(--alto)", color: "#1a0303" } : undefined}
-          >
+          <button type="submit" className={`btn btn-primary ${peligro ? s.botonPeligro : ""}`} disabled={ocupado} data-autofoco>
+            {peligro ? <Icon name="basura" /> : <Icon name="check" />}
             {ocupado ? "Un momento…" : textoConfirmar}
           </button>
         </div>
       }
     >
-      <div style={{ display: "grid", gap: 12, fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>{children}</div>
+      <div className={s.textoConfirmar}>{children}</div>
       {error ? (
         <p className="dialogo-error" role="alert">
           <Icon name="alerta" />
@@ -134,6 +272,8 @@ export function DialogoConfirmar({
     </Dialogo>
   );
 }
+
+/* ============================================================ correo */
 
 export function DialogoCorreo({
   correoUsuario,
@@ -172,11 +312,12 @@ export function DialogoCorreo({
     <Dialogo
       titulo="Enviar el informe por correo"
       descripcion="Te enviamos el mismo informe PDF que descargas: diagrama, inventario, flujos, transferencias internacionales, riesgos y la base para el registro de actividades de tratamiento."
-      estrecho
+      tamano="sm"
+      icono="correo"
       onCerrar={onCerrar}
       onEnviar={enviar}
       pie={
-        <div>
+        <div className={s.modalAcciones}>
           <button type="button" className="btn btn-ghost" onClick={onCerrar} disabled={ocupado}>
             Cancelar
           </button>
@@ -224,8 +365,9 @@ export function DialogoCorreo({
           <p className={s.ayuda}>Por ejemplo, el de tu encargado de protección de datos o tu asesor.</p>
         </div>
       ) : null}
-      <p className={s.ayuda}>
-        <strong>Vista que se enviará:</strong> {descripcionFiltros}.
+      <p className={s.notaSuave}>
+        <Icon name="filtro" />
+        <span><strong>Vista que se enviará:</strong> {descripcionFiltros}.</span>
       </p>
       {error ? (
         <p className="dialogo-error" role="alert">
@@ -248,6 +390,7 @@ export function SelectorCategorias({
   ayuda,
   error,
   autofoco = false,
+  destacadas,
 }: {
   catalogo: CatalogoMapa;
   modo: "datos" | "titulares";
@@ -257,11 +400,14 @@ export function SelectorCategorias({
   ayuda?: string;
   error?: string;
   autofoco?: boolean;
+  /** Códigos sugeridos (p. ej. los que ya tiene el origen del flujo): se muestran primero y marcados. */
+  destacadas?: string[];
 }) {
   const id = useId();
   const [busqueda, setBusqueda] = useState("");
   const q = busqueda.trim().toLowerCase();
   const elegido = new Set(valor);
+  const sugeridas = new Set(destacadas ?? []);
 
   const grupos = useMemo(() => {
     if (modo === "titulares") {
@@ -296,23 +442,20 @@ export function SelectorCategorias({
             <input
               type="search"
               className="input"
-              placeholder={modo === "datos" ? "Buscar (ej.: salud, correo, IP)" : "Buscar titulares"}
+              placeholder={modo === "datos" ? "Buscar (ej.: salud, correo, IP)" : "Buscar titulares (ej.: clientes)"}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               aria-label={`Buscar en ${etiqueta.toLowerCase()}`}
               data-autofoco={autofoco || undefined}
             />
           </div>
-          <span className={s.ayuda} aria-live="polite">
-            {valor.length ? `${valor.length} elegida${valor.length === 1 ? "" : "s"}` : "Ninguna elegida"}
-            {sensibles ? ` · ${sensibles} sensible${sensibles === 1 ? "" : "s"}` : ""}
+          <span className={s.selectorConteo} aria-live="polite">
+            <strong>{valor.length ? `${valor.length} elegida${valor.length === 1 ? "" : "s"}` : "Ninguna elegida"}</strong>
+            {sensibles ? <span className={s.marcaSensible}> · {sensibles} sensible{sensibles === 1 ? "" : "s"}</span> : null}
             {valor.length ? (
-              <>
-                {" · "}
-                <button type="button" className="link-btn" onClick={() => onCambiar([])}>
-                  Quitar todas
-                </button>
-              </>
+              <button type="button" className="link-btn" onClick={() => onCambiar([])}>
+                Quitar todas
+              </button>
             ) : null}
           </span>
         </div>
@@ -322,12 +465,13 @@ export function SelectorCategorias({
             {modo === "datos" ? <legend>{g.nombre}</legend> : <legend className="sr-only">{g.nombre}</legend>}
             <div className={s.opcionesCategoria}>
               {g.items.map((c) => (
-                <label key={c.codigo} className={s.pastilla} data-sensible={c.sensible || undefined} title={c.ayuda}>
+                <label key={c.codigo} className={s.pastilla} data-sensible={c.sensible || undefined} data-sugerida={sugeridas.has(c.codigo) || undefined} title={c.ayuda}>
                   <input type="checkbox" checked={elegido.has(c.codigo)} onChange={() => alternar(c.codigo)} />
                   <span>{c.nombre}</span>
                   {c.sensible ? <span className={s.marcaSensible}>SENSIBLE</span> : null}
                   {c.nna ? <span className={s.marcaNna}>NNA</span> : null}
                   {c.posibleNna ? <span className={s.marcaNna} title="Puede incluir menores de 18 años">¿NNA?</span> : null}
+                  {sugeridas.has(c.codigo) && !elegido.has(c.codigo) ? <span className={s.marcaSugerida}>sugerida</span> : null}
                 </label>
               ))}
             </div>

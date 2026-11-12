@@ -124,6 +124,8 @@ const QUERY_PERMITIDOS = new Map<string, number>([
   // filtros del informe PDF
   ["version", 9], ["pagina", 6], ["sensibles", 5], ["nna", 5], ["internacional", 5], ["tercero", 12],
   ["pais", 2], ["tipo", 20],
+  // Informe del registro de actividades: código verificable que se quiere confirmar
+  ["codigo", 40],
 ]);
 
 export function filtrarQuery(params: URLSearchParams): string {

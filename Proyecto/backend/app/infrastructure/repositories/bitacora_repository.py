@@ -153,6 +153,12 @@ class Accion:
     RAT_VERSION_VIGENTE = "rat.version_vigente"           # detalle: numero, huella (prefijo), campos cambiados
     RAT_MARCADA_REVISION = "rat.marcada_revision"         # un cambio en el mapa la devolvió a revisión
     RAT_CAMBIO_RECHAZADO = "rat.cambio_rechazado"         # versión desactualizada, incompleta o transición inválida
+    # HU-36: informe del RAT (PDF y XLSX). El detalle lleva el id de la emisión, la versión del RAT, si es
+    # borrador, el formato y conteos; nunca los textos del registro ni el correo de destino.
+    RAT_INFORME_GENERADO = "rat.informe_generado"
+    RAT_INFORME_DESCARGADO = "rat.informe_descargado"
+    RAT_INFORME_ENVIADO = "rat.informe_enviado"
+    RAT_INFORME_VERIFICADO = "rat.informe_verificado"
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -249,6 +255,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MAPA_PLANTILLA_APLICADA: Categoria.CREACION,
     Accion.MAPA_SUGERENCIA_ACEPTADA: Categoria.CREACION,
     Accion.RAT_ACTIVIDAD_CREADA: Categoria.CREACION,             # HU-35
+    Accion.RAT_INFORME_GENERADO: Categoria.CREACION,             # HU-36 (descargas y envíos: acceso)
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

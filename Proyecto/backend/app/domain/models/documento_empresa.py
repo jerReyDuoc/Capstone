@@ -9,6 +9,8 @@ Una fila por archivo GUARDADO por el sistema para la empresa:
   borrador      PDF de un borrador de cumplimiento CONSOLIDADO (HU-16). El borrador en revisión
                 vive en borrador_documento; al consolidarlo, app/application/use_cases/borradores.py
                 lo guarda aquí con guardar_documento() y aparece en "Mis documentos".
+  rat_pdf       HU-36: informe PDF del Registro de Actividades de Tratamiento (una emisión de
+  rat_xlsx      rat_informe guarda los dos formatos con el mismo código verificable).
 
 Las evidencias (tabla evidencias) y las constancias (avance_formativo) NO se copian aquí:
 "Mis documentos" las lee de su propia tabla para no duplicar archivos.
@@ -27,13 +29,17 @@ from app.core.database import Base
 
 TIPO_INFORME = "informe_pdf"
 TIPO_BORRADOR = "borrador"
-TIPOS_DOCUMENTO = (TIPO_INFORME, TIPO_BORRADOR)
+TIPO_RAT_PDF = "rat_pdf"        # HU-36
+TIPO_RAT_XLSX = "rat_xlsx"      # HU-36
+TIPOS_RAT = (TIPO_RAT_PDF, TIPO_RAT_XLSX)
+TIPOS_DOCUMENTO = (TIPO_INFORME, TIPO_BORRADOR, *TIPOS_RAT)
 
 
 class DocumentoEmpresa(Base):
     __tablename__ = "documento_empresa"
     __table_args__ = (
-        CheckConstraint(f"tipo IN ('{TIPO_INFORME}', '{TIPO_BORRADOR}')", name="ck_documento_empresa_tipo"),
+        CheckConstraint("tipo IN (" + ", ".join(f"'{t}'" for t in TIPOS_DOCUMENTO) + ")",
+                        name="ck_documento_empresa_tipo"),
     )
 
     id: Mapped[int] = mapped_column("id", Integer, primary_key=True)

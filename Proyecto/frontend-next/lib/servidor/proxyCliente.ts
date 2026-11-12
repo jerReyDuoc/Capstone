@@ -39,12 +39,22 @@ interface Regla {
   archivo?: boolean;
 }
 
-/** HU-29: lo que puede venir de "Mis documentos": PDF, texto anonimizado de evidencias y DOCX (borradores). */
+/** Planilla Excel (informe del registro de actividades). */
+export const TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * HU-29: lo que puede venir de "Mis documentos": PDF, texto anonimizado de evidencias, DOCX (borradores)
+ * y XLSX (informe del registro de actividades).
+ */
 export const TIPOS_DOCUMENTO = [
   "application/pdf",
   "text/plain",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  TIPO_XLSX,
 ] as const;
+
+/** Informe del registro de actividades: PDF o planilla Excel. */
+export const TIPOS_INFORME_RAT = ["application/pdf", TIPO_XLSX] as const;
 
 /** HU-16: la descarga previa de un borrador es Markdown o PDF. */
 export const TIPOS_BORRADOR = ["application/pdf", "text/markdown"] as const;
@@ -139,6 +149,13 @@ const REGLAS: Regla[] = [
   { metodo: "POST", patron: /^registro-actividades\/actividades\/\d{1,9}\/estado$/ },
   { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones$/ },
   { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones\/\d{1,9}$/ },
+  // Informe del registro (PDF y Excel): vista previa e historial, emisión (arma los dos archivos),
+  // descarga, envío por correo y verificación de un código.
+  { metodo: "GET", patron: /^registro-actividades\/informes$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/informes$/, timeoutMs: 90_000 },
+  { metodo: "GET", patron: /^registro-actividades\/informes\/verificacion$/ },
+  { metodo: "GET", patron: /^registro-actividades\/informes\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_INFORME_RAT, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/informes\/\d{1,9}\/enviar$/, timeoutMs: 60_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
