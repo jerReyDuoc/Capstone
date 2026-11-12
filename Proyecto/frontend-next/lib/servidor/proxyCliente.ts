@@ -130,6 +130,15 @@ const REGLAS: Regla[] = [
   { metodo: "POST", patron: /^mapa-datos\/versiones\/\d{1,9}\/restaurar$/ },
   { metodo: "GET", patron: /^mapa-datos\/informe\/pdf$/, binario: true, timeoutMs: 45_000 },
   { metodo: "POST", patron: /^mapa-datos\/informe\/enviar$/, timeoutMs: 45_000 },
+  // Registro de actividades de tratamiento (servicio contratado): actividades, estados y versiones.
+  { metodo: "GET", patron: /^registro-actividades$/ },
+  { metodo: "GET", patron: /^registro-actividades\/catalogo$/ },
+  { metodo: "POST", patron: /^registro-actividades\/actividades$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^registro-actividades\/actividades\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^registro-actividades\/actividades\/\d{1,9}\/estado$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones\/\d{1,9}$/ },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

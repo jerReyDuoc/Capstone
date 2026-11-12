@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 11-nov-2026 (HU-07: pruebas de alucinación y verificación de las salidas del modelo, saneamiento de entrada OWASP LLM01 y modelo local opcional) |
+| **Última actualización** | 11-nov-2026 (HU-35: registro de actividades de tratamiento sobre el mapa de datos, con versiones vigentes inmutables) |
 
 ---
 
@@ -102,6 +102,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Autenticación en todos los endpoints (HU-20) | ✅ Hecho | Evaluaciones, respuestas, evidencias y reportes exigen el token del encuestado/referente dueño o de un admin (404 en lo ajeno); métricas de IA, eventos de seguridad y revisión humana solo admin; catálogos, controles y landing públicos. Ver `Extras/Cambios/backend/CAMBIOS_HU20.md` |
 | CRUD de administración de matriz/árbol (backend) | 🔴 Pendiente | Existe solo en la demo del frontend |
 | Mapa de datos personales (HU-34) | ✅ Hecho | `/empresa/mapa-datos` (contrato vigente): sistemas, bases de datos, terceros y flujos con proveedor, país de alojamiento y responsable interno; categorías de datos (sensibles) y de titulares (NNA) de un **catálogo común con el RAT/RoPA**; transferencias internacionales calculadas; mapa navegable con filtros, hallazgos de riesgo, inicio desde plantilla por rubro o desde la evaluación, versiones inalterables con restauración, audit log, informe PDF, PNG, CSV y envío por correo. Ver [5.17](#517-mapa-de-datos-personales-hu-34) y `Extras/Cambios/backend/CAMBIOS_HU34.md` |
+| Registro de actividades de tratamiento (HU-35) | ✅ Hecho | `/empresa/registro-actividades` (contrato vigente): cada actividad con los 11 campos mínimos del reglamento de la Ley 21.719, medidas de seguridad y rol (responsable o encargado); sistemas, bases, terceros y flujos **elegidos del mapa de datos** (sin doble ingreso) y vuelta automática a revisión cuando el mapa cambia; completitud por actividad y global; estados borrador → en revisión → vigente → archivada con **versiones vigentes inmutables** (trigger) y audit log. Textos legales como propuesta pendiente de validación. Ver [5.18](#518-registro-de-actividades-de-tratamiento-hu-35) y `Extras/Cambios/backend/CAMBIOS_HU35.md` |
 | Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
@@ -499,6 +500,14 @@ El backend (`app/domain/mapa_datos/`) calcula el resumen, la completitud y **10 
 
 Se inicia desde una **plantilla por rubro** (8, más una base común) o desde las **respuestas de la evaluación** (F2–F7: si declaró usar un LLM externo se sugiere el flujo hacia ese proveedor). Todo lo agregado así queda «por confirmar». **Cada cambio crea una versión** (`mapa_datos_version`: instantánea completa + huella SHA-256 + diferencias; un trigger impide modificarla) y queda en el `audit_log` en la misma transacción; las versiones se pueden ver y restaurar. Toda edición envía la versión que vio el usuario (409 si cambió). Detalle en `Extras/Cambios/backend/CAMBIOS_HU34.md` y `Extras/Cambios/frontend/CAMBIOS_HU34.md`.
 
+### 5.18 Registro de actividades de tratamiento (HU-35)
+
+El usuario definitivo (con contrato vigente) lleva en `/empresa/registro-actividades` el **registro de actividades de tratamiento** de su empresa. Cada actividad cubre los **11 campos mínimos del reglamento** (tipos de datos con los sensibles, ámbito territorial, bases de datos, categorías de titulares, finalidades, fuentes y si son de acceso público, base de licitud e interés legítimo, terceros destinatarios, transferencias internacionales y garantías, plazos de conservación por categoría, decisiones automatizadas o perfilamiento con su lógica) más **medidas de seguridad** y **rol de la empresa** (responsable o encargado), en un formulario de 6 pasos.
+
+**Sin doble ingreso:** sistemas, bases, terceros y flujos se eligen del mapa de datos (con el subconjunto de categorías que usa la actividad); tipos de datos, titulares, países, terceros y transferencias **se calculan** con el mapa actual (`app/domain/rat/analisis.py`). Cuando el mapa cambia algo que una actividad usa, en la **misma transacción** la actividad vigente vuelve a «en revisión» con el motivo (y el mapa avisa cuántas actividades afectó).
+
+**Completitud** por actividad (13 campos, con condicionales: interés legítimo, base para sensibles, garantías, lógica de decisiones, organización mandante) y global (promedio de las activas). **Estados** borrador → en revisión → vigente → archivada: aprueba el mismo usuario; no queda vigente con datos obligatorios vacíos (422 `ACTIVIDAD_INCOMPLETA`); al quedar vigente se guarda una **versión inmutable** (`rat_actividad_version`, instantánea + huella SHA-256; un trigger impide `UPDATE`/`DELETE`). Editar una vigente abre una nueva versión en borrador y la vigente sigue valiendo; aprobar sin cambios no crea otra versión; una archivada se reactiva sin duplicarla. Cada cambio queda en el `audit_log` (`rat.*`). Los textos de ayuda y el catálogo de bases de licitud (`app/domain/rat/catalogo.py`) son una **propuesta pendiente de validación por asesoría legal**. Detalle en `Extras/Cambios/backend/CAMBIOS_HU35.md`.
+
 ---
 
 ## 6. Base de datos
@@ -786,6 +795,12 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET / POST | `/api/mapa-datos/sugerencias[/{clave}/aceptar\|descartar, /restablecer]` | 🏢 | HU-34: propuestas desde la evaluación |
 | GET / POST | `/api/mapa-datos/versiones[/{n}[/restaurar]]` | 🏢 | HU-34: historial, instantánea con diferencias y restauración |
 | GET / POST | `/api/mapa-datos/informe/pdf` · `/informe/enviar` | 🏢 | HU-34: informe PDF con los filtros del mapa / el mismo PDF por correo |
+| GET | `/api/registro-actividades/catalogo` | 🏢 | HU-35: bases de licitud, medidas, fuentes, plazos, estados, campos y textos de ayuda |
+| GET | `/api/registro-actividades` | 🏢 | HU-35: actividades con su completitud y la completitud global |
+| POST | `/api/registro-actividades/actividades` | 🏢 | HU-35: crea una actividad en borrador `{nombre, …}` (201; 409 `NOMBRE_DUPLICADO`) |
+| GET / PATCH | `/api/registro-actividades/actividades/{id}` | 🏢 | HU-35: la actividad con lo que toma del mapa / edita `{revision, …}` (409 `ACTIVIDAD_DESACTUALIZADA` o `ACTIVIDAD_NO_EDITABLE`) |
+| POST | `/api/registro-actividades/actividades/{id}/estado` | 🏢 | HU-35: `{revision, accion}` enviar_revision · volver_borrador · aprobar (422 `ACTIVIDAD_INCOMPLETA`) · nueva_version · archivar · reactivar |
+| GET | `/api/registro-actividades/actividades/{id}/versiones[/{n}]` | 🏢 | HU-35: versiones vigentes inmutables e instantánea verificada de una |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
 

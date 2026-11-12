@@ -172,7 +172,7 @@ export interface VistaMapa {
   limites: { max_elementos: number; max_flujos: number };
   catalogo_version: string;
   /** Solo en las respuestas de un cambio: null si no había nada que guardar. */
-  cambio?: { version: number; resumen: string } | null;
+  cambio?: { version: number; resumen: string; actividades_afectadas?: number } | null;
 }
 
 export interface PlantillaMapa {
@@ -451,6 +451,14 @@ export function nombreTitular(cat: CatalogoMapa | null, codigo: string): string 
 
 /** "1 elemento" / "3 elementos". */
 export const plural = (n: number, singular: string, varios: string) => `${n} ${n === 1 ? singular : varios}`;
+
+/** Texto del aviso tras un cambio del mapa (suma las actividades del registro que volvieron a revisión). */
+export function textoCambioMapa(resumen: string, actividadesAfectadas: number | undefined): string {
+  if (!actividadesAfectadas) return resumen;
+  return `${resumen} Revisa el registro de actividades: ${actividadesAfectadas === 1
+    ? "1 actividad usa lo que cambiaste."
+    : `${actividadesAfectadas} actividades usan lo que cambiaste.`}`;
+}
 
 /** Datos de contacto en un texto (el backend los rechaza: se avisa antes de enviar). */
 export function contieneContacto(texto: string | null | undefined): boolean {

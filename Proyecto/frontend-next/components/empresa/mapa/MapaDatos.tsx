@@ -27,7 +27,7 @@ import {
   cargarSugerencias, confirmarRevision, crearElemento, crearFlujo, csvInventario, describirFiltros, descartarSugerencia,
   descargarInformeMapa, editarElemento, editarFlujo, eliminarElemento, eliminarFlujo, enviarInformeMapa, ETIQUETA_TIPO,
   filtrosActivos, mensajeError, nombrePais, plural, restablecerSugerencias, restaurarVersion, SIN_FILTROS, svgAPng,
-  svgParaExportar,
+  svgParaExportar, textoCambioMapa,
   type CatalogoMapa, type DatosElemento, type DatosFlujo, type ElementoMapa, type FiltrosMapa, type FlujoMapa,
   type PlantillaMapa, type SugerenciasApi, type TipoElemento, type VistaMapa,
 } from "@/lib/mapaDatos";
@@ -156,7 +156,9 @@ export function MapaDatos() {
         if (opciones.cerrar !== false) setDialogo(null);
         setAviso({
           tono: "ok",
-          texto: nueva.cambio === null ? "No había cambios que guardar." : opciones.exito ?? nueva.cambio?.resumen ?? "Cambios guardados.",
+          texto: nueva.cambio === null
+            ? "No había cambios que guardar."
+            : textoCambioMapa(opciones.exito ?? nueva.cambio?.resumen ?? "Cambios guardados.", nueva.cambio?.actividades_afectadas),
         });
         return nueva;
       } catch (e) {

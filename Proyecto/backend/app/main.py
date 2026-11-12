@@ -18,6 +18,7 @@ from app.api.routes import admin_rubros  # correcciones 05-11: rubros desde el p
 from app.api.routes import admin_revision  # HU-22: bandeja de revisión del Oficial de Cumplimiento
 from app.api.routes import admin_retencion  # HU-25: retención de usuarios temporales vencidos
 from app.api.routes import mapa_datos  # HU-34: mapa de datos personales (base del RAT y del RoPA)
+from app.api.routes import registro_actividades  # HU-35: registro de actividades de tratamiento (RAT)
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ app.include_router(admin_rubros.router)
 app.include_router(admin_revision.router)
 app.include_router(admin_retencion.router)
 app.include_router(mapa_datos.router)
+app.include_router(registro_actividades.router)
 
 @app.get("/health")
 async def health():

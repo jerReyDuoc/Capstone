@@ -610,6 +610,29 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
+    # ------------------------------------------------------------ HU-35: registro de actividades (RAT)
+    # Describe ACTIVIDADES de la organización con categorías del catálogo común y los ids de lo
+    # elegido del mapa: no guarda datos de titulares. Los textos libres (nombre, finalidades,
+    # interés legítimo, lógica de decisiones…) se rechazan al guardar si traen correos, RUT o
+    # teléfonos (app/domain/rat/modelo.py) y la auditoría de contenido los vuelve a revisar ("pii").
+    "rat_actividad": {
+        **_sin_dp("id", "empresa_id", "estado", "estado_previo", "revision", "completitud", "version_vigente",
+                  "fecha_creacion", "fecha_actualizacion", "fecha_vigencia", "fecha_archivo"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("nombre", "contenido", "motivos_revision")},
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Saber qué usuario de la empresa creó la actividad (HU-35)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    # Versiones vigentes, inmutables (criterio 4): la instantánea repite los textos de la actividad.
+    "rat_actividad_version": {
+        **_sin_dp("id", "actividad_id", "empresa_id", "numero", "fecha", "huella", "version_mapa"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("resumen", "cambios", "contenido")},
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa dejó vigente cada versión (HU-35)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
 }
 
 

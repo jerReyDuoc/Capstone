@@ -144,6 +144,15 @@ class Accion:
     MAPA_CAMBIO_RECHAZADO = "mapa_datos.cambio_rechazado"     # versión desactualizada o límite
     MAPA_INFORME_DESCARGADO = "mapa_datos.informe_descargado"
     MAPA_INFORME_ENVIADO = "mapa_datos.informe_enviado"
+    # HU-35: registro de actividades de tratamiento (RAT). Cada vez que una actividad queda vigente
+    # se guarda además una versión inmutable en rat_actividad_version; el detalle aquí solo lleva ids,
+    # estados, códigos de campos y conteos (nunca los textos que escribe la empresa).
+    RAT_ACTIVIDAD_CREADA = "rat.actividad_creada"
+    RAT_ACTIVIDAD_EDITADA = "rat.actividad_editada"
+    RAT_ESTADO_CAMBIADO = "rat.estado_cambiado"           # detalle: accion, desde, hacia
+    RAT_VERSION_VIGENTE = "rat.version_vigente"           # detalle: numero, huella (prefijo), campos cambiados
+    RAT_MARCADA_REVISION = "rat.marcada_revision"         # un cambio en el mapa la devolvió a revisión
+    RAT_CAMBIO_RECHAZADO = "rat.cambio_rechazado"         # versión desactualizada, incompleta o transición inválida
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -214,6 +223,11 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MAPA_VERSION_RESTAURADA: Categoria.MODIFICACION,
     Accion.MAPA_SUGERENCIA_DESCARTADA: Categoria.MODIFICACION,
     Accion.MAPA_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
+    Accion.RAT_ACTIVIDAD_EDITADA: Categoria.MODIFICACION,        # HU-35
+    Accion.RAT_ESTADO_CAMBIADO: Categoria.MODIFICACION,
+    Accion.RAT_VERSION_VIGENTE: Categoria.MODIFICACION,
+    Accion.RAT_MARCADA_REVISION: Categoria.MODIFICACION,
+    Accion.RAT_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -234,6 +248,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MAPA_FLUJO_CREADO: Categoria.CREACION,
     Accion.MAPA_PLANTILLA_APLICADA: Categoria.CREACION,
     Accion.MAPA_SUGERENCIA_ACEPTADA: Categoria.CREACION,
+    Accion.RAT_ACTIVIDAD_CREADA: Categoria.CREACION,             # HU-35
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

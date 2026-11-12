@@ -222,12 +222,19 @@ class MapaDatosCasos:
             cambios=cambios[:MAX_CAMBIOS_GUARDADOS], contenido=despues, huella=versiones.huella(despues),
             elementos=len(el), flujos=len(fl),
         ))
+        # HU-35 criterio 2: las actividades del registro que usan lo que cambió vuelven a revisión, en
+        # esta misma transacción (si algo falla, no se guarda ni el cambio del mapa ni la marca).
+        from app.application.use_cases.registro_actividades import marcar_afectadas_por_mapa
+
+        afectadas = await marcar_afectadas_por_mapa(self.db, self.empresa_id, cambios, antes, despues, mapa.version,
+                                                    self.actor, self.bitacora)
         self.bitacora.registrar(
             accion=accion_audit, entidad="mapa_datos", entidad_id=mapa.id, actor=self.actor,
             detalle={"version": mapa.version, "cambios": len(cambios), "elementos_total": len(el),
                      "flujos_total": len(fl), **detalle})
         await self.db.commit()
-        return {**self._armar_vista(mapa, el, fl), "cambio": {"version": mapa.version, "resumen": texto}}
+        return {**self._armar_vista(mapa, el, fl), "cambio": {"version": mapa.version, "resumen": texto,
+                                                       "actividades_afectadas": len(afectadas)}}
 
     # ================================================================ elementos (C1, C2)
     @staticmethod
