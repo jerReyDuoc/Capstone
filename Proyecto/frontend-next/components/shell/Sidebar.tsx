@@ -14,6 +14,7 @@
  *
  * HU-32: grupo "Privacidad" con "Mis derechos" (derechos ARCOP) para el encuestado
  * (/panel/mis-derechos) y para el cliente (/empresa/mis-derechos, con o sin contrato).
+ * HU-35: el cliente ve además "Registro de actividades", después del mapa de datos.
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -55,6 +56,15 @@ const EMPRESA: Item[] = [
 // grupo "Gobernanza de IA" (servicio contratado: solo el cliente los ve).
 const BORRADORES: Item = { ruta: "/empresa/borradores", etiqueta: "Borradores", icono: "documento" };
 
+<<<<<<< Updated upstream
+=======
+// Mapa de datos personales del cliente (servicio contratado): va en "Privacidad", antes de sus derechos.
+const MAPA_DATOS: Item = { ruta: "/empresa/mapa-datos", etiqueta: "Mapa de datos", icono: "mapa" };
+
+// Registro de actividades de tratamiento (servicio contratado): se arma sobre el mapa de datos.
+const REGISTRO_ACTIVIDADES: Item = { ruta: "/empresa/registro-actividades", etiqueta: "Registro de actividades", icono: "lista" };
+
+>>>>>>> Stashed changes
 // HU-32: derechos ARCOP. Cada titular tiene su página (la del cliente no depende del contrato).
 const MIS_DERECHOS: Record<"encuestado" | "cliente", Item> = {
   encuestado: { ruta: "/panel/mis-derechos", etiqueta: "Mis derechos", icono: "escudo" },
@@ -138,7 +148,15 @@ export function Sidebar() {
       {modo === "encuestado" || modo === "cliente" ? (
         <nav className="nav" aria-labelledby="nav-privacidad">
           <p className="nav-heading" id="nav-privacidad">Privacidad</p>
+<<<<<<< Updated upstream
           <ul className="nav-list">{enlace(MIS_DERECHOS[modo])}</ul>
+=======
+          <ul className="nav-list">
+            {modo === "cliente" ? enlace(MAPA_DATOS) : null}
+            {modo === "cliente" ? enlace(REGISTRO_ACTIVIDADES) : null}
+            {enlace(MIS_DERECHOS[modo])}
+          </ul>
+>>>>>>> Stashed changes
         </nav>
       ) : null}
 

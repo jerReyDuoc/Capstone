@@ -116,6 +116,32 @@ const REGLAS: Regla[] = [
   { metodo: "POST", patron: /^arcop\/solicitudes$/ },
   { metodo: "POST", patron: /^arcop\/solicitudes\/\d{1,9}\/(cancelacion|informacion)$/ },
   { metodo: "GET", patron: /^arcop\/solicitudes\/\d{1,9}\/exportacion$/, binario: true, tipos: TIPOS_EXPORTACION_ARCOP_CLIENTE, timeoutMs: 30_000 },
+<<<<<<< Updated upstream
+=======
+  // Mapa de datos personales (servicio contratado): elementos, flujos, plantillas, sugerencias,
+  // versiones e informe PDF (descarga y envío por correo).
+  { metodo: "GET", patron: /^mapa-datos$/ },
+  { metodo: "GET", patron: /^mapa-datos\/(catalogo|plantillas|sugerencias|versiones)$/ },
+  { metodo: "GET", patron: /^mapa-datos\/versiones\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^mapa-datos\/(elementos|flujos|revision)$/ },
+  { metodo: "PATCH", patron: /^mapa-datos\/(elementos|flujos)\/\d{1,9}$/ },
+  { metodo: "DELETE", patron: /^mapa-datos\/(elementos|flujos)\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^mapa-datos\/plantillas\/aplicar$/ },
+  { metodo: "POST", patron: /^mapa-datos\/sugerencias\/restablecer$/ },
+  { metodo: "POST", patron: /^mapa-datos\/sugerencias\/[a-z_]{1,40}\/(aceptar|descartar)$/ },
+  { metodo: "POST", patron: /^mapa-datos\/versiones\/\d{1,9}\/restaurar$/ },
+  { metodo: "GET", patron: /^mapa-datos\/informe\/pdf$/, binario: true, timeoutMs: 45_000 },
+  { metodo: "POST", patron: /^mapa-datos\/informe\/enviar$/, timeoutMs: 45_000 },
+  // Registro de actividades de tratamiento (servicio contratado): actividades, estados y versiones.
+  { metodo: "GET", patron: /^registro-actividades$/ },
+  { metodo: "GET", patron: /^registro-actividades\/catalogo$/ },
+  { metodo: "POST", patron: /^registro-actividades\/actividades$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}$/ },
+  { metodo: "PATCH", patron: /^registro-actividades\/actividades\/\d{1,9}$/ },
+  { metodo: "POST", patron: /^registro-actividades\/actividades\/\d{1,9}\/estado$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones$/ },
+  { metodo: "GET", patron: /^registro-actividades\/actividades\/\d{1,9}\/versiones\/\d{1,9}$/ },
+>>>>>>> Stashed changes
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

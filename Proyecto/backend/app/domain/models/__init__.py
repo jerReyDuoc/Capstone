@@ -57,6 +57,13 @@ from app.domain.models.tutor import (
     RolMensajeTutor,
     TipoMensajeTutor,
 )
+<<<<<<< Updated upstream
+=======
+# HU-25: plazo de retención de usuarios temporales configurable desde el panel
+from app.domain.models.configuracion_retencion import ConfiguracionRetencion
+from app.domain.models.mapa_datos import MapaDatos, MapaDatosVersion, MapaElemento, MapaFlujo  # HU-34
+from app.domain.models.rat import RatActividad, RatActividadVersion  # HU-35
+>>>>>>> Stashed changes
 
 __all__ = [
     "BorradorDocumento",
@@ -109,4 +116,14 @@ __all__ = [
     "MensajeTutor",
     "RolMensajeTutor",
     "TipoMensajeTutor",
+<<<<<<< Updated upstream
+=======
+    "ConfiguracionRetencion",
+    "MapaDatos",
+    "MapaElemento",
+    "MapaFlujo",
+    "MapaDatosVersion",
+    "RatActividad",
+    "RatActividadVersion",
+>>>>>>> Stashed changes
 ]
