@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 from app.application.asistente.contexto import clave_segura
 from app.application.schemas.asistente_rat import AsistenteRatRespuesta, PropuestaIA
@@ -29,7 +30,7 @@ from app.domain.mapa_datos.modelo import ErrorValidacion
 from app.domain.rat import catalogo as cat_rat
 from app.domain.rat import modelo as modelo_rat
 
-MAX_PROPUESTAS = 8
+MAX_PROPUESTAS = 6
 MAX_EXPLICACIONES = 12
 MAX_CHARS_EXPLICACION = 400
 MAX_INTENTOS = 12
@@ -74,6 +75,28 @@ class ResultadoAnclaje:
 
 
 # ------------------------------------------------------------------ utilidades
+_VACIO = dict(
+    descripcion=None, tipo_elemento=None, subtipo=None, proveedor=None, pais=None, responsable=None,
+    rol_tercero=None, contrato_firmado=None, categorias_datos=[], categorias_titulares=[], origen=None, destino=None,
+    finalidad=None, frecuencia=None, medio=None, cifrado=None, garantia=None, area=None, elementos=[], flujos=[],
+    finalidades=[], fuentes=[], base_licitud=None, interes_legitimo=None, base_sensibles=None, plazos=[],
+    decisiones_automatizadas=None, medidas=[], rol_empresa=None, riesgo_sugerido=None,
+)
+
+
+def plano(p: PropuestaIA) -> SimpleNamespace:
+    """La propuesta con todos los campos al mismo nivel (solo los del bloque de su tipo; el resto vacío)."""
+    datos = {**copy.deepcopy(_VACIO), "tipo": p.tipo, "clave": p.clave, "nombre": p.nombre,
+             "explicaciones": list(p.explicaciones), "confianza": p.confianza}
+    bloque = {"elemento": p.elemento, "flujo": p.flujo, "actividad": p.actividad}.get(p.tipo)
+    if bloque is not None:
+        datos.update({k: v for k, v in bloque.model_dump().items() if v is not None})
+        if p.tipo == "actividad":
+            datos["plazos"] = list(bloque.plazos)
+    return SimpleNamespace(**datos)
+
+
+
 def _recortar(texto: str | None, maximo: int) -> str | None:
     if texto is None:
         return None
@@ -269,10 +292,11 @@ def anclar(r: AsistenteRatRespuesta, ctx: ContextoAnclaje) -> ResultadoAnclaje:
     salida: list[PropuestaAnclada] = []
     validas: dict[str, str] = dict(ctx.pendientes)
     orden = {"elemento": 0, "flujo": 1, "actividad": 2}
-    for c, p in sorted(zip(claves_lote, crudas), key=lambda x: orden[x[1].tipo]):
-        p = p.model_copy(update={"origen": remapear(p.origen), "destino": remapear(p.destino),
-                                 "elementos": [remapear(x) for x in p.elementos],
-                                 "flujos": [remapear(x) for x in p.flujos]})
+    for c, cruda in sorted(zip(claves_lote, crudas), key=lambda x: orden[x[1].tipo]):
+        p = plano(cruda)
+        p.origen, p.destino = remapear(p.origen), remapear(p.destino)
+        p.elementos = [remapear(x) for x in p.elementos]
+        p.flujos = [remapear(x) for x in p.flujos]
         # Solo se puede referir lo pendiente o lo de esta respuesta que ya sobrevivió al anclaje
         tipos_validos = dict(validas)
         if p.tipo == "elemento":

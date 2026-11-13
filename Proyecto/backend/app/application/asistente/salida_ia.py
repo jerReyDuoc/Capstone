@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import re
 
+from pydantic import BaseModel
+
 from app.application.ai.agente import salida as validacion
-from app.application.schemas.asistente_rat import AsistenteRatRespuesta, PropuestaIA
+from app.application.schemas.asistente_rat import AsistenteRatRespuesta
 
 BLOQUEANTES = validacion.PROBLEMAS_BLOQUEANTES
 RESUMEN_BLOQUEADO = ("No pude procesar esta parte de forma segura. Sigue con la siguiente pregunta o completa "
@@ -23,21 +25,21 @@ _MARCADORES = re.compile(
     r"c[óo]digo de control interno|datos del sistema, confiables|propuestas pendientes \(se pueden",
     re.IGNORECASE,
 )
-_CAMPOS_TEXTO = ("nombre", "descripcion", "proveedor", "responsable", "finalidad", "area", "interes_legitimo")
 
 
-def _textos_propuesta(p: PropuestaIA) -> list[str]:
-    salida = [getattr(p, c) or "" for c in _CAMPOS_TEXTO]
-    salida += list(p.finalidades) + [e.texto or "" for e in p.explicaciones]
-    salida += [pl.fundamento or "" for pl in p.plazos]
-    return salida
+def _textos(valor) -> list[str]:
+    """Todos los textos de un objeto de la salida, recorriendo sus bloques y listas."""
+    if isinstance(valor, str):
+        return [valor]
+    if isinstance(valor, BaseModel):
+        return [t for v in valor.__dict__.values() for t in _textos(v)]
+    if isinstance(valor, (list, tuple)):
+        return [t for v in valor for t in _textos(v)]
+    return []
 
 
 def textos_de(r: AsistenteRatRespuesta) -> list[str]:
-    salida = [r.resumen or ""] + list(r.preguntas_pendientes) + [i.texto or "" for i in r.inconsistencias]
-    for p in r.propuestas:
-        salida += _textos_propuesta(p)
-    return salida
+    return _textos(r)
 
 
 def problemas(r: AsistenteRatRespuesta, canario: str | None, system_prompt: str) -> list[str]:
@@ -54,13 +56,15 @@ def _limpiar(texto: str | None) -> str | None:
     return validacion.sin_enlaces(validacion.sin_codigo(texto)).strip()
 
 
-def _limpiar_propuesta(p: PropuestaIA) -> PropuestaIA:
-    cambios: dict = {c: _limpiar(getattr(p, c)) for c in _CAMPOS_TEXTO if getattr(p, c) is not None}
-    cambios["nombre"] = cambios.get("nombre") or p.nombre
-    cambios["finalidades"] = [x for x in (_limpiar(f) for f in p.finalidades) if x]
-    cambios["explicaciones"] = [e.model_copy(update={"texto": _limpiar(e.texto) or ""}) for e in p.explicaciones]
-    cambios["plazos"] = [pl.model_copy(update={"fundamento": _limpiar(pl.fundamento)}) for pl in p.plazos]
-    return p.model_copy(update=cambios)
+def _limpio(valor):
+    """Copia con código y enlaces quitados de todos los textos (los códigos de catálogo no se tocan)."""
+    if isinstance(valor, str):
+        return _limpiar(valor) or ""
+    if isinstance(valor, BaseModel):
+        return valor.model_copy(update={k: _limpio(v) for k, v in valor.__dict__.items()})
+    if isinstance(valor, list):
+        return [_limpio(v) for v in valor]
+    return valor
 
 
 def respuesta_bloqueada() -> AsistenteRatRespuesta:
@@ -78,7 +82,7 @@ def aplicar(r: AsistenteRatRespuesta, encontrados: list[str]) -> tuple[Asistente
             "resumen": _limpiar(data.resumen) or "",
             "preguntas_pendientes": [x for x in (_limpiar(q) for q in data.preguntas_pendientes) if x],
             "inconsistencias": [i.model_copy(update={"texto": _limpiar(i.texto) or ""}) for i in data.inconsistencias],
-            "propuestas": [_limpiar_propuesta(p) for p in data.propuestas],
+            "propuestas": [_limpio(p) for p in data.propuestas],
         })
     if "alcance" in encontrados:
         data = data.model_copy(update={"propuestas": [], "inconsistencias": []})

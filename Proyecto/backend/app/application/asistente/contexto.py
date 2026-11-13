@@ -31,30 +31,26 @@ def clave_segura(texto: str | None, por_defecto: str = "propuesta") -> str:
     return c or por_defecto
 
 
-def _lista(opciones) -> str:
-    return ", ".join(f"{o.codigo} ({o.nombre})" for o in opciones)
+def _codigos(opciones) -> str:
+    return ", ".join(o.codigo for o in opciones)
 
 
 def catalogos_texto() -> str:
-    sub = "\n".join(f"  subtipos de {t}: {_lista(ops)}" for t, ops in cat.SUBTIPOS.items())
-    datos = ", ".join(f"{c.codigo} ({c.nombre}{', SENSIBLE' if c.sensible else ''})" for c in cat.CATEGORIAS_DATOS)
+    """Solo los códigos (son palabras en español que se entienden solas): menos tokens por llamada."""
+    sub = "\n".join(f"  subtipo de {t}: {_codigos(ops)}" for t, ops in cat.SUBTIPOS.items())
+    sensibles = ", ".join(c.codigo for c in cat.CATEGORIAS_DATOS if c.sensible)
     return "\n".join([
         "- tipo_elemento: sistema, base_datos, tercero",
         sub,
-        f"- categorias_datos: {datos}",
-        f"- categorias_titulares: {_lista(cat.CATEGORIAS_TITULARES)}",
-        f"- rol_tercero: {_lista(cat.ROLES_TERCERO)}",
-        f"- garantia (solo envíos fuera de Chile): {_lista(cat.GARANTIAS_TRANSFERENCIA)}",
-        f"- frecuencia: {_lista(cat.FRECUENCIAS)}",
-        f"- medio: {_lista(cat.MEDIOS)}",
+        f"- categorias_datos: {_codigos(cat.CATEGORIAS_DATOS)} (sensibles: {sensibles})",
+        f"- categorias_titulares: {_codigos(cat.CATEGORIAS_TITULARES)}",
+        f"- rol_tercero: {_codigos(cat.ROLES_TERCERO)}",
+        f"- garantia (solo envíos fuera de Chile): {_codigos(cat.GARANTIAS_TRANSFERENCIA)}",
         "- pais: código ISO de 2 letras (CL = Chile)",
-        f"- fuentes: {_lista(cat_rat.FUENTES)}",
-        f"- base_licitud: {_lista(cat_rat.BASES_LICITUD)}",
-        f"- base_sensibles: {_lista(cat_rat.BASES_SENSIBLES)}",
-        f"- unidad de plazo: {_lista(cat_rat.UNIDADES_PLAZO)}",
-        f"- desde (inicio del plazo): {_lista(cat_rat.INICIOS_PLAZO)}",
-        f"- medidas: {_lista(cat_rat.MEDIDAS_SEGURIDAD)}",
-        f"- rol_empresa: {_lista(cat_rat.ROLES_EMPRESA)}",
+        f"- base_licitud: {_codigos(cat_rat.BASES_LICITUD)}",
+        f"- base_sensibles: {_codigos(cat_rat.BASES_SENSIBLES)}",
+        f"- unidad de plazo: {_codigos(cat_rat.UNIDADES_PLAZO)}",
+        f"- desde (inicio del plazo): {_codigos(cat_rat.INICIOS_PLAZO)}",
         "- riesgo_sugerido: Bajo, Medio, Alto, Crítico",
     ])
 

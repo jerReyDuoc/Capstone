@@ -24,7 +24,9 @@ from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import TareaIA, crear_politicas
 from app.application.ai.prompts import asistente_rat as prompt
 from app.application.asistente import anclaje, banco, contexto, documento, inconsistencias, salida_ia
-from app.application.schemas.asistente_rat import AsistenteRatRespuesta, Explicacion, PlazoIA, PropuestaIA
+from app.application.schemas.asistente_rat import (
+    ActividadIA, AsistenteRatRespuesta, ElementoIA, Explicacion, FlujoIA, PlazoIA, PropuestaIA,
+)
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.ports.llm_provider_port import LLMProviderPort, LLMResponse
 from app.domain.rat import cobertura
@@ -33,16 +35,33 @@ from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 
 
 # ====================================================================== utilidades
+_CAMPOS_BLOQUE = {
+    "elemento": ("tipo_elemento", "subtipo", "proveedor", "pais", "responsable", "rol_tercero", "contrato_firmado",
+                 "categorias_datos", "categorias_titulares"),
+    "flujo": ("origen", "destino", "finalidad", "categorias_datos", "garantia", "cifrado"),
+    "actividad": ("area", "elementos", "flujos", "finalidades", "base_licitud", "interes_legitimo", "base_sensibles",
+                  "plazos", "riesgo_sugerido"),
+}
+_LISTAS = {"categorias_datos", "categorias_titulares", "elementos", "flujos", "finalidades", "plazos"}
+
+
 def propuesta(**kw) -> PropuestaIA:
-    base = dict(
-        tipo="elemento", clave="x", nombre="Algo", descripcion=None, tipo_elemento=None, subtipo=None,
-        proveedor=None, pais=None, responsable=None, rol_tercero=None, contrato_firmado=None,
-        categorias_datos=[], categorias_titulares=[], origen=None, destino=None, finalidad=None, frecuencia=None,
-        medio=None, cifrado=None, garantia=None, area=None, elementos=[], flujos=[], finalidades=[], fuentes=[],
-        base_licitud=None, interes_legitimo=None, base_sensibles=None, plazos=[], decisiones_automatizadas=None,
-        medidas=[], rol_empresa=None, riesgo_sugerido=None, explicaciones=[], confianza="media",
-    )
-    base.update(kw)
+    """Arma una propuesta con los campos planos de la prueba: van al bloque de su tipo (los demás en null)."""
+    tipo = kw.pop("tipo", "elemento")
+    base = {"tipo": tipo, "clave": kw.pop("clave", "x"), "nombre": kw.pop("nombre", "Algo"),
+            "explicaciones": kw.pop("explicaciones", []), "confianza": kw.pop("confianza", "media"),
+            "elemento": None, "flujo": None, "actividad": None}
+    bloque = {c: kw.pop(c, [] if c in _LISTAS else None) for c in _CAMPOS_BLOQUE[tipo]}
+    kw.pop("descripcion", None)
+    if tipo == "elemento":
+        bloque["tipo_elemento"] = bloque["tipo_elemento"] or ""
+        base["elemento"] = ElementoIA(**bloque)
+    elif tipo == "flujo":
+        bloque["origen"], bloque["destino"] = bloque["origen"] or "", bloque["destino"] or ""
+        base["flujo"] = FlujoIA(**bloque)
+    else:
+        base["actividad"] = ActividadIA(**bloque)
+    assert not kw, f"campos que no existen en el bloque {tipo}: {sorted(kw)}"
     return PropuestaIA(**base)
 
 
@@ -62,8 +81,7 @@ def remuneraciones() -> AsistenteRatRespuesta:
                   pais="CL", rol_tercero="cesionario", categorias_datos=["salud"],
                   categorias_titulares=["trabajadores"]),
         propuesta(tipo="flujo", clave="remu_mutual", nombre="Licencias a la mutual", origen="nuevo:sistema_remu",
-                  destino="nuevo:mutual", finalidad="Tramitar licencias médicas", categorias_datos=["salud"],
-                  categorias_titulares=["trabajadores"]),
+                  destino="nuevo:mutual", finalidad="Tramitar licencias médicas", categorias_datos=["salud"]),
         propuesta(tipo="actividad", clave="pago_remu", nombre="Pago de remuneraciones", area="RR. HH.",
                   elementos=["nuevo:sistema_remu", "id:999"], flujos=["nuevo:remu_mutual"],
                   finalidades=["Pagar sueldos y cotizaciones"], base_licitud="contrato",
@@ -156,13 +174,13 @@ def test_clave_repetida_se_renombra_y_sus_referencias_se_reescriben():
 
 def test_fuera_de_alcance_no_deja_propuestas_y_maximo_ocho():
     assert anclaje.anclar(respuesta(propuesta(tipo_elemento="sistema"), fuera=True), anclaje.ContextoAnclaje()).propuestas == []
-    muchas = respuesta(*[propuesta(clave=f"s{i}", nombre=f"Sistema {i}", tipo_elemento="sistema") for i in range(12)])
+    muchas = respuesta(*[propuesta(clave=f"s{i}", nombre=f"Sistema {i}", tipo_elemento="sistema") for i in range(10)])
     r = anclaje.anclar(muchas, anclaje.ContextoAnclaje())
     assert len(r.propuestas) == anclaje.MAX_PROPUESTAS and "demasiadas_propuestas" in r.descartes
 
 
 def test_elemento_sin_tipo_se_descarta():
-    r = anclaje.anclar(respuesta(propuesta(tipo_elemento=None)), anclaje.ContextoAnclaje())
+    r = anclaje.anclar(respuesta(propuesta(tipo_elemento="")), anclaje.ContextoAnclaje())
     assert r.propuestas == [] and "elemento_invalido:tipo" in r.descartes
 
 
@@ -258,13 +276,23 @@ def test_salida_con_frases_del_prompt_es_fuga():
 
 
 def test_enlaces_y_codigo_se_limpian():
-    r = respuesta(propuesta(nombre="Sistema", tipo_elemento="sistema", descripcion="Ver https://malo.example/x",
+    r = respuesta(propuesta(nombre="Sistema", tipo_elemento="sistema", proveedor="Ver https://malo.example/x",
                             explicaciones=[Explicacion(campo="general", texto="```rm -rf /```")]))
     encontrados = salida_ia.problemas(r, None, prompt.SYSTEM)
     limpio, bloqueada = salida_ia.aplicar(r, encontrados)
     assert {"url", "codigo"} <= set(encontrados) and bloqueada is None
     p = limpio.propuestas[0]
-    assert "https://" not in p.descripcion and "rm -rf" not in p.explicaciones[0].texto
+    assert "https://" not in p.elemento.proveedor and "rm -rf" not in p.explicaciones[0].texto
+
+
+def test_bloques_de_otro_tipo_se_ignoran():
+    """Si el modelo llena un bloque que no es el de su tipo, ese bloque no se usa."""
+    p = propuesta(clave="crm", nombre="CRM", tipo_elemento="sistema", pais="CL")
+    p = p.model_copy(update={"actividad": ActividadIA(area="Ventas", elementos=[], flujos=[], finalidades=["x"],
+                                                      base_licitud="contrato", interes_legitimo=None,
+                                                      base_sensibles=None, plazos=[], riesgo_sugerido="Alto")})
+    r = anclaje.anclar(respuesta(p), anclaje.ContextoAnclaje())
+    assert "base_licitud" not in r.propuestas[0].payload and r.propuestas[0].riesgo_sugerido is None
 
 
 def test_fuera_de_alcance_con_propuestas():
@@ -296,9 +324,13 @@ class ProveedorAsistente(LLMProviderPort):
     def __init__(self, data: AsistenteRatRespuesta | None = None):
         self.data = data or remuneraciones()
         self.requests = []
+        self.error = None   # LLMProviderError que se lanza en la próxima llamada
 
     async def generar(self, req):
         self.requests.append(req)
+        if self.error is not None:
+            error, self.error = self.error, None
+            raise error
         return LLMResponse(data=self.data, proveedor=self.nombre, modelo=self.modelo_por_defecto,
                            tokens_entrada=100, tokens_salida=50, latencia_ms=1.0)
 
@@ -568,4 +600,36 @@ def test_api_documento_y_listado_de_personas(hu27, ia):
                          files={"file": ("trabajadores.txt", listado.encode(), "text/plain")})
         assert r.status_code == 201 and r.json()["documento"]["estado"] == "rechazado_pii"
         assert len(ia.requests) == llamadas      # no llegó al LLM
+    _correr(esc)
+
+
+@api
+def test_api_ayuda_ocupada_no_avanza_y_se_puede_guardar_sin_ayuda(hu27, ia):
+    """Si el proveedor falla (p. ej. límite de tokens por minuto), la pregunta no avanza y no se pierde nada."""
+    async def esc(c):
+        from app.domain.models import AsistenteMensaje, BitacoraAuditoria
+        from app.domain.ports.llm_provider_port import LLMProviderError, TipoErrorLLM
+
+        h = (await _cliente(hu27, c))["hc"]
+        s = (await c.post("/api/asistente/sesiones", headers=h, json={})).json()["sesion"]
+        ia.error = LLMProviderError(TipoErrorLLM.RATE_LIMIT, "429", 5.0)
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 503 and hu27._codigo(r) == "AYUDA_NO_DISPONIBLE"
+        assert r.json()["detail"]["tipo_error"] == "rate_limit" and "Espera un momento" in r.json()["detail"]["mensaje"]
+        assert await _filas(hu27, AsistenteMensaje) == []       # no se guardó nada
+        e = (await c.get("/api/asistente", headers=h)).json()
+        assert e["sesion"]["pregunta"]["codigo"] == "personas.sistemas"            # no avanzó
+        assert e["ia"]["cuota"]["respuestas"]["usados"] == 0                       # la cuota se devolvió
+        # Reintentar funciona
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 200 and r.json()["nuevas"]
+        # Guardar sin ayuda: avanza sin llamar al proveedor
+        llamadas = len(ia.requests)
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h,
+                         json={"texto": "La mutual recibe las licencias", "sin_ia": True})
+        assert r.status_code == 200 and len(ia.requests) == llamadas and r.json()["nuevas"] == []
+        assert r.json()["sesion"]["pregunta"]["codigo"] == "personas.seleccion"
+        rechazos = [b for b in await _filas(hu27, BitacoraAuditoria)
+                    if b.accion == "asistente.respuesta" and b.resultado == "rechazado"]
+        assert rechazos and rechazos[0].detalle["error_ia"] == "rate_limit"
     _correr(esc)

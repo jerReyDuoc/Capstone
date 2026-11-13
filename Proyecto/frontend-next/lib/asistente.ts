@@ -182,11 +182,14 @@ export const cambiarArea = (sesionId: number, area: CodigoArea) =>
   pedir<EstadoAsistente>(`${BASE_ASISTENTE}/sesiones/${sesionId}/area`, { method: "POST", json: { area } });
 
 /** Nunca se reintenta: puede llamar al servicio de IA y gastar cuota. */
-export const responderPregunta = (sesionId: number, texto: string, omitir = false) =>
+export const responderPregunta = (sesionId: number, texto: string, omitir = false, sinIa = false) =>
   pedir<EstadoAsistente>(`${BASE_ASISTENTE}/sesiones/${sesionId}/respuestas`, {
     method: "POST",
-    json: omitir ? { omitir: true } : { texto },
+    json: omitir ? { omitir: true } : sinIa ? { texto, sin_ia: true } : { texto },
   }, { reintentos: 0 });
+
+/** La ayuda automática falló por algo pasajero: la pregunta no avanzó y se puede reintentar o guardar sin ayuda. */
+export const CODIGO_AYUDA_NO_DISPONIBLE = "AYUDA_NO_DISPONIBLE";
 
 export const cerrarEntrevista = (sesionId: number) =>
   pedir<EstadoAsistente>(`${BASE_ASISTENTE}/sesiones/${sesionId}/cerrar`, { method: "POST", json: {} });

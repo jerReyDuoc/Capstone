@@ -77,7 +77,17 @@ AVISOS = {
     "anonimizacion": "No pudimos proteger los datos de esta respuesta, así que no usamos la ayuda automática. "
                      "Puedes seguir y completar a mano.",
     "sin_propuestas": None,
+    "sin_ayuda": "Guardamos tu respuesta sin ayuda automática. Puedes agregar lo que falte a mano en el mapa o en el "
+                 "registro.",
 }
+# Cuando la ayuda automática falla por algo pasajero, la pregunta NO avanza: el usuario reintenta o guarda sin ayuda
+MENSAJES_FALLA_IA = {
+    "rate_limit": "La ayuda automática está ocupada: se hicieron muchas consultas en el último minuto. Espera un "
+                  "momento y vuelve a enviar tu respuesta, o guárdala sin ayuda.",
+    "timeout": "La ayuda automática tardó demasiado en responder. Vuelve a enviar tu respuesta o guárdala sin ayuda.",
+}
+MENSAJE_FALLA_IA = ("La ayuda automática no respondió esta vez. Vuelve a enviar tu respuesta o guárdala sin ayuda: "
+                    "no se pierde nada.")
 MENSAJE_BLOQUEO = ("Tu respuesta contiene texto que intenta cambiar las reglas del asistente, así que no la "
                    "procesamos. Cuéntanos con tus palabras qué hace tu empresa (por ejemplo, «usamos un sistema de "
                    "remuneraciones en la nube»).")
@@ -493,7 +503,12 @@ class AsistenteRat:
             await self._evento(n.get("texto") or "", n.get("categoria"), origen, regla=n.get("regla"))
 
     # ------------------------------------------------------------------ responder (C1)
-    async def responder(self, sesion_id: int, texto: str | None, omitir: bool = False) -> dict:
+    async def responder(self, sesion_id: int, texto: str | None, omitir: bool = False, sin_ia: bool = False) -> dict:
+        """
+        `omitir`: salta la pregunta. `sin_ia`: guarda la respuesta sin llamar a la ayuda automática (lo elige el
+        usuario cuando la ayuda falló). Si la ayuda falla por algo pasajero (cuota por minuto del proveedor, tiempo
+        de espera, conexión), la pregunta no avanza y se responde 503 AYUDA_NO_DISPONIBLE para reintentar.
+        """
         s = await self._sesion(sesion_id, bloquear=True)
         if s.estado != "activa":
             raise AsistenteError(409, "SESION_CERRADA", "Esta entrevista ya terminó. Abre una nueva.")
@@ -512,11 +527,17 @@ class AsistenteRat:
         ahora = _ahora()
         area_respondida = s.area_actual
 
-        if omitir:
-            info = {"motivo_sin_ia": None, "propuestas": [], "resumen": None, "preguntas": [], "traza_id": None,
-                    "prompt_version": None, "textos_sanitizados": {}, "entidades": 0, "neutralizados": [],
-                    "bloqueado": False, "descartes": []}
-            contenido_usuario = TEXTO_OMITIDA
+        if omitir or sin_ia:
+            info = {"motivo_sin_ia": "sin_ayuda" if sin_ia else None, "propuestas": [], "resumen": None,
+                    "preguntas": [], "traza_id": None, "prompt_version": None, "textos_sanitizados": {}, "entidades": 0,
+                    "neutralizados": [], "bloqueado": False, "descartes": []}
+            if omitir:
+                contenido_usuario = TEXTO_OMITIDA
+            else:
+                try:
+                    contenido_usuario = await self._anon(texto) if self.anonimizador else TEXTO_NO_GUARDADO
+                except AnonimizacionError:
+                    contenido_usuario = TEXTO_NO_GUARDADO
         else:
             previos = [m.contenido for m in (await self.db.execute(
                 select(AsistenteMensaje).where(AsistenteMensaje.sesion_id == s.id, AsistenteMensaje.rol == "usuario",
@@ -527,6 +548,8 @@ class AsistenteRat:
                                         cuota="dia", previos=previos)
             if info["bloqueado"]:
                 return await self._bloqueada(s, p, texto, info, ahora)
+            if info["motivo_sin_ia"] == "ia_no_disponible":
+                await self._falla_ia(s, p, texto, info)
             await self._registrar_neutralizados(info["neutralizados"])
             # Lo que se guarda es EXACTAMENTE lo que vio el LLM (ya sanitizado); sin IA, se anonimiza aquí
             contenido_usuario = info["textos_sanitizados"].get("respuesta")
@@ -556,11 +579,25 @@ class AsistenteRat:
                      "traza_id": info.get("traza_id"), "prompt_version": info.get("prompt_version"),
                      "entidades_anonimizadas": info.get("entidades", 0),
                      "lineas_omitidas": len(info.get("neutralizados") or []),
-                     "descartes": (info.get("descartes") or [])[:20],
+                     "descartes": (info.get("descartes") or [])[:20], "error_ia": info.get("error_ia"),
                      "huella_respuesta": huella(texto) if texto else None, "largo": len(texto)})
         await self.db.commit()
         return {**await self.estado(), "nuevas": [p_.id for p_ in info["propuestas"]],
                 "aviso": AVISOS.get(info["motivo_sin_ia"] or "")}
+
+    async def _falla_ia(self, s: AsistenteSesion, p: banco.Pregunta, texto: str, info: dict) -> None:
+        """La ayuda falló (la cuota ya se devolvió): no se guarda nada, queda auditado y se pide reintentar."""
+        tipo = info.get("error_ia")
+        sesion_id = s.id   # antes del rollback: después el objeto queda expirado
+        await self.db.rollback()
+        self.bitacora.registrar(
+            accion=Accion.ASISTENTE_RESPUESTA, entidad="asistente_sesion", entidad_id=sesion_id,
+            actor=self.actor, resultado=RESULTADO_RECHAZADO,
+            detalle={"area": p.codigo.split(".")[0], "pregunta": p.codigo, "motivo_sin_ia": "ia_no_disponible",
+                     "error_ia": tipo, "huella_respuesta": huella(texto), "largo": len(texto)})
+        await self.db.commit()
+        raise AsistenteError(503, "AYUDA_NO_DISPONIBLE", MENSAJES_FALLA_IA.get(tipo or "", MENSAJE_FALLA_IA),
+                             tipo_error=tipo, reintentar_en_s=30 if tipo == "rate_limit" else None)
 
     @staticmethod
     def _texto_asistente(info: dict, siguiente: banco.Pregunta | None, omitida: bool) -> str:

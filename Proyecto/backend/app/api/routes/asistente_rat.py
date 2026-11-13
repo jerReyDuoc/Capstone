@@ -100,6 +100,7 @@ class CambioArea(BaseModel):
 class Respuesta(BaseModel):
     texto: str | None = Field(default=None, max_length=8000)
     omitir: bool = False
+    sin_ia: bool = False   # guardar sin ayuda automática (cuando la ayuda falló)
 
 
 class Aceptacion(BaseModel):
@@ -135,7 +136,7 @@ async def responder(sesion_id: int, payload: Respuesta, cliente: ClienteConServi
                     servicios: ServiciosAsistente = Depends(obtener_servicios_asistente)):
     """C1: la respuesta se analiza (con IA si está disponible) y devuelve las propuestas para revisar."""
     return await _ejecutar(_caso(db, cliente, servicios, limitador).responder(sesion_id, payload.texto,
-                                                                               payload.omitir))
+                                                                               payload.omitir, payload.sin_ia))
 
 
 @router.post("/sesiones/{sesion_id}/cerrar")

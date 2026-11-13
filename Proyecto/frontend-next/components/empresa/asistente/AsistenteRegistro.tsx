@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 import {
-  ACCEPT_DOCUMENTO, AVISO_DOCUMENTO, ETIQUETA_ESTADO, ETIQUETA_INCONSISTENCIA, MOTIVOS_DESCARTE, NIVEL_CONFIANZA,
+  ACCEPT_DOCUMENTO, AVISO_DOCUMENTO, CODIGO_AYUDA_NO_DISPONIBLE, ETIQUETA_ESTADO, ETIQUETA_INCONSISTENCIA, MOTIVOS_DESCARTE, NIVEL_CONFIANZA,
   aceptarPropuesta, agruparPropuestas, cambiarArea, cantidad, cargarAsistente, cerrarEntrevista, cuotaTexto,
   dependenciasPendientes, descartarPropuesta, diccionario, etiquetaIa, explicacionesSueltas, filasPropuesta,
   iniciarEntrevista, progresoEntrevista, responderPregunta, subirDocumento, tipoVisual, tituloTipo, tonoSeveridad,
@@ -261,6 +261,7 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
   const sesion = estado.sesion!;
   const [texto, setTexto] = useState("");
   const [error, setError] = useState("");
+  const [fallaIa, setFallaIa] = useState("");
   const [ocupado, setOcupado] = useState<Ocupado>("");
   const log = useRef<HTMLDivElement>(null);
   const max = estado.limites.max_caracteres;
@@ -285,14 +286,34 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
     }
   }
 
-  async function enviar(ev: FormEvent) {
-    ev.preventDefault();
+  /** Envía la respuesta. Si la ayuda automática falla, el texto se conserva para reintentar o guardar sin ayuda. */
+  async function mandar(sinIa: boolean) {
     const problema = validarRespuesta(texto, max);
     if (problema) {
       setError(problema);
       return;
     }
-    if (await ejecutar("respuesta", () => responderPregunta(sesion.id, texto.trim()))) setTexto("");
+    if (ocupado) return;
+    setOcupado("respuesta");
+    setError("");
+    setFallaIa("");
+    try {
+      alCambiar(await responderPregunta(sesion.id, texto.trim(), false, sinIa));
+      setTexto("");
+    } catch (e) {
+      if (e instanceof ErrorBff && e.info.codigo === CODIGO_AYUDA_NO_DISPONIBLE) {
+        setFallaIa(e.info.mensaje || "La ayuda automática no respondió esta vez.");
+      } else {
+        setError(mensaje(e, "No pudimos enviar tu respuesta. Inténtalo de nuevo."));
+      }
+    } finally {
+      setOcupado("");
+    }
+  }
+
+  function enviar(ev: FormEvent) {
+    ev.preventDefault();
+    void mandar(false);
   }
 
   return (
@@ -362,6 +383,19 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
               </button>
             </div>
           </div>
+          {fallaIa ? (
+            <div className={a.fallaIa} role="alert">
+              <p><Icon name="reloj" /> {fallaIa}</p>
+              <div className={a.acciones}>
+                <button type="button" className="btn btn-primary btn-sm" disabled={!!ocupado} onClick={() => mandar(false)}>
+                  <Icon name="refrescar" /> Volver a intentar
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" disabled={!!ocupado} onClick={() => mandar(true)}>
+                  Guardar sin ayuda
+                </button>
+              </div>
+            </div>
+          ) : null}
         </form>
       ) : (
         <div className={a.fin} role="status">

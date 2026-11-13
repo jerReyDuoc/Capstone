@@ -15,6 +15,8 @@ Se separa en:
 
 Historial de versiones:
   1.0.0  primera versión.
+  1.1.0  menos tokens (límite por minuto del proveedor): cada propuesta llena solo el bloque de su tipo
+         (elemento, flujo o actividad), máximo 6 propuestas y catálogos solo con sus códigos.
 
 Cambiar el texto de este archivo => subir PROMPT_VERSION. La versión queda en cada llamada
 (llamadas_llm.prompt_version) y en cada propuesta (asistente_propuesta.prompt_version).
@@ -26,7 +28,7 @@ from dataclasses import dataclass, field
 from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
 from app.domain.ports.sanitizer_port import TipoEntidad
 
-PROMPT_VERSION = "asistente_rat/1.0.0"
+PROMPT_VERSION = "asistente_rat/1.1.0"
 
 _ETIQUETAS = ", ".join(t.etiqueta for t in TipoEntidad)
 _SEP = "═" * 63
@@ -87,10 +89,12 @@ CÓMO PROPONER
   de las PROPUESTAS PENDIENTES. No dupliques lo que ya existe: si existe, refiérelo por id.
 - Cada flujo necesita origen y destino. Cada actividad necesita al menos un sistema o base
   (elementos) y, si los datos viajan, sus flujos.
-- Llena solo los campos de su tipo: un elemento no lleva base de licitud; una actividad no lleva
-  país. Lo que no corresponde va en null o como lista vacía.
+- Cada propuesta lleva SOLO el bloque de su tipo ("elemento", "flujo" o "actividad"); los otros
+  dos bloques van en null.
 - Propón solo lo que la respuesta o el documento respaldan. Si algo es una suposición razonable,
-  usa "confianza": "baja" y dilo en la explicación. Máximo 8 propuestas por respuesta.
+  usa "confianza": "baja" y dilo en la explicación. Máximo 6 propuestas por respuesta; si hay más,
+  propón las más importantes y menciona el resto en "preguntas_pendientes".
+- Sé breve: explicaciones de una o dos frases y solo para los valores importantes.
 - Base de licitud: elige la más defendible para esa finalidad y explica por qué en una o dos
   frases simples. El consentimiento NO es la respuesta por defecto (un contrato de trabajo o de
   venta, una obligación legal o un interés legítimo suelen ser la base correcta). Si hay datos
@@ -102,8 +106,8 @@ CÓMO PROPONER
 - Riesgo: sugiere Bajo, Medio, Alto o Crítico y explica qué lo sube (datos sensibles, menores de
   edad, decisiones automatizadas, envío fuera de Chile, terceros sin contrato) o lo baja. El
   sistema lo recalcula con su propia matriz: tu explicación ayuda a entenderlo.
-- Explica cada valor importante en "explicaciones" ({{campo, texto}}): tipo, base_licitud,
-  base_sensibles, plazos, riesgo, pais, garantia, categorias_datos.
+- Explica en "explicaciones" ({{campo, texto}}) la base_licitud, la base_sensibles, los plazos y el
+  riesgo de las actividades, y el país o la garantía cuando los datos salen de Chile.
 
 INCONSISTENCIAS QUE DEBES SEÑALAR (en "inconsistencias")
   - "sensible_sin_base": una actividad usa datos sensibles y no tiene base para tratarlos.

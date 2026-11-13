@@ -58,3 +58,12 @@ El NER cubre RUT, nombres, correos, teléfonos, direcciones y datos codificados;
 
 - Aceptar una propuesta es en dos pasos (el caso de uso del mapa/RAT confirma su propio cambio y luego se cierra la propuesta). Si el segundo paso fallara, el elemento queda creado y la propuesta sigue «por revisar»; aceptarla otra vez da 409 `NOMBRE_DUPLICADO` y se descarta a mano.
 - Las inconsistencias que el modelo menciona por su cuenta no se muestran: se muestran solo las que calcula el backend (deterministas).
+
+## v1.1 · Respuestas que fallaban con «La ayuda automática no respondió esta vez»
+
+**Causa.** Cada consulta del asistente pesaba unos 6.000 tokens de entrada y la salida era larga (el modo estricto obliga a escribir todos los campos de cada propuesta: ~35 por propuesta). Con el límite de tokens por minuto del plan del proveedor, dos respuestas seguidas lo superaban (`llamadas_llm.tipo_error = 'rate_limit'`); también podía cortarse la salida (`salida_invalida`).
+
+**Cambios.**
+- Salida más corta: cada propuesta trae solo el bloque de su tipo (`elemento`, `flujo` o `actividad`) y los otros van en `null`; máximo 6 propuestas (`schemas/asistente_rat.py`, `anclaje.plano()`).
+- Entrada más corta: los catálogos van solo con sus códigos (`contexto.catalogos_texto`). Prompt `asistente_rat/1.1.0`.
+- Si la ayuda falla por algo pasajero, **la pregunta no avanza ni se guarda nada**: 503 `AYUDA_NO_DISPONIBLE` con `tipo_error`, la cuota se devuelve y el rechazo queda en la bitácora (`error_ia`). La pantalla ofrece **Volver a intentar** o **Guardar sin ayuda** (`sin_ia: true`, guarda la respuesta anonimizada y avanza). La IA deshabilitada o la cuota diaria agotada siguen degradando sin error (C6).

@@ -266,6 +266,10 @@
 .barraCaja { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; justify-content: flex-end; padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--line); }
 .contador { margin-right: auto; font-size: var(--fs-xs); color: var(--text-subtle); }
 
+.fallaIa { display: grid; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-left: 3px solid var(--medio); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: var(--medio-soft); }
+.fallaIa p { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--fs-sm); color: var(--text); line-height: 1.5; }
+.fallaIa p svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--medio); }
+
 .fin { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4); border-radius: var(--radius-md); background: var(--accent-soft); }
 .fin svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
 .fin p { margin: 4px 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
