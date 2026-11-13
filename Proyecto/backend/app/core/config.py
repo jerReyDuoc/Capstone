@@ -361,6 +361,27 @@ class Settings(BaseSettings):
     # Envíos del informe por correo por empresa y día.
     RAT_CORREOS_DIA_EMPRESA: int = 5
 
+    # ------------------------------------------------ HU-41: registro de tratamiento de la propia plataforma
+    # El mapa, el RAT y el RoPA de ComplianceAI se generan desde app/core/catalogo_datos_personales.py y
+    # estos datos del despliegue (nada de esto cambia cómo se tratan los datos: solo cómo se describen).
+    # Razón social y RUT de Therion Labs para la portada de los informes (el RUT es opcional).
+    THERION_RAZON_SOCIAL: str = "Therion Labs SpA"
+    THERION_RUT: str | None = None
+    # País (ISO 3166-1 alfa-2) donde se alojan la base de datos, los archivos y las colas. Staging y
+    # producción viven en Azure North Central US.
+    PLATAFORMA_PAIS_ALOJAMIENTO: str = "US"
+    # Proveedor de correo con CORREO_MODO=smtp: nombre, país y garantía de la transferencia internacional
+    # (código: pais_adecuado, clausulas_contractuales, normas_corporativas, consentimiento, excepcion_legal
+    # o ninguna). Vacío = sin declarar: el registro lo muestra como hallazgo de la revisión interna.
+    CORREO_PROVEEDOR_NOMBRE: str | None = None
+    CORREO_PROVEEDOR_PAIS: str | None = None
+    CORREO_PROVEEDOR_GARANTIA: str | None = None
+    # Proveedores con el acuerdo de tratamiento de datos confirmado por el área legal, separados por coma
+    # (azure, llm, correo, verificacion). Los que falten salen "por confirmar".
+    PROVEEDORES_CONTRATO_CONFIRMADO: str = ""
+    # Emisiones nuevas del RAT o del RoPA de la plataforma por día (las reutilizadas no cuentan).
+    PLATAFORMA_INFORMES_DIA: int = 20
+
     # HU-09: log inmutable (audit_log) para el Auditor Externo (Ley 21.719, art. 14 ter)
     # Filas por lote sellado. Cada lote recibe un hash SHA-256 que un tercero puede
     # recalcular con el archivo exportado (verificación de integridad por hash en lote).
@@ -518,6 +539,23 @@ class Settings(BaseSettings):
             raise ValueError("ASISTENTE_MAX_DENSIDAD_PII (0-100) o ASISTENTE_MAX_PENDIENTES (1-500) fuera de rango (HU-39).")
         if not 0 <= self.ASISTENTE_TEMPERATURA <= 1:
             raise ValueError("ASISTENTE_TEMPERATURA debe estar entre 0 y 1 (HU-39).")
+        # HU-41: datos del despliegue para el registro de la plataforma
+        from app.domain import catalogo_tratamiento as _cat_mapa
+        for nombre in ("PLATAFORMA_PAIS_ALOJAMIENTO", "CORREO_PROVEEDOR_PAIS"):
+            valor = getattr(self, nombre)
+            if valor is not None:
+                valor = valor.strip().upper() or None
+                setattr(self, nombre, valor)
+            if valor is not None and valor not in _cat_mapa.NOMBRE_PAIS:
+                raise ValueError(f"{nombre} debe ser un código de país de dos letras de la lista del mapa (HU-41).")
+        if not self.PLATAFORMA_PAIS_ALOJAMIENTO:
+            raise ValueError("PLATAFORMA_PAIS_ALOJAMIENTO es obligatorio (HU-41).")
+        if self.CORREO_PROVEEDOR_GARANTIA and self.CORREO_PROVEEDOR_GARANTIA not in _cat_mapa.GARANTIAS:
+            raise ValueError("CORREO_PROVEEDOR_GARANTIA debe ser un código de garantía del mapa (HU-41).")
+        if not 1 <= self.PLATAFORMA_INFORMES_DIA <= 500:
+            raise ValueError("PLATAFORMA_INFORMES_DIA debe estar entre 1 y 500 (HU-41).")
+        if not self.THERION_RAZON_SOCIAL.strip():
+            raise ValueError("THERION_RAZON_SOCIAL no puede quedar vacía (HU-41).")
         if not 0 < len(self.MATRIZ_VERSION.strip()) <= 30:
             raise ValueError("MATRIZ_VERSION debe tener entre 1 y 30 caracteres (HU-21).")
         # En desarrollo la falta de clave se detecta al crear el gateway (worker),

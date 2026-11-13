@@ -66,6 +66,7 @@ from app.domain.models.ropa import RopaDatos, RopaInforme  # HU-37
 from app.domain.models.asistente import (  # HU-39
     AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion,
 )
+from app.domain.models.plataforma import PlataformaInforme, PlataformaRegistro  # HU-41
 
 __all__ = [
     "BorradorDocumento",
@@ -131,4 +132,6 @@ __all__ = [
     "AsistenteMensaje",
     "AsistenteDocumento",
     "AsistentePropuesta",
+    "PlataformaInforme",
+    "PlataformaRegistro",
 ]

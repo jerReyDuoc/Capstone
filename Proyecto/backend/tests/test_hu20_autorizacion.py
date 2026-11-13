@@ -670,6 +670,19 @@ RUTAS_RETENCION = [
 ]
 
 
+# HU-41: registro de tratamiento de la propia plataforma, solo admin. Sus pruebas de 401, 403 y 2xx
+# están en tests/test_hu41_registro_plataforma.py::test_api_solo_admin.
+RUTAS_PRIVACIDAD_PLATAFORMA = [
+    ("GET", "/api/admin/privacidad-plataforma"),
+    ("GET", "/api/admin/privacidad-plataforma/actividades/{clave}"),
+    ("PATCH", "/api/admin/privacidad-plataforma/ropa-datos"),
+    ("POST", "/api/admin/privacidad-plataforma/informes"),
+    ("GET", "/api/admin/privacidad-plataforma/informes/verificacion"),
+    ("GET", "/api/admin/privacidad-plataforma/informes/{informe_id}/descarga"),
+    ("GET", "/api/admin/privacidad-plataforma/mapa/descarga"),
+]
+
+
 # ===================================================================== C3: cobertura de la matriz
 def test_todas_las_rutas_estan_clasificadas():
     """
@@ -691,6 +704,7 @@ def test_todas_las_rutas_estan_clasificadas():
         | set(RUTAS_HU24)
         | set(RUTAS_RUBROS)
         | set(RUTAS_RETENCION)
+        | set(RUTAS_PRIVACIDAD_PLATAFORMA)
         | {("GET", "/api/evaluaciones"), ("GET", "/api/evaluaciones/benchmark")}
     )
     assert existentes - clasificadas == set(), "Rutas sin clasificar en HU-20"

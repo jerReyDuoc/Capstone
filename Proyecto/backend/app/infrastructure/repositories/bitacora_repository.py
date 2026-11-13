@@ -173,6 +173,13 @@ class Accion:
     ASISTENTE_PROPUESTA_ACEPTADA = "asistente.propuesta_aceptada"
     ASISTENTE_PROPUESTA_EDITADA = "asistente.propuesta_editada"      # aceptada con cambios del usuario
     ASISTENTE_PROPUESTA_DESCARTADA = "asistente.propuesta_descartada"
+    # HU-41: registro de tratamiento de la propia plataforma (RAT y RoPA de ComplianceAI). El detalle lleva
+    # el tipo, la versión, si es oficial, conteos y prefijos de huellas; nunca los datos de contacto del RoPA.
+    PLATAFORMA_INFORME_GENERADO = "plataforma.informe_generado"
+    PLATAFORMA_INFORME_DESCARGADO = "plataforma.informe_descargado"
+    PLATAFORMA_INFORME_VERIFICADO = "plataforma.informe_verificado"
+    PLATAFORMA_MAPA_DESCARGADO = "plataforma.mapa_descargado"
+    PLATAFORMA_ROPA_DATOS_ACTUALIZADOS = "plataforma.ropa_datos_actualizados"   # detalle: campos cambiados
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -250,6 +257,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RAT_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
     Accion.ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,      # HU-37
     Accion.ASISTENTE_PROPUESTA_DESCARTADA: Categoria.MODIFICACION,  # HU-39
+    Accion.PLATAFORMA_ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,  # HU-41
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -276,6 +284,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.ASISTENTE_SESION_CREADA: Categoria.CREACION,          # HU-39
     Accion.ASISTENTE_PROPUESTA_ACEPTADA: Categoria.CREACION,
     Accion.ASISTENTE_PROPUESTA_EDITADA: Categoria.CREACION,
+    Accion.PLATAFORMA_INFORME_GENERADO: Categoria.CREACION,      # HU-41 (descargas y verificaciones: acceso)
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

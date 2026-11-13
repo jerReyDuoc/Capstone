@@ -72,6 +72,8 @@ B_TUTOR = "Ejecución del contrato del servicio pagado: Agente IA Tutor del pane
 C_AUDITORIA = ("Mientras exista el registro del audit_log (inmutable, HU-09). Plazo de conservación "
                "y purga por lote sellado: pendiente de definir por el PO")
 C_AUDITOR = "Mientras la cuenta del auditor exista (vence sola; el admin puede desactivarla)"
+# HU-41: datos de contacto de Therion Labs para su propio RoPA (fila única que se reemplaza al editarla)
+C_REGISTRO_PLATAFORMA = "Mientras Therion Labs mantenga el registro de la plataforma (se reemplaza al actualizarlo)"
 
 
 @dataclass(frozen=True)
@@ -727,9 +729,337 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
+    # ------------------------------------------------------------ HU-41: registro de la propia plataforma
+    # Cada emisión del RAT o del RoPA de ComplianceAI: código, versión, huella, cifras y los archivos
+    # cifrados (nombre UUID en STORAGE_DIR). Sin datos de titulares; los textos se revisan igual ("pii").
+    "plataforma_informe": {
+        **_sin_dp("id", "tipo", "codigo", "version", "huella", "oficial", "actividades", "aviso_version",
+                  "archivo_pdf", "archivo_xlsx", "hash_pdf", "hash_xlsx", "nombre_pdf", "nombre_xlsx", "fecha"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("motivos_borrador", "resumen")},
+        "emitido_por_admin_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué administrador emitió cada informe de la plataforma (HU-41)",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+    },
+    # Datos de contacto de Therion Labs y de su delegado para el RoPA de la plataforma (mismo formato y
+    # validación que ropa_datos del cliente). Cifrados en reposo y nunca en la bitácora.
+    "plataforma_registro": {
+        **_sin_dp("id", "fecha_actualizacion"),
+        "ropa_datos": Dato(
+            CONTACTO, CIFRADO,
+            finalidad="Datos de contacto de Therion Labs y de su delegado de protección de datos que exige el "
+                      "RoPA de la plataforma (HU-41)",
+            base=B_RESPONSABILIDAD, conservacion=C_REGISTRO_PLATAFORMA, escaneo="cifrado",
+        ),
+        "actualizado_por_admin_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué administrador actualizó los datos del RoPA de la plataforma",
+            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+        ),
+    },
 }
 
 
 def columnas_personales() -> list[tuple[str, str, Dato]]:
     """[(tabla, columna, dato)] de las columnas con datos personales, en orden estable."""
     return [(t, c, d) for t, cols in CATALOGO.items() for c, d in cols.items() if d.es_personal]
+
+
+# =============================================================================================
+# HU-41 · Registro de tratamiento de la PROPIA plataforma, generado desde este inventario
+# =============================================================================================
+# El mapa de datos, el RAT y el RoPA de ComplianceAI salen de aquí (app/application/plataforma/):
+#
+#   - cada tabla del modelo pertenece a UNA actividad de tratamiento o está en TABLAS_SIN_TRATAMIENTO
+#     (catálogos y agregados sin datos personales). tests/test_hu41_registro_plataforma.py falla si
+#     aparece una tabla nueva sin decidir dónde va, o si una tabla con datos personales queda fuera;
+#   - las categorías de datos de cada actividad se calculan de sus columnas personales;
+#   - los plazos se calculan agrupando esas columnas por su conservación: cada conservación que
+#     nombra un ajuste (AJUSTE_POR_CONSERVACION) toma su VALOR VIGENTE al generar. Nunca se escribe
+#     un número a mano, así el registro no puede quedar distinto de lo que ejecuta la retención.
+#
+# Nada de esto cambia lo que la plataforma hace con los datos: lo describe.
+
+# Conservación → ajuste que la ejecuta (plazo de titulares: el del panel de retención o el del entorno)
+AJUSTE_POR_CONSERVACION: dict[str, str] = {
+    C_TITULAR: "RETENCION_DATOS_TITULAR_DIAS",
+    C_ARCOP: "RETENCION_ARCOP_CERRADAS_DIAS",
+    C_EVENTOS: "RETENCION_EVENTOS_SEGURIDAD_DIAS",
+    C_TUTOR: "TUTOR_RETENCION_DIAS",
+    C_CLIENTE: "CONTRATO_GRACIA_DIAS",
+}
+# Desde cuándo se cuenta cada plazo (códigos de app/domain/rat/catalogo.py: INICIOS_PLAZO)
+INICIO_POR_AJUSTE: dict[str, str] = {
+    "RETENCION_DATOS_TITULAR_DIAS": "cumplida_finalidad",       # después de vencer el acceso
+    "RETENCION_ARCOP_CERRADAS_DIAS": "cumplida_finalidad",      # después del cierre de la solicitud
+    "RETENCION_EVENTOS_SEGURIDAD_DIAS": "cumplida_finalidad",   # después de revisado el evento
+    "TUTOR_RETENCION_DIAS": "ultima_interaccion",               # sin actividad en la conversación
+    "CONTRATO_GRACIA_DIAS": "termino_relacion",                 # después del término del contrato
+}
+# Nombre en lenguaje simple de cada ajuste (pantalla e informes; el nombre técnico va aparte)
+NOMBRE_AJUSTE: dict[str, str] = {
+    "RETENCION_DATOS_TITULAR_DIAS": "Retención de datos de encuestados e invitados",
+    "RETENCION_ARCOP_CERRADAS_DIAS": "Retención de solicitudes de derechos cerradas",
+    "RETENCION_EVENTOS_SEGURIDAD_DIAS": "Retención de eventos de seguridad revisados",
+    "TUTOR_RETENCION_DIAS": "Retención de conversaciones del tutor",
+    "CONTRATO_GRACIA_DIAS": "Plazo de gracia al terminar el contrato",
+}
+# Conservación sin número (depende de un evento o está pendiente): texto corto para el registro
+TEXTO_SIN_PLAZO: dict[str, str] = {
+    C_PRUEBA: "mientras exista el registro, como prueba del consentimiento o de la atención del derecho",
+    C_ADMIN: "mientras la cuenta interna esté activa",
+    C_AUDITOR: "mientras exista la cuenta del auditor externo",
+    C_SESION: "mientras exista la cuenta (depuración de sesiones y enlaces vencidos por definir)",
+    C_CONTRATACION: "hasta traspasar la evaluación a la empresa o descartar la solicitud",
+    C_AUDITORIA: "mientras exista el registro de auditoría (inmutable; plazo de purga por definir)",
+    C_REGISTRO_PLATAFORMA: "mientras Therion Labs mantenga el registro de la plataforma",
+}
+
+# Base de licitud del inventario → código del catálogo del RAT
+BASE_RAT: dict[str, str] = {
+    B_CONSENTIMIENTO: "consentimiento",
+    B_CONSENTIMIENTO_CONTRATACION: "consentimiento",
+    B_OBLIGACION_ARCOP: "obligacion_legal",
+    B_RESPONSABILIDAD: "obligacion_legal",
+    B_SEGURIDAD: "interes_legitimo",
+    B_CONTRATO: "contrato",
+    B_CONTRATO_CLIENTE: "contrato",
+    B_TUTOR: "contrato",
+}
+
+# Categoría del inventario → categoría de datos del catálogo común del mapa y del RAT
+CATEGORIA_RAT: dict[str, str] = {
+    CONTACTO: "contacto",
+    CREDENCIAL: "credenciales",
+    METADATO: "navegacion",          # fechas, accesos, IP e identificadores ligados a un titular
+    SEUDONIMO: "navegacion",         # huellas y códigos ligados a un titular
+    TEXTO_LIBRE: "comunicaciones",   # lo que escribe el titular (puede traer cualquier dato)
+    DERIVADO_IA: "comunicaciones",   # salida del modelo sobre esos textos (ya anonimizados)
+}
+CATEGORIA_RAT_COLUMNA: dict[tuple[str, str], str] = {
+    ("usuario_definitivo", "nombre"): "identificacion",
+    ("solicitud_contratacion", "nombre_contacto"): "identificacion",
+    ("solicitud_contratacion", "cargo_contacto"): "laborales",
+}
+
+# Catálogos y agregados sin datos personales: no forman parte de ninguna actividad
+TABLAS_SIN_TRATAMIENTO: frozenset[str] = frozenset({
+    "dominio", "rubro", "ruta_formativa", "preguntas_filtro", "catalogo_brechas", "matriz_controles",
+    "matriz_version", "regla_aplicabilidad", "benchmark", "resumen", "leccion_formativa", "pregunta_verificacion",
+})
+
+
+@dataclass(frozen=True)
+class ElementoPlataforma:
+    """Un sistema o una base propia de la plataforma (mapa de datos). `categorias`: las que puede recibir
+    (None = todas las de la actividad que lo usa)."""
+    clave: str
+    tipo: str                         # sistema | base_datos
+    subtipo: str
+    nombre: str
+    descripcion: str
+    ubicacion: str                    # "local" (Chile, quien opera) | "alojamiento" (país del alojamiento)
+    proveedor: str | None = None
+    categorias: frozenset[str] | None = None
+
+
+@dataclass(frozen=True)
+class ProveedorPlataforma:
+    """Un tercero que trata datos por cuenta de Therion Labs (encargado del tratamiento)."""
+    clave: str
+    nombre: str
+    subtipo: str
+    descripcion: str
+    pais: str | None                  # None = se toma de la configuración (correo)
+    garantia: str | None              # código de catalogo_tratamiento.GARANTIAS_TRANSFERENCIA
+    categorias: frozenset[str] | None = None
+
+
+ELEMENTOS_PLATAFORMA: tuple[ElementoPlataforma, ...] = (
+    ElementoPlataforma("plataforma", "sistema", "aplicacion_propia", "Plataforma ComplianceAI",
+                       "Sitio web, paneles, API y tareas programadas, operados por Therion Labs desde Chile",
+                       "local"),
+    ElementoPlataforma("base_datos", "base_datos", "relacional", "Base de datos de la plataforma",
+                       "PostgreSQL administrado en la nube", "alojamiento", "Microsoft Azure"),
+    ElementoPlataforma("archivos", "base_datos", "nube_almacenamiento", "Archivos cifrados",
+                       "Evidencias, informes y documentos generados, cifrados en reposo", "alojamiento",
+                       "Microsoft Azure", frozenset({"comunicaciones"})),
+    ElementoPlataforma("colas", "base_datos", "otro", "Colas y límites de uso",
+                       "Tareas programadas y contadores de uso por dirección IP (temporales)", "alojamiento",
+                       "Microsoft Azure", frozenset({"navegacion"})),
+)
+
+PROVEEDORES_PLATAFORMA: tuple[ProveedorPlataforma, ...] = (
+    ProveedorPlataforma("azure", "Microsoft Azure", "proveedor_nube",
+                        "Alojamiento de la plataforma, la base de datos, los archivos y las colas",
+                        "US", "clausulas_contractuales"),
+    ProveedorPlataforma("llm", "Groq", "proveedor_ia",
+                        "Modelo de lenguaje: recibe los textos ya anonimizados", "US", "clausulas_contractuales",
+                        frozenset({"comunicaciones"})),
+    ProveedorPlataforma("correo", "Proveedor de correo (SMTP)", "proveedor_servicios",
+                        "Envío de enlaces de activación y recuperación, avisos e informes por correo",
+                        None, None, frozenset({"contacto", "identificacion", "comunicaciones"})),
+    ProveedorPlataforma("verificacion", "Cloudflare Turnstile", "proveedor_servicios",
+                        "Verificación anti-bots de los formularios públicos (recibe la IP y datos del navegador)",
+                        "US", "clausulas_contractuales", frozenset({"navegacion"})),
+)
+
+
+@dataclass(frozen=True)
+class ActividadPlataforma:
+    clave: str
+    nombre: str
+    area: str
+    descripcion: str
+    tablas: tuple[str, ...]
+    finalidades: tuple[str, ...]
+    base_licitud: str                       # código del catálogo del RAT
+    fuentes: tuple[tuple[str, str], ...]    # (tipo, detalle)
+    titulares: tuple[str, ...]              # códigos de catalogo_tratamiento.CATEGORIAS_TITULARES
+    elementos: tuple[str, ...]              # claves de ELEMENTOS_PLATAFORMA y PROVEEDORES_PLATAFORMA
+    medidas: tuple[str, ...]                # códigos de app/domain/rat/catalogo.py: MEDIDAS_SEGURIDAD
+    interes_legitimo: str | None = None
+    ambito_nota: str | None = None
+
+
+_AMBITO = "Titulares en Chile; la plataforma se aloja en la nube del proveedor de alojamiento"
+_BASE_COMUN = ("plataforma", "base_datos", "azure")
+
+# Las 8 actividades que exige la historia + las herramientas de registro de los clientes (D2)
+ACTIVIDADES_PLATAFORMA: tuple[ActividadPlataforma, ...] = (
+    ActividadPlataforma(
+        "encuesta_publica", "Encuesta pública y evaluación de madurez", "Producto",
+        "Personas que responden la evaluación gratuita o invitada: correo opcional, clave para retomar, "
+        "justificaciones y su revisión por la capa de IA.",
+        ("usuario_temporal", "evaluacion", "respuestas", "respuestas_filtro", "sanitizaciones", "llamadas_llm"),
+        ("Evaluar la madurez de gobernanza de IA de la organización que responde",
+         "Permitir retomar la evaluación y enviar el informe al correo indicado",
+         "Atender los derechos de quien respondió"),
+        "consentimiento", (("titular", "Formulario de la encuesta"),), ("usuarios",),
+        _BASE_COMUN + ("colas", "llm", "correo", "verificacion"),
+        ("cifrado_transito", "cifrado_reposo", "seudonimizacion", "eliminacion_segura", "control_acceso"),
+        ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "contratacion", "Solicitud de contratación", "Comercial",
+        "Datos de quien pide ser contactado para contratar el servicio pagado y su autorización para traspasar "
+        "la evaluación a la empresa.",
+        ("solicitud_contratacion",),
+        ("Contactar a quien pidió contratar el servicio",
+         "Traspasar la evaluación a la empresa cuando se autoriza"),
+        "consentimiento", (("titular", "Formulario de contratación"),), ("prospectos",),
+        _BASE_COMUN + ("colas", "correo", "verificacion"),
+        ("cifrado_transito", "control_acceso", "registro_accesos"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "cuentas", "Cuentas y acceso", "Operaciones",
+        "Cuentas del equipo interno, de los usuarios de las empresas cliente y del auditor externo; sesiones y "
+        "enlaces de activación o recuperación.",
+        ("usuarios_admin", "usuario_definitivo", "token_activacion", "sesion_usuario", "token_recuperacion",
+         "usuario_auditor", "empresa"),
+        ("Permitir el inicio de sesión y la activación de las cuentas",
+         "Detectar accesos indebidos y cerrar sesiones o revocar enlaces"),
+        "contrato", (("titular", "Alta de la cuenta y uso de la plataforma"),
+                     ("generados", "Registros de sesión")),
+        ("trabajadores", "clientes", "contactos_proveedores"),
+        _BASE_COMUN + ("colas", "correo"),
+        ("control_acceso", "registro_accesos", "cifrado_transito", "cifrado_reposo"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "tutor", "Agente IA Tutor y formación", "Producto",
+        "Conversaciones de los usuarios de la empresa con el tutor y el avance de la formación de la empresa.",
+        ("conversacion_tutor", "mensaje_tutor", "avance_formativo"),
+        ("Responder dudas de la ruta formativa de la empresa",
+         "Registrar el avance de la formación y emitir constancias"),
+        "contrato", (("titular", "Mensajes al tutor"), ("generados", "Avance de la formación")), ("clientes",),
+        _BASE_COMUN + ("llm",),
+        ("seudonimizacion", "eliminacion_segura", "cifrado_transito", "control_acceso"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "evidencias", "Evidencias y documentos", "Producto",
+        "Archivos que respaldan cada control, la explicación de la IA y los documentos generados en «Mis "
+        "documentos».",
+        ("evidencias", "documento_empresa"),
+        ("Validar el cumplimiento de cada control con su evidencia",
+         "Guardar los informes y documentos de la empresa"),
+        "contrato", (("titular", "Archivos subidos por el usuario"), ("generados", "Informes de la plataforma")),
+        ("usuarios", "clientes"),
+        _BASE_COMUN + ("archivos", "llm"),
+        ("cifrado_reposo", "seudonimizacion", "cifrado_transito", "control_acceso"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "borradores", "Borradores de cumplimiento", "Producto",
+        "Políticas, avisos de privacidad y evaluaciones de impacto que la empresa revisa antes de consolidarlos.",
+        ("borrador_documento",),
+        ("Preparar los documentos de cumplimiento de la empresa",),
+        "contrato", (("titular", "Contenido que edita la empresa"), ("generados", "Propuesta del Agente IA")),
+        ("clientes",),
+        _BASE_COMUN + ("archivos", "llm"),
+        ("cifrado_reposo", "control_acceso", "cifrado_transito"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "arcop", "Derechos ARCOP", "Privacidad",
+        "Solicitudes de acceso, rectificación, supresión, oposición y portabilidad, y su seguimiento.",
+        ("solicitudes_arcop", "eventos_solicitud_arcop"),
+        ("Atender los derechos de los titulares", "Demostrar que cada solicitud se respondió a tiempo"),
+        "obligacion_legal", (("titular", "Formulario de derechos"),), ("usuarios", "clientes"),
+        _BASE_COMUN,
+        ("cifrado_reposo", "registro_accesos", "control_acceso", "cifrado_transito"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "auditoria", "Auditoría y seguridad", "Seguridad",
+        "Bitácora inmutable de acciones, eventos de intentos de manipulación de la IA y emisiones de este mismo "
+        "registro.",
+        ("audit_log", "audit_log_sello", "eventos_seguridad", "configuracion_retencion", "plataforma_informe",
+         "plataforma_registro"),
+        ("Poder demostrar el cumplimiento (principio de responsabilidad)",
+         "Revisar los intentos de manipulación de la IA"),
+        "obligacion_legal", (("generados", "Registros de la plataforma"),),
+        ("trabajadores", "clientes", "usuarios"),
+        _BASE_COMUN + ("archivos",),
+        ("registro_accesos", "respaldos", "control_acceso", "cifrado_transito"), ambito_nota=_AMBITO),
+    ActividadPlataforma(
+        "herramientas_registro", "Herramientas de registro de las empresas", "Producto",
+        "Mapa de datos, registro de actividades, RoPA y asistente de las empresas cliente, incluido el contacto "
+        "de su delegado de protección de datos.",
+        ("mapa_datos", "mapa_elemento", "mapa_flujo", "mapa_datos_version", "rat_actividad",
+         "rat_actividad_version", "rat_informe", "ropa_datos", "ropa_informe", "asistente_sesion",
+         "asistente_mensaje", "asistente_documento", "asistente_propuesta"),
+        ("Que la empresa mantenga su propio registro de tratamiento y lo presente",),
+        "contrato", (("titular", "Lo que registra la empresa"), ("generados", "Propuestas del asistente")),
+        ("clientes",),
+        _BASE_COMUN + ("archivos", "llm", "correo"),
+        ("cifrado_reposo", "control_acceso", "seudonimizacion", "cifrado_transito"), ambito_nota=_AMBITO),
+)
+
+# Las 8 actividades que exige la historia (criterio 1): la prueba comprueba que existan
+ACTIVIDADES_OBLIGATORIAS = ("encuesta_publica", "contratacion", "cuentas", "tutor", "evidencias", "borradores",
+                            "arcop", "auditoria")
+
+
+def actividad_de_tabla(tabla: str) -> ActividadPlataforma | None:
+    for a in ACTIVIDADES_PLATAFORMA:
+        if tabla in a.tablas:
+            return a
+    return None
+
+
+def categoria_rat(tabla: str, columna: str, dato: Dato) -> str:
+    return CATEGORIA_RAT_COLUMNA.get((tabla, columna)) or CATEGORIA_RAT[dato.categoria]
+
+
+def columnas_de_actividad(act: ActividadPlataforma) -> list[tuple[str, str, Dato]]:
+    """Columnas personales que la plataforma GUARDA para la actividad (las que no se guardan no cuentan)."""
+    return [(t, c, d) for t in act.tablas for c, d in CATALOGO.get(t, {}).items()
+            if d.es_personal and d.tratamiento != NO_SE_GUARDA]
+
+
+def problemas_de_cobertura(tablas: set[str] | frozenset[str] | None = None) -> dict[str, list[str]]:
+    """
+    Qué falta decidir para que el registro de la plataforma cubra el modelo. `tablas` = las del modelo
+    (por defecto, las del inventario). Vacío en todas las claves = todo cubierto.
+    """
+    tablas = set(CATALOGO) if tablas is None else set(tablas)
+    asignadas: dict[str, list[str]] = {}
+    for a in ACTIVIDADES_PLATAFORMA:
+        for t in a.tablas:
+            asignadas.setdefault(t, []).append(a.clave)
+    personales = {t for t, cols in CATALOGO.items() if any(d.es_personal for d in cols.values())}
+    return {
+        "sin_actividad": sorted(t for t in tablas if t not in asignadas and t not in TABLAS_SIN_TRATAMIENTO),
+        "personales_sin_tratamiento": sorted(personales & TABLAS_SIN_TRATAMIENTO),
+        "en_varias": sorted(t for t, acts in asignadas.items() if len(acts) > 1 or t in TABLAS_SIN_TRATAMIENTO),
+        "inexistentes": sorted((set(asignadas) | TABLAS_SIN_TRATAMIENTO) - tablas),
+    }

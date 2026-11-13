@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 13-nov-2026 (HU-37: informe RoPA desde el registro de actividades, en PDF y Excel, como responsable y como encargado) · 12-nov-2026 (HU-36: informe del registro de actividades en PDF y Excel, con código verificable, matriz de riesgos y marca de agua de borrador; mapa de datos con ficha en ventana, asistentes por pasos y guía) |
+| **Última actualización** | 13-nov-2026 (HU-41: registro de tratamiento de la propia plataforma —mapa, RAT y RoPA de ComplianceAI— generado desde el inventario de datos, con revisión interna) · 13-nov-2026 (HU-37: informe RoPA desde el registro de actividades, en PDF y Excel, como responsable y como encargado) · 12-nov-2026 (HU-36: informe del registro de actividades en PDF y Excel, con código verificable, matriz de riesgos y marca de agua de borrador; mapa de datos con ficha en ventana, asistentes por pasos y guía) |
 
 ---
 
@@ -105,6 +105,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Registro de actividades de tratamiento (HU-35) | ✅ Hecho | `/empresa/registro-actividades` (contrato vigente): cada actividad con los 11 campos mínimos del reglamento de la Ley 21.719, medidas de seguridad y rol (responsable o encargado); sistemas, bases, terceros y flujos **elegidos del mapa de datos** (sin doble ingreso) y vuelta automática a revisión cuando el mapa cambia; completitud por actividad y global; estados borrador → en revisión → vigente → archivada con **versiones vigentes inmutables** (trigger) y audit log. Textos legales como propuesta pendiente de validación. Ver [5.18](#518-registro-de-actividades-de-tratamiento-hu-35) y `Extras/Cambios/backend/CAMBIOS_HU35.md` |
 | Informe del registro de actividades (HU-36) | ✅ Hecho | Botón **Informe del registro** en `/empresa/registro-actividades`: PDF (motor de informes de HU-21) y Excel armados en el servidor desde la **versión vigente** de cada actividad, con portada, resumen (actividades, datos sensibles, transferencias internacionales, decisiones automatizadas), detalle por actividad y **matriz de riesgos** 5 × 5 (base de HU-38); fecha, **versión del RAT**, **código verificable** `CIA-REG-AAAA-NNNNNN-D` y aviso legal; ambos en **Mis documentos** y cada emisión, descarga, envío y verificación en el audit log; con actividades no vigentes sale como **borrador** con marca de agua. Envío por correo. Ver [5.19](#519-informe-del-registro-de-actividades-hu-36) |
 | Informe RoPA (HU-37) | ✅ Hecho | Botón **Informe RoPA** en `/empresa/registro-actividades`: una sola pantalla con lo que se incluye (**como responsable** / **como encargado**, según el rol de cada actividad), los datos que el registro no tiene (contacto de la empresa, delegado de protección de datos y organizaciones mandantes, guardados cifrados para la próxima vez), vista previa e historial. PDF y Excel desde la **versión vigente** de cada actividad, con fecha, versión, código `CIA-ROPA-AAAA-NNNNNN-D` y aviso legal; en **Mis documentos** y en el audit log. Ver [5.20](#520-informe-ropa-hu-37) |
+| Privacidad de la plataforma (HU-41) | ✅ Hecho | Panel interno › **Privacidad de la plataforma** (`/admin/privacidad`, solo admin): el mapa de datos, el RAT y el RoPA de ComplianceAI se generan desde `catalogo_datos_personales.py` (9 actividades con finalidad, base y plazo), con los plazos **vigentes** de la retención, los proveedores activos como encargados (país y garantía) y una **revisión interna** con hallazgos. PDF y Excel con los mismos generadores que el cliente y código `CIA-PLAT-REG/ROPA-AAAA-NNNNNN-D`. Ver [5.21](#521-privacidad-de-la-plataforma-hu-41) |
 | Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
@@ -535,6 +536,17 @@ Desde `/empresa/registro-actividades` › **Informe RoPA**, el usuario definitiv
 
 **Mapa de datos (mejoras de usabilidad):** el diagrama va primero y los indicadores debajo; una **guía** compacta indica el siguiente paso; al elegir un recuadro o una flecha se abre su **ficha en una ventana centrada** (con lo que falta completar, conexiones navegables y riesgos); agregar un elemento o un flujo son **asistentes por pasos** con explicaciones, vista previa del recorrido y los riesgos que se detectarán; el inventario tiene vistas por tipo, estado de cada registro y tarjetas en el teléfono. Las ventanas se ajustan al contenido (sin espacio vacío).
 
+### 5.21 Privacidad de la plataforma (HU-41)
+
+El administrador de Therion Labs genera el registro de tratamiento de la **propia** plataforma y lo demuestra con las mismas herramientas que se venden (Panel interno › **Privacidad de la plataforma**).
+
+- **Fuente única** (`app/core/catalogo_datos_personales.py`, sección HU-41): `ACTIVIDADES_PLATAFORMA` (encuesta pública, contratación, cuentas, tutor, evidencias, borradores, ARCOP, auditoría y herramientas de registro de las empresas), `TABLAS_SIN_TRATAMIENTO` (catálogos y agregados), `ELEMENTOS_PLATAFORMA`, `PROVEEDORES_PLATAFORMA` y `AJUSTE_POR_CONSERVACION` (cada conservación enlazada al ajuste que la ejecuta). Las categorías de datos y los plazos salen de las columnas personales de cada tabla.
+- **Generador** (`app/application/plataforma/registro.py`, lógica pura): arma `Elemento`, `Flujo`, contenido de actividad e instantánea con el mismo formato del cliente y usa `rat/analisis.py`, `rat/informe.py`, `pdf_rat`, `xlsx_rat`, `pdf_ropa`, `xlsx_ropa` y `pdf_mapa` sin cambiarlos. El plazo de cada categoría es el **valor vigente** del ajuste (el de titulares, el del panel de retención si se fijó allí); sin valor, queda sin número y se informa.
+- **Proveedores**: Microsoft Azure (alojamiento), Groq (con `LLM_PROVIDER=groq`), proveedor de correo (con `CORREO_MODO=smtp`) y Cloudflare Turnstile (con `TURNSTILE_SECRET_KEY`), como encargados con país y garantía. Los flujos desde la plataforma (operada desde Chile) hacia el alojamiento y los proveedores se calculan como transferencias internacionales. Ajustes nuevos: `THERION_RAZON_SOCIAL`, `THERION_RUT`, `PLATAFORMA_PAIS_ALOJAMIENTO`, `CORREO_PROVEEDOR_NOMBRE/PAIS/GARANTIA`, `PROVEEDORES_CONTRATO_CONFIRMADO`, `PLATAFORMA_INFORMES_DIA`.
+- **Revisión interna** (`app/application/plataforma/revision.py`): cobertura del inventario, reglas de retención desactivadas, plazos pendientes de decisión (registro de auditoría, sesiones, contrataciones descartadas), actividades incompletas, proveedores sin país o garantía, contratos por confirmar, última ejecución de la retención y capa de IA.
+- **Informes**: el RAT es **oficial** solo si todas las actividades están completas; si no, sale como borrador con los motivos exactos. El RoPA (Therion Labs como responsable) pide una vez los datos de contacto (cifrados en `plataforma_registro`). Cada emisión queda en `plataforma_informe` (archivos cifrados en `STORAGE_DIR`, inmutable en PostgreSQL) y en el audit log (`plataforma.*`, sin datos de contacto).
+- **Prueba de cobertura** (`tests/test_hu41_registro_plataforma.py`): falla si una tabla nueva no está en una actividad ni en `TABLAS_SIN_TRATAMIENTO`, si una conservación nombra un ajuste sin enlazarlo o si los plazos generados difieren de los ajustes configurados.
+
 ---
 
 ## 6. Base de datos
@@ -839,6 +851,20 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | GET | `/api/registro-actividades/ropa/{id}/descarga?formato=pdf\|xlsx` | 🏢 | HU-37: descarga de una emisión (410 `ARCHIVO_ELIMINADO`) |
 
 El rol `cliente` (🏢) ve con las rutas 📋 (resumen, comparativa, plan formativo, informe PDF…) solo las evaluaciones migradas a su empresa. HU-30: sin contrato vigente las rutas 🏢 de cursos, remediación y espacio de la empresa responden 403 `CONTRATO_NO_VIGENTE`; lo gratuito y ARCOP (`/api/arcop/solicitudes`, ahora también para el cliente) siguen disponibles, y la constancia se descarga durante el plazo de gracia. Detalle en `Extras/Cambios/backend/CAMBIOS_HU27.md`, `CAMBIOS_HU31.md`, `CAMBIOS_HU28.md` y `CAMBIOS_HU30.md`.
+
+### Privacidad de la plataforma — `/api/admin/privacidad-plataforma` (HU-41)
+
+Solo admin (🛡️). Cada emisión, descarga, verificación y cambio de los datos del RoPA queda en el audit log.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/admin/privacidad-plataforma` | Registro generado del inventario: actividades, mapa, proveedores, plazos vigentes, revisión interna, datos del RoPA y emisiones |
+| GET | `/api/admin/privacidad-plataforma/actividades/{clave}` | Ficha de una actividad (404 `ACTIVIDAD_NO_ENCONTRADA`) |
+| PATCH | `/api/admin/privacidad-plataforma/ropa-datos` | Contacto de Therion Labs y delegado (solo los campos enviados; 422 `DATO_INVALIDO` con `campo`) |
+| POST | `/api/admin/privacidad-plataforma/informes` | `{tipo: rat\|ropa, forzar?}`: PDF y Excel con el mismo código (200 si reutiliza; 409 `ROPA_DATOS_INCOMPLETOS`; 429 `LIMITE_INFORMES`) |
+| GET | `/api/admin/privacidad-plataforma/informes/verificacion?codigo=…` | Confirma un código `CIA-PLAT-…` y si el registro sigue igual |
+| GET | `/api/admin/privacidad-plataforma/informes/{id}/descarga?formato=pdf\|xlsx` | Descarga una emisión (410 `ARCHIVO_ELIMINADO`) |
+| GET | `/api/admin/privacidad-plataforma/mapa/descarga` | PDF del mapa de datos de la plataforma |
 
 ### Matriz normativa — `/api/admin/matriz` (HU-24)
 
@@ -1226,6 +1252,7 @@ Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**:
 | `test_t06_minimizacion.py` | 15 | T-06: inventario de datos personales, plazos de conservación y validaciones de producción |
 | `test_hu20_autorizacion.py` | 15 (75 casos) | HU-20: matriz de autorización **por endpoint** (6 actores), solo-admin, rutas públicas y una prueba que falla si aparece una ruta sin clasificar |
 | `test_hu23_semilla_staging.py` | 5 | HU-23: datos semilla de staging (administrador sin teclado, evaluaciones sintéticas con k ≥ 5 en el benchmark, idempotencia y `--eliminar`) |
+| `test_hu41_registro_plataforma.py` | 28 | HU-41: actividades desde el inventario, cobertura (tabla nueva sin actividad = falla), plazos iguales a los ajustes configurados, proveedores como encargados con país y garantía, revisión interna, RAT y RoPA con los generadores del cliente y API solo admin |
 | `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
 
 Soporte: `conftest.py` (variables mínimas y storage temporal), `_api_harness.py` (siembra datos de prueba), `_capa_ia_fakes.py` (dobles de prueba), `_corpus_ner.py` (corpus sintético etiquetado para medir el NER).

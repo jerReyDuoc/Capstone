@@ -4,6 +4,7 @@
  * - Lee el token del admin de su cookie httpOnly y lo envía como Bearer.
  * - Solo reenvía la lista blanca de lib/servidor/proxyAdmin.ts (lo demás → 404).
  * - Todo lo que no es GET exige mismo origen (CSRF) y cuerpo JSON acotado.
+ * - HU-41: las descargas marcadas como binarias (PDF y Excel) pasan tal cual, con su Content-Disposition.
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -59,6 +60,22 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
     throw e;
   }
   if (!res.ok) return errorAdminDesdeBackend(res);
+  if (permiso.binario) {
+    const tipo = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!(permiso.tipos ?? ["application/pdf"]).includes(tipo)) {
+      return respuestaError(502, { codigo: "RESPUESTA_INVALIDA", mensaje: "El servidor no devolvió un documento válido." });
+    }
+    const disposicion = res.headers.get("content-disposition");
+    return new NextResponse(await res.arrayBuffer(), {
+      status: 200,
+      headers: {
+        "Content-Type": tipo,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),
+      },
+    });
+  }
   return new NextResponse(await res.text(), {
     status: res.status,
     headers: { "Content-Type": res.headers.get("content-type") ?? "application/json", "Cache-Control": "no-store" },

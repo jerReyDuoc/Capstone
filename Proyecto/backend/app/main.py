@@ -22,6 +22,7 @@ from app.api.routes import registro_actividades  # HU-35: registro de actividade
 from app.api.routes import informe_rat  # HU-36: informe del RAT (PDF y XLSX)
 from app.api.routes import informe_ropa  # HU-37: informe RoPA desde el registro (PDF y XLSX)
 from app.api.routes import asistente_rat  # HU-39: asistente de IA para el mapa de datos y el RAT
+from app.api.routes import admin_privacidad  # HU-41: registro de tratamiento de la propia plataforma
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ app.include_router(registro_actividades.router)
 app.include_router(informe_rat.router)
 app.include_router(informe_ropa.router)
 app.include_router(asistente_rat.router)
+app.include_router(admin_privacidad.router)
 
 @app.get("/health")
 async def health():

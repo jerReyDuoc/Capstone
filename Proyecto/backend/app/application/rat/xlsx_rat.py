@@ -196,9 +196,7 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
     fila += 1
     if inf.borrador:
         poner(ws, fila, 1, "Por qué es un borrador", f_borrador, fill_borrador)
-        poner(ws, fila, 2, "\n".join(list(inf.motivos_borrador) + [
-            "Para emitir el informe oficial, deja vigentes todas las actividades del registro y vuelve a generarlo."]),
-            f_normal, fill_borrador)
+        poner(ws, fila, 2, "\n".join(list(inf.motivos_borrador) + [inf.nota_borrador]), f_normal, fill_borrador)
         alto_fila(ws, fila, ["", "\n".join(inf.motivos_borrador) + "\nx"], w)
         fila += 2
     poner(ws, fila, 1, inf.aviso.titulo, f_negrita, fill_aviso)

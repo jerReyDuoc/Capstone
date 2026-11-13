@@ -68,6 +68,9 @@ AVISO_RAT = AvisoInforme(
 
 USO_PREVISTO = ("Agencia de Protección de Datos Personales · certificador del modelo de prevención de "
                 "infracciones · directorio")
+# Qué hacer para que el informe deje de ser borrador (portada del PDF y del XLSX). HU-41 lo reemplaza en el
+# registro de la propia plataforma, que no se edita en pantalla sino en el inventario de datos.
+NOTA_BORRADOR = "Para emitir el informe oficial, deja vigentes todas las actividades del registro y vuelve a generarlo."
 
 
 # ============================================================ entradas
@@ -148,6 +151,7 @@ class InformeRat:
     codigo: str | None = None
     version_rat: int | None = None
     archivadas: int = 0
+    nota_borrador: str = NOTA_BORRADOR
 
     def con_emision(self, codigo: str, version_rat: int) -> "InformeRat":
         return replace(self, codigo=codigo, version_rat=version_rat)
@@ -476,7 +480,7 @@ def resumen_publico(inf: InformeRat) -> dict:
 
 
 __all__ = [
-    "AVISO_RAT", "USO_PREVISTO", "FuenteActividad", "ActividadInforme", "InformeRat", "armar", "codigo",
+    "AVISO_RAT", "USO_PREVISTO", "NOTA_BORRADOR", "FuenteActividad", "ActividadInforme", "InformeRat", "armar", "codigo",
     "leer_codigo", "huella", "huella_legible", "campos_legibles", "resumen_publico", "texto_plazo",
     "texto_fuente", "texto_rol", "texto_base", "texto_decisiones", "texto_medidas", "medidas_por_grupo",
     "texto_destinatarios", "texto_transferencias", "texto_ambito",

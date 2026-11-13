@@ -11,7 +11,12 @@ export type MetodoAdmin = "GET" | "POST" | "PATCH";
 
 const ENTIDADES_MATRIZ = "(controles|brechas|rutas|preguntas-filtro)";
 
-const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
+// HU-41: las descargas (PDF y Excel del registro de la plataforma) pasan como binario, con su Content-Disposition
+export const TIPOS_PDF_XLSX = ["application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] as const;
+
+type Regla = { metodo: MetodoAdmin; patron: RegExp; binario?: boolean; tipos?: readonly string[] };
+
+const REGLAS: Regla[] = [
   // Bandeja de solicitudes de contratación (HU-31)
   { metodo: "GET", patron: /^admin\/contrataciones$/ },
   { metodo: "GET", patron: /^admin\/contrataciones\/\d{1,9}$/ },
@@ -61,18 +66,29 @@ const REGLAS: { metodo: MetodoAdmin; patron: RegExp }[] = [
   { metodo: "PATCH", patron: /^admin\/retencion$/ },
   { metodo: "GET", patron: /^admin\/retencion\/(vista-previa|ejecuciones)$/ },
   { metodo: "POST", patron: /^admin\/retencion\/(simulacion|ejecuciones)$/ },
+  // HU-41: registro de tratamiento de la propia plataforma (mapa, RAT, RoPA y revisión interna)
+  { metodo: "GET", patron: /^admin\/privacidad-plataforma$/ },
+  { metodo: "GET", patron: /^admin\/privacidad-plataforma\/actividades\/[a-z_]{1,40}$/ },
+  { metodo: "PATCH", patron: /^admin\/privacidad-plataforma\/ropa-datos$/ },
+  { metodo: "POST", patron: /^admin\/privacidad-plataforma\/informes$/ },
+  { metodo: "GET", patron: /^admin\/privacidad-plataforma\/informes\/verificacion$/ },
+  { metodo: "GET", patron: /^admin\/privacidad-plataforma\/informes\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_PDF_XLSX },
+  { metodo: "GET", patron: /^admin\/privacidad-plataforma\/mapa\/descarga$/, binario: true, tipos: ["application/pdf"] },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
 
-export type AutorizacionAdmin = { ok: true; ruta: string } | { ok: false };
+export type AutorizacionAdmin =
+  | { ok: true; ruta: string; binario?: boolean; tipos?: readonly string[] }
+  | { ok: false };
 
 export function autorizarRutaAdmin(metodo: string, segmentos: string[]): AutorizacionAdmin {
   // HU-24: hasta 6 segmentos (admin/matriz/borrador/controles/12/aplicabilidad)
   if (!segmentos.length || segmentos.length > 6 || !segmentos.every((s) => SEGMENTO.test(s))) return { ok: false };
   const ruta = segmentos.join("/");
-  const permitida = REGLAS.some((r) => r.metodo === metodo && r.patron.test(ruta));
-  return permitida ? { ok: true, ruta } : { ok: false };
+  const regla = REGLAS.find((r) => r.metodo === metodo && r.patron.test(ruta));
+  if (!regla) return { ok: false };
+  return regla.binario ? { ok: true, ruta, binario: true, tipos: regla.tipos } : { ok: true, ruta };
 }
 
 const QUERY_ADMIN = new Map<string, RegExp>([
@@ -100,6 +116,9 @@ const QUERY_ADMIN = new Map<string, RegExp>([
   ["accion", /^[a-z_.]{1,60}$/],
   // HU-25: plazo a previsualizar (días)
   ["dias", /^\d{1,5}$/],
+  // HU-41: código verificable de un informe de la plataforma y formato de descarga
+  ["codigo", /^[A-Za-z0-9-]{10,45}$/],
+  ["formato", /^(pdf|xlsx)$/],
 ]);
 
 export function filtrarQueryAdmin(params: URLSearchParams): string {

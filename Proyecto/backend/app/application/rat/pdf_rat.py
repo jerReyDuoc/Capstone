@@ -86,8 +86,7 @@ def generar_pdf_rat(inf: I.InformeRat) -> bytes:
     if inf.borrador:
         historia += [M.caja_alerta(
             "BORRADOR: este informe no corresponde a una versión oficial del registro",
-            list(inf.motivos_borrador) + ["Para emitir el informe oficial, deja vigentes todas las actividades del "
-                                          "registro y vuelve a generarlo."], ancho, e), Spacer(1, 8)]
+            list(inf.motivos_borrador) + [inf.nota_borrador], ancho, e), Spacer(1, 8)]
 
     estado = (f'<font color="{M.MARCA_AGUA}">Borrador</font>' if inf.borrador
               else f'<font color="{M.VERDE}">Oficial</font>')

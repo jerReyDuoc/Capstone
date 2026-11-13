@@ -2,7 +2,8 @@
 
 /**
  * Correcciones 05-11 · Barra común del panel interno (Empresas cliente, Matriz normativa,
- * Bandeja de revisión y, desde HU-32, Solicitudes ARCOP). Antes cada página tenía su copia.
+ * Bandeja de revisión y, desde HU-32, Solicitudes ARCOP; HU-41: Privacidad de la plataforma). Antes cada
+ * página tenía su copia.
  *
  *  - "Actualizar" vuelve a pedir los datos de la sección abierta sin recargar la página (F5):
  *    no se pierde la pestaña, el filtro ni lo que se está escribiendo. Muestra la hora de la
@@ -27,6 +28,8 @@ const SECCIONES = [
   { href: "/admin/arcop", texto: "Solicitudes ARCOP" },
   // HU-25: plazo de retención de usuarios temporales y ejecuciones de la anonimización
   { href: "/admin/retencion", texto: "Retención de datos" },
+  // HU-41: registro de tratamiento de la propia plataforma (mapa, RAT, RoPA y revisión interna)
+  { href: "/admin/privacidad", texto: "Privacidad de la plataforma" },
 ] as const;
 
 const MIN_ENTRE_AUTOMATICAS_MS = 30_000;
