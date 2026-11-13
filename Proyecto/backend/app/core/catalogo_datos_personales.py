@@ -644,10 +644,52 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # resumen con nombres de categorías) se revisan igual en la auditoría de contenido ("pii").
     "rat_informe": {
         **_sin_dp("id", "empresa_id", "codigo", "version_rat", "huella", "borrador", "actividades",
-                  "aviso_version", "fecha", "documento_pdf_id", "documento_xlsx_id"),
+                  "aviso_version", "fecha", "documento_pdf_id", "documento_xlsx_id",
+                  "revision_id"),  # HU-40: la revisión interna que dejó constancia de esa versión
         **{c: Dato(SIN_DP, escaneo="pii") for c in ("motivos_borrador", "resumen", "versiones")},
         "usuario_definitivo_id": Dato(
             METADATO, finalidad="Trazabilidad: qué usuario de la empresa emitió cada informe del registro (HU-36)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    # ------------------------------------------------------------ HU-40: revisión interna del registro
+    # La revisión describe el REGISTRO de la empresa (actividades, elementos y flujos), no a titulares. Los
+    # textos libres (justificaciones, observaciones, notas de cierre y conclusión) se rechazan al guardar si
+    # traen correos, RUT o teléfonos y la auditoría de contenido los vuelve a revisar ("pii"). El único dato
+    # personal es el nombre y el cargo de quien revisa, que la persona escribe para la constancia.
+    "rat_revision": {
+        **_sin_dp("id", "empresa_id", "numero", "estado", "fecha_inicio", "fecha_revision", "version_rat", "huella",
+                  "version_mapa", "informe_id"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("verificaciones", "conclusion", "resumen", "lista")},
+        "revisor_nombre": Dato(
+            CONTACTO, EN_CLARO,
+            finalidad="Dejar constancia de quién hizo la revisión interna del registro (constancia, informe del "
+                      "registro y paquete de evidencia) (HU-40)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
+        "revisor_cargo": Dato(
+            CONTACTO, EN_CLARO, finalidad="Indicar en la constancia el cargo de quien revisó el registro (HU-40)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="pii",
+        ),
+        **{c: Dato(METADATO, finalidad="Trazabilidad: qué usuario de la empresa inició y marcó la revisión (HU-40)",
+                   base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE) for c in ("iniciada_por_id", "revisado_por_id")},
+    },
+    "rat_observacion": {
+        **_sin_dp("id", "empresa_id", "revision_id", "numero", "objeto_tipo", "objeto_id", "objeto_clave", "criterio",
+                  "prioridad", "estado", "fecha_apertura", "huella_apertura", "fecha_cierre", "huella_cierre",
+                  "objeto_cambio", "reaperturas"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("objeto_nombre", "texto", "nota_cierre")},
+        **{c: Dato(METADATO, finalidad="Trazabilidad: qué usuario de la empresa abrió y cerró cada observación "
+                                       "de la revisión interna (HU-40)",
+                   base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE) for c in ("abierta_por_id", "cerrada_por_id")},
+    },
+    "rat_revision_config": _sin_dp("empresa_id", "plazo_meses", "aviso_dias", "recordatorio_correo",
+                                   "ultimo_recordatorio", "etapa_recordatorio", "fecha_actualizacion"),
+    "rat_paquete_evidencia": {
+        **_sin_dp("id", "empresa_id", "revision_id", "codigo", "sha256", "huella_manifiesto", "archivos",
+                  "tamano_bytes", "fecha"),
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa exportó cada paquete de evidencia (HU-40)",
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
@@ -839,6 +881,8 @@ CATEGORIA_RAT_COLUMNA: dict[tuple[str, str], str] = {
     ("usuario_definitivo", "nombre"): "identificacion",
     ("solicitud_contratacion", "nombre_contacto"): "identificacion",
     ("solicitud_contratacion", "cargo_contacto"): "laborales",
+    ("rat_revision", "revisor_nombre"): "identificacion",   # HU-40
+    ("rat_revision", "revisor_cargo"): "laborales",
 }
 
 # Catálogos y agregados sin datos personales: no forman parte de ninguna actividad
@@ -1016,7 +1060,8 @@ ACTIVIDADES_PLATAFORMA: tuple[ActividadPlataforma, ...] = (
         "de su delegado de protección de datos.",
         ("mapa_datos", "mapa_elemento", "mapa_flujo", "mapa_datos_version", "rat_actividad",
          "rat_actividad_version", "rat_informe", "ropa_datos", "ropa_informe", "asistente_sesion",
-         "asistente_mensaje", "asistente_documento", "asistente_propuesta"),
+         "asistente_mensaje", "asistente_documento", "asistente_propuesta",
+         "rat_revision", "rat_observacion", "rat_revision_config", "rat_paquete_evidencia"),  # HU-40
         ("Que la empresa mantenga su propio registro de tratamiento y lo presente",),
         "contrato", (("titular", "Lo que registra la empresa"), ("generados", "Propuestas del asistente")),
         ("clientes",),
