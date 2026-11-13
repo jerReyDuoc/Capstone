@@ -32,7 +32,20 @@ export interface CuotaBorradoresApi {
   reinicia_en: string;
 }
 
+/** Actividad del registro que puede entrar en la evaluación de impacto. */
+export interface ActividadRegistroBorrador {
+  actividad_id: number;
+  nombre: string;
+  nivel: "Bajo" | "Medio" | "Alto" | "Crítico";
+  puntaje: number;
+  requiere_pia: boolean;
+  motivos_pia: string[];
+  vigente: boolean;
+}
+
 export interface CatalogoBorradoresApi {
+  /** Lo que la evaluación de impacto y el aviso de privacidad toman del registro de actividades. */
+  registro?: { actividades: ActividadRegistroBorrador[]; pia: ActividadRegistroBorrador[]; finalidades: number };
   plantillas: PlantillaApi[];
   ia_habilitada: boolean;
   cuota: CuotaBorradoresApi;
@@ -68,6 +81,8 @@ export interface GenerarBorradorApi {
   cuota: CuotaBorradoresApi;
   /** El borrador se armó sin el Agente IA (deshabilitado, cuota agotada o no respondió). */
   aviso?: string;
+  /** Actividades del registro que usó (evaluación de impacto y aviso de privacidad). */
+  registro?: { actividades: number; ids: number[]; sin_version_vigente: number };
 }
 
 /* ------------------------------------------------------------ llamadas */
@@ -77,11 +92,49 @@ export const cargarCatalogoBorradores = () => pedir<CatalogoBorradoresApi>(`${BA
 export const listarBorradores = () => pedir<{ items: BorradorApi[] }>(BASE_BORRADORES);
 
 /** Nunca se reintenta: puede llamar al LLM y gastar cuota. */
-export const generarBorrador = (tipo: TipoBorrador, instrucciones: string, usarIa: boolean) =>
+export const generarBorrador = (tipo: TipoBorrador, instrucciones: string, usarIa: boolean, actividades: number[] = []) =>
   pedir<GenerarBorradorApi>(BASE_BORRADORES, {
     method: "POST",
-    json: { tipo, instrucciones: instrucciones.trim() || null, usar_ia: usarIa },
+    json: {
+      tipo, instrucciones: instrucciones.trim() || null, usar_ia: usarIa,
+      ...(tipo === "pia" && actividades.length ? { actividades: actividades.slice(0, MAX_ACTIVIDADES_PIA) } : {}),
+    },
   });
+
+/** Máximo de actividades del registro en una evaluación de impacto (igual que el backend). */
+export const MAX_ACTIVIDADES_PIA = 10;
+
+/**
+ * Actividades que la evaluación de impacto marca de entrada: la pedida por la URL (si existe en el registro)
+ * o las que tienen la evaluación recomendada.
+ */
+export function actividadesPiaIniciales(
+  registro: CatalogoBorradoresApi["registro"] | undefined,
+  pedida: number | null,
+): number[] {
+  if (!registro) return [];
+  if (pedida && registro.actividades.some((a) => a.actividad_id === pedida)) return [pedida];
+  return registro.pia.map((a) => a.actividad_id).slice(0, MAX_ACTIVIDADES_PIA);
+}
+
+/** Qué tomará del registro cada plantilla (texto de ayuda bajo el formulario). */
+export function textoRegistroBorrador(
+  tipo: TipoBorrador,
+  registro: CatalogoBorradoresApi["registro"] | undefined,
+  elegidas: number,
+): string | null {
+  if (tipo === "politica_llm") return null;
+  if (!registro || !registro.actividades.length) {
+    return "Tu registro de actividades está vacío: el borrador saldrá con la plantilla. Completa el registro para que tome tus finalidades, bases y riesgos.";
+  }
+  if (tipo === "aviso_privacidad") {
+    return `Tomará las ${registro.finalidades} finalidades de tu registro con su base de licitud, los datos, proveedores, transferencias y plazos.`;
+  }
+  if (!elegidas) {
+    return "Ninguna actividad tiene una evaluación de impacto recomendada. Elige alguna para pre-llenarla o genera la plantilla en blanco.";
+  }
+  return `Se pre-llenará con ${elegidas === 1 ? "1 actividad" : `${elegidas} actividades`} de tu registro: descripción, base de licitud, riesgos y medidas.`;
+}
 
 export const cargarBorrador = (id: number) => pedir<{ borrador: BorradorApi }>(`${BASE_BORRADORES}/${id}`);
 
@@ -140,6 +193,10 @@ const TEXTO_ADVERTENCIA: Record<string, string> = {
   articulo_no_verificado: "Descartamos secciones del Agente IA que citaban artículos no verificados.",
   codigo: "Quitamos contenido técnico que no corresponde a un documento.",
   url: "Quitamos enlaces externos que propuso el Agente IA.",
+  registro_aplicado: "Completamos secciones con tu registro de actividades: revísalas antes de aprobar.",
+  registro_no_vigente: "Algunas actividades que usamos aún no están vigentes en tu registro.",
+  registro_vacio: "Tu registro de actividades está vacío: el borrador salió con la plantilla.",
+  pia_sin_alto_riesgo: "Ninguna actividad de tu registro tiene una evaluación de impacto recomendada.",
 };
 
 export function advertenciasVisibles(codigos: readonly string[]): string[] {

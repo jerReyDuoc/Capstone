@@ -32,7 +32,7 @@ from app.domain.mapa_datos.modelo import Elemento, ErrorValidacion, Flujo
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.mapa_datos import MapaDatos, MapaElemento, MapaFlujo
 from app.domain.models.rat import RatActividad, RatActividadVersion
-from app.domain.rat import analisis, estados, modelo, versiones, vinculo_mapa
+from app.domain.rat import analisis, estados, modelo, riesgos, versiones, vinculo_mapa
 from app.domain.rat import catalogo as cat
 from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
 
@@ -116,6 +116,7 @@ class RegistroActividadesCasos:
 
     def __init__(self, db: AsyncSession, cliente):
         self.db = db
+        self.cliente = cliente
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id
         self.usuario_id: int = cliente.usuario.id
@@ -160,6 +161,11 @@ class RegistroActividadesCasos:
 
     def _vista(self, f: RatActividad, elementos: list[Elemento], flujos: list[Flujo], detalle: bool) -> dict:
         deriv, compl = _evaluar(f.contenido, elementos, flujos)
+        # HU-38 C1: nivel de riesgo con reglas explicables (lo que la actividad dice hoy). Sin nada elegido
+        # del mapa todavía no hay con qué calcularlo (None).
+        riesgo = riesgos.evaluar(f.id, f.nombre, modelo.completar(f.contenido), deriv,
+                                 faltantes=len(compl["faltantes"])).como_dict() \
+            if deriv["elementos"] or deriv["flujos"] else None
         datos = {
             "id": f.id,
             "nombre": f.nombre,
@@ -174,6 +180,8 @@ class RegistroActividadesCasos:
                                                                        "faltantes", "puede_quedar_vigente")},
             "motivos_revision": list(f.motivos_revision or []),
             "resumen": self._resumen(deriv, f.contenido),
+            "riesgo": riesgo if detalle or riesgo is None else {k: riesgo[k] for k in (
+                "nivel", "puntaje", "probabilidad", "impacto", "requiere_pia", "motivos_pia", "mayor_riesgo")},
             "area": modelo.completar(f.contenido).get("area"),
             "origen": getattr(f, "origen", None) or "manual",   # HU-39: "ia" = propuesta del asistente aceptada
             "fecha_creacion": _iso(f.fecha_creacion),
@@ -200,6 +208,14 @@ class RegistroActividadesCasos:
                 **analisis.completitud_global([v["completitud"]["porcentaje"] for v in activas]),
                 "por_estado": por_estado,
                 "por_revisar": sum(1 for v in activas if v["motivos_revision"] and v["estado"] == cat.EN_REVISION),
+            },
+            # HU-38 C1: cuántas actividades activas son de mayor riesgo y cuántas piden evaluación de impacto
+            "riesgos": {
+                "por_nivel": {n: sum(1 for v in activas if (v["riesgo"] or {}).get("nivel") == n) for n in riesgos.NIVELES},
+                "mayor_riesgo": sum(1 for v in activas if (v["riesgo"] or {}).get("mayor_riesgo")),
+                "pia_recomendadas": sum(1 for v in activas if (v["riesgo"] or {}).get("requiere_pia")),
+                "metodologia": riesgos.METODOLOGIA, "metodologia_pia": riesgos.METODOLOGIA_PIA,
+                "referencia": riesgos.REFERENCIA_MATRIZ,
             },
             "mapa": {"version": version_mapa, "elementos": len(elementos), "flujos": len(flujos),
                      "iniciado": bool(elementos)},
@@ -407,8 +423,14 @@ class RegistroActividadesCasos:
                 "reactivar": ("Reactivaste la actividad: quedó en revisión para que confirmes que sigue al día."
                               if hacia == cat.EN_REVISION else "Reactivaste la actividad: quedó en borrador."),
             }[accion]
-        return {"actividad": self._vista(f, elementos, flujos, detalle=True), "cambio": accion, "mensaje": texto,
-                "version_creada": nueva_version.numero if nueva_version is not None else None}
+        respuesta = {"actividad": self._vista(f, elementos, flujos, detalle=True), "cambio": accion, "mensaje": texto,
+                     "version_creada": nueva_version.numero if nueva_version is not None else None}
+        if accion == "aprobar":
+            # HU-38 C3: con el registro vigente y completo, cuenta como evidencia en la evaluación (solo mejora)
+            from app.application.use_cases.cumplimiento_rat import aplicar_tras_aprobar
+
+            respuesta["evidencia"] = await aplicar_tras_aprobar(self.db, self.cliente)
+        return respuesta
 
     # ---------------------------------------------------------------- versiones
     async def listar_versiones(self, actividad_id: int) -> dict:

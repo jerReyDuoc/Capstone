@@ -337,6 +337,22 @@ def generar_pdf_rat(inf: I.InformeRat) -> bytes:
                       p(factores), p(trat)])
     historia.append(M.tabla(filas, [ancho * w for w in (0.04, 0.18, 0.06, 0.08, 0.09, 0.24, 0.31)]))
 
+    # HU-38: matriz de las actividades de mayor riesgo y evaluaciones de impacto recomendadas
+    mayores = rg.matriz_mayor_riesgo(list(inf.riesgos))
+    historia.append(Spacer(1, 10))
+    historia.append(p(f"Actividades de mayor riesgo ({esc(rg.REFERENCIA_MATRIZ)})", e.h3))
+    historia.append(p(esc(rg.METODOLOGIA_PIA), e.gris_chico))
+    if mayores:
+        filas = [cab("#", "Actividad", "Nivel", "Evaluación de impacto", "Por qué")]
+        for rv in mayores:
+            filas.append([p(str(numero_de.get(rv.actividad_id, ""))), p(f"<b>{esc(rv.nombre)}</b>"),
+                          p(nivel(rv.nivel)), p("Recomendada" if rv.requiere_pia else "No requerida"),
+                          p("<br/>".join(f"• {esc(m)}" for m in rv.motivos_pia) or "Riesgo alto o crítico.")])
+        historia.append(M.tabla(filas, [ancho * w for w in (0.05, 0.27, 0.12, 0.16, 0.40)]))
+    else:
+        historia.append(p("Ninguna actividad del registro tiene un riesgo alto o crítico ni requiere una evaluación "
+                          "de impacto.", e.chico))
+
     # ================================================================ 6. verificación
     historia.append(Spacer(1, 12))
     filas = [cab("#", "Actividad", "Versión", "Huella")]

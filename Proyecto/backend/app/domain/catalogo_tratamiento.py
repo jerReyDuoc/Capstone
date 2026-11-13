@@ -276,6 +276,8 @@ CODIGOS_TITULARES_NNA = frozenset(c.codigo for c in CATEGORIAS_TITULARES if c.nn
 TIPOS = tuple(t.codigo for t in TIPOS_ELEMENTO)
 SUBTIPOS_POR_TIPO: dict[str, frozenset[str]] = {t: frozenset(o.codigo for o in ops) for t, ops in SUBTIPOS.items()}
 ROLES = frozenset(r.codigo for r in ROLES_TERCERO)
+# HU-38: subtipos de elementos que implican uso de inteligencia artificial (matriz de riesgos del RAT)
+SUBTIPOS_IA = frozenset({"sistema_ia", "vectorial", "proveedor_ia"})
 ROLES_CON_CONTRATO = frozenset(r.codigo for r in ROLES_TERCERO if r.extra.get("requiere_contrato"))
 GARANTIAS = frozenset(g.codigo for g in GARANTIAS_TRANSFERENCIA)
 GARANTIAS_VALIDAS = frozenset(g.codigo for g in GARANTIAS_TRANSFERENCIA if g.extra.get("valida"))

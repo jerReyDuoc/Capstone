@@ -510,6 +510,26 @@ export function PasoSistemas({ borrador: b, cambiar, catalogo, catalogoMapa, map
           <ErrorCampo error={errorCampo} campos={["ambito_nota"]} />
         </div>
       </Bloque>
+
+      {catalogo.volumenes?.length ? (
+        <Bloque catalogo={catalogo} completitud={completitud} titulo="Cuántas personas abarca">
+          <div className={ms.campo}>
+            <label htmlFor="rat-volumen">Personas que alcanza la actividad (opcional)</label>
+            <select
+              id="rat-volumen"
+              className={`select ${ms.control}`}
+              value={b.volumen ?? ""}
+              aria-describedby="rat-volumen-ayuda"
+              onChange={(e) => cambiar({ volumen: e.target.value || null })}
+            >
+              <option value="">Sin indicar</option>
+              {catalogo.volumenes.map((v) => <option key={v.codigo} value={v.codigo}>{v.nombre}</option>)}
+            </select>
+            <span id="rat-volumen-ayuda" className={ms.ayuda}>{catalogo.ayuda_volumen}</span>
+            <ErrorCampo error={errorCampo} campos={["volumen"]} />
+          </div>
+        </Bloque>
+      ) : null}
     </>
   );
 }

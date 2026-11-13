@@ -41,6 +41,9 @@ export function FichaActividad({
         ? `${nombre(catalogo.roles_empresa, c.rol)}${c.rol === "encargado" && c.responsable_mandante ? ` por cuenta de ${c.responsable_mandante}` : ""}`
         : SIN,
     },
+    ...(c.volumen
+      ? [{ titulo: "Personas que abarca", valor: nombre(catalogo.volumenes ?? [], c.volumen) }]
+      : []),
     {
       titulo: "Finalidades",
       valor: c.finalidades.length ? <ul>{c.finalidades.map((f) => <li key={f}>{f}</li>)}</ul> : SIN,
@@ -151,7 +154,7 @@ export function FichaActividad({
 export function ResumenCorto({ porcentaje, faltan }: { porcentaje: number; faltan: number }) {
   return (
     <span className="card-sub" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-      <Icon name={faltan ? "alerta" : "check"} />
+      <Icon name={faltan ? "alerta" : "check"} width={16} height={16} aria-hidden />
       {porcentaje} % completa{faltan ? ` · ${plural(faltan, "dato pendiente", "datos pendientes")}` : ""}
     </span>
   );

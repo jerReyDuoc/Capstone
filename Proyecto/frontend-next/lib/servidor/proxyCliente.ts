@@ -163,6 +163,10 @@ const REGLAS: Regla[] = [
   { metodo: "PATCH", patron: /^registro-actividades\/ropa\/datos$/ },
   { metodo: "POST", patron: /^registro-actividades\/ropa$/, timeoutMs: 90_000 },
   { metodo: "GET", patron: /^registro-actividades\/ropa\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_INFORME_RAT, timeoutMs: 30_000 },
+  // El registro conectado con el resto: estado, matriz de mayor riesgo, brechas con su ruta y aporte a la
+  // evaluación; usarlo como evidencia recalcula el puntaje (más tiempo).
+  { metodo: "GET", patron: /^registro-actividades\/cumplimiento$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/cumplimiento\/evidencia$/, timeoutMs: 60_000 },
   // Asistente de registro: entrevista guiada, documentos y propuestas que el usuario acepta o descarta.
   // Responder y analizar un documento llaman al servicio de IA: más tiempo.
   { metodo: "GET", patron: /^asistente$/ },

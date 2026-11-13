@@ -22,10 +22,12 @@ import { fechaCorta } from "@/lib/empresa";
 import { descargarBlob } from "@/lib/exportar";
 import {
   advertenciasVisibles, cargarBorrador, cargarCatalogoBorradores, consolidarBorrador, cuotaBorradoresTexto,
-  descargarBorrador, descartarBorrador, ETIQUETA_ESTADO, ETIQUETA_TIPO, generarBorrador, guardarBorrador,
+  actividadesPiaIniciales, descargarBorrador, descartarBorrador, ETIQUETA_ESTADO, ETIQUETA_TIPO, generarBorrador,
+  guardarBorrador, MAX_ACTIVIDADES_PIA, textoRegistroBorrador,
   listarBorradores, parsearMarkdown, pendientesDe, segmentos, siguientePendiente, validarContenido,
   type BloqueMd, type BorradorApi, type CatalogoBorradoresApi, type FormatoBorrador, type TipoBorrador,
 } from "@/lib/borradores";
+import { TONO_RIESGO } from "@/lib/registroActividades";
 import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
 import s from "@/components/admin/admin.module.css";
 import b from "./borradores.module.css";
@@ -182,7 +184,16 @@ function GenerarBorrador({
   enRevision: number;
   alGenerar: (b: BorradorApi, aviso: string | undefined, cuota: CatalogoBorradoresApi["cuota"]) => Promise<void>;
 }) {
-  const [tipo, setTipo] = useState<TipoBorrador>(catalogo.plantillas[0]?.tipo ?? "politica_llm");
+  // Desde Mi empresa o el registro: ?plantilla=pia&actividad=ID abre la evaluación de impacto con esa actividad
+  const [tipo, setTipo] = useState<TipoBorrador>(() => {
+    const pedida = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plantilla") : null;
+    return catalogo.plantillas.find((p) => p.tipo === pedida)?.tipo ?? catalogo.plantillas[0]?.tipo ?? "politica_llm";
+  });
+  const [elegidas, setElegidas] = useState<number[]>(() => {
+    const id = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("actividad")) : NaN;
+    return actividadesPiaIniciales(catalogo.registro, Number.isInteger(id) && id > 0 ? id : null);
+  });
+  const ayudaRegistro = textoRegistroBorrador(tipo, catalogo.registro, elegidas.length);
   const [instrucciones, setInstrucciones] = useState("");
   const [usarIa, setUsarIa] = useState(catalogo.ia_habilitada);
   const [ocupado, setOcupado] = useState(false);
@@ -201,7 +212,7 @@ function GenerarBorrador({
     setOcupado(true);
     setError("");
     try {
-      const r = await generarBorrador(tipo, instrucciones, usarIa && catalogo.ia_habilitada);
+      const r = await generarBorrador(tipo, instrucciones, usarIa && catalogo.ia_habilitada, elegidas);
       setInstrucciones("");
       await alGenerar(r.borrador, r.aviso, r.cuota);
     } catch (e) {
@@ -239,6 +250,38 @@ function GenerarBorrador({
             {plantilla.secciones.length} secciones: {plantilla.secciones.slice(0, 5).join(", ")}
             {plantilla.secciones.length > 5 ? "…" : "."}
           </p>
+        ) : null}
+
+        {ayudaRegistro ? <p className="callout" role="status"><span>{ayudaRegistro}</span></p> : null}
+        {tipo === "pia" && catalogo.registro?.actividades.length ? (
+          <fieldset className={b.plantillas}>
+            <legend>Actividades del registro que evalúa</legend>
+            {catalogo.registro.actividades.map((a) => {
+              const marcada = elegidas.includes(a.actividad_id);
+              return (
+                <label key={a.actividad_id} className="check">
+                  <input
+                    type="checkbox"
+                    checked={marcada}
+                    disabled={!marcada && elegidas.length >= MAX_ACTIVIDADES_PIA}
+                    onChange={(e) =>
+                      setElegidas((x) => (e.target.checked ? [...x, a.actividad_id] : x.filter((i) => i !== a.actividad_id)))
+                    }
+                  />
+                  <span>
+                    {a.nombre}{" "}
+                    <span className={`badge ${TONO_RIESGO[a.nivel]}`}>
+                      Riesgo {a.nivel.toLocaleLowerCase("es")}
+                    </span>
+                    <span className={s.sub}>
+                      {a.requiere_pia ? `Recomendada: ${a.motivos_pia.join(" ")}` : "Sin evaluación de impacto recomendada."}
+                      {a.vigente ? "" : " Aún no está vigente."}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
         ) : null}
 
         <div className="field">

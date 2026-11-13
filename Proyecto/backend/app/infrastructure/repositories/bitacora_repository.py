@@ -153,6 +153,7 @@ class Accion:
     RAT_VERSION_VIGENTE = "rat.version_vigente"           # detalle: numero, huella (prefijo), campos cambiados
     RAT_MARCADA_REVISION = "rat.marcada_revision"         # un cambio en el mapa la devolvió a revisión
     RAT_CAMBIO_RECHAZADO = "rat.cambio_rechazado"         # versión desactualizada, incompleta o transición inválida
+    RAT_EVIDENCIA_APLICADA = "rat.evidencia_aplicada"     # HU-38: el registro mejoró controles (estados y puntaje)
     # HU-36: informe del RAT (PDF y XLSX). El detalle lleva el id de la emisión, la versión del RAT, si es
     # borrador, el formato y conteos; nunca los textos del registro ni el correo de destino.
     RAT_INFORME_GENERADO = "rat.informe_generado"
@@ -255,6 +256,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RAT_VERSION_VIGENTE: Categoria.MODIFICACION,
     Accion.RAT_MARCADA_REVISION: Categoria.MODIFICACION,
     Accion.RAT_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
+    Accion.RAT_EVIDENCIA_APLICADA: Categoria.MODIFICACION,      # HU-38
     Accion.ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,      # HU-37
     Accion.ASISTENTE_PROPUESTA_DESCARTADA: Categoria.MODIFICACION,  # HU-39
     Accion.PLATAFORMA_ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,  # HU-41

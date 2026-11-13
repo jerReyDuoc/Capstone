@@ -45,6 +45,9 @@ export interface CatalogoRat {
   grupos_medidas: string[];
   medidas_seguridad: OpcionRat[];
   roles_empresa: OpcionRat[];
+  /** Cuántas personas abarca la actividad (dato opcional que usa el nivel de riesgo). */
+  volumenes?: OpcionRat[];
+  ayuda_volumen?: string;
   campos: { codigo: CodigoCampo; titulo: string; paso: number; ayuda: string; desde_mapa: boolean }[];
   pasos: { numero: number; titulo: string; descripcion: string }[];
 }
@@ -94,6 +97,8 @@ export interface ContenidoActividad {
   rol: string | null;
   responsable_mandante: string | null;
   ambito_nota: string | null;
+  /** Opcional: a cuántas personas alcanza la actividad (solo existe si tiene valor). */
+  volumen?: string | null;
 }
 
 export interface EstadoCampo {
@@ -143,6 +148,37 @@ export interface Derivados {
     garantia_nombre: string; garantia_valida: boolean;
   }[];
   fuera_de_chile_sin_flujo: { id: number; nombre: string; pais: string; pais_nombre: string }[];
+  /** Sistemas, bases o proveedores con inteligencia artificial que usa la actividad. */
+  sistemas_ia?: { id: number; nombre: string; subtipo_nombre: string }[];
+}
+
+/* ============================================================ nivel de riesgo de la actividad */
+
+export type NivelRiesgo = "Bajo" | "Medio" | "Alto" | "Crítico";
+
+export interface FactorRiesgo {
+  eje: "probabilidad" | "impacto";
+  puntos: number;
+  titulo: string;
+  detalle: string;
+  tratamiento: string;
+}
+
+export interface RiesgoActividad {
+  nivel: NivelRiesgo;
+  puntaje: number;
+  probabilidad: number;
+  impacto: number;
+  /** Se recomienda una evaluación de impacto y por qué. */
+  requiere_pia: boolean;
+  motivos_pia: string[];
+  /** Parte de la matriz de las actividades de mayor riesgo. */
+  mayor_riesgo: boolean;
+  /** Solo en el detalle */
+  factores?: FactorRiesgo[];
+  tratamientos?: string[];
+  probabilidad_nombre?: string;
+  impacto_nombre?: string;
 }
 
 export interface MotivoRevision {
@@ -177,6 +213,8 @@ export interface Actividad {
   completitud: Completitud;
   motivos_revision: MotivoRevision[];
   resumen: ResumenActividad;
+  /** Nivel de riesgo con reglas explicables (null si todavía no elige nada del mapa). */
+  riesgo?: RiesgoActividad | null;
   area: string | null;
   fecha_creacion: string | null;
   fecha_actualizacion: string | null;
@@ -198,6 +236,14 @@ export interface ListaRegistro {
   };
   mapa: { version: number; elementos: number; flujos: number; iniciado: boolean };
   limites: { max_actividades: number };
+  riesgos?: {
+    por_nivel: Record<NivelRiesgo, number>;
+    mayor_riesgo: number;
+    pia_recomendadas: number;
+    metodologia: string;
+    metodologia_pia: string;
+    referencia: string;
+  };
 }
 
 export interface RespuestaActividad {
@@ -205,6 +251,8 @@ export interface RespuestaActividad {
   cambio?: string | null;
   mensaje?: string;
   version_creada?: number | null;
+  /** Al dejarla vigente: si el registro ya cuenta como evidencia en la evaluación. */
+  evidencia?: ResultadoEvidencia | null;
 }
 
 export interface VersionResumen {
@@ -284,6 +332,7 @@ export function contenidoVacio(nombre = ""): ContenidoActividad {
 const CLAVES: (keyof ContenidoActividad)[] = [
   "nombre", "descripcion", "area", "elementos", "flujos", "finalidades", "fuentes", "base_licitud", "interes_legitimo",
   "base_sensibles", "sin_destinatarios", "plazos", "decisiones", "medidas", "rol", "responsable_mandante", "ambito_nota",
+  "volumen",
 ];
 
 /** Texto vacío o con solo espacios = sin valor (como lo guarda el servidor). */
@@ -311,7 +360,7 @@ export function cambiosContenido(guardado: ContenidoActividad, borrador: Conteni
 /** El campo del registro y el paso del formulario en que se completa cada parte del contenido. */
 export const PASO_DE_CLAVE: Record<keyof ContenidoActividad, number> = {
   nombre: 1, descripcion: 1, area: 1, finalidades: 1, rol: 1, responsable_mandante: 1,
-  elementos: 2, flujos: 2, ambito_nota: 2,
+  elementos: 2, flujos: 2, ambito_nota: 2, volumen: 2,
   fuentes: 3, base_licitud: 3, interes_legitimo: 3, base_sensibles: 3,
   sin_destinatarios: 4,
   plazos: 5, decisiones: 5,
@@ -435,4 +484,144 @@ export function textoVersion(a: Pick<Actividad, "estado" | "version_vigente">): 
   if (a.estado === "vigente") return `Versión ${a.version_vigente} vigente`;
   if (a.estado === "archivada") return `Última versión vigente: ${a.version_vigente}`;
   return `Sigue valiendo la versión ${a.version_vigente} mientras completas los cambios`;
+}
+
+/* ============================================================ riesgo, evidencia y brechas del registro */
+
+/** Clase de color de la insignia de cada nivel de riesgo (globals.css). */
+export const TONO_RIESGO: Record<NivelRiesgo, string> = {
+  Bajo: "tone-ok",
+  Medio: "tone-medio",
+  Alto: "tone-alto",
+  Crítico: "tone-critico",
+};
+
+/** Texto corto del riesgo para la lista ("Riesgo alto · evaluación de impacto recomendada"). */
+export function textoRiesgo(r: RiesgoActividad | null | undefined): string {
+  if (!r) return "Riesgo sin calcular: elige del mapa los sistemas de la actividad";
+  return `Riesgo ${r.nivel.toLocaleLowerCase("es")}${r.requiere_pia ? " · evaluación de impacto recomendada" : ""}`;
+}
+
+export interface ControlRespaldado {
+  respuesta_id: number;
+  obligacion: string | null;
+  estado_actual: string | null;
+  estado_actual_nombre: string | null;
+  estado_aportado: string | null;
+  estado_aportado_nombre: string | null;
+  motivo: string | null;
+  mejora: boolean;
+  respaldado_por_registro: boolean;
+}
+
+export interface ResultadoEvidencia {
+  aplicado: boolean;
+  motivo: "sin_evaluacion" | "registro_incompleto" | "sin_mejoras" | null;
+  mensaje: string;
+  evaluacion_id?: number;
+  faltantes?: string[];
+  controles: {
+    respuesta_id: number; evidencia_id: number; estado_previo: string | null; estado_resultante: string;
+    obligacion: string | null; puntaje_previo: number | null; puntaje_resultante: number | null;
+  }[];
+  puntaje_previo?: number | null;
+  puntaje_resultante?: number | null;
+}
+
+export type CodigoBrechaRegistro = "sin_base_licitud" | "sin_plazo" | "transferencia_sin_garantia" | "flujo_sin_actividad";
+
+export interface BrechaRegistro {
+  codigo: CodigoBrechaRegistro;
+  titulo: string;
+  texto: string;
+  severidad: "Crítica" | "Alta" | "Media" | "Baja";
+  paso: number | null;
+  actividad: { id: number; nombre: string } | null;
+  flujo_id: number | null;
+  obligacion: string | null;
+  ruta: { id: number; nombre: string | null; nivel: string | null; horas: number | null;
+          estado: "no_iniciado" | "en_curso" | "completado" } | null;
+  remediacion: { evaluacion_id: number; respuesta_id: number; estado: string | null; estado_nombre: string | null;
+                 abierta: boolean } | null;
+}
+
+export interface ActividadMayorRiesgo {
+  actividad_id: number;
+  nombre: string;
+  estado: EstadoActividad;
+  estado_nombre: string;
+  version: number | null;
+  origen: "vigente" | "trabajo";
+  nivel: NivelRiesgo;
+  puntaje: number;
+  probabilidad: number;
+  impacto: number;
+  requiere_pia: boolean;
+  motivos_pia: string[];
+  factores: string[];
+  tratamientos: string[];
+}
+
+export interface CumplimientoRegistro {
+  mapa: { iniciado: boolean; version: number; elementos: number; flujos: number; flujos_sin_actividad: number };
+  registro: {
+    activas: number; vigentes: number; completas: number; en_revision: number; borradores: number;
+    por_revisar: number; completitud: number; vigente_completo: boolean; faltantes: string[];
+  };
+  riesgos: {
+    referencia: string; metodologia: string; metodologia_pia: string; por_nivel: Record<NivelRiesgo, number>;
+    mayor_riesgo: ActividadMayorRiesgo[]; pia_recomendadas: number; mapa_calor: number[][];
+  };
+  brechas: BrechaRegistro[];
+  evidencia: {
+    evaluacion_id: number | null; aplicable: boolean; faltantes: string[]; controles: ControlRespaldado[];
+    por_mejorar: number; puntaje_general: number | null;
+  };
+  borradores: { pia: { recomendada: boolean; actividades: number }; aviso: { finalidades: number } };
+}
+
+export const cargarCumplimiento = () => pedir<CumplimientoRegistro>(`${BASE_RAT}/cumplimiento`);
+export const usarRegistroComoEvidencia = () =>
+  pedir<ResultadoEvidencia>(`${BASE_RAT}/cumplimiento/evidencia`, { method: "POST", json: {} });
+
+/** Dónde se corrige cada brecha: la actividad en su paso, o el mapa de datos (envíos y garantías). */
+export function hrefCorregirBrecha(b: Pick<BrechaRegistro, "codigo" | "actividad" | "paso">): { href: string; texto: string } {
+  if (b.codigo === "transferencia_sin_garantia") {
+    return { href: "/empresa/mapa-datos", texto: "Registrar la garantía en el mapa" };
+  }
+  if (b.codigo === "flujo_sin_actividad" || !b.actividad) {
+    return { href: "/empresa/registro-actividades", texto: "Registrar la actividad" };
+  }
+  const paso = b.paso ? `&paso=${b.paso}` : "";
+  return { href: `/empresa/registro-actividades?actividad=${b.actividad.id}${paso}`, texto: "Corregir la actividad" };
+}
+
+/** Pasos de la ruta de remediación de una brecha, en orden (corregir, formarse, re-evaluar). */
+export function rutaRemediacion(b: BrechaRegistro): { clave: string; texto: string; href: string; hecho?: boolean }[] {
+  const pasos: { clave: string; texto: string; href: string; hecho?: boolean }[] = [];
+  const corregir = hrefCorregirBrecha(b);
+  pasos.push({ clave: "corregir", texto: corregir.texto, href: corregir.href });
+  if (b.ruta) {
+    const estado = b.ruta.estado === "completado" ? "completado" : b.ruta.estado === "en_curso" ? "en curso" : "sin empezar";
+    pasos.push({
+      clave: "formacion", texto: `Módulo «${b.ruta.nombre ?? "de formación"}» (${estado})`,
+      href: `/panel/capacitacion/${b.ruta.id}${b.remediacion ? `?evaluacion=${b.remediacion.evaluacion_id}` : ""}`,
+      hecho: b.ruta.estado === "completado",
+    });
+  }
+  if (b.remediacion?.abierta) {
+    pasos.push({
+      clave: "remediacion", texto: `Re-evaluar el control (hoy: ${(b.remediacion.estado_nombre ?? "con brecha").toLocaleLowerCase("es")})`,
+      href: `/panel/remediacion?evaluacion=${b.remediacion.evaluacion_id}&control=${b.remediacion.respuesta_id}`,
+    });
+  }
+  return pasos;
+}
+
+/** Frase del estado del registro para el espacio de la empresa. */
+export function textoEstadoRegistro(c: Pick<CumplimientoRegistro, "mapa" | "registro">): string {
+  if (!c.mapa.iniciado) return "Aún no registras tu mapa de datos.";
+  if (!c.registro.activas) return "Tu mapa está listo: registra tus actividades de tratamiento.";
+  if (c.registro.vigente_completo) return "Tu registro está vigente y completo.";
+  return `${c.registro.vigentes} de ${c.registro.activas} actividades vigentes · ${c.registro.completitud} % completo`;
 }

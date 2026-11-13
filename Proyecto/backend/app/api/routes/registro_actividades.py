@@ -12,6 +12,11 @@ HU-35 · Registro de Actividades de Tratamiento (RAT) del cliente.
                                                                          archivar | reactivar
   GET    /api/registro-actividades/actividades/{id}/versiones            versiones vigentes (inmutables)
   GET    /api/registro-actividades/actividades/{id}/versiones/{numero}   instantánea de una versión
+  GET    /api/registro-actividades/cumplimiento                          HU-38: estado del mapa y del registro,
+                                                                         matriz de mayor riesgo, brechas con su
+                                                                         ruta y aporte a la evaluación
+  POST   /api/registro-actividades/cumplimiento/evidencia                HU-38: usa el registro vigente y completo
+                                                                         como evidencia (solo mejora controles)
 
 Todas exigen usuario definitivo con contrato VIGENTE (empresa_con_servicio, HU-30): 401 sin sesión,
 403 NO_AUTORIZADO para otros roles y 403 CONTRATO_NO_VIGENTE sin servicio. Lo de otra empresa
@@ -110,6 +115,7 @@ class ActividadEntrada(_Base):
     rol: str | None = Field(None, max_length=20)
     responsable_mandante: str | None = Field(None, max_length=300)
     ambito_nota: str | None = Field(None, max_length=600)
+    volumen: str | None = Field(None, max_length=20)      # HU-38: opcional (catalogo.VOLUMENES)
 
 
 class EditarEntrada(ActividadEntrada):
@@ -179,3 +185,25 @@ async def versiones(actividad_id: int, cliente: ClienteConServicio = Depends(emp
 async def version(actividad_id: int, numero: int, cliente: ClienteConServicio = Depends(empresa_con_servicio),
                   db: AsyncSession = Depends(get_db)):
     return _json(await _ejecutar(_casos(db, cliente).obtener_version(actividad_id, numero)))
+
+
+# ------------------------------------------------------------------ HU-38: el registro conectado con el resto
+@router.get("/cumplimiento")
+async def cumplimiento(cliente: ClienteConServicio = Depends(empresa_con_servicio), db: AsyncSession = Depends(get_db)):
+    """
+    Estado del mapa y del registro, matriz de las actividades de mayor riesgo (con la evaluación de impacto
+    recomendada), brechas que genera el registro con su ruta de remediación y lo que el registro aporta a
+    la evaluación más reciente.
+    """
+    from app.application.use_cases.cumplimiento_rat import CumplimientoRegistro
+
+    return _json(await CumplimientoRegistro(db, cliente).resumen())
+
+
+@router.post("/cumplimiento/evidencia")
+async def usar_como_evidencia(cliente: ClienteConServicio = Depends(empresa_con_servicio),
+                              db: AsyncSession = Depends(get_db)):
+    """Usa el registro vigente y completo como evidencia de los controles de protección de datos (solo mejora)."""
+    from app.application.use_cases.cumplimiento_rat import CumplimientoRegistro
+
+    return _json(await CumplimientoRegistro(db, cliente).aplicar(origen="manual"))

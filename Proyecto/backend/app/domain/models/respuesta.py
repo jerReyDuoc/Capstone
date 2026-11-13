@@ -57,6 +57,7 @@ class FuenteClasificacion(str, Enum):
     LLM = "llm"
     SEGURIDAD = "seguridad"  # decisión tomada por la capa anti prompt-injection
     REVISION = "revision"    # decisión del Oficial de Cumplimiento (revisión humana)
+    RAT = "rat"              # HU-38: lo respalda el registro de actividades vigente y completo
 
 class Respuesta(Base):
     __tablename__ = "respuestas"

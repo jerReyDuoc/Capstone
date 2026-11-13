@@ -342,8 +342,17 @@ class Settings(BaseSettings):
     # Propuestas pendientes de revisar por empresa (las decididas no cuentan)
     ASISTENTE_MAX_PENDIENTES: int = 60
     ASISTENTE_MODELO: str | None = None   # vacío = LLM_MODEL
-    ASISTENTE_MAX_TOKENS_SALIDA: int = 6000
-    ASISTENTE_TIMEOUT_S: float = 60.0
+    # Corrección 13-11: 6000 tokens reservados por respuesta agotaban el límite de tokens por minuto del
+    # proveedor tras unas pocas preguntas. 6 propuestas con sus explicaciones caben de sobra en 4000.
+    ASISTENTE_MAX_TOKENS_SALIDA: int = 4000
+    # Tiempo de espera de CADA intento HTTP al proveedor
+    ASISTENTE_TIMEOUT_S: float = 45.0
+    # Tiempo TOTAL de la ayuda automática por respuesta (anonimización + reintentos + LLM). Debe ser menor
+    # que la espera del BFF (90 s): si se pasa, la respuesta se guarda igual o se reintenta, nunca queda colgada.
+    ASISTENTE_TIEMPO_MAXIMO_S: float = 70.0
+    # Propuestas pendientes que ve el modelo en cada llamada (las más recientes). Las demás se siguen
+    # validando igual; mostrarlas todas hacía crecer el prompt con cada pregunta.
+    ASISTENTE_PENDIENTES_EN_PROMPT: int = 15
     ASISTENTE_TEMPERATURA: float = 0.1
 
     # ------------------------------------------------ HU-34: mapa de datos personales
@@ -539,6 +548,10 @@ class Settings(BaseSettings):
             raise ValueError("ASISTENTE_MAX_DENSIDAD_PII (0-100) o ASISTENTE_MAX_PENDIENTES (1-500) fuera de rango (HU-39).")
         if not 0 <= self.ASISTENTE_TEMPERATURA <= 1:
             raise ValueError("ASISTENTE_TEMPERATURA debe estar entre 0 y 1 (HU-39).")
+        if not 10 <= self.ASISTENTE_TIEMPO_MAXIMO_S <= 85:
+            raise ValueError("ASISTENTE_TIEMPO_MAXIMO_S debe estar entre 10 y 85 segundos: el BFF espera 90 (HU-39).")
+        if not 0 <= self.ASISTENTE_PENDIENTES_EN_PROMPT <= 60:
+            raise ValueError("ASISTENTE_PENDIENTES_EN_PROMPT debe estar entre 0 y 60 (HU-39).")
         # HU-41: datos del despliegue para el registro de la plataforma
         from app.domain import catalogo_tratamiento as _cat_mapa
         for nombre in ("PLATAFORMA_PAIS_ALOJAMIENTO", "CORREO_PROVEEDOR_PAIS"):

@@ -115,6 +115,10 @@ def derivados(contenido: dict, elementos: list[Elemento], flujos: list[Flujo]) -
             fuera_sin_flujo.append({"id": e["id"], "nombre": e["nombre"], "pais": e["pais"],
                                     "pais_nombre": cat_mapa.nombre_pais(e["pais"])})
 
+    # HU-38: sistemas, bases o proveedores con IA que usa la actividad (elegidos o extremos de un flujo
+    # elegido). No es parte de la instantánea (versiones._CAMPOS_DERIVADOS).
+    ia = sistemas_ia_en({"elementos": sel_elementos, "flujos": sel_flujos}, elementos)
+
     datos_ord = _ordenar_datos(datos)
     titulares_ord = sorted(titulares, key=lambda t: _ORDEN_TITULARES.get(t, 999))
     return {
@@ -134,7 +138,25 @@ def derivados(contenido: dict, elementos: list[Elemento], flujos: list[Flujo]) -
         "terceros": sorted(terceros.values(), key=lambda t: t["nombre"].lower()),
         "transferencias": transferencias,
         "fuera_de_chile_sin_flujo": fuera_sin_flujo,
+        "sistemas_ia": ia,
     }
+
+
+def sistemas_ia_en(mapa: dict, elementos: list[Elemento]) -> list[dict]:
+    """
+    HU-38: los sistemas con IA de lo que la actividad toma del mapa (derivados o la instantánea de una
+    versión vigente, que guarda los ids), según el subtipo ACTUAL de cada elemento en el mapa.
+    """
+    por_id = {e.id: e for e in elementos}
+    ids = [x.get("id") for x in mapa.get("elementos") or []]
+    ids += [i for x in mapa.get("flujos") or [] for i in (x.get("origen_id"), x.get("destino_id"))]
+    salida: dict[int, dict] = {}
+    for i in ids:
+        e = por_id.get(i)
+        if e is not None and e.subtipo in cat_mapa.SUBTIPOS_IA and e.id not in salida:
+            salida[e.id] = {"id": e.id, "nombre": e.nombre,
+                            "subtipo_nombre": cat_mapa.etiqueta_subtipo(e.tipo, e.subtipo)}
+    return sorted(salida.values(), key=lambda x: x["nombre"].lower())
 
 
 # ============================================================ completitud

@@ -327,7 +327,7 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
 
     # ================================================================ Matriz de riesgos
     ws = wb.create_sheet("Matriz de riesgos")
-    w = [6, 30, 13, 13, 13, 13, 13, 50, 60]
+    w = [6, 30, 13, 13, 13, 13, 13, 50, 60, 40]
     fila = preparar(ws, "Matriz de riesgos (probabilidad × impacto)", w)
     ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=len(w))
     poner(ws, fila, 1, rg.METODOLOGIA, f_sub)
@@ -361,10 +361,12 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
         datos.append([numero_de.get(rv.actividad_id), rv.nombre, rv.probabilidad, rv.impacto, rv.puntaje, rv.nivel,
                       f"Probabilidad {rg.ETIQUETA_PROBABILIDAD[rv.probabilidad].lower()}, impacto "
                       f"{rg.ETIQUETA_IMPACTO[rv.impacto].lower()}", "\n".join(f"• {f.titulo}: {f.detalle}" for f in rv.factores) or "Sin factores relevantes",
-                      "\n".join(f"• {t}" for t in rv.tratamientos) or "Mantener los controles actuales."])
+                      "\n".join(f"• {t}" for t in rv.tratamientos) or "Mantener los controles actuales.",
+                      # HU-38: evaluación de impacto recomendada y por qué
+                      ("Recomendada: " + " ".join(rv.motivos_pia)) if rv.requiere_pia else "No requerida"])
         colores[(fila + 1 + n, 6)] = Font(name="Calibri", bold=True, size=10, color=_sin_hash(M.COLOR_NIVEL[rv.nivel]))
     tabla(ws, fila, ["N.º", "Actividad", "Probabilidad", "Impacto", "Puntaje", "Nivel", "Lectura", "Factores",
-                     "Tratamiento sugerido"], datos, w, colores=colores)
+                     "Tratamiento sugerido", "Evaluación de impacto"], datos, w, colores=colores)
     ws.freeze_panes = None
 
     # ================================================================ Verificación

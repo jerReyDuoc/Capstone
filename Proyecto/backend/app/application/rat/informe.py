@@ -92,6 +92,8 @@ class FuenteActividad:
     contenido: dict | None = None
     derivados: dict | None = None
     completitud: dict | None = None
+    # HU-38: sistemas con IA que usa la actividad según el mapa ACTUAL (la instantánea no los guarda)
+    sistemas_ia: tuple = ()
 
 
 # ============================================================ resultado
@@ -222,7 +224,8 @@ def _actividad(numero: int, f: FuenteActividad) -> ActividadInforme:
         origen = "trabajo"
         faltantes = tuple(x["titulo"] for x in (f.completitud or {}).get("faltantes", []))
     nombre = contenido.get("nombre") or f.nombre
-    riesgo = rg.evaluar(f.id, nombre, contenido, mapa, len(faltantes))
+    riesgo = rg.evaluar(f.id, nombre, contenido, mapa, len(faltantes),
+                        sistemas_ia=list(f.sistemas_ia) if f.sistemas_ia else None)
     return ActividadInforme(
         numero=numero, id=f.id, nombre=nombre, estado=f.estado,
         estado_nombre=cat.nombre(cat.ESTADOS_POR_CODIGO, f.estado), origen=origen,
@@ -303,6 +306,10 @@ def _resumen(acts: list[ActividadInforme], riesgos: list[rg.RiesgoActividad], ar
         "bases_licitud": dict(sorted(bases.items(), key=lambda x: (-x[1], x[0]))),
         "riesgos": niveles,
         "riesgos_altos": niveles["Alto"] + niveles["Crítico"],
+        # HU-38: matriz de mayor riesgo (Decreto 662, art. 3 letra e) y evaluaciones de impacto recomendadas
+        "mayor_riesgo": sum(1 for r in riesgos if r.mayor_riesgo),
+        "pia_recomendadas": sum(1 for r in riesgos if r.requiere_pia),
+        "con_ia": sum(1 for r in riesgos if any(f.titulo == "Uso de inteligencia artificial" for f in r.factores)),
     }
 
 
@@ -472,7 +479,9 @@ def resumen_publico(inf: InformeRat) -> dict:
             "id": a.id, "numero": a.numero, "nombre": a.nombre, "estado": a.estado, "estado_nombre": a.estado_nombre,
             "origen": a.origen, "version": a.version, "pendiente": a.pendiente,
             "riesgo": {"nivel": a.riesgo.nivel, "puntaje": a.riesgo.puntaje, "probabilidad": a.riesgo.probabilidad,
-                       "impacto": a.riesgo.impacto} if a.riesgo else None,
+                       "impacto": a.riesgo.impacto, "requiere_pia": a.riesgo.requiere_pia,
+                       "motivos_pia": list(a.riesgo.motivos_pia), "mayor_riesgo": a.riesgo.mayor_riesgo}
+            if a.riesgo else None,
         } for a in inf.actividades],
         "mapa_calor": rg.mapa_calor(list(inf.riesgos)),
         "aviso": {"version": inf.aviso.version, "pie": inf.aviso.pie},

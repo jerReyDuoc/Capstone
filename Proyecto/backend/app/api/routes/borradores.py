@@ -3,7 +3,8 @@ HU-16 · Borradores adaptados de documentos de cumplimiento (rol cliente, contra
 
   GET    /api/borradores/plantillas                    plantillas disponibles, cuota de IA y límites
   GET    /api/borradores                               borradores de la empresa (en revisión y consolidados)
-  POST   /api/borradores                               genera un borrador {tipo, instrucciones?, usar_ia?, evaluacion_id?}
+  POST   /api/borradores                               genera un borrador {tipo, instrucciones?, usar_ia?, evaluacion_id?,
+                                                        actividades?} (HU-38: la PIA y el aviso toman el registro)
   GET    /api/borradores/{id}                          borrador con su contenido Markdown (revisión)
   PATCH  /api/borradores/{id}                          guarda la edición {contenido, version}
   GET    /api/borradores/{id}/descarga?formato=md|pdf  descarga previa (PDF con marca "BORRADOR")
@@ -107,6 +108,9 @@ class NuevoBorrador(BaseModel):
                                       description="Preferencias de redacción para el Agente IA (opcional)")
     usar_ia: bool = Field(True, description="false = solo la plantilla y la evaluación, sin llamar al LLM")
     evaluacion_id: int | None = Field(None, ge=1, description="Vacío = la evaluación más reciente de la empresa")
+    # HU-38: actividades del registro que evalúa la PIA (vacío = las que tienen la evaluación recomendada)
+    actividades: list[int] | None = Field(None, max_length=10,
+                                          description="Ids de actividades del registro para la PIA (opcional)")
 
 
 @router.post("", status_code=201)
@@ -120,7 +124,7 @@ async def generar(
     """C1 y C2: genera el borrador adaptado a la evaluación de tu empresa (y, si se pide, con el Agente IA)."""
     try:
         datos = await _casos(db, cliente, servicios, limitador).generar(
-            payload.tipo, payload.instrucciones, payload.usar_ia, payload.evaluacion_id)
+            payload.tipo, payload.instrucciones, payload.usar_ia, payload.evaluacion_id, payload.actividades)
     except BorradorError as e:
         raise _http(e)
     return _json(datos, 201)

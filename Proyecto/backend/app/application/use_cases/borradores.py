@@ -31,9 +31,15 @@ Reglas:
     del LLM. Si el servicio de IA falla, la cuota se devuelve.
   - Todo queda en la bitácora inmutable (HU-09) sin el texto del borrador ni de las
     instrucciones (solo su huella HMAC).
+
+HU-38 C2: la PIA se pre-llena con las actividades de alto riesgo del registro de actividades (o las que
+elija la empresa) y el aviso de privacidad toma sus finalidades y bases de licitud
+(app/application/borradores/registro.py). El registro se lee igual que el informe del RAT (versión
+vigente de cada actividad) y nunca pasa por el LLM.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -152,8 +158,31 @@ class Borradores:
                 "restantes": max(0, limite - usados) if limite > 0 else None,
                 "reinicia_en": reinicio.isoformat().replace("+00:00", "Z")}
 
+    # ------------------------------------------------------------------ HU-38: el registro de actividades
+    async def _registro(self):
+        from app.application.borradores import registro as reg_borrador
+        from app.application.use_cases.informe_rat import InformeRatCasos
+
+        return reg_borrador.desde_informe(await InformeRatCasos(self.db, self.cliente).armar())
+
+    async def _registro_para_catalogo(self) -> dict:
+        try:
+            reg = await self._registro()
+        except Exception as e:  # noqa: BLE001 - el catálogo de plantillas no depende del registro
+            logger.error("HU-38: no se pudo leer el registro para los borradores (%s)", type(e).__name__)
+            await self.db.rollback()
+            return {"actividades": [], "pia": [], "finalidades": 0}
+
+        def act(a) -> dict:
+            return {"actividad_id": a.id, "nombre": a.nombre, "nivel": a.riesgo.nivel, "puntaje": a.riesgo.puntaje,
+                    "requiere_pia": a.riesgo.requiere_pia, "motivos_pia": list(a.riesgo.motivos_pia),
+                    "vigente": a.vigente}
+        return {"actividades": [act(a) for a in reg.actividades], "pia": [act(a) for a in reg.recomendadas_pia()],
+                "finalidades": sum(len(a.finalidades) for a in reg.actividades)}
+
     async def catalogo(self) -> dict:
         return {
+            "registro": await self._registro_para_catalogo(),
             "plantillas": catalogo(),
             "ia_habilitada": bool(settings.BORRADORES_IA_HABILITADA),
             "cuota": await self.cuota(),
@@ -296,7 +325,7 @@ class Borradores:
         return adaptacion, info
 
     async def generar(self, tipo: str | None, instrucciones: str | None, usar_ia: bool = True,
-                      evaluacion_id: int | None = None) -> dict:
+                      evaluacion_id: int | None = None, actividades: list[int] | None = None) -> dict:
         t = TipoPlantilla.normalizar(tipo)
         if t is None:
             raise BorradorError(422, "PLANTILLA_INVALIDA", "Elige una plantilla: Política de uso de LLM, Aviso de "
@@ -319,6 +348,16 @@ class Borradores:
         plantilla = obtener_plantilla(t)
         ctx = await self._contexto(evaluacion_id)
         identidad = await self._identidad(ctx)
+        # HU-38 C2: la PIA y el aviso de privacidad toman lo que ya dice el registro de actividades
+        registro = None
+        if t in (TipoPlantilla.PIA, TipoPlantilla.AVISO_PRIVACIDAD):
+            registro = await self._registro()
+            if actividades:
+                validas = {a.id for a in registro.actividades}
+                if t != TipoPlantilla.PIA or not set(actividades) <= validas:
+                    raise BorradorError(422, "ACTIVIDADES_INVALIDAS",
+                                        "Elige actividades de tu registro (solo para la evaluación de impacto).")
+                registro = registro.con_seleccion(actividades)
         if usar_ia:
             adaptacion, info = await self._adaptar(plantilla, ctx, instrucciones)
         else:
@@ -331,15 +370,19 @@ class Borradores:
                                  for x in adaptacion.notas] if n]
         except AnonimizacionError:
             notas = []
-        contenido = generador.generar_markdown(plantilla, ctx, identidad, adaptacion, datetime.now(ZONA))
+        contenido = generador.generar_markdown(plantilla, ctx, identidad, adaptacion, datetime.now(ZONA),
+                                               registro=registro)
         ahora = _ahora()
         advertencias = list(dict.fromkeys(info["advertencias"] + ([info["motivo_sin_ia"]]
-                                                                  if info["motivo_sin_ia"] else [])))
+                                                                  if info["motivo_sin_ia"] else [])
+                                          + (registro.advertencias(t.value) if registro is not None else [])))
+        huella_contexto = ctx.huella() if registro is None else hashlib.sha256(
+            (ctx.huella() + registro.huella()).encode()).hexdigest()[:32]
         b = BorradorDocumento(
             empresa_id=self.empresa.id, evaluacion_id=ctx.evaluacion_id, usuario_definitivo_id=self.usuario.id,
             tipo=t.value, titulo=plantilla.titulo, estado=EstadoBorrador.EN_REVISION.value, version=1,
             contenido=contenido, adaptado_ia=info["adaptado_ia"], prompt_version=info["prompt_version"],
-            traza_id=info["traza_id"], version_plantillas=VERSION_PLANTILLAS, huella_contexto=ctx.huella(),
+            traza_id=info["traza_id"], version_plantillas=VERSION_PLANTILLAS, huella_contexto=huella_contexto,
             notas=notas or None, advertencias=advertencias or None,
             fecha_creacion=ahora, fecha_actualizacion=ahora,
         )
@@ -356,10 +399,13 @@ class Borradores:
                      "prompt_version": info["prompt_version"], "version_plantillas": VERSION_PLANTILLAS,
                      "entidades_anonimizadas": info["entidades_anonimizadas"],
                      "huella_instrucciones": huella(instrucciones) if instrucciones else None,
-                     "largo_instrucciones": len(instrucciones), "pendientes": len(generador.pendientes(contenido))},
+                     "largo_instrucciones": len(instrucciones), "pendientes": len(generador.pendientes(contenido)),
+                     "actividades_registro": registro.resumen(t.value)["actividades"] if registro is not None else None},
         )
         await self.db.commit()
         respuesta = {"borrador": borrador_a_dict(b, con_contenido=True), "cuota": await self.cuota()}
+        if registro is not None:
+            respuesta["registro"] = registro.resumen(t.value)
         aviso = AVISOS.get(info["motivo_sin_ia"] or "")
         if aviso:
             respuesta["aviso"] = aviso

@@ -7,6 +7,9 @@
  * Aquí quedan la empresa, su contrato y accesos directos; el historial vive en
  * /empresa/evaluaciones y los documentos en /empresa/documentos.
  *
+ * El registro de actividades conectado con el resto (estado del mapa y del registro, matriz de mayor
+ * riesgo, aporte a la evaluación y brechas con su ruta): EstadoProteccionDatos.tsx.
+ *
  * HU-30: sin contrato vigente se muestra la situación del contrato con lo que sigue disponible:
  * el historial y los resultados (gratuitos) y, durante el plazo de gracia, Mis documentos.
  */
@@ -14,6 +17,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { diasParaTermino, fechaCorta, type ContratoClienteApi } from "@/lib/empresa";
 import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
+import { EstadoProteccionDatos } from "./EstadoProteccionDatos";
 import s from "@/components/admin/admin.module.css";
 
 export function EspacioEmpresa() {
@@ -66,7 +70,12 @@ export function EspacioEmpresa() {
         <Acceso href="/empresa/mapa-datos" icono="mapa" titulo="Mapa de datos personales">
           Qué datos tratas, de quién, dónde están y con quién los compartes.
         </Acceso>
+        <Acceso href="/empresa/registro-actividades" icono="lista" titulo="Registro de actividades">
+          Tus actividades de tratamiento, su nivel de riesgo y su vigencia.
+        </Acceso>
       </nav>
+
+      <EstadoProteccionDatos />
 
       <section className="card" aria-labelledby="titulo-empresa">
         <div className="card-head">

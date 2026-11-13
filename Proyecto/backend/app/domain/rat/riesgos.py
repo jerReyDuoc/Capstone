@@ -1,5 +1,5 @@
 """
-HU-36 (base de HU-38) · Matriz de riesgos de las actividades del registro.
+HU-36 / HU-38 · Matriz de riesgos de las actividades del registro.
 
 Cada actividad recibe un riesgo INHERENTE en una matriz de 5 × 5 (probabilidad × impacto), calculado
 solo con lo que ya dice el registro (sin preguntar nada nuevo). Es determinista: la misma actividad
@@ -16,9 +16,16 @@ da siempre el mismo resultado, así el PDF, la planilla y el panel dicen lo mism
   nivel = probabilidad × impacto     1–4 Bajo · 5–9 Medio · 10–14 Alto · 15–25 Crítico
 
 Metodología ORIENTATIVA (inspirada en ISO 31000 e ISO/IEC 27005, y en los criterios de alto riesgo de
-la Ley N.º 21.719). Los pesos viven en este archivo para que HU-38 (matriz de riesgos editable) los
-ajuste o permita que la empresa registre su propia valoración y el riesgo residual sin tocar el
-resto del informe. Cada factor trae su explicación y un tratamiento sugerido.
+la Ley N.º 21.719). Los pesos viven en este archivo. Cada factor trae su explicación y un tratamiento
+sugerido.
+
+HU-38 · Matriz de mayor riesgo y evaluación de impacto:
+  - Las actividades de MAYOR RIESGO (nivel Alto o Crítico, o con un motivo de evaluación de impacto)
+    forman la matriz de riesgos del registro (Decreto 662, art. 3 letra e): matriz_mayor_riesgo().
+  - Se RECOMIENDA una evaluación de impacto (PIA) cuando se cumple alguna regla de motivos_pia():
+    riesgo Alto o Crítico; decisiones automatizadas o perfilamiento; datos sensibles o de NNA a gran
+    escala (10.000 personas o más); o IA con datos sensibles o de NNA. Cada motivo es un texto que
+    explica la regla, para que la empresa sepa por qué.
 """
 from __future__ import annotations
 
@@ -36,11 +43,21 @@ ETIQUETA_IMPACTO = {1: "Muy bajo", 2: "Bajo", 3: "Moderado", 4: "Alto", 5: "Muy 
 
 METODOLOGIA = (
     "Riesgo inherente = probabilidad × impacto, en una escala de 1 a 5 cada uno. El impacto sube con los datos "
-    "sensibles, los de niños, niñas y adolescentes, las decisiones automatizadas y la cantidad de grupos de "
-    "personas. La probabilidad sube con las transferencias internacionales, los terceros sin contrato, las pocas "
-    "medidas de seguridad, las decisiones sin revisión humana y la información incompleta. Es una valoración "
-    "orientativa calculada con lo que registró la empresa: no reemplaza una evaluación de impacto en protección "
-    "de datos cuando la ley la exige."
+    "sensibles, los de niños, niñas y adolescentes, las decisiones automatizadas, la cantidad de grupos de "
+    "personas y el volumen de personas que abarca la actividad. La probabilidad sube con las transferencias "
+    "internacionales, los terceros sin contrato, las pocas medidas de seguridad, las decisiones sin revisión "
+    "humana, el uso de inteligencia artificial y la información incompleta. Es una valoración orientativa "
+    "calculada con lo que registró la empresa: no reemplaza una evaluación de impacto en protección de datos "
+    "cuando la ley la exige."
+)
+
+# HU-38: la matriz de las actividades de mayor riesgo es parte del registro que pide el reglamento
+REFERENCIA_MATRIZ = "Decreto 662, art. 3 letra e"
+NIVELES_ALTOS = ("Alto", "Crítico")
+METODOLOGIA_PIA = (
+    "Se recomienda una evaluación de impacto en protección de datos cuando la actividad tiene un riesgo alto o "
+    "crítico, toma decisiones automatizadas o arma perfiles de las personas, trata datos sensibles o de niños, "
+    "niñas y adolescentes a gran escala (10.000 personas o más) o usa inteligencia artificial con esos datos."
 )
 
 # Medidas que se esperan como mínimo cuando hay datos sensibles
@@ -68,6 +85,8 @@ class RiesgoActividad:
     probabilidad: int
     impacto: int
     factores: tuple[Factor, ...] = field(default_factory=tuple)
+    # HU-38: por qué se recomienda una evaluación de impacto (vacío = no se recomienda)
+    motivos_pia: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def puntaje(self) -> int:
@@ -76,6 +95,15 @@ class RiesgoActividad:
     @property
     def nivel(self) -> str:
         return nivel_de(self.puntaje)
+
+    @property
+    def requiere_pia(self) -> bool:
+        return bool(self.motivos_pia)
+
+    @property
+    def mayor_riesgo(self) -> bool:
+        """HU-38: forma parte de la matriz de mayor riesgo (Decreto 662, art. 3 letra e)."""
+        return self.nivel in NIVELES_ALTOS or self.requiere_pia
 
     @property
     def tratamientos(self) -> list[str]:
@@ -91,6 +119,7 @@ class RiesgoActividad:
             "probabilidad_nombre": ETIQUETA_PROBABILIDAD[self.probabilidad], "impacto": self.impacto,
             "impacto_nombre": ETIQUETA_IMPACTO[self.impacto], "puntaje": self.puntaje, "nivel": self.nivel,
             "factores": [f.como_dict() for f in self.factores], "tratamientos": self.tratamientos,
+            "requiere_pia": self.requiere_pia, "motivos_pia": list(self.motivos_pia), "mayor_riesgo": self.mayor_riesgo,
         }
 
 
@@ -105,11 +134,15 @@ def _acotar(v: int) -> int:
     return max(1, min(5, v))
 
 
-def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltantes: int = 0) -> RiesgoActividad:
+def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltantes: int = 0,
+            sistemas_ia: list[dict] | None = None) -> RiesgoActividad:
     """
     `contenido`: lo que escribió la empresa (rat.modelo.completar). `mapa`: lo que la actividad toma del
     mapa (las listas de rat.analisis.derivados o de la instantánea de una versión vigente).
     `faltantes`: campos obligatorios vacíos (0 en una versión vigente).
+    `sistemas_ia` (HU-38): sistemas con IA que usa la actividad; si no se indica se toman de
+    `mapa["sistemas_ia"]` (rat.analisis.derivados). Una instantánea no los guarda: el caso de uso los
+    calcula con el mapa actual (rat.analisis.sistemas_ia_en).
     """
     factores: list[Factor] = []
     tipos = mapa.get("tipos_datos") or []
@@ -145,6 +178,13 @@ def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltant
             "impacto", 1, "Muchos grupos de personas",
             f"Abarca {len(titulares)} categorías de titulares: un incidente afectaría a muchas personas.",
             "Revisa si todos los grupos son necesarios para la finalidad (minimización)."))
+    volumen = cat.VOLUMENES_POR_CODIGO.get(contenido.get("volumen") or "")
+    if volumen is not None and volumen.extra.get("puntos"):
+        factores.append(Factor(
+            "impacto", int(volumen.extra["puntos"]), "Gran volumen de personas",
+            f"La actividad alcanza a {volumen.nombre[0].lower() + volumen.nombre[1:]}: un incidente tendría un "
+            "alcance masivo.",
+            "Minimiza los datos y el número de personas alcanzadas, y prueba tu procedimiento ante incidentes."))
 
     # ------------------------------------------------------------ probabilidad
     sin_garantia = [t for t in transferencias if not t.get("garantia_valida")]
@@ -189,6 +229,14 @@ def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltant
             "probabilidad", 1, "Información incompleta",
             f"Faltan {faltantes} dato(s) obligatorio(s) del registro: lo que no está documentado no se controla.",
             "Completa la actividad y déjala vigente."))
+    ia = list(sistemas_ia if sistemas_ia is not None else mapa.get("sistemas_ia") or [])
+    if ia:
+        factores.append(Factor(
+            "probabilidad", 1, "Uso de inteligencia artificial",
+            "Usa " + ", ".join(x.get("nombre", "?") for x in ia[:3]) + ("…" if len(ia) > 3 else "")
+            + ": los datos pueden quedar expuestos en lo que se envía al modelo o en sus respuestas.",
+            "Anonimiza o seudonimiza los datos antes de enviarlos al modelo, valida sus respuestas e informa a las "
+            "personas que usas inteligencia artificial."))
     fuentes = {f.get("tipo") for f in contenido.get("fuentes") or []}
     if fuentes & {"terceros", "acceso_publico"}:
         factores.append(Factor(
@@ -198,7 +246,26 @@ def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltant
 
     impacto = _acotar(1 + sum(f.puntos for f in factores if f.eje == "impacto"))
     probabilidad = _acotar(1 + sum(f.puntos for f in factores if f.eje == "probabilidad"))
-    return RiesgoActividad(actividad_id, nombre, probabilidad, impacto, tuple(factores))
+    motivos = motivos_pia(nivel_de(probabilidad * impacto), bool(sensibles), nna, decisiones,
+                          bool(volumen and volumen.extra.get("gran_escala")), bool(ia))
+    return RiesgoActividad(actividad_id, nombre, probabilidad, impacto, tuple(factores), tuple(motivos))
+
+
+def motivos_pia(nivel: str, sensibles: bool, nna: bool, decisiones: dict, gran_escala: bool, usa_ia: bool) -> list[str]:
+    """HU-38: reglas explicables de cuándo se recomienda una evaluación de impacto (METODOLOGIA_PIA)."""
+    motivos: list[str] = []
+    if nivel in NIVELES_ALTOS:
+        motivos.append(f"Su riesgo inherente es {nivel.lower()}.")
+    if decisiones.get("existe"):
+        motivos.append("Arma perfiles de las personas con decisiones automatizadas." if decisiones.get("perfilamiento")
+                       else "Toma decisiones automatizadas sobre las personas.")
+    especiales = "datos sensibles y de niños, niñas o adolescentes" if sensibles and nna else (
+        "datos sensibles" if sensibles else "datos de niños, niñas o adolescentes")
+    if (sensibles or nna) and gran_escala:
+        motivos.append(f"Trata {especiales} a gran escala.")
+    if (sensibles or nna) and usa_ia:
+        motivos.append(f"Usa inteligencia artificial con {especiales}.")
+    return motivos
 
 
 # ============================================================ agregados
@@ -220,3 +287,8 @@ def conteo_niveles(riesgos: list[RiesgoActividad]) -> dict[str, int]:
 def ordenar(riesgos: list[RiesgoActividad]) -> list[RiesgoActividad]:
     """Del más grave al más leve (a igual puntaje, el de mayor impacto primero)."""
     return sorted(riesgos, key=lambda r: (-r.puntaje, -r.impacto, r.nombre.lower()))
+
+
+def matriz_mayor_riesgo(riesgos: list[RiesgoActividad]) -> list[RiesgoActividad]:
+    """HU-38 C1: las actividades de mayor riesgo, de la más grave a la más leve (Decreto 662, art. 3 letra e)."""
+    return [r for r in ordenar(riesgos) if r.mayor_riesgo]

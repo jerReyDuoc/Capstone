@@ -16,6 +16,8 @@ El contenido se guarda como un documento JSON (rat_actividad.contenido) con esta
   medidas                   {codigos, otras}
   rol, responsable_mandante (si la empresa es encargada: por cuenta de qué organización)
   ambito_nota               aclaración opcional del ámbito territorial
+  volumen                   (HU-38, opcional) a cuántas personas alcanza: catalogo.VOLUMENES. Solo se guarda
+                            si tiene valor, así las versiones y huellas anteriores no cambian.
 
 Nada de lo anterior se repite del mapa: los nombres, países, terceros y transferencias se calculan
 con app/domain/rat/analisis.py. Minimización: los textos se rechazan si traen correos, RUT o
@@ -43,8 +45,10 @@ LARGOS = {
 CAMPOS_EDITABLES = (
     "nombre", "descripcion", "area", "elementos", "flujos", "finalidades", "fuentes", "base_licitud",
     "interes_legitimo", "base_sensibles", "sin_destinatarios", "plazos", "decisiones", "medidas", "rol",
-    "responsable_mandante", "ambito_nota",
+    "responsable_mandante", "ambito_nota", "volumen",
 )
+# HU-38: claves opcionales que NO forman parte del contenido vacío (solo existen si tienen valor)
+OPCIONALES = ("volumen",)
 
 
 def contenido_vacio() -> dict:
@@ -62,7 +66,10 @@ def completar(contenido: dict | None) -> dict:
     """El contenido guardado con todas sus claves (lo que falte, con su valor vacío)."""
     base = contenido_vacio()
     for k, v in (contenido or {}).items():
-        if k in base:
+        if k in OPCIONALES:
+            if v is not None:
+                base[k] = v
+        elif k in base:
             if isinstance(base[k], dict) and isinstance(v, dict):
                 base[k] = {**base[k], **{kk: vv for kk, vv in v.items() if kk in base[k]}}
             else:
@@ -289,6 +296,12 @@ def normalizar(datos: dict, actual: dict | None = None) -> dict:
             nuevo[campo] = _medidas(valor)
         elif campo == "rol":
             nuevo[campo] = _opcion(valor, campo, cat.ROLES_POR_CODIGO, "Elige si tu empresa es responsable o encargada.")
+        elif campo == "volumen":
+            v = _opcion(valor, campo, cat.VOLUMENES_POR_CODIGO, "Elige cuántas personas abarca la actividad.")
+            if v is None:
+                nuevo.pop("volumen", None)
+            else:
+                nuevo["volumen"] = v
 
     # Coherencia: lo que deja de aplicar no se guarda
     if nuevo["base_licitud"] != cat.INTERES_LEGITIMO:

@@ -474,3 +474,6 @@
   .textoPregunta { font-size: var(--fs-lg); }
   .conversacion, .panelPropuestas, .recorrido, .revision { padding: var(--sp-4); }
 }
+
+/* Corrección 13-11: texto de espera junto a los puntitos mientras la ayuda automática analiza */
+.espera { margin-left: 10px; font-size: var(--fs-sm); color: var(--text-muted); }

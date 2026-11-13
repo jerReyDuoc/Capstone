@@ -37,7 +37,7 @@ from app.application.use_cases.limites_encuesta import ventana_diaria
 from app.application.use_cases.upload_evidence import ArchivoDemasiadoGrandeError, TipoArchivoNoAdmitidoError, validar_archivo
 from app.core.config import settings
 from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.evidencia import ORIGEN_REMEDIACION, EstadoValidacion, Evidencia
+from app.domain.models.evidencia import ORIGEN_REMEDIACION, ORIGENES_REMEDIACION, EstadoValidacion, Evidencia
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
@@ -84,6 +84,7 @@ def evidencia_dict(e: Evidencia) -> dict:
         "en_proceso": e.estado_validacion in _SIN_TERMINAR,
         "puntaje_previo": e.puntaje_previo,
         "puntaje_resultante": e.puntaje_resultante,
+        "origen": e.origen,             # HU-38: "rat" = lo respaldó el registro de actividades (sin archivo)
         "mejoro": bool(e.estado_resultante and e.estado_previo
                        and _RANGO.get(e.estado_resultante, 0) > _RANGO.get(e.estado_previo, 0)),
     }
@@ -124,7 +125,7 @@ class Remediacion:
         if abiertas:
             filas = (await self.db.execute(
                 select(Evidencia).where(Evidencia.respuesta_id.in_([r.id for r in abiertas]),
-                                        Evidencia.origen == ORIGEN_REMEDIACION)
+                                        Evidencia.origen.in_(ORIGENES_REMEDIACION))   # HU-38: también el registro
                 .order_by(Evidencia.id_evidencia)
             )).scalars().all()
             for e in filas:
@@ -161,7 +162,7 @@ class Remediacion:
             select(Evidencia.fecha_procesada, Evidencia.puntaje_previo, Evidencia.puntaje_resultante,
                    Evidencia.respuesta_id, Evidencia.estado_previo, Evidencia.estado_resultante)
             .join(Respuesta, Evidencia.respuesta_id == Respuesta.id)
-            .where(Respuesta.evaluacion_id == ev.id, Evidencia.origen == ORIGEN_REMEDIACION,
+            .where(Respuesta.evaluacion_id == ev.id, Evidencia.origen.in_(ORIGENES_REMEDIACION),
                    Evidencia.puntaje_resultante.is_not(None), Evidencia.puntaje_previo.is_not(None),
                    Evidencia.puntaje_resultante > Evidencia.puntaje_previo)
             .order_by(Evidencia.id_evidencia)
@@ -277,7 +278,7 @@ class Remediacion:
         e = await self.db.get(Evidencia, evidencia_id)
         respuesta = await self.db.get(Respuesta, e.respuesta_id) if e else None
         ev = await self.db.get(Evaluacion, respuesta.evaluacion_id) if respuesta else None
-        if e is None or not e.es_remediacion or ev is None or ev.empresa_id != self.empresa.id:
+        if e is None or e.origen not in ORIGENES_REMEDIACION or ev is None or ev.empresa_id != self.empresa.id:
             raise RemediacionError(404, "EVIDENCIA_NO_ENCONTRADA", "Evidencia no encontrada")
         datos = None
         try:

@@ -190,6 +190,21 @@ export const responderPregunta = (sesionId: number, texto: string, omitir = fals
 
 /** La ayuda automática falló por algo pasajero: la pregunta no avanzó y se puede reintentar o guardar sin ayuda. */
 export const CODIGO_AYUDA_NO_DISPONIBLE = "AYUDA_NO_DISPONIBLE";
+/** La respuesta anterior se sigue analizando (doble envío, otra pestaña): se espera y se recarga. */
+export const CODIGO_RESPUESTA_EN_PROCESO = "RESPUESTA_EN_PROCESO";
+/** La pregunta ya se respondió en otra pestaña: se recarga la entrevista. */
+export const CODIGO_PREGUNTA_YA_RESPONDIDA = "PREGUNTA_YA_RESPONDIDA";
+
+/**
+ * Lo que se muestra mientras la ayuda automática analiza una respuesta, según los segundos que lleva.
+ * El servidor corta a los 70 s como máximo: después de eso responde o pide reintentar, nunca queda colgado.
+ */
+export function textoEspera(segundos: number): string {
+  if (segundos < 8) return "Analizando tu respuesta…";
+  if (segundos < 25) return "Sigo analizando tu respuesta y preparando las propuestas…";
+  if (segundos < 50) return "Está tardando más de lo normal. Puede demorar hasta un minuto.";
+  return "Ya casi: si no termina pronto, podrás reintentar o guardar tu respuesta sin ayuda.";
+}
 
 export const cerrarEntrevista = (sesionId: number) =>
   pedir<EstadoAsistente>(`${BASE_ASISTENTE}/sesiones/${sesionId}/cerrar`, { method: "POST", json: {} });

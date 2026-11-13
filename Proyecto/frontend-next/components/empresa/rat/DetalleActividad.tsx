@@ -25,6 +25,7 @@ import {
 import { FichaActividad, ResumenCorto } from "./Ficha";
 import { HistorialActividad } from "./Historial";
 import { PasoActividad, PasoConservacion, PasoDestinatarios, PasoLicitud, PasoSeguridad, PasoSistemas, type PropsPaso } from "./Pasos";
+import { RiesgoDeActividad } from "./RiesgoActividad";
 import s from "./rat.module.css";
 
 type Pestana = "ficha" | "versiones";
@@ -68,6 +69,7 @@ export function DetalleActividad({
   onAviso,
   onSesionVencida,
   onMapaDesactualizado,
+  pasoInicial,
 }: {
   id: number;
   catalogo: CatalogoRat;
@@ -77,11 +79,13 @@ export function DetalleActividad({
   onAviso: (a: Aviso) => void;
   onSesionVencida: (e: unknown) => boolean;
   onMapaDesactualizado: () => Promise<void>;
+  /** Paso del formulario en que se abre (al venir desde una brecha del registro). */
+  pasoInicial?: number;
 }) {
   const [actividad, setActividad] = useState<Actividad | null>(null);
   const [borrador, setBorrador] = useState<ContenidoActividad | null>(null);
   const [error, setError] = useState("");
-  const [paso, setPaso] = useState(1);
+  const [paso, setPaso] = useState(pasoInicial && pasoInicial >= 1 && pasoInicial <= 6 ? pasoInicial : 1);
   const [pestana, setPestana] = useState<Pestana>("ficha");
   const [ocupado, setOcupado] = useState(false);
   const [errorCampo, setErrorCampo] = useState<{ campo: string; mensaje: string } | null>(null);
@@ -179,7 +183,9 @@ export function DetalleActividad({
       aplicar(r.actividad);
       setConfirmar(null);
       if (accion === "nueva_version" || accion === "reactivar") setPaso(1);
-      onAviso({ tono: "ok", texto: r.mensaje ?? "Listo." });
+      // Al dejarla vigente, el registro completo cuenta como evidencia en la evaluación de la empresa
+      const evidencia = r.evidencia?.aplicado ? ` ${r.evidencia.mensaje}` : "";
+      onAviso({ tono: "ok", texto: `${r.mensaje ?? "Listo."}${evidencia}` });
     } catch (e) {
       setConfirmar(null);
       await resolverError(e, "No pudimos cambiar el estado. Inténtalo de nuevo.");
@@ -280,6 +286,8 @@ export function DetalleActividad({
           <p className="card-sub">Vigente desde el {fechaHoraChile(actividad.fecha_vigencia)}.</p>
         ) : null}
       </section>
+
+      <RiesgoDeActividad actividadId={actividad.id} riesgo={actividad.riesgo} />
 
       {actividad.motivos_revision.length ? (
         <div className="callout callout-aviso" role="status">

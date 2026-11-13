@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   agruparPropuestas, cambios, cantidad, cuotaTexto, dependenciasPendientes, progresoEntrevista, tipoVisual, diccionario, etiquetaIa, explicacionesSueltas, filasPropuesta,
   nombreRef, ordenarPropuestas, tituloTipo, tonoSeveridad, validarDocumento, validarRespuesta, versionGuia,
+  CODIGO_PREGUNTA_YA_RESPONDIDA, CODIGO_RESPUESTA_EN_PROCESO, textoEspera,
   type EstadoAsistente, type PropuestaApi,
 } from "@/lib/asistente";
 import type { CatalogoMapa } from "@/lib/mapaDatos";
@@ -169,5 +170,18 @@ describe("diseño de la pantalla", () => {
     expect(g.map((x) => x.tipo)).toEqual(["elemento", "actividad"]);
     expect(cantidad(1, "flujo", "flujos")).toBe("1 flujo");
     expect(cantidad(3, "flujo", "flujos")).toBe("3 flujos");
+  });
+});
+
+describe("espera mientras la ayuda automática analiza", () => {
+  it("explica la espera según los segundos y nunca promete más de un minuto", () => {
+    expect(textoEspera(0)).toBe("Analizando tu respuesta…");
+    expect(textoEspera(12)).toMatch(/Sigo analizando/);
+    expect(textoEspera(30)).toMatch(/hasta un minuto/);
+    expect(textoEspera(65)).toMatch(/reintentar o guardar tu respuesta sin ayuda/);
+  });
+  it("los códigos de respuesta en curso son los del servidor", () => {
+    expect(CODIGO_RESPUESTA_EN_PROCESO).toBe("RESPUESTA_EN_PROCESO");
+    expect(CODIGO_PREGUNTA_YA_RESPONDIDA).toBe("PREGUNTA_YA_RESPONDIDA");
   });
 });

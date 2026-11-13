@@ -46,7 +46,7 @@ from app.domain.models.documento_empresa import (
     TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, TIPOS_RAT, TIPOS_ROPA, DocumentoEmpresa,
 )
 from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.evidencia import Evidencia, EstadoValidacion
+from app.domain.models.evidencia import ORIGEN_RAT, Evidencia, EstadoValidacion
 from app.domain.models.formacion import AvanceFormativo
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
@@ -273,7 +273,8 @@ class DocumentosEmpresa:
             .join(Respuesta, Evidencia.respuesta_id == Respuesta.id)
             .join(Evaluacion, Respuesta.evaluacion_id == Evaluacion.id)
             .outerjoin(MatrizControl, Respuesta.matriz_controles_id_control == MatrizControl.id_control)
-            .where(Evaluacion.empresa_id == self.empresa.id, Evidencia.fecha_eliminacion.is_(None))
+            .where(Evaluacion.empresa_id == self.empresa.id, Evidencia.fecha_eliminacion.is_(None),
+                   Evidencia.origen != ORIGEN_RAT)      # HU-38: la del registro no es un archivo
             .order_by(Evidencia.id_evidencia.desc())
         )).all()
 

@@ -325,9 +325,12 @@ class ProveedorAsistente(LLMProviderPort):
         self.data = data or remuneraciones()
         self.requests = []
         self.error = None   # LLMProviderError que se lanza en la próxima llamada
+        self.demora = 0.0   # segundos que tarda en responder (para probar el tiempo máximo)
 
     async def generar(self, req):
         self.requests.append(req)
+        if self.demora:
+            await asyncio.sleep(self.demora)
         if self.error is not None:
             error, self.error = self.error, None
             raise error
@@ -632,4 +635,73 @@ def test_api_ayuda_ocupada_no_avanza_y_se_puede_guardar_sin_ayuda(hu27, ia):
         rechazos = [b for b in await _filas(hu27, BitacoraAuditoria)
                     if b.accion == "asistente.respuesta" and b.resultado == "rechazado"]
         assert rechazos and rechazos[0].detalle["error_ia"] == "rate_limit"
+    _correr(esc)
+
+
+# ====================================================================== corrección 13-11: el asistente no se cuelga
+@api
+def test_api_ayuda_lenta_se_corta_a_tiempo_y_no_avanza(hu27, ia, monkeypatch):
+    """La ayuda automática tiene un tiempo TOTAL: si el proveedor tarda, se pide reintentar (nunca queda colgada)."""
+    async def esc(c):
+        from app.core.config import settings
+        from app.domain.models import AsistenteMensaje
+
+        monkeypatch.setattr(settings, "ASISTENTE_TIEMPO_MAXIMO_S", 0.3)
+        h = (await _cliente(hu27, c))["hc"]
+        s = (await c.post("/api/asistente/sesiones", headers=h, json={})).json()["sesion"]
+        ia.demora = 2.0
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 503 and hu27._codigo(r) == "AYUDA_NO_DISPONIBLE"
+        assert r.json()["detail"]["tipo_error"] == "timeout" and "tardó demasiado" in r.json()["detail"]["mensaje"]
+        assert await _filas(hu27, AsistenteMensaje) == []
+        e = (await c.get("/api/asistente", headers=h)).json()
+        assert e["sesion"]["pregunta"]["codigo"] == "personas.sistemas"            # no avanzó
+        assert e["ia"]["cuota"]["respuestas"]["usados"] == 0                       # la cuota se devolvió
+        # El turno quedó libre: reintentar funciona apenas el proveedor responde
+        ia.demora = 0.0
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 200 and r.json()["nuevas"]
+    _correr(esc)
+
+
+@api
+def test_api_una_respuesta_a_la_vez_por_entrevista(hu27, ia):
+    """Un segundo envío mientras la IA analiza el primero no espera ni se duplica: 409 y se recarga."""
+    async def esc(c):
+        from app.infrastructure.cache.limitador import obtener_limitador
+        from app.main import app
+
+        h = (await _cliente(hu27, c))["hc"]
+        s = (await c.post("/api/asistente/sesiones", headers=h, json={})).json()["sesion"]
+        limitador = app.dependency_overrides[obtener_limitador]()
+        clave = f"asistente:procesando:{s['id']}"
+        await limitador.consumir(clave, 1, 100)                 # otra petición está analizando
+        llamadas = len(ia.requests)
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 409 and hu27._codigo(r) == "RESPUESTA_EN_PROCESO"
+        assert len(ia.requests) == llamadas and await limitador.usados(clave) == 1   # el turno sigue tomado
+        await limitador.reiniciar(clave)                        # la primera terminó
+        r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": "Usamos planillas"})
+        assert r.status_code == 200
+        assert await limitador.usados(clave) == 0               # al terminar, el turno se suelta
+    _correr(esc)
+
+
+@api
+def test_api_el_prompt_no_crece_con_cada_pregunta(hu27, ia, monkeypatch):
+    """El modelo ve solo las propuestas pendientes más recientes (antes iban todas y el prompt crecía sin fin)."""
+    async def esc(c):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "ASISTENTE_PENDIENTES_EN_PROMPT", 2)
+        h = (await _cliente(hu27, c))["hc"]
+        s = (await c.post("/api/asistente/sesiones", headers=h, json={})).json()["sesion"]
+        for texto in ("Usamos planillas", "Un sistema de remuneraciones", "La mutual recibe licencias"):
+            r = await c.post(f"/api/asistente/sesiones/{s['id']}/respuestas", headers=h, json={"texto": texto})
+            assert r.status_code == 200, r.text
+        assert r.json()["pendientes"] > 2
+        ultimo = ia.requests[-1].user
+        assert ultimo.count("propuesta pendiente ·") == 2
+        pendientes = ultimo.split("PROPUESTAS PENDIENTES")[1].split("═")[0]
+        assert pendientes.count("\n  - ") == 2
     _correr(esc)

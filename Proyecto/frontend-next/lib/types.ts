@@ -496,6 +496,8 @@ export interface EvidenciaRemediacionApi {
   fecha_procesada: string | null;
   en_proceso: boolean;
   mejoro: boolean;
+  /** "rat" = la respaldó el registro de actividades vigente y completo (no hay archivo). */
+  origen?: "cuestionario" | "remediacion" | "rat";
   /** Puntaje general antes y después de procesarla (iguales si el control no mejoró). */
   puntaje_previo?: number | null;
   puntaje_resultante?: number | null;

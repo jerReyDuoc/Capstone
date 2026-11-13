@@ -13,6 +13,11 @@ class EstadoValidacion(str, Enum):
 
 ORIGEN_CUESTIONARIO = "cuestionario"
 ORIGEN_REMEDIACION = "remediacion"  # HU-17
+# HU-38: el registro de actividades VIGENTE Y COMPLETO de la empresa respalda un control de protección
+# de datos. No hay archivo (storage_path vacío): la "evidencia" es la huella del registro. Cuenta en la
+# evolución del puntaje igual que una remediación y nunca baja el control.
+ORIGEN_RAT = "rat"
+ORIGENES_REMEDIACION = (ORIGEN_REMEDIACION, ORIGEN_RAT)
 
 
 class Evidencia(Base):
@@ -60,6 +65,10 @@ class Evidencia(Base):
     @property
     def es_remediacion(self) -> bool:
         return self.origen == ORIGEN_REMEDIACION
+
+    @property
+    def es_del_registro(self) -> bool:
+        return self.origen == ORIGEN_RAT
 
     @property
     def eliminada(self) -> bool:

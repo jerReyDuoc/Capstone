@@ -587,6 +587,11 @@ RUTAS_CON_TOKEN_PROPIO = [
     ("POST", "/api/registro-actividades/ropa", "/api/registro-actividades/ropa", {"json": {}}),
     ("GET", "/api/registro-actividades/ropa/{informe_id}/descarga",
      "/api/registro-actividades/ropa/1/descarga?formato=pdf", {}),
+    # HU-38: el registro conectado con la evaluación, las brechas y los borradores (solo cliente con contrato
+    # vigente; flujo completo en test_hu38_integracion_rat.py)
+    ("GET", "/api/registro-actividades/cumplimiento", "/api/registro-actividades/cumplimiento", {}),
+    ("POST", "/api/registro-actividades/cumplimiento/evidencia", "/api/registro-actividades/cumplimiento/evidencia",
+     {}),
     # HU-39: asistente de IA del mapa y del RAT (solo cliente con contrato vigente; roles y flujo
     # completo en test_hu39_asistente_rat.py)
     ("GET", "/api/asistente", "/api/asistente", {}),

@@ -1,0 +1,34 @@
+/* "Mi empresa" · Protección de datos personales (estado del mapa, del registro, riesgos y brechas). */
+.seccion { display: grid; gap: var(--sp-5); }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-3); }
+.tarjeta {
+  display: grid; gap: 6px; align-content: start; padding: var(--sp-4); border: 1px solid var(--line);
+  border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); text-decoration: none;
+}
+a.tarjeta:hover { border-color: var(--line-control); }
+a.tarjeta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tarjeta[data-ok="true"] { border-color: var(--ok); }
+.tarjeta strong { font-size: var(--fs-md); }
+.etiqueta { display: flex; gap: 6px; align-items: center; font-size: var(--fs-xs); color: var(--text-muted); }
+.etiqueta svg { width: 16px; height: 16px; }
+.pie { display: block; font-size: var(--fs-xs); color: var(--text-muted); font-weight: 400; }
+.barra { display: block; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.barra span { display: block; height: 100%; background: var(--accent); }
+
+.bloque { display: grid; gap: var(--sp-3); }
+.titulo { font-size: var(--fs-md); font-weight: 600; margin: 0; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.item {
+  display: flex; gap: var(--sp-3); align-items: flex-start; justify-content: space-between; padding: var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+}
+.item > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.acciones { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
+.pasos { margin: 0; padding-left: var(--sp-5); display: grid; gap: 4px; font-size: var(--fs-sm); }
+
+.brecha { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.brechaCabeza { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.brecha p { margin: 0; }
+.ruta { margin: 0; padding-left: var(--sp-5); display: grid; gap: 4px; font-size: var(--fs-sm); }
+.ruta li[data-hecho="true"] { color: var(--ok); }
+.ruta li[data-hecho="true"]::marker { content: "✓ "; }

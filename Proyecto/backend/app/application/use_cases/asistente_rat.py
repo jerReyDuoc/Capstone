@@ -232,7 +232,8 @@ class AsistenteRat:
         q = select(AsistenteSesion).where(AsistenteSesion.id == sesion_id,
                                           AsistenteSesion.empresa_id == self.empresa_id)
         if bloquear:
-            q = q.with_for_update()
+            # populate_existing: si la sesión ya estaba cargada, se relee lo que hay en la BD al bloquearla
+            q = q.with_for_update().execution_options(populate_existing=True)
         s = (await self.db.execute(q)).scalar_one_or_none()
         if s is None:                      # lo de otra empresa no existe (404, no 403)
             raise AsistenteError(404, "SESION_NO_ENCONTRADA", "No encontramos esa entrevista.")
@@ -411,25 +412,38 @@ class AsistenteRat:
                                  f"Tienes {len(pendientes)} propuestas por revisar. Acepta o descarta algunas antes de "
                                  "seguir: así nada se te acumula.")
         referenciables = [p for p in todas if p.estado in ("sugerida", "aceptada", "editada")]
+        # Corrección 13-11: el modelo ve solo las pendientes MÁS RECIENTES (las aceptadas ya están en el mapa con
+        # su id). Antes iban todas en cada llamada y el prompt crecía con cada pregunta hasta agotar el límite de
+        # tokens por minuto del proveedor. El anclaje sigue validando contra TODAS (ctx_anclaje, más abajo).
+        en_prompt = pendientes[:settings.ASISTENTE_PENDIENTES_EN_PROMPT]
         mapa_txt = contexto.mapa_texto(
             elementos, flujos, [a for a in actividades if a["estado"] != "archivada"],
-            [{"clave": p.clave, "tipo": p.tipo, "nombre": propuesta_a_dict(p)["nombre"]} for p in pendientes])
+            [{"clave": p.clave, "tipo": p.tipo, "nombre": propuesta_a_dict(p)["nombre"]} for p in en_prompt])
         ctx = ContextoAsistente(area=area, area_nombre=banco.area(area).nombre if area in banco.AREAS_POR_CODIGO
                                 else "Documento", pregunta=pregunta, catalogos=contexto.catalogos_texto(),
-                                pendientes=tuple(p.clave for p in referenciables), tipo_documento=tipo_documento)
+                                pendientes=tuple(p.clave for p in en_prompt), tipo_documento=tipo_documento)
         from app.application.ai.agente import SkillIA
 
         try:
-            salida = await self.agente.ejecutar(
+            # Corrección 13-11: tiempo TOTAL acotado (anonimización + reintentos del proveedor + LLM). Antes un
+            # 429 del proveedor con sus reintentos podía tardar varios minutos: el navegador se rendía a los 90 s
+            # y la respuesta quedaba "colgada".
+            salida = await asyncio.wait_for(self.agente.ejecutar(
                 SkillIA.ASISTENTE_RAT,
                 textos={"respuesta": respuesta, "documento": documento_texto, "mapa": mapa_txt},
                 datos={"contexto": ctx, "previos_usuario": previos},
                 contexto=ContextoLlamada(),
-            )
+            ), timeout=settings.ASISTENTE_TIEMPO_MAXIMO_S)
         except CapaIAError as e:
             if reserva is not None:
                 await reserva.devolver()   # no fue culpa del usuario: no gasta su cuota
             info.update(motivo_sin_ia="ia_no_disponible", error_ia=e.tipo_error)
+            return info
+        except asyncio.TimeoutError:
+            if reserva is not None:
+                await reserva.devolver()
+            logger.warning("HU-39: la ayuda automática superó %ss", settings.ASISTENTE_TIEMPO_MAXIMO_S)
+            info.update(motivo_sin_ia="ia_no_disponible", error_ia="timeout")
             return info
 
         info["neutralizados"] = list(salida.neutralizados)
@@ -509,13 +523,44 @@ class AsistenteRat:
         usuario cuando la ayuda falló). Si la ayuda falla por algo pasajero (cuota por minuto del proveedor, tiempo
         de espera, conexión), la pregunta no avanza y se responde 503 AYUDA_NO_DISPONIBLE para reintentar.
         """
-        s = await self._sesion(sesion_id, bloquear=True)
+        # Corrección 13-11: la sesión se lee SIN bloquearla. Antes quedaba bloqueada (SELECT … FOR UPDATE) durante
+        # toda la llamada al LLM: si el navegador se rendía y el usuario reenviaba, la segunda petición esperaba
+        # el bloqueo de la primera y el asistente "dejaba de responder". Ahora se bloquea solo al guardar.
+        s = await self._sesion(sesion_id)
         if s.estado != "activa":
             raise AsistenteError(409, "SESION_CERRADA", "Esta entrevista ya terminó. Abre una nueva.")
         p = banco.pregunta(s.area_actual, s.paso)
         if p is None:
             raise AsistenteError(409, "ENTREVISTA_TERMINADA", "Ya respondiste todas las preguntas. Revisa las propuestas "
                                  "o elige un área para agregar más información.")
+        clave_proceso = await self._tomar_turno(s.id)
+        try:
+            return await self._responder(s, p, texto, omitir, sin_ia)
+        finally:
+            await self._soltar_turno(clave_proceso)
+
+    async def _tomar_turno(self, sesion_id: int) -> str | None:
+        """Una respuesta a la vez por entrevista (doble clic, otra pestaña o reenvío mientras la IA trabaja)."""
+        if self.limitador is None:
+            return None
+        clave = f"asistente:procesando:{sesion_id}"
+        try:
+            consumo = await self.limitador.consumir(clave, 1, int(settings.ASISTENTE_TIEMPO_MAXIMO_S) + 30)
+        except LimitadorNoDisponibleError:
+            return None
+        if not consumo.permitido:
+            await self.limitador.devolver(clave)         # deshace solo este intento; el turno sigue tomado
+            raise AsistenteError(409, "RESPUESTA_EN_PROCESO", "Todavía estamos analizando tu respuesta anterior. "
+                                 "Espera unos segundos: aparecerá aquí apenas termine.")
+        return clave
+
+    async def _soltar_turno(self, clave: str | None) -> None:
+        if clave is not None and self.limitador is not None:
+            await self.limitador.reiniciar(clave)
+
+    async def _responder(self, s: AsistenteSesion, p: banco.Pregunta, texto: str | None, omitir: bool,
+                         sin_ia: bool) -> dict:
+        sesion_id, area_pregunta, paso_pregunta = s.id, s.area_actual, s.paso
         texto = (texto or "").strip()
         if not omitir:
             if not texto:
@@ -559,6 +604,13 @@ class AsistenteRat:
                 except AnonimizacionError:
                     contenido_usuario = TEXTO_NO_GUARDADO
 
+        # Ahora sí se bloquea la sesión, solo para avanzar la pregunta, y se confirma que nadie la avanzó mientras
+        # la IA trabajaba (otra pestaña): en ese caso no se guarda nada de esta respuesta.
+        s = await self._sesion(sesion_id, bloquear=True)
+        if s.estado != "activa" or (s.area_actual, s.paso) != (area_pregunta, paso_pregunta):
+            await self.db.rollback()
+            raise AsistenteError(409, "PREGUNTA_YA_RESPONDIDA", "Esta pregunta ya se respondió en otra pestaña. "
+                                 "Recargamos la entrevista para que sigas desde donde va.")
         self.db.add(AsistenteMensaje(sesion_id=s.id, rol="usuario", area=area_respondida, pregunta_codigo=p.codigo,
                                      contenido=contenido_usuario, bloqueado=False, traza_id=info.get("traza_id"),
                                      fecha=ahora))

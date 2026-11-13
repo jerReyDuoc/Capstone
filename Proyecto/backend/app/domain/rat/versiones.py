@@ -26,11 +26,12 @@ _CAMPO_DE = {
     "fuentes": "fuentes", "base_licitud": "base_licitud", "interes_legitimo": "base_licitud",
     "base_sensibles": "base_licitud", "sin_destinatarios": "destinatarios", "plazos": "conservacion",
     "decisiones": "decisiones", "medidas": "medidas", "rol": "rol", "responsable_mandante": "rol",
-    "ambito_nota": "ambito",
+    "ambito_nota": "ambito", "volumen": "volumen",
     "elementos": "bases_datos", "flujos": "bases_datos", "tipos_datos": "tipos_datos", "titulares": "titulares",
     "bases_datos": "bases_datos", "paises": "ambito", "terceros": "destinatarios", "transferencias": "transferencias",
 }
-TITULO_CAMBIO = {"actividad": "Nombre o descripción", **{c.codigo: c.titulo for c in cat.CAMPOS}}
+TITULO_CAMBIO = {"actividad": "Nombre o descripción", **{c.codigo: c.titulo for c in cat.CAMPOS},
+                 "volumen": "Cantidad de personas"}
 
 
 def _derivados_estables(deriv: dict) -> dict:
@@ -73,7 +74,7 @@ def diferencias(antes: dict | None, despues: dict) -> list[str]:
                 campo = _CAMPO_DE.get(k)
                 if campo and campo not in cambiados:
                     cambiados.append(campo)
-    orden = ["actividad", *cat.CODIGOS_CAMPO]
+    orden = ["actividad", *cat.CODIGOS_CAMPO, "volumen"]
     return sorted(cambiados, key=orden.index)
 
 

@@ -146,6 +146,20 @@ MEDIDAS_SEGURIDAD: tuple[Opcion, ...] = (
     Opcion("evaluacion_impacto", "Evaluación de impacto o de riesgos", extra={"grupo": GRUPOS_MEDIDAS[1]}),
 )
 
+# ============================================================ volumen de personas (HU-38)
+# Dato OPCIONAL de la actividad (no es uno de los 13 campos obligatorios): a cuántas personas alcanza.
+# Lo usa la matriz de riesgos (app/domain/rat/riesgos.py): `puntos` suma al impacto y `gran_escala`
+# activa la recomendación de evaluación de impacto cuando además hay datos sensibles o de NNA.
+VOLUMENES: tuple[Opcion, ...] = (
+    Opcion("hasta_mil", "Menos de 1.000 personas", extra={"puntos": 0, "gran_escala": False}),
+    Opcion("hasta_10_mil", "Entre 1.000 y 10.000 personas", extra={"puntos": 0, "gran_escala": False}),
+    Opcion("hasta_100_mil", "Entre 10.000 y 100.000 personas", extra={"puntos": 1, "gran_escala": True}),
+    Opcion("mas_100_mil", "Más de 100.000 personas", extra={"puntos": 2, "gran_escala": True}),
+)
+AYUDA_VOLUMEN = ("Opcional. A cuántas personas alcanza la actividad, aproximadamente. Un volumen alto sube el "
+                 "riesgo de la actividad y, con datos sensibles o de menores de edad, hace recomendable una "
+                 "evaluación de impacto.")
+
 # ============================================================ rol de la empresa
 ROLES_EMPRESA: tuple[Opcion, ...] = (
     Opcion("responsable", "Responsable",
@@ -226,6 +240,7 @@ UNIDADES_POR_CODIGO = _por_codigo(UNIDADES_PLAZO)
 INICIOS_POR_CODIGO = _por_codigo(INICIOS_PLAZO)
 MEDIDAS_POR_CODIGO = _por_codigo(MEDIDAS_SEGURIDAD)
 ROLES_POR_CODIGO = _por_codigo(ROLES_EMPRESA)
+VOLUMENES_POR_CODIGO = _por_codigo(VOLUMENES)
 ESTADOS_POR_CODIGO = _por_codigo(ESTADOS)
 CODIGOS_ESTADO = tuple(e.codigo for e in ESTADOS)
 
@@ -264,6 +279,8 @@ def catalogo_dict() -> dict:
         "grupos_medidas": list(GRUPOS_MEDIDAS),
         "medidas_seguridad": vig(MEDIDAS_SEGURIDAD),
         "roles_empresa": vig(ROLES_EMPRESA),
+        "volumenes": vig(VOLUMENES),
+        "ayuda_volumen": AYUDA_VOLUMEN,
         "campos": [{"codigo": c.codigo, "titulo": c.titulo, "paso": c.paso, "ayuda": c.ayuda,
                     "desde_mapa": c.desde_mapa} for c in CAMPOS],
         "pasos": [{"numero": n, "titulo": t, "descripcion": d} for n, t, d in PASOS],

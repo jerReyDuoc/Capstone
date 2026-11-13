@@ -20,6 +20,10 @@ Salida: un documento Markdown editable con
     secciones del documento que las abordan),
   - Anexo B: plan de implementación con las brechas que el documento ayuda a cerrar.
 
+HU-38: con `registro` (borradores/registro.py) la PIA se pre-llena con las actividades de alto riesgo del
+registro de actividades y el aviso de privacidad toma sus finalidades y bases de licitud. Esas cláusulas
+llevan el texto del registro (no el que propone el Agente IA) y una nota para revisarlas.
+
 Nunca escribe códigos internos de controles o brechas (regla de interfaz del 29-oct).
 """
 from __future__ import annotations
@@ -42,6 +46,7 @@ from app.application.borradores.plantillas import (
 ZONA = ZoneInfo("America/Santiago")
 MAX_PLAN = 12
 NOTA_IA = "*Sección adaptada por el Agente IA para tu empresa: revísala antes de aprobar.*"
+NOTA_REGISTRO = "*Sección completada con tu registro de actividades de tratamiento: revísala antes de aprobar.*"
 ETIQUETA_ESTADO = {"no_cumplido": "No cumplido", "parcialmente_cumplido": "Parcialmente cumplido"}
 ETIQUETA_MADUREZ = {"inicial": "Inicial", "en_desarrollo": "En desarrollo", "gestionado": "Gestionado",
                     "optimizado": "Optimizado"}
@@ -203,10 +208,13 @@ def generar_markdown(
     identidad: IdentidadEmpresa,
     adaptacion: AdaptacionIA | None = None,
     ahora: datetime | None = None,
+    registro=None,
 ) -> str:
     ahora = ahora or datetime.now(ZONA)
     hoy = ahora.date()
     adaptacion = adaptacion or AdaptacionIA()
+    # HU-38: cláusulas completadas con el registro de actividades (hechos del registro: la IA no las reescribe)
+    del_registro: dict[str, str] = registro.textos(plantilla.tipo.value) if registro is not None else {}
     prioritarias = set(clausulas_prioritarias(plantilla, ctx))
     numero = {c.id: i for i, c in enumerate(plantilla.clausulas, start=1)}
 
@@ -230,8 +238,12 @@ def generar_markdown(
 
     for c in plantilla.clausulas:
         partes += [f"## {numero[c.id]}. {c.titulo}", ""]
-        adaptado = adaptacion.secciones.get(c.id) if c.adaptable else None
-        partes += [etiquetas_a_marcadores(adaptado.strip()) if adaptado else c.texto, ""]
+        if c.id in del_registro:
+            partes += [del_registro[c.id].strip(), "", NOTA_REGISTRO, ""]
+            adaptado = None
+        else:
+            adaptado = adaptacion.secciones.get(c.id) if c.adaptable else None
+            partes += [etiquetas_a_marcadores(adaptado.strip()) if adaptado else c.texto, ""]
         if adaptado:
             partes += [NOTA_IA, ""]
         if c.id in prioritarias and c.refuerzo:

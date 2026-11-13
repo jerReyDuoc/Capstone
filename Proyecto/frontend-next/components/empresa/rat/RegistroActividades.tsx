@@ -23,8 +23,8 @@ import { ErrorBff } from "@/lib/encuesta/cliente";
 import { fechaHoraChile } from "@/lib/fechas";
 import { cargarCatalogoMapa, cargarMapa, mensajeError, plural, type CatalogoMapa, type VistaMapa } from "@/lib/mapaDatos";
 import {
-  cargarCatalogoRat, cargarRegistro, crearActividad, ETIQUETA_ESTADO, filtrarActividades, textoVersion, TONO_ESTADO,
-  type Actividad, type CatalogoRat, type FiltroEstado, type ListaRegistro,
+  cargarCatalogoRat, cargarRegistro, crearActividad, ETIQUETA_ESTADO, filtrarActividades, textoRiesgo, textoVersion,
+  TONO_ESTADO, TONO_RIESGO, type Actividad, type CatalogoRat, type FiltroEstado, type ListaRegistro,
 } from "@/lib/registroActividades";
 import { DetalleActividad } from "./DetalleActividad";
 import { InformeRat } from "./InformeRat";
@@ -56,8 +56,20 @@ export function RegistroActividades() {
   const [informe, setInforme] = useState(false);
   const [ropa, setRopa] = useState(false);
   const [aviso, setAviso] = useState<Aviso>(null);
+  const [pasoInicial, setPasoInicial] = useState<number | undefined>(undefined);
 
   const listo = espacio.tipo === "listo";
+
+  // Al llegar desde una brecha del registro (Mi empresa): ?actividad=ID&paso=N abre esa actividad en ese paso
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const id = Number(q.get("actividad"));
+    const paso = Number(q.get("paso"));
+    if (Number.isInteger(id) && id > 0) {
+      setAbierta(id);
+      if (Number.isInteger(paso) && paso > 0) setPasoInicial(paso);
+    }
+  }, []);
 
   const sesionVencida = useCallback(
     (e: unknown) => {
@@ -198,11 +210,13 @@ export function RegistroActividades() {
         <DetalleActividad
           key={abierta}
           id={abierta}
+          pasoInicial={pasoInicial}
           catalogo={catalogo}
           catalogoMapa={catalogoMapa}
           mapa={mapa}
           onVolver={() => {
             setAbierta(null);
+            setPasoInicial(undefined);
             void recargar();
           }}
           onAviso={setAviso}
@@ -281,6 +295,25 @@ export function RegistroActividades() {
               </div>
             ))}
           </section>
+
+          {registro.riesgos && registro.riesgos.mayor_riesgo ? (
+            <div className={`callout ${s.riesgoResumen}`} role="status">
+              <span>
+                <Icon name="escudo" />{" "}
+                <strong>{plural(registro.riesgos.mayor_riesgo, "actividad de mayor riesgo", "actividades de mayor riesgo")}</strong>
+                {registro.riesgos.pia_recomendadas
+                  ? ` · ${registro.riesgos.pia_recomendadas} con evaluación de impacto recomendada`
+                  : ""}
+                . Forman la matriz de riesgos de tu registro ({registro.riesgos.referencia}).
+              </span>
+              <span className={s.acciones}>
+                <Link href="/empresa" className="btn btn-ghost btn-sm">Ver en Mi empresa</Link>
+                {registro.riesgos.pia_recomendadas ? (
+                  <Link href="/empresa/borradores?plantilla=pia" className="btn btn-primary btn-sm">Generar evaluación de impacto</Link>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
 
           {g.por_revisar ? (
             <p className="callout callout-aviso" role="status">
@@ -367,6 +400,12 @@ function FilaActividad({ actividad: a, onAbrir }: { actividad: Actividad; onAbri
         <span className={s.filaMeta}>
           <span className={`badge ${TONO_ESTADO[a.estado]}`}>{ETIQUETA_ESTADO[a.estado]}</span>
           {revisar ? <span className={ms.etiqueta} data-tono="internacional">Cambió el mapa</span> : null}
+          {a.riesgo ? (
+            <span className={`badge ${TONO_RIESGO[a.riesgo.nivel]}`} title={textoRiesgo(a.riesgo)}>
+              Riesgo {a.riesgo.nivel.toLocaleLowerCase("es")}
+            </span>
+          ) : null}
+          {a.riesgo?.requiere_pia ? <span className={ms.etiqueta} data-tono="sensible">Evaluación de impacto recomendada</span> : null}
           {a.resumen.hay_sensibles ? <span className={ms.etiqueta} data-tono="sensible">Datos sensibles</span> : null}
           {a.resumen.incluye_nna ? <span className={ms.etiqueta} data-tono="nna">Niños, niñas o adolescentes</span> : null}
           {a.resumen.transferencias ? (

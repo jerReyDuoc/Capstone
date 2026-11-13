@@ -118,8 +118,9 @@ class InformeRatCasos:
             for v in (await self.db.execute(
                     select(RatActividadVersion).where(RatActividadVersion.actividad_id.in_(con_vigente)))).scalars():
                 versiones[(v.actividad_id, v.numero)] = v
-        necesita_mapa = any((f.id, f.version_vigente) not in versiones for f in filas)
-        els, fls = await self._mapa() if necesita_mapa else ([], [])
+        # HU-38: el mapa se lee siempre (también para las vigentes): la matriz de riesgos necesita saber qué
+        # sistemas con IA usa cada actividad, y la instantánea no guarda el subtipo de los elementos.
+        els, fls = await self._mapa() if filas else ([], [])
         fuentes = []
         for f in filas:
             v = versiones.get((f.id, f.version_vigente)) if f.version_vigente is not None else None
@@ -128,7 +129,8 @@ class InformeRatCasos:
                     id=f.id, nombre=f.nombre, estado=f.estado, version_vigente=f.version_vigente,
                     fecha_vigencia=f.fecha_vigencia, fecha_actualizacion=f.fecha_actualizacion,
                     motivos_revision=tuple(f.motivos_revision or []), instantanea=v.contenido,
-                    huella_version=v.huella, fecha_version=v.fecha))
+                    huella_version=v.huella, fecha_version=v.fecha,
+                    sistemas_ia=tuple(analisis.sistemas_ia_en((v.contenido or {}).get("mapa") or {}, els))))
             else:
                 deriv = analisis.derivados(f.contenido, els, fls)
                 fuentes.append(I.FuenteActividad(

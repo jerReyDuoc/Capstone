@@ -19,10 +19,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { BrandMark, Icon, type IconName } from "@/components/ui/Icon";
 import {
-  ACCEPT_DOCUMENTO, AVISO_DOCUMENTO, CODIGO_AYUDA_NO_DISPONIBLE, ETIQUETA_ESTADO, ETIQUETA_INCONSISTENCIA, MOTIVOS_DESCARTE, NIVEL_CONFIANZA,
+  ACCEPT_DOCUMENTO, AVISO_DOCUMENTO, CODIGO_AYUDA_NO_DISPONIBLE, CODIGO_PREGUNTA_YA_RESPONDIDA,
+  CODIGO_RESPUESTA_EN_PROCESO, ETIQUETA_ESTADO, ETIQUETA_INCONSISTENCIA, MOTIVOS_DESCARTE, NIVEL_CONFIANZA,
   aceptarPropuesta, agruparPropuestas, cambiarArea, cantidad, cargarAsistente, cerrarEntrevista, cuotaTexto,
   dependenciasPendientes, descartarPropuesta, diccionario, etiquetaIa, explicacionesSueltas, filasPropuesta,
-  iniciarEntrevista, progresoEntrevista, responderPregunta, subirDocumento, tipoVisual, tituloTipo, tonoSeveridad,
+  iniciarEntrevista, progresoEntrevista, responderPregunta, subirDocumento, textoEspera, tipoVisual, tituloTipo,
+  tonoSeveridad,
   validarDocumento, validarRespuesta,
   type AreaApi, type CodigoArea, type Diccionario, type EstadoAsistente, type InconsistenciaApi, type MotivoDescarte,
   type PayloadPropuesta, type PropuestaApi, type TipoVisual,
@@ -266,6 +268,16 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
   const log = useRef<HTMLDivElement>(null);
   const max = estado.limites.max_caracteres;
   const p = sesion.pregunta;
+  // Segundos que lleva analizando la respuesta (para explicar la espera en vez de dejar solo los puntitos)
+  const [segundos, setSegundos] = useState(0);
+  useEffect(() => {
+    if (ocupado !== "respuesta") {
+      setSegundos(0);
+      return;
+    }
+    const t = setInterval(() => setSegundos((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [ocupado]);
 
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
@@ -303,6 +315,15 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
     } catch (e) {
       if (e instanceof ErrorBff && e.info.codigo === CODIGO_AYUDA_NO_DISPONIBLE) {
         setFallaIa(e.info.mensaje || "La ayuda automática no respondió esta vez.");
+      } else if (e instanceof ErrorBff && (e.info.codigo === CODIGO_RESPUESTA_EN_PROCESO
+                                           || e.info.codigo === CODIGO_PREGUNTA_YA_RESPONDIDA)) {
+        // La respuesta anterior sigue en curso o ya se respondió en otra pestaña: se avisa y se recarga
+        setError(mensaje(e, "Todavía estamos analizando tu respuesta anterior."));
+        try {
+          alCambiar(await cargarAsistente());
+        } catch {
+          /* se verá al recargar la página */
+        }
       } else {
         setError(mensaje(e, "No pudimos enviar tu respuesta. Inténtalo de nuevo."));
       }
@@ -345,7 +366,7 @@ function Conversacion({ estado, alCambiar }: { estado: EstadoAsistente; alCambia
             <BrandMark className={a.avatar} />
             <div className={`${a.burbuja} ${a.escribiendo}`}>
               <span className={a.puntos} aria-hidden="true"><i /><i /><i /></span>
-              <span className="sr-only">Analizando tu respuesta</span>
+              <span className={a.espera}>{textoEspera(segundos)}</span>
             </div>
           </div>
         ) : null}
