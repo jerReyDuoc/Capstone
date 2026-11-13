@@ -124,14 +124,27 @@ export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: nu
       detalle: tamanoLegible(x.tamano_bytes),
       fecha: x.fecha_creacion, descargable: true, eliminable: true,
     })),
-    registro: (d.registro_actividades ?? []).map((x) => ({
-      clave: `d${x.id}`, tipo: "documento", id: x.id,
-      titulo: `Informe del registro de actividades${x.rat ? ` · versión ${x.rat.version_rat}` : ""} (${x.tipo === "rat_xlsx" ? "Excel" : "PDF"})`,
-      detalle: [x.rat?.borrador ? "Borrador" : x.rat ? "Oficial" : null, x.rat?.codigo ? `Código ${x.rat.codigo}` : null,
-        tamanoLegible(x.tamano_bytes)].filter(Boolean).join(" · "),
-      fecha: x.fecha_creacion, descargable: true, eliminable: true,
-      nota: x.rat?.borrador ? "Borrador" : undefined,
-    })),
+    registro: (d.registro_actividades ?? []).map((x): Fila => {
+      const formato = x.tipo === "rat_xlsx" || x.tipo === "ropa_xlsx" ? "Excel" : "PDF";
+      if (x.tipo === "ropa_pdf" || x.tipo === "ropa_xlsx") {
+        const partes = x.ropa?.partes ?? [];
+        return {
+          clave: `d${x.id}`, tipo: "documento", id: x.id,
+          titulo: `Informe RoPA${x.ropa ? ` · versión ${x.ropa.version}` : ""} (${formato})`,
+          detalle: [partes.length === 2 ? "Responsable y encargado" : partes[0] === "encargado" ? "Encargado" : partes.length ? "Responsable" : null,
+            x.ropa?.codigo ? `Código ${x.ropa.codigo}` : null, tamanoLegible(x.tamano_bytes)].filter(Boolean).join(" · "),
+          fecha: x.fecha_creacion, descargable: true, eliminable: true,
+        };
+      }
+      return {
+        clave: `d${x.id}`, tipo: "documento", id: x.id,
+        titulo: `Informe del registro de actividades${x.rat ? ` · versión ${x.rat.version_rat}` : ""} (${formato})`,
+        detalle: [x.rat?.borrador ? "Borrador" : x.rat ? "Oficial" : null, x.rat?.codigo ? `Código ${x.rat.codigo}` : null,
+          tamanoLegible(x.tamano_bytes)].filter(Boolean).join(" · "),
+        fecha: x.fecha_creacion, descargable: true, eliminable: true,
+        nota: x.rat?.borrador ? "Borrador" : undefined,
+      };
+    }),
     borradores: d.borradores.map((x) => ({
       clave: `d${x.id}`, tipo: "documento", id: x.id, titulo: x.nombre, detalle: tamanoLegible(x.tamano_bytes),
       fecha: x.fecha_creacion, descargable: true, eliminable: true,
@@ -149,7 +162,7 @@ export function MisDocumentos({ recarga = 0, encabezado = true }: { recarga?: nu
   };
   const vacios: Record<Pestana, ReactNode> = {
     informes: "Aún no hay informes guardados. Se guardan al completar una reevaluación o con Guardar informe en Mis evaluaciones.",
-    registro: "Aún no hay informes del registro de actividades. Genéralos desde Registro de actividades › Informe del registro.",
+    registro: "Aún no hay informes del registro de actividades. Genéralos desde Registro de actividades › Informe del registro o Informe RoPA.",
     borradores: "Aún no hay borradores de documentos de cumplimiento.",
     evidencias: "Tu empresa no tiene evidencias subidas.",
     constancias: "Aún no hay constancias: se obtienen al completar un módulo formativo.",

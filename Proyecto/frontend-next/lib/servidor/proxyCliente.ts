@@ -17,6 +17,8 @@
  * HU-16: borradores de cumplimiento (generar, revisar, editar con PATCH, descargar en
  * Markdown o PDF, consolidar y descartar). Generar espera al Agente IA: hasta 90 s.
  *
+ * Informe RoPA del registro de actividades: vista previa, datos de contacto (PATCH), emisión y descarga.
+ *
  * HU-32: derechos ARCOP del usuario definitivo (con o sin contrato vigente, HU-30): crear,
  * consultar, cancelar, aportar información y descargar sus datos (JSON o CSV) cuando una
  * solicitud de acceso o portabilidad está resuelta.
@@ -156,6 +158,11 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^registro-actividades\/informes\/verificacion$/ },
   { metodo: "GET", patron: /^registro-actividades\/informes\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_INFORME_RAT, timeoutMs: 30_000 },
   { metodo: "POST", patron: /^registro-actividades\/informes\/\d{1,9}\/enviar$/, timeoutMs: 60_000 },
+  // Informe RoPA: vista previa, datos que el registro no tiene (PATCH), emisión (PDF y Excel) y descarga.
+  { metodo: "GET", patron: /^registro-actividades\/ropa$/, timeoutMs: 30_000 },
+  { metodo: "PATCH", patron: /^registro-actividades\/ropa\/datos$/ },
+  { metodo: "POST", patron: /^registro-actividades\/ropa$/, timeoutMs: 90_000 },
+  { metodo: "GET", patron: /^registro-actividades\/ropa\/\d{1,9}\/descarga$/, binario: true, tipos: TIPOS_INFORME_RAT, timeoutMs: 30_000 },
   // Asistente de registro: entrevista guiada, documentos y propuestas que el usuario acepta o descarta.
   // Responder y analizar un documento llaman al servicio de IA: más tiempo.
   { metodo: "GET", patron: /^asistente$/ },

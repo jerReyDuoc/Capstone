@@ -157,7 +157,7 @@ export const COLORES_DIMENSION = ["#3987e5", "#d95926", "#9085e9", "#c98500", "#
 
 export interface DocumentoGenerado {
   id: number;
-  tipo: "informe_pdf" | "borrador" | "rat_pdf" | "rat_xlsx";
+  tipo: "informe_pdf" | "borrador" | "rat_pdf" | "rat_xlsx" | "ropa_pdf" | "ropa_xlsx";
   nombre: string;
   evaluacion_id: number | null;
   mime_type: string;
@@ -165,6 +165,8 @@ export interface DocumentoGenerado {
   fecha_creacion: string;
   /** Solo en los informes del registro de actividades: la emisión a la que pertenece. */
   rat?: { informe_id: number; codigo: string | null; version_rat: number; borrador: boolean; actividades: number };
+  /** Solo en los informes RoPA: la emisión a la que pertenece. */
+  ropa?: { informe_id: number; codigo: string | null; version: number; partes: ("responsable" | "encargado")[]; actividades: number };
 }
 
 export interface EvidenciaDocumento {
@@ -190,7 +192,7 @@ export interface DocumentosApi {
   empresa: { id: number; razon_social: string };
   informes: DocumentoGenerado[];
   borradores: DocumentoGenerado[];
-  /** Informes del registro de actividades (PDF y Excel de cada emisión). Puede faltar en respuestas antiguas. */
+  /** Informes del registro de actividades y RoPA (PDF y Excel de cada emisión). Puede faltar en respuestas antiguas. */
   registro_actividades?: DocumentoGenerado[];
   evidencias: EvidenciaDocumento[];
   constancias: ConstanciaDocumento[];

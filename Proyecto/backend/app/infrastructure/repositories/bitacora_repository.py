@@ -159,6 +159,11 @@ class Accion:
     RAT_INFORME_DESCARGADO = "rat.informe_descargado"
     RAT_INFORME_ENVIADO = "rat.informe_enviado"
     RAT_INFORME_VERIFICADO = "rat.informe_verificado"
+    # HU-37: informe RoPA. El detalle lleva ids, versión, partes, nombres de campos y conteos; nunca las
+    # direcciones, correos ni teléfonos que la empresa informa para el RoPA.
+    ROPA_DATOS_ACTUALIZADOS = "ropa.datos_actualizados"   # detalle: campos cambiados, organizaciones
+    ROPA_INFORME_GENERADO = "ropa.informe_generado"
+    ROPA_INFORME_DESCARGADO = "ropa.informe_descargado"
     # HU-39: asistente de IA para el mapa de datos y el RAT (sin texto: huellas, códigos y conteos)
     ASISTENTE_SESION_CREADA = "asistente.sesion_creada"
     ASISTENTE_RESPUESTA = "asistente.respuesta"                     # detalle: area, propuestas, motivo_sin_ia
@@ -243,6 +248,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RAT_VERSION_VIGENTE: Categoria.MODIFICACION,
     Accion.RAT_MARCADA_REVISION: Categoria.MODIFICACION,
     Accion.RAT_CAMBIO_RECHAZADO: Categoria.MODIFICACION,
+    Accion.ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,      # HU-37
     Accion.ASISTENTE_PROPUESTA_DESCARTADA: Categoria.MODIFICACION,  # HU-39
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
@@ -266,6 +272,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.MAPA_SUGERENCIA_ACEPTADA: Categoria.CREACION,
     Accion.RAT_ACTIVIDAD_CREADA: Categoria.CREACION,             # HU-35
     Accion.RAT_INFORME_GENERADO: Categoria.CREACION,             # HU-36 (descargas y envíos: acceso)
+    Accion.ROPA_INFORME_GENERADO: Categoria.CREACION,            # HU-37 (descargas: acceso)
     Accion.ASISTENTE_SESION_CREADA: Categoria.CREACION,          # HU-39
     Accion.ASISTENTE_PROPUESTA_ACEPTADA: Categoria.CREACION,
     Accion.ASISTENTE_PROPUESTA_EDITADA: Categoria.CREACION,

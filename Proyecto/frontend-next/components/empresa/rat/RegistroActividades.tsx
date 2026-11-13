@@ -28,6 +28,7 @@ import {
 } from "@/lib/registroActividades";
 import { DetalleActividad } from "./DetalleActividad";
 import { InformeRat } from "./InformeRat";
+import { InformeRopa } from "./InformeRopa";
 import s from "./rat.module.css";
 
 type Aviso = { tono: "ok" | "error"; texto: string } | null;
@@ -53,6 +54,7 @@ export function RegistroActividades() {
   const [busqueda, setBusqueda] = useState("");
   const [creando, setCreando] = useState(false);
   const [informe, setInforme] = useState(false);
+  const [ropa, setRopa] = useState(false);
   const [aviso, setAviso] = useState<Aviso>(null);
 
   const listo = espacio.tipo === "listo";
@@ -123,6 +125,10 @@ export function RegistroActividades() {
           <button type="button" className="btn btn-ghost" onClick={() => setInforme(true)} title="Descarga el informe en PDF o Excel">
             <Icon name="documento" />
             Informe del registro
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setRopa(true)}>
+            <Icon name="tabla" />
+            Informe RoPA
           </button>
           <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
             <Icon name="mas" />
@@ -335,6 +341,7 @@ export function RegistroActividades() {
           }}
         />
       ) : null}
+      {ropa ? <InformeRopa onCerrar={() => setRopa(false)} onSesionVencida={sesionVencida} /> : null}
       {creando ? (
         <DialogoNueva
           onCerrar={() => setCreando(false)}

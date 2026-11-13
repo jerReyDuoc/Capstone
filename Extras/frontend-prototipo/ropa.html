@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo · Informe RoPA</title>
+<style>
+:root{
+  --bg:#050807;--surface:#0a100e;--surface-2:#0f1714;--surface-3:#142019;--line:#18231f;--line-strong:#24332d;--line-control:#567067;
+  --text:#f1f4f3;--text-muted:#a9b3af;--text-subtle:#8a9590;
+  --accent:#14d89e;--accent-hover:#3be3b2;--accent-soft:#0c2a20;--on-accent:#03110c;
+  --medio:#f2b53f;--medio-soft:rgba(242,181,63,.14);--alto:#f2605c;--alto-soft:rgba(242,96,92,.14);
+  --info:#93a0a8;--info-soft:rgba(147,160,168,.14);--ok-soft:rgba(20,216,158,.14);--lav:#8fa3ff;--lav-soft:rgba(143,163,255,.14);
+  --fs-xs:.75rem;--fs-sm:.875rem;--fs-md:1rem;--fs-lg:1.125rem;--fs-xl:1.5rem;
+  --r-sm:8px;--r-md:12px;--r-lg:18px;
+  --font-display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;--font-body:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--fs-md);line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+svg{width:18px;height:18px;flex:none}
+.proto{position:fixed;top:0;left:0;right:0;z-index:50;background:var(--medio);color:#1a1200;font-size:var(--fs-xs);font-weight:700;text-align:center;padding:4px}
+/* layout */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh;padding-top:24px}
+.side{border-right:1px solid var(--line);padding:20px 14px;display:grid;align-content:start;gap:4px}
+.brand{font-family:var(--font-display);font-weight:700;font-size:1.15rem;padding:6px 10px 18px}
+.brand b{color:var(--accent)}
+.nav{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:var(--r-sm);color:var(--text-muted);font-size:var(--fs-sm)}
+.nav[aria-current]{background:var(--accent-soft);color:var(--text)}
+.nav[aria-current] svg{color:var(--accent)}
+main{padding:28px 36px;max-width:1240px}
+h1{font-family:var(--font-display);font-size:var(--fs-xl);font-weight:600}
+.sub{color:var(--text-muted);font-size:var(--fs-sm);margin-top:4px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 16px;border-radius:var(--r-sm);border:1px solid transparent;font-weight:600;font-size:var(--fs-sm);cursor:pointer;background:none}
+.btn-primary{background:var(--accent);color:var(--on-accent)}.btn-primary:hover{background:var(--accent-hover)}
+.btn-ghost{border-color:var(--line-control)}.btn-ghost:hover{background:var(--surface-2)}
+.btn-sm{min-height:34px;padding:0 12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.link-btn{background:none;border:0;color:var(--accent);font-weight:600;font-size:var(--fs-sm);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:3px}
+.nuevo{font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:999px;background:var(--on-accent);color:var(--accent)}
+.lista{display:grid;gap:8px;list-style:none;padding:0}
+.fila{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:14px 18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.fila h3{font-size:var(--fs-sm);font-weight:600}.fila p{font-size:var(--fs-xs);color:var(--text-muted)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;white-space:nowrap}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.t-ok{background:var(--ok-soft);color:var(--accent)}.t-medio{background:var(--medio-soft);color:var(--medio)}.t-info{background:var(--info-soft);color:var(--info)}
+.t-lav{background:var(--lav-soft);color:var(--lav)}.t-alto{background:var(--alto-soft);color:var(--alto)}
+/* dialog */
+.velo{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;place-items:start center;overflow:auto;padding:48px 16px;z-index:40}
+.velo.abierto{display:grid}
+.dialogo{width:min(980px,100%);background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r-lg);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.d-cab{display:flex;justify-content:space-between;gap:16px;padding:22px 26px 0}
+.d-cab h2{font-family:var(--font-display);font-size:1.3rem;font-weight:600}
+.d-cab p{color:var(--text-muted);font-size:var(--fs-sm);max-width:68ch}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:var(--r-sm);border:1px solid var(--line-control);background:none;cursor:pointer}
+.pasos{display:flex;gap:6px;padding:18px 26px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.paso{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;color:var(--text-subtle);background:none;border:1px solid transparent;cursor:pointer}
+.paso span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--surface-3);font-size:11px}
+.paso[aria-current="step"]{color:var(--text);border-color:var(--accent);background:var(--accent-soft)}
+.paso[aria-current="step"] span{background:var(--accent);color:var(--on-accent)}
+.paso.hecho{color:var(--text-muted)}.paso.hecho span{background:var(--accent-soft);color:var(--accent)}
+.d-cuerpo{padding:22px 26px;display:grid;gap:18px}
+.d-pie{display:flex;justify-content:space-between;gap:12px;padding:16px 26px 22px;border-top:1px solid var(--line);flex-wrap:wrap}
+.estado{--c:var(--accent);display:flex;gap:16px;padding:16px 20px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);border-radius:var(--r-lg);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 14%,transparent),transparent 70%),var(--surface-2)}
+.estado[data-tono="aviso"]{--c:var(--medio)}
+.estado .ico{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c);flex:none}
+.estado h3{font-size:var(--fs-lg);font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.estado p,.estado li{font-size:var(--fs-sm);color:var(--text-muted)}
+.estado ul{padding-left:18px;margin-top:4px}
+.ver{padding:2px 10px;border-radius:999px;background:var(--surface-3);font-size:var(--fs-xs);font-weight:600;color:var(--text-muted)}
+.vistas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vista{position:relative;display:grid;gap:8px;padding:18px;border:1px solid var(--line-control);border-radius:var(--r-md);background:var(--surface-2);cursor:pointer}
+.vista:has(input:checked){border-color:var(--accent);background:linear-gradient(135deg,rgba(20,216,158,.08),transparent 60%),var(--surface-2)}
+.vista:has(input:disabled){opacity:.55;cursor:not-allowed}
+.vista input{position:absolute;top:18px;right:18px;width:18px;height:18px;accent-color:var(--accent)}
+.vista h4{font-size:var(--fs-md);font-weight:600;padding-right:28px}
+.vista .art{font-family:var(--mono);font-size:var(--fs-xs);color:var(--accent)}
+.vista p{font-size:var(--fs-sm);color:var(--text-muted)}
+.vista ul{font-size:var(--fs-xs);color:var(--text-muted);padding-left:16px}
+.bloque{display:grid;gap:12px;padding:16px 20px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.bloque-cab{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bloque-cab h3{display:flex;gap:8px;align-items:center;font-size:var(--fs-sm);font-weight:700}
+.bloque-cab h3 svg{color:var(--accent)}
+.ayuda{font-size:var(--fs-xs);color:var(--text-subtle)}
+.callout{display:flex;gap:10px;padding:12px 14px;border-radius:var(--r-sm);background:var(--surface-3);font-size:var(--fs-sm);color:var(--text-muted)}
+.callout svg{color:var(--accent);margin-top:2px}
+.callout[data-tono="aviso"] svg{color:var(--medio)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.campo{display:grid;gap:6px}
+.campo.ancho{grid-column:1/-1}
+.campo label,.etq{font-size:var(--fs-xs);font-weight:600;color:var(--text-muted);letter-spacing:.03em}
+.control{width:100%;min-height:40px;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--line-control);background:var(--surface-3)}
+.control:focus{outline:2px solid var(--accent);outline-offset:1px}
+.control[readonly]{color:var(--text-subtle);border-style:dashed}
+.seg{display:inline-flex;border:1px solid var(--line-control);border-radius:var(--r-sm);overflow:hidden}
+.seg label{padding:7px 14px;font-size:var(--fs-sm);cursor:pointer;color:var(--text-muted)}
+.seg input{display:none}
+.seg label:has(input:checked){background:var(--accent-soft);color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.origen{white-space:nowrap;font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
+.o-rat{background:var(--ok-soft);color:var(--accent)}.o-tu{background:var(--lav-soft);color:var(--lav)}
+.oculto{display:none!important}
+.mandante{border-left:3px solid var(--lav);padding-left:14px;display:grid;gap:12px}
+.mandante h4{font-size:var(--fs-sm);font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+details.ayudaExp summary{cursor:pointer;font-size:var(--fs-xs);color:var(--accent);font-weight:600}
+details.ayudaExp p{font-size:var(--fs-xs);color:var(--text-muted);margin-top:6px}
+/* preview */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{padding:10px 14px;background:none;border:0;border-bottom:2px solid transparent;font-size:var(--fs-sm);font-weight:600;color:var(--text-muted);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--text);border-color:var(--accent)}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
+table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{font-size:var(--fs-xs);font-weight:700;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.06em;background:var(--surface-3)}
+tbody tr:last-child td{border-bottom:0}
+td.letra{font-family:var(--mono);color:var(--accent);white-space:nowrap;width:1%}
+td.campo-art{width:26%;color:var(--text-muted);font-size:var(--fs-xs)}
+td ul{padding-left:16px}
+.act-sel{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line-control);background:var(--surface-3);font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:var(--text-muted)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
+.formatos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.formato{display:flex;gap:14px;padding:16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.formato .ico{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent);flex:none}
+.formato h4{font-size:var(--fs-sm);font-weight:600}.formato p{font-size:var(--fs-xs);color:var(--text-muted)}
+.portada{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start}
+.hoja{aspect-ratio:1/1.414;background:#f7f8f7;color:#1b2420;border-radius:6px;padding:16px 14px;display:grid;align-content:start;gap:7px;font-size:7.5px;box-shadow:0 10px 30px rgba(0,0,0,.5);position:relative}
+.hoja .b{height:4px;background:#0baf80;width:40%;border-radius:2px}
+.hoja h5{font-size:10px;line-height:1.2}
+.hoja .l{height:4px;background:#d8dcda;border-radius:2px}
+.hoja .k{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.hoja .k div{background:#e8ecea;border-radius:3px;padding:4px}
+.hoja .aviso{position:absolute;bottom:12px;left:14px;right:14px;border-top:1px solid #cfd5d2;padding-top:5px;color:#5b6661}
+dl.datos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
+dl.datos dt{font-size:var(--fs-xs);color:var(--text-subtle)}dl.datos dd{font-size:var(--fs-sm);font-weight:600}
+.code{font-family:var(--mono);font-size:var(--fs-xs)}
+.exito{display:grid;gap:14px;justify-items:start}
+.ok-grande{display:grid;place-items:center;width:52px;height:52px;border-radius:14px;background:var(--accent-soft);color:var(--accent)}
+.ok-grande svg{width:26px;height:26px}
+.notas{position:fixed;left:12px;bottom:12px;width:190px;z-index:60;background:#1a1606;border:1px solid var(--medio);border-radius:var(--r-md);padding:12px 14px;font-size:var(--fs-xs);color:#f5e7c4;display:grid;gap:6px}
+.notas b{color:var(--medio)}.notas summary{cursor:pointer}
+.notas ol{padding-left:16px;display:grid;gap:3px}
+@media (max-width:820px){.app{grid-template-columns:1fr}.side{display:none}.vistas,.grid2,.formatos,.portada{grid-template-columns:1fr}main{padding:20px}.notas{display:none}}
+/* ---- v2: una sola pantalla con scroll ---- */
+.velo{padding:32px 16px}
+.dialogo{display:flex;flex-direction:column;max-height:calc(100vh - 64px)}
+.d-cab.fija{align-items:center;padding:16px 24px;border-bottom:1px solid var(--line)}
+.titulo{display:flex;align-items:center;gap:10px}
+.d-scroll{overflow-y:auto;padding:4px 24px 24px}
+.d-pie.fija{align-items:center;padding:14px 24px;border-top:1px solid var(--line);background:var(--surface);border-radius:0 0 var(--r-lg) var(--r-lg)}
+.sec{display:grid;gap:12px;padding:20px 0;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec-cab{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sec-t{font-size:var(--fs-sm);font-weight:700;letter-spacing:.02em}
+.vista{grid-template-columns:auto 1fr auto;align-items:center;padding:14px 16px;gap:12px}
+.vista input{position:static}
+.vista h4{padding-right:0;font-size:var(--fs-sm)}
+.opc{font-weight:500;color:var(--text-subtle);margin-left:4px}
+.fila-dpo{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mandante{gap:10px}
+.mandante + .mandante{margin-top:6px}
+.act-sel{margin-bottom:10px}
+td.campo-art{width:24%}
+td.desc{white-space:nowrap}td.desc .btn+.btn{margin-left:6px}
+.icon-btn.chico{width:30px;height:30px;border-color:transparent;color:var(--text-muted)}
+.icon-btn.chico:hover,.icon-btn.chico[aria-expanded="true"]{color:var(--accent);background:var(--surface-2)}
+.info-wrap{position:relative}
+.pop{position:absolute;top:36px;left:0;width:300px;z-index:5;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface-2);box-shadow:0 12px 30px rgba(0,0,0,.5);display:grid;gap:6px}
+.pop p{font-size:var(--fs-xs);color:var(--text-muted)}
+.pie-msg{font-size:var(--fs-sm);color:var(--medio);display:flex;align-items:center;gap:8px}
+.pie-msg:empty{visibility:hidden}
+.pie-ok{display:flex;align-items:center;gap:10px}.pie-ok div{display:grid;font-size:var(--fs-sm)}.pie-ok .code{color:var(--text-muted)}
+.ok-chico{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="proto">PROTOTIPO NAVEGABLE · datos de ejemplo · no conectado al servidor</div>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-lista" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-globo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
+  <symbol id="i-escudo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-tabla" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></symbol>
+  <symbol id="i-empresa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1"/></symbol>
+  <symbol id="i-usuario" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-carpeta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-mapa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m9 3-6 3v15l6-3 6 3 6-3V3l-6 3zM9 3v15M15 6v15"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-descargar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+</svg>
+<div class="app">
+  <nav class="side" aria-label="Navegación">
+    <div class="brand">Compliance<b>AI</b></div>
+    <a class="nav"><svg><use href="#i-panel"/></svg>Panel</a>
+    <a class="nav"><svg><use href="#i-mapa"/></svg>Mapa de datos</a>
+    <a class="nav" aria-current="page"><svg><use href="#i-lista"/></svg>Registro de actividades</a>
+    <a class="nav"><svg><use href="#i-carpeta"/></svg>Mis documentos</a>
+  </nav>
+  <main>
+    <h1>Registro de actividades de tratamiento</h1>
+    <p class="sub">Comercial Andes SpA · 6 actividades · versión del registro N.º 14</p>
+    <div class="toolbar">
+      <button class="btn btn-primary">+ Nueva actividad</button>
+      <button class="btn btn-ghost"><svg><use href="#i-pdf"/></svg>Informe del registro</button>
+      <button class="btn btn-ghost" id="abrirRopa"><svg><use href="#i-tabla"/></svg>Informe RoPA</button>
+    </div>
+    <ul class="lista" id="listaActs"></ul>
+  </main>
+</div>
+
+<div class="velo" id="velo">
+  <section class="dialogo" role="dialog" aria-modal="true" aria-labelledby="tRopa">
+    <header class="d-cab fija">
+      <div class="titulo">
+        <h2 id="tRopa">Informe RoPA</h2>
+        <span class="ver">Registro N.º 14</span>
+        <div class="info-wrap">
+          <button class="icon-btn chico" id="btnInfo" aria-expanded="false" aria-controls="popInfo" aria-label="Más información"><svg><use href="#i-info"/></svg></button>
+          <div class="pop oculto" id="popInfo" role="tooltip">
+            <p>Se arma con las actividades vigentes de tu registro, sin volver a ingresarlas.</p>
+            <p>Los datos que el registro no tiene se guardan y vienen listos la próxima vez.</p>
+            <p>El PDF y el Excel quedan en Mis documentos.</p>
+          </div>
+        </div>
+      </div>
+      <button class="icon-btn" id="cerrar" aria-label="Cerrar"><svg><use href="#i-x"/></svg></button>
+    </header>
+
+    <div class="d-scroll">
+      <!-- incluir -->
+      <section class="sec">
+        <h3 class="sec-t">Incluir</h3>
+        <div class="vistas">
+          <label class="vista">
+            <input type="checkbox" id="vResp" checked>
+            <h4>Como responsable</h4>
+            <span class="badge t-ok">3 actividades</span>
+          </label>
+          <label class="vista">
+            <input type="checkbox" id="vEnc" checked>
+            <h4>Como encargado</h4>
+            <span class="badge t-lav">2 actividades · 2 organizaciones</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- empresa -->
+      <section class="sec">
+        <div class="sec-cab"><h3 class="sec-t">Datos de la empresa</h3><span class="badge t-ok" data-estado="emp">Completo</span></div>
+        <div class="grid2" data-grupo="emp">
+          <div class="campo"><label>Razón social</label><input class="control" readonly value="Comercial Andes SpA"></div>
+          <div class="campo"><label>RUT</label><input class="control" readonly value="76.543.210-K"></div>
+          <div class="campo ancho"><label for="dir">Dirección</label><input id="dir" class="control" data-req value="Av. Apoquindo 4500, of. 1201, Las Condes, Santiago"></div>
+          <div class="campo"><label for="mail">Correo de contacto</label><input id="mail" class="control" data-req value="privacidad@comercialandes.cl"></div>
+          <div class="campo"><label for="tel">Teléfono <span class="opc">opcional</span></label><input id="tel" class="control" placeholder="+56 2 2345 6789"></div>
+        </div>
+        <div class="fila-dpo">
+          <span class="etq">Delegado de protección de datos</span>
+          <div class="seg" role="radiogroup" aria-label="Delegado de protección de datos">
+            <label><input type="radio" name="dpo" value="si" checked>Sí</label>
+            <label><input type="radio" name="dpo" value="no">No</label>
+          </div>
+        </div>
+        <div class="grid2" id="fDpo" data-grupo="emp">
+          <div class="campo"><label>Cargo o área</label><input class="control" data-req value="Oficial de Protección de Datos"></div>
+          <div class="campo"><label>Correo</label><input class="control" data-req value="dpo@comercialandes.cl"></div>
+        </div>
+      </section>
+
+      <!-- mandantes -->
+      <section class="sec" id="secMand">
+        <div class="sec-cab"><h3 class="sec-t">Organizaciones para las que actúas como encargado</h3></div>
+        <div class="mandante">
+          <h4>Retail Pacífico S.A.C. <span class="badge t-ok" data-estado="m1">Completo</span></h4>
+          <div class="grid2" data-grupo="m1">
+            <div class="campo ancho"><label>Dirección</label><input class="control" data-req value="Av. Javier Prado Este 4200, Lima, Perú"></div>
+            <div class="campo"><label>Correo de contacto</label><input class="control" data-req value="privacidad@retailpacifico.pe"></div>
+            <div class="campo"><label>Delegado de protección de datos <span class="opc">opcional</span></label><input class="control" value="dpo@retailpacifico.pe"></div>
+          </div>
+        </div>
+        <div class="mandante">
+          <h4>Grupo Sur S.A. <span class="badge t-medio" data-estado="m2">Falta completar</span></h4>
+          <div class="grid2" data-grupo="m2">
+            <div class="campo ancho"><label>Dirección</label><input class="control" data-req placeholder="Dirección de la organización"></div>
+            <div class="campo"><label>Correo de contacto</label><input class="control" data-req placeholder="contacto@organizacion.cl"></div>
+            <div class="campo"><label>Delegado de protección de datos <span class="opc">opcional</span></label><input class="control"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- vista previa -->
+      <section class="sec">
+        <h3 class="sec-t">Vista previa</h3>
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="resp">Como responsable</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="enc">Como encargado</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="trans">Transferencias</button>
+        </div>
+        <div data-panel="resp">
+          <div class="act-sel" id="selResp"></div>
+          <div class="table-wrap"><table><tbody id="tResp"></tbody></table></div>
+        </div>
+        <div data-panel="enc" class="oculto">
+          <div class="act-sel" id="selEnc"></div>
+          <div class="table-wrap"><table><tbody id="tEnc"></tbody></table></div>
+        </div>
+        <div data-panel="trans" class="oculto">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Actividad</th><th>Destino</th><th>País</th><th>Garantía</th></tr></thead>
+            <tbody>
+              <tr><td>Gestión de clientes y ventas</td><td>Proveedor de CRM en la nube</td><td>Estados Unidos</td><td>Cláusulas contractuales tipo</td></tr>
+              <tr><td>Campañas de marketing por correo</td><td>Plataforma de envío de correos</td><td>Irlanda</td><td>Cláusulas contractuales tipo</td></tr>
+              <tr><td>Mesa de ayuda</td><td>Retail Pacífico S.A.C.</td><td>Perú</td><td>Contrato de encargo</td></tr>
+              <tr><td>Cálculo de nómina</td><td>Respaldo en la nube</td><td>Brasil</td><td>Cláusulas contractuales tipo</td></tr>
+              <tr><td>Remuneraciones del personal</td><td>Software de nómina</td><td>India</td><td><span class="badge t-alto">Sin garantía</span></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- emitidos -->
+      <section class="sec">
+        <h3 class="sec-t">Informes emitidos</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Emitido</th><th>Código</th><th>Versión</th><th>Incluye</th><th>Descargar</th></tr></thead>
+          <tbody id="hist">
+            <tr><td>02-10-2026 16:40</td><td class="code">CIA-ROPA-2026-000018-2</td><td>N.º 2</td><td>Responsable</td><td class="desc"><button class="btn btn-ghost btn-sm">PDF</button><button class="btn btn-ghost btn-sm">Excel</button></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+
+    <footer class="d-pie fija">
+      <p class="pie-msg" id="pieMsg" role="status"></p>
+      <div class="pie-ok oculto" id="pieOk" role="status">
+        <span class="ok-chico"><svg><use href="#i-check"/></svg></span>
+        <div><strong>Informe N.º 3 guardado en Mis documentos</strong><span class="code">CIA-ROPA-2026-000031-7</span></div>
+        <button class="btn btn-ghost btn-sm">PDF</button><button class="btn btn-ghost btn-sm">Excel</button>
+      </div>
+      <button class="btn btn-primary" id="generar"><svg><use href="#i-descargar"/></svg>Generar PDF y Excel</button>
+    </footer>
+  </section>
+</div>
+
+
+<details class="notas">
+  <summary><b>Para revisar aquí</b></summary>
+  <ol>
+    <li>Completa los datos de Grupo Sur S.A.: el botón Generar se activa.</li>
+    <li>Desmarca «Como encargado»: se ocultan sus secciones.</li>
+    <li>Ícono ⓘ junto al título.</li>
+  </ol>
+</details>
+
+<script>
+const ACTS=[
+ {n:"Gestión de clientes y ventas",a:"Gerencia comercial",rol:"responsable",e:"vigente",
+  fin:["Gestionar ventas y despachos","Emitir boletas y facturas","Atender reclamos"],
+  tit:["Clientes","Prospectos"],dat:["Identificación","Contacto","Datos de pago","Historial de compras"],
+  dest:["Proveedor de CRM en la nube","Transportista","Servicio de Impuestos Internos"],
+  trans:"Estados Unidos · proveedor de CRM · cláusulas contractuales tipo",
+  plazos:["Identificación y contacto: 5 años desde el término de la relación","Datos de pago: 6 años desde la emisión del documento tributario"],
+  med:{t:["Cifrado en tránsito y en reposo","Control de acceso por perfiles","Respaldos periódicos"],o:["Políticas de privacidad","Contratos con proveedores que tratan datos"]}},
+ {n:"Remuneraciones del personal",a:"Recursos humanos",rol:"responsable",e:"vigente",
+  fin:["Calcular y pagar remuneraciones","Cumplir obligaciones previsionales"],
+  tit:["Trabajadores"],dat:["Identificación","Datos bancarios","Remuneraciones","Salud (licencias médicas)"],sens:true,
+  dest:["Software de nómina","Instituciones previsionales"],
+  trans:'India · software de nómina · <span class="badge t-alto">Sin garantía</span>',
+  plazos:["Todas las categorías: 5 años desde el término del contrato de trabajo"],
+  med:{t:["Control de acceso por perfiles","Registro de accesos"],o:["Compromisos de confidencialidad","Capacitación del personal"]}},
+ {n:"Campañas de marketing por correo",a:"Marketing",rol:"responsable",e:"vigente",
+  fin:["Enviar ofertas a clientes que lo aceptaron"],tit:["Clientes"],dat:["Contacto","Preferencias"],
+  dest:["Plataforma de envío de correos"],trans:"Irlanda · plataforma de correos · cláusulas contractuales tipo",
+  plazos:["Contacto y preferencias: hasta que la persona retire su consentimiento"],
+  med:{t:["Cifrado en tránsito"],o:["Procedimiento ante incidentes de seguridad"]}},
+ {n:"Mesa de ayuda",a:"Servicio al cliente",rol:"encargado",mand:"Retail Pacífico S.A.C.",e:"vigente",
+  cat:"Atención de consultas y reclamos de los clientes de Retail Pacífico por teléfono y chat",
+  trans:"Perú · Retail Pacífico S.A.C. · contrato de encargo",
+  med:{t:["Cifrado en tránsito y en reposo","Control de acceso por perfiles"],o:["Compromisos de confidencialidad"]}},
+ {n:"Cálculo de nómina",a:"Servicios contables",rol:"encargado",mand:"Grupo Sur S.A.",e:"vigente",
+  cat:"Cálculo mensual de remuneraciones y emisión de liquidaciones de los trabajadores de Grupo Sur",
+  trans:"Brasil · respaldo en la nube · cláusulas contractuales tipo",
+  med:{t:["Respaldos periódicos","Eliminación segura al vencer el plazo"],o:["Contratos con proveedores que tratan datos"]}},
+ {n:"Videovigilancia de bodegas",a:"Operaciones",rol:"responsable",e:"borrador"},
+];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const ul=a=>"<ul>"+a.map(x=>`<li>${x}</li>`).join("")+"</ul>";
+$("#listaActs").innerHTML=ACTS.map(a=>`<li class="fila"><div><h3>${a.n}</h3><p>${a.a}${a.mand?" · por cuenta de "+a.mand:""}</p></div>
+ <span class="badge ${a.rol==="encargado"?"t-lav":"t-info"}">${a.rol==="encargado"?"Encargado":"Responsable"}</span>
+ <span class="badge ${a.e==="vigente"?"t-ok":"t-medio"}">${a.e==="vigente"?"Vigente":"Borrador"}</span></li>`).join("");
+
+const val=id=>$(id).value.trim();
+function contactoEmpresa(){const dpo=$("input[name=dpo]:checked").value==="si";
+ return `Comercial Andes SpA · ${val("#dir")||"—"} · ${val("#mail")||"—"}`+(dpo?`<br>Delegado: ${$("#fDpo input").value||"—"}`:"");}
+function filasResp(a){return [
+ ["Responsable",contactoEmpresa()],
+ ["Finalidades",ul(a.fin)],
+ ["Titulares",a.tit.join(", ")],
+ ["Categorías de datos",a.dat.join(", ")+(a.sens?' <span class="badge t-alto">Datos sensibles</span>':"")],
+ ["Destinatarios",ul(a.dest)],
+ ["Transferencias internacionales",a.trans],
+ ["Plazos de supresión",ul(a.plazos)],
+ ["Medidas de seguridad","<b>Técnicas:</b> "+a.med.t.join(", ")+"<br><b>Organizativas:</b> "+a.med.o.join(", ")],
+];}
+function filasEnc(a){
+ const g=a.mand.startsWith("Grupo")?"m2":"m1";const ins=$$(`[data-grupo=${g}] input`);
+ const c=ins[1].value.trim();
+ return [
+ ["Encargado",contactoEmpresa()],
+ ["Por cuenta de",a.mand+(c?` · ${c}`:' <span class="badge t-medio">Falta el contacto</span>')],
+ ["Tratamientos",a.cat],
+ ["Transferencias internacionales",a.trans],
+ ["Medidas de seguridad","<b>Técnicas:</b> "+a.med.t.join(", ")+"<br><b>Organizativas:</b> "+a.med.o.join(", ")],
+];}
+const sel={};
+function pintar(rol,s,tb,fn){
+ const acts=ACTS.filter(a=>a.rol===rol&&a.e==="vigente");const i=sel[rol]||0;
+ $(s).innerHTML=acts.map((a,k)=>`<button class="chip" aria-pressed="${k===i}" data-k="${k}">${a.n}</button>`).join("");
+ $(tb).innerHTML=fn(acts[i]).map(([c,v])=>`<tr><td class="campo-art">${c}</td><td>${v}</td></tr>`).join("");
+ $$(s+" .chip").forEach(b=>b.onclick=()=>{sel[rol]=+b.dataset.k;pintar(rol,s,tb,fn);});
+}
+function previa(){pintar("responsable","#selResp","#tResp",filasResp);pintar("encargado","#selEnc","#tEnc",filasEnc);}
+
+$$(".tab").forEach(t=>t.onclick=()=>{$$(".tab").forEach(x=>x.setAttribute("aria-selected",x===t));
+ $$("[data-panel]").forEach(p=>p.classList.toggle("oculto",p.dataset.panel!==t.dataset.tab));});
+
+function estado(){
+ $("#pieOk").classList.add("oculto");$("#pieMsg").classList.remove("oculto");
+ const r=$("#vResp").checked,e=$("#vEnc").checked;
+ $("#fDpo").classList.toggle("oculto",$("input[name=dpo]:checked").value!=="si");
+ $("#secMand").classList.toggle("oculto",!e);
+ $('[data-tab=resp]').classList.toggle("oculto",!r);$('[data-tab=enc]').classList.toggle("oculto",!e);
+ const activa=$(".tab[aria-selected=true]");if(activa.classList.contains("oculto"))$(".tab:not(.oculto)").click();
+ const faltan=[];
+ for(const g of ["emp","m1","m2"]){
+  if(g!=="emp"&&!e)continue;
+  const vac=$$(`[data-grupo=${g}] input[data-req]`).filter(i=>!i.closest(".oculto")&&!i.value.trim());
+  const b=$(`[data-estado=${g}]`);b.className="badge "+(vac.length?"t-medio":"t-ok");b.textContent=vac.length?"Falta completar":"Completo";
+  if(vac.length)faltan.push(g==="emp"?"los datos de la empresa":g==="m1"?"Retail Pacífico S.A.C.":"Grupo Sur S.A.");
+ }
+ let msg="";
+ if(!r&&!e)msg="Elige qué incluir.";
+ else if(faltan.length)msg="Completa "+faltan.join(" y ");
+ $("#pieMsg").innerHTML=msg?`<svg><use href="#i-alerta"/></svg>${msg}`:"";
+ $("#generar").disabled=!!msg;
+ previa();
+}
+$$("#velo input").forEach(i=>i.addEventListener("input",estado));
+$$("#velo input[type=radio],#velo input[type=checkbox]").forEach(i=>i.addEventListener("change",estado));
+
+$("#btnInfo").onclick=e=>{e.stopPropagation();const p=$("#popInfo");const ab=p.classList.toggle("oculto");$("#btnInfo").setAttribute("aria-expanded",!ab);};
+document.addEventListener("click",e=>{if(!e.target.closest(".info-wrap")){$("#popInfo").classList.add("oculto");$("#btnInfo").setAttribute("aria-expanded","false");}});
+
+$("#generar").onclick=()=>{
+ const r=$("#vResp").checked,e=$("#vEnc").checked;
+ $("#hist").insertAdjacentHTML("afterbegin",`<tr><td>13-11-2026 00:20</td><td class="code">CIA-ROPA-2026-000031-7</td><td>N.º 3</td><td>${r&&e?"Responsable y encargado":r?"Responsable":"Encargado"}</td><td class="desc"><button class="btn btn-ghost btn-sm">PDF</button><button class="btn btn-ghost btn-sm">Excel</button></td></tr>`);
+ $("#pieMsg").classList.add("oculto");$("#pieOk").classList.remove("oculto");
+};
+$("#abrirRopa").onclick=()=>$("#velo").classList.add("abierto");
+$("#cerrar").onclick=()=>$("#velo").classList.remove("abierto");
+estado();
+$("#velo").classList.add("abierto");
+
+</script>
+</body>
+</html>

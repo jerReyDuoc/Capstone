@@ -11,6 +11,8 @@ Una fila por archivo GUARDADO por el sistema para la empresa:
                 lo guarda aquí con guardar_documento() y aparece en "Mis documentos".
   rat_pdf       HU-36: informe PDF del Registro de Actividades de Tratamiento (una emisión de
   rat_xlsx      rat_informe guarda los dos formatos con el mismo código verificable).
+  ropa_pdf      HU-37: informe RoPA del registro de actividades (una emisión de ropa_informe guarda
+  ropa_xlsx     los dos formatos con el mismo código).
 
 Las evidencias (tabla evidencias) y las constancias (avance_formativo) NO se copian aquí:
 "Mis documentos" las lee de su propia tabla para no duplicar archivos.
@@ -32,7 +34,10 @@ TIPO_BORRADOR = "borrador"
 TIPO_RAT_PDF = "rat_pdf"        # HU-36
 TIPO_RAT_XLSX = "rat_xlsx"      # HU-36
 TIPOS_RAT = (TIPO_RAT_PDF, TIPO_RAT_XLSX)
-TIPOS_DOCUMENTO = (TIPO_INFORME, TIPO_BORRADOR, *TIPOS_RAT)
+TIPO_ROPA_PDF = "ropa_pdf"      # HU-37
+TIPO_ROPA_XLSX = "ropa_xlsx"    # HU-37
+TIPOS_ROPA = (TIPO_ROPA_PDF, TIPO_ROPA_XLSX)
+TIPOS_DOCUMENTO = (TIPO_INFORME, TIPO_BORRADOR, *TIPOS_RAT, *TIPOS_ROPA)
 
 
 class DocumentoEmpresa(Base):

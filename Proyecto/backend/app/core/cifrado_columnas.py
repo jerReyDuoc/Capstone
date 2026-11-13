@@ -101,3 +101,41 @@ class TextoCifradoBorrador(TextoCifrado):
         except ClaveCifradoInvalida:
             logger.error("No se pudo descifrar un borrador (¿cambió ENTITY_MAP_KEY?)")
             return TEXTO_ILEGIBLE
+
+
+# ---------------------------------------------------------------- HU-37: datos del informe RoPA
+# El RoPA exige datos de contacto (correo y teléfono de la empresa, correo del delegado de protección de
+# datos y de cada organización por cuenta de la cual la empresa actúa como encargada). Misma excepción
+# documentada que los borradores, con su propia subclave ("ropa"): se guardan cifrados y solo se descifran
+# al leerlos por el ORM para la propia empresa.
+@lru_cache(maxsize=4)
+def _cifrador_ropa(clave: str) -> CifradorDatos:
+    return CifradorDatos(clave, "ropa")
+
+
+def cifrador_ropa() -> CifradorDatos:
+    if not settings.ENTITY_MAP_KEY:
+        raise ClaveCifradoInvalida(
+            "ENTITY_MAP_KEY no configurada: los datos del informe RoPA se guardan cifrados (HU-37) "
+            "y sin clave no se pueden escribir."
+        )
+    return _cifrador_ropa(settings.ENTITY_MAP_KEY)
+
+
+class TextoCifradoRopa(TextoCifrado):
+    """Como TextoCifrado (prefijo enc:v1:, fail-closed), con la subclave de los datos del RoPA."""
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return cifrador_ropa().cifrar_texto(str(value))
+
+    def process_result_value(self, value, dialect):
+        if value is None or not CifradorDatos.esta_cifrado(value):
+            return value
+        try:
+            return cifrador_ropa().descifrar_texto(value)
+        except ClaveCifradoInvalida:
+            logger.error("No se pudieron descifrar los datos del informe RoPA (¿cambió ENTITY_MAP_KEY?)")
+            return TEXTO_ILEGIBLE

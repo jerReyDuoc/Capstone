@@ -43,7 +43,7 @@ from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleEr
 from app.core.autenticacion import Actor
 from app.core.config import settings
 from app.domain.models.documento_empresa import (
-    TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, TIPOS_RAT, DocumentoEmpresa,
+    TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, TIPOS_RAT, TIPOS_ROPA, DocumentoEmpresa,
 )
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
@@ -223,6 +223,21 @@ async def _emisiones_rat(db: AsyncSession, empresa_id: int) -> dict[int, dict]:
     return salida
 
 
+async def _emisiones_ropa(db: AsyncSession, empresa_id: int) -> dict[int, dict]:
+    """HU-37: código, versión y partes de la emisión de cada documento del informe RoPA (por id de documento)."""
+    from app.domain.models.ropa import RopaInforme
+
+    filas = (await db.execute(select(RopaInforme).where(RopaInforme.empresa_id == empresa_id))).scalars().all()
+    salida: dict[int, dict] = {}
+    for r in filas:
+        datos = {"ropa": {"informe_id": r.id, "codigo": r.codigo, "version": r.version,
+                          "partes": list(r.partes or []), "actividades": r.actividades}}
+        for doc_id in (r.documento_pdf_id, r.documento_xlsx_id):
+            if doc_id:
+                salida[doc_id] = datos
+    return salida
+
+
 class DocumentosEmpresa:
     """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (empresa_con_documentos)."""
 
@@ -264,6 +279,8 @@ class DocumentosEmpresa:
 
         emisiones = await _emisiones_rat(self.db, self.empresa.id) if any(
             d.tipo in TIPOS_RAT for d in documentos) else {}
+        if any(d.tipo in TIPOS_ROPA for d in documentos):          # HU-37
+            emisiones.update(await _emisiones_ropa(self.db, self.empresa.id))
 
         constancias = (await self.db.execute(
             select(AvanceFormativo, RutaFormativa.nombre)
@@ -278,7 +295,9 @@ class DocumentosEmpresa:
             # HU-16: los borradores se guardan con guardar_documento(tipo="borrador")
             "borradores": [_doc_dict(d) for d in documentos if d.tipo == TIPO_BORRADOR],
             # HU-36: informes del registro de actividades (PDF y XLSX), con su código verificable
-            "registro_actividades": [_doc_dict(d, emisiones.get(d.id)) for d in documentos if d.tipo in TIPOS_RAT],
+            # HU-37: también los informes RoPA (PDF y XLSX), con su código y versión
+            "registro_actividades": [_doc_dict(d, emisiones.get(d.id)) for d in documentos
+                                     if d.tipo in TIPOS_RAT or d.tipo in TIPOS_ROPA],
             "evidencias": [{
                 "id": e.id_evidencia, "nombre": e.nombre_archivo, "evaluacion_id": ev_id,
                 "control": codigo, "origen": e.origen, "fecha_subida": e.fecha_subida,

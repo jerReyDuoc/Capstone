@@ -649,6 +649,37 @@ CATALOGO: dict[str, dict[str, Dato]] = {
             base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
         ),
     },
+    # ------------------------------------------------------------ HU-37: informe RoPA
+    # Datos que el RoPA pide y el registro no tiene. Son canales de contacto de ORGANIZACIONES (la empresa y
+    # las organizaciones por cuenta de las cuales actúa como encargada): la ayuda pide correos genéricos y,
+    # para el delegado, el cargo o el área, no el nombre de una persona. Aun así un correo puede identificar
+    # a alguien: se clasifican como contacto, van cifrados en reposo (misma excepción que los borradores,
+    # HU-16, con su propia subclave) y nunca se copian a la bitácora de auditoría.
+    "ropa_datos": {
+        **_sin_dp("id", "empresa_id", "fecha_actualizacion"),
+        "contenido": Dato(
+            CONTACTO, CIFRADO,
+            finalidad="Datos de contacto que exige el formato RoPA (responsable o encargado, su delegado de "
+                      "protección de datos y las organizaciones por cuenta de las cuales actúa), informados por "
+                      "la empresa para sus informes (HU-37)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE, escaneo="cifrado",
+        ),
+        "actualizado_por_usuario_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa actualizó los datos del RoPA (HU-37)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
+    # Cada emisión del informe RoPA (PDF y XLSX en "Mis documentos"): código, versión, huella, partes y
+    # conteos. Sin datos de titulares.
+    "ropa_informe": {
+        **_sin_dp("id", "empresa_id", "codigo", "version", "huella", "actividades", "aviso_version", "fecha",
+                  "documento_pdf_id", "documento_xlsx_id"),
+        **{c: Dato(SIN_DP, escaneo="pii") for c in ("partes", "resumen", "versiones")},
+        "usuario_definitivo_id": Dato(
+            METADATO, finalidad="Trazabilidad: qué usuario de la empresa emitió cada informe RoPA (HU-37)",
+            base=B_CONTRATO_CLIENTE, conservacion=C_CLIENTE,
+        ),
+    },
     # ------------------------------------------------------------ HU-39: asistente de IA del mapa y del RAT
     # La entrevista describe PROCESOS de la empresa, no personas. Lo que escribe el usuario se guarda
     # anonimizado (el mismo texto que vio el LLM) y las propuestas pasan por el NER antes de guardarse.
