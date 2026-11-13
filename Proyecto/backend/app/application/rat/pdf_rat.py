@@ -45,6 +45,31 @@ def _marcar_sensibles(texto: str) -> str:
              .replace("(NNA)", f'<font color="{M.NNA}"><b>(NNA)</b></font>'))
 
 
+def _marca_revision(inf: I.InformeRat, ancho: float, e, p) -> list:
+    """HU-40 criterio 3: la marca de la revisión interna en la portada (o que la versión aún no se revisa)."""
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Spacer
+
+    m = inf.revision
+    if not inf.revision_aplica:
+        return []
+    if m is None:
+        if inf.borrador:
+            return []
+        return [p("<b>Revisión interna:</b> esta versión del registro todavía no tiene una revisión interna "
+                  "registrada.", e.gris_chico), Spacer(1, 4)]
+    titulo = ParagraphStyle("rev_t", parent=e.aviso_titulo, textColor=M._hex(M.VERDE), fontSize=10.5, leading=13)
+    detalle = (f"Revisión interna N.º {m.numero} de la versión {m.version_rat} del registro"
+               + (f" · {m.puntos} puntos de la lista de verificación revisados" if m.puntos else "")
+               + (f", {m.aceptados} aceptado(s) con justificación" if m.aceptados else "")
+               + (f" · {m.observaciones} observación(es) cerrada(s)" if m.observaciones else "") + ".")
+    contenido = [p(esc(m.texto), titulo), Spacer(1, 2), p(esc(detalle), e.aviso_texto),
+                 p("La persona que revisó confirmó que el registro es fiel a la realidad de la organización en esa "
+                   "fecha. La marca vale solo para esta versión: si el registro cambia, se debe revisar de nuevo.",
+                   e.gris_chico)]
+    return [M._caja(contenido, ancho, M.VERDE_SUAVE, M.VERDE), Spacer(1, 6)]
+
+
 def generar_pdf_rat(inf: I.InformeRat) -> bytes:
     M.importar()
     from reportlab.graphics.shapes import Drawing, Rect, String
@@ -104,6 +129,7 @@ def generar_pdf_rat(inf: I.InformeRat) -> bytes:
         ("Huella del registro", I.huella_legible(inf.huella)),
     ]
     historia += [M.ficha(celdas, ancho, e), Spacer(1, 6)]
+    historia += _marca_revision(inf, ancho, e, p)
     historia.append(p(f"<b>Uso previsto:</b> {esc(I.USO_PREVISTO)}.", e.gris_chico))
     historia.append(Spacer(1, 8))
     historia.append(M.caja_aviso(inf.aviso, ancho, e))
@@ -370,6 +396,11 @@ def generar_pdf_rat(inf: I.InformeRat) -> bytes:
         Spacer(1, 4),
         M.tabla(filas, [ancho * w for w in (0.05, 0.47, 0.16, 0.32)]),
     ]))
+    if inf.revision:
+        historia.append(Spacer(1, 6))
+        historia.append(p(f"<b>Revisión interna:</b> {esc(inf.revision.texto)} (revisión N.º {inf.revision.numero} de la "
+                          f"versión {inf.revision.version_rat} del registro). La constancia y el paquete de evidencia "
+                          "están en ComplianceIA (Registro de actividades › Revisión interna).", e.gris_chico))
 
     izquierda = (f"ComplianceIA | {inf.codigo or 'Vista previa'} | RAT versión {inf.version_rat or '—'} | "
                  f"{inf.empresa[:60]}")

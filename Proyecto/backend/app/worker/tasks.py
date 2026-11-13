@@ -107,6 +107,13 @@ async def sellar_audit_log_task(ctx):
         return {"lotes_sellados": len(nuevos), "hasta_id": nuevos[-1].hasta_id if nuevos else None}
 
 
+async def recordar_revision_rat_task(ctx):
+    """HU-40 criterio 5: recordatorio de la revisión periódica del registro (vence pronto o está vencida)."""
+    from app.application.use_cases.revision_interna import enviar_recordatorios
+    async with AsyncSessionLocal() as session:
+        return await enviar_recordatorios(session)
+
+
 async def startup(ctx):
     """Carga el motor NER al iniciar: si falta spaCy/modelo, el worker no arranca
     (mejor fallar al inicio que en cada evidencia)."""
@@ -131,6 +138,8 @@ class WorkerSettings:
              timeout=settings.RETENCION_TIMEOUT_S, unique=True),
         # HU-09: sellado por lote del audit_log cada AUDIT_SELLO_CADA_MIN minutos
         cron(sellar_audit_log_task, minute=set(range(0, 60, settings.AUDIT_SELLO_CADA_MIN)), run_at_startup=True),
+        # HU-40: recordatorio de la revisión interna del registro, diario a REVISION_RAT_HORA_UTC
+        cron(recordar_revision_rat_task, hour=settings.REVISION_RAT_HORA_UTC, minute=15, unique=True),
     ]
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     max_tries = 3

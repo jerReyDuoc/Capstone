@@ -142,7 +142,19 @@ class InformeRatCasos:
 
     async def armar(self, generado: datetime | None = None) -> I.InformeRat:
         fuentes, archivadas = await self._fuentes()
-        return I.armar(fuentes, generado or _ahora(), self.razon_social, self.rut, await self._rubro(), archivadas)
+        inf = I.armar(fuentes, generado or _ahora(), self.razon_social, self.rut, await self._rubro(), archivadas)
+        # HU-40 criterio 3: si esta versión (misma huella) tiene una revisión interna, el informe lleva la marca
+        return inf.con_revision(await self._marca(huella=inf.huella))
+
+    async def _marca(self, huella: str | None = None, revision_id: int | None = None) -> I.MarcaRevision | None:
+        from app.domain.models.rat_revision import REVISADA, RatRevision
+
+        if revision_id is None and huella is None:
+            return None
+        q = select(RatRevision).where(RatRevision.empresa_id == self.empresa_id, RatRevision.estado == REVISADA)
+        q = q.where(RatRevision.id == revision_id) if revision_id is not None else q.where(RatRevision.huella == huella)
+        r = (await self.db.execute(q.order_by(RatRevision.id.desc()).limit(1))).scalar_one_or_none()
+        return marca_de_revision(r)
 
     # ================================================================ emisiones
     async def _ultima(self) -> RatInforme | None:
@@ -162,8 +174,10 @@ class InformeRatCasos:
         def doc(d: DocumentoEmpresa | None) -> dict | None:
             return {"id": d.id, "nombre": d.nombre, "tamano_bytes": d.tamano_bytes} if d else None
 
+        marca = await self._marca(revision_id=r.revision_id) if getattr(r, "revision_id", None) else None
         return {
             "id": r.id, "codigo": r.codigo, "version_rat": r.version_rat, "fecha": _iso(r.fecha),
+            "revision": I.marca_dict(marca),
             "borrador": r.borrador, "motivos_borrador": list(r.motivos_borrador or []), "actividades": r.actividades,
             "huella": r.huella, "huella_legible": I.huella_legible(r.huella), "resumen": r.resumen or {},
             "aviso_version": r.aviso_version, "documentos": {"pdf": doc(pdf), "xlsx": doc(xlsx)},
@@ -176,10 +190,11 @@ class InformeRatCasos:
             .order_by(RatInforme.id.desc()).limit(MAX_HISTORIAL))).scalars().all())
         emisiones = [await self._vista_emision(r) for r in filas]
         ultima = filas[0] if filas else None
-        al_dia = bool(ultima and ultima.huella == inf.huella and ultima.borrador == inf.borrador)
+        al_dia = bool(ultima and ultima.huella == inf.huella and ultima.borrador == inf.borrador
+                      and ultima.revision_id == (inf.revision.id if inf.revision else None))
         return {
             "previa": {**I.resumen_publico(inf), "puede_emitir": bool(inf.actividades),
-                       "version_siguiente": (ultima.version_rat + (0 if al_dia else 1)) if ultima else 1},
+                       "version_siguiente": (ultima.version_rat + (0 if ultima.huella == inf.huella else 1)) if ultima else 1},
             "al_dia": al_dia,
             "ultima": emisiones[0] if emisiones else None,
             "emisiones": emisiones,
@@ -210,7 +225,9 @@ class InformeRatCasos:
             raise await self._rechazar("registro_vacio", InformeRatError(
                 409, "RAT_VACIO", "Tu registro aún no tiene actividades. Registra al menos una para generar el informe."))
         ultima = await self._ultima()
-        if ultima is not None and not forzar and ultima.huella == inf.huella and ultima.borrador == inf.borrador:
+        revision_id = inf.revision.id if inf.revision else None
+        if (ultima is not None and not forzar and ultima.huella == inf.huella and ultima.borrador == inf.borrador
+                and ultima.revision_id == revision_id):
             vista = await self._vista_emision(ultima)
             if vista["documentos"]["pdf"] and vista["documentos"]["xlsx"]:
                 # El texto se arma ANTES del rollback: después, `ultima` queda expirada y leer su fecha
@@ -232,7 +249,8 @@ class InformeRatCasos:
             empresa_id=self.empresa_id, codigo=None, version_rat=version, huella=inf.huella, borrador=inf.borrador,
             motivos_borrador=list(inf.motivos_borrador), actividades=len(inf.actividades), resumen=inf.resumen,
             versiones=[{"id": a.id, "version": a.version, "huella": a.huella_version} for a in inf.actividades],
-            aviso_version=inf.aviso.version, fecha=_naive(generado), usuario_definitivo_id=self.usuario_id)
+            aviso_version=inf.aviso.version, fecha=_naive(generado), usuario_definitivo_id=self.usuario_id,
+            revision_id=revision_id)
         self.db.add(fila)
         await self.db.flush()
         fila.codigo = I.codigo(fila.id, generado.astimezone(ZONA).year)
@@ -261,7 +279,8 @@ class InformeRatCasos:
             self.bitacora.registrar(
                 accion=Accion.RAT_INFORME_GENERADO, entidad="rat_informe", entidad_id=fila.id, actor=self.actor,
                 detalle={"version_rat": version, "borrador": inf.borrador, "actividades": len(inf.actividades),
-                         "huella": inf.huella[:16], "forzado": forzar, "documentos": [doc_pdf.id, doc_xlsx.id]})
+                         "huella": inf.huella[:16], "forzado": forzar, "documentos": [doc_pdf.id, doc_xlsx.id],
+                         "revision_id": revision_id})
             await self.db.commit()
         except Exception:
             await self.db.rollback()
@@ -309,13 +328,14 @@ class InformeRatCasos:
         await self.db.commit()
         return contenido, doc.nombre, doc.mime_type
 
-    def _informe_de(self, fila: RatInforme) -> I.InformeRat:
+    async def _informe_de(self, fila: RatInforme) -> I.InformeRat:
         """Lo mínimo para el cuerpo del correo (las cifras guardadas al emitir)."""
+        marca = await self._marca(revision_id=fila.revision_id) if fila.revision_id else None
         return I.InformeRat(
             empresa=self.razon_social, rut=self.rut, rubro=None,
             generado=fila.fecha.replace(tzinfo=timezone.utc), actividades=(), resumen=fila.resumen or {},
             borrador=fila.borrador, motivos_borrador=tuple(fila.motivos_borrador or []), huella=fila.huella,
-            riesgos=(), codigo=fila.codigo, version_rat=fila.version_rat)
+            riesgos=(), codigo=fila.codigo, version_rat=fila.version_rat, revision=marca, revision_aplica=True)
 
     async def enviar(self, informe_id: int, email: str | None, formatos: list[str]) -> dict:
         if settings.CORREO_MODO == "desactivado":
@@ -345,7 +365,7 @@ class InformeRatCasos:
             raise InformeRatError(429, "LIMITE_CORREOS", f"Ya enviaste el informe {settings.RAT_CORREOS_DIA_EMPRESA} "
                                                          "veces hoy. Descárgalo o vuelve a intentarlo mañana.",
                                   reintentar_en_s=consumo.reintentar_en_s)
-        inf = self._informe_de(fila)
+        inf = await self._informe_de(fila)
         texto, html = correo_rat.cuerpo(inf, formatos)
         try:
             modo = await correo.enviar(destino, correo_rat.asunto(inf), texto, html, adjuntos)
@@ -388,6 +408,17 @@ class InformeRatCasos:
                         "El código es auténtico, pero el registro cambió después de esa emisión: genera un informe "
                         "nuevo para presentar la versión actual."),
         }
+
+
+def marca_de_revision(r) -> I.MarcaRevision | None:
+    """La marca que lleva el informe a partir de una fila de rat_revision revisada (HU-40)."""
+    if r is None or r.fecha_revision is None:
+        return None
+    res = r.resumen or {}
+    return I.MarcaRevision(
+        id=r.id, numero=r.numero, fecha=r.fecha_revision, revisor=r.revisor_nombre or "", cargo=r.revisor_cargo,
+        version_rat=r.version_rat or 0, puntos=int(res.get("revisados") or 0), aceptados=int(res.get("aceptados") or 0),
+        observaciones=int((res.get("observaciones") or {}).get("cerradas") or 0))
 
 
 def _fecha_txt(d: datetime | None) -> str:

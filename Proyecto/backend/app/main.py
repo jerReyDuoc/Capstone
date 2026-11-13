@@ -23,6 +23,7 @@ from app.api.routes import informe_rat  # HU-36: informe del RAT (PDF y XLSX)
 from app.api.routes import informe_ropa  # HU-37: informe RoPA desde el registro (PDF y XLSX)
 from app.api.routes import asistente_rat  # HU-39: asistente de IA para el mapa de datos y el RAT
 from app.api.routes import admin_privacidad  # HU-41: registro de tratamiento de la propia plataforma
+from app.api.routes import revision_interna  # HU-40: revisión interna del registro (auditoría interna)
 from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ app.include_router(admin_retencion.router)
 app.include_router(mapa_datos.router)
 app.include_router(registro_actividades.router)
 app.include_router(informe_rat.router)
+app.include_router(revision_interna.router)
 app.include_router(informe_ropa.router)
 app.include_router(asistente_rat.router)
 app.include_router(admin_privacidad.router)

@@ -54,3 +54,8 @@ class RatInforme(Base):
         "documento_pdf_id", Integer, ForeignKey("documento_empresa.id", ondelete="SET NULL"), nullable=True)
     documento_xlsx_id: Mapped[int | None] = mapped_column(
         "documento_xlsx_id", Integer, ForeignKey("documento_empresa.id", ondelete="SET NULL"), nullable=True)
+    # HU-40: revisión interna que dejó constancia de ESTA versión del registro (la marca que lleva el informe).
+    # Se fija al emitir; el trigger impide cambiarla después.
+    revision_id: Mapped[int | None] = mapped_column(
+        "revision_id", Integer, ForeignKey("rat_revision.id", name="fk_rat_informe_revision"),
+        nullable=True)

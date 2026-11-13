@@ -142,6 +142,10 @@ export function RegistroActividades() {
             <Icon name="tabla" />
             Informe RoPA
           </button>
+          <Link href="/empresa/registro-actividades/revision" className="btn btn-ghost" title="Revisa el registro y deja constancia">
+            <Icon name="constancia" />
+            Revisión interna
+          </Link>
           <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
             <Icon name="mas" />
             Nueva actividad
@@ -315,6 +319,8 @@ export function RegistroActividades() {
             </div>
           ) : null}
 
+          <AvisoRevisionInterna r={registro.revision_interna} />
+
           {g.por_revisar ? (
             <p className="callout callout-aviso" role="status">
               <Icon name="alerta" />
@@ -388,6 +394,25 @@ export function RegistroActividades() {
         />
       ) : null}
       {avisoFlotante}
+    </div>
+  );
+}
+
+/** Aviso de la revisión interna periódica: solo cuando conviene actuar (vence, venció o nunca se hizo). */
+function AvisoRevisionInterna({ r }: { r: ListaRegistro["revision_interna"] }) {
+  if (!r || r.estado === "al_dia" || r.estado === "sin_registro") return null;
+  const vence = r.vence ? r.vence.split("-").reverse().join("-") : "";
+  const texto =
+    r.estado === "vencida" ? `La revisión interna del registro venció el ${vence}.`
+    : r.estado === "por_vencer" ? `La revisión interna del registro vence el ${vence} (en ${r.dias} día(s)).`
+    : `Aún no haces la primera revisión interna del registro (plazo: ${vence}).`;
+  return (
+    <div className={`callout ${r.estado === "sin_revision" ? "" : "callout-aviso"}`} role="status">
+      <Icon name={r.estado === "sin_revision" ? "constancia" : "reloj"} />
+      <span>
+        <strong>{texto}</strong> {r.en_curso ? `Tienes la revisión N.º ${r.en_curso} en curso.` : `Revísalo cada ${r.plazo_meses} meses y deja constancia antes de presentarlo.`}{" "}
+        <Link href="/empresa/registro-actividades/revision">{r.en_curso ? "Continuar la revisión" : "Ir a la revisión interna"}</Link>
+      </span>
     </div>
   );
 }

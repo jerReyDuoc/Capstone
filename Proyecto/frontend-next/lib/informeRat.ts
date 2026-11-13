@@ -61,6 +61,18 @@ export interface PreviaInforme {
   aviso: { version: string; pie: string };
   puede_emitir: boolean;
   version_siguiente: number;
+  /** Revisión interna que dejó constancia de esta versión (la marca que lleva el informe). */
+  revision?: MarcaRevisionInforme | null;
+}
+
+export interface MarcaRevisionInforme {
+  id: number;
+  numero: number;
+  fecha: string;
+  revisor: string;
+  cargo: string | null;
+  version_rat: number;
+  texto: string;
 }
 
 export interface DocumentoEmision {
@@ -82,6 +94,7 @@ export interface EmisionInforme {
   resumen: Partial<ResumenInforme>;
   aviso_version: string;
   documentos: { pdf: DocumentoEmision | null; xlsx: DocumentoEmision | null };
+  revision?: MarcaRevisionInforme | null;
 }
 
 export interface ListaInformes {

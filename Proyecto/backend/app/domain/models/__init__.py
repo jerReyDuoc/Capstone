@@ -67,6 +67,9 @@ from app.domain.models.asistente import (  # HU-39
     AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion,
 )
 from app.domain.models.plataforma import PlataformaInforme, PlataformaRegistro  # HU-41
+from app.domain.models.rat_revision import (  # HU-40: revisión interna del registro
+    RatObservacion, RatPaqueteEvidencia, RatRevision, RatRevisionConfig,
+)
 
 __all__ = [
     "BorradorDocumento",
@@ -134,4 +137,8 @@ __all__ = [
     "AsistentePropuesta",
     "PlataformaInforme",
     "PlataformaRegistro",
+    "RatRevision",
+    "RatObservacion",
+    "RatRevisionConfig",
+    "RatPaqueteEvidencia",
 ]

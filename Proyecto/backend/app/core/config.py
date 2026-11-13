@@ -370,6 +370,24 @@ class Settings(BaseSettings):
     # Envíos del informe por correo por empresa y día.
     RAT_CORREOS_DIA_EMPRESA: int = 5
 
+    # ------------------------------------------------ HU-40: revisión interna del registro (auditoría interna)
+    # Plazo por defecto entre revisiones (la empresa lo cambia en su configuración, de 1 a 36 meses) y con
+    # cuántos días de anticipación se avisa que vence.
+    REVISION_RAT_PLAZO_MESES: int = 12
+    REVISION_RAT_AVISO_DIAS: int = 30
+    # Con la revisión vencida, el recordatorio por correo se repite cada N días (nunca más de uno por etapa).
+    REVISION_RAT_REPETIR_DIAS: int = 30
+    # Hora (UTC) del recordatorio diario: 12:00 UTC = 09:00 en Chile continental (horario de verano).
+    REVISION_RAT_HORA_UTC: int = 12
+    # Paquetes de evidencia (ZIP) y envíos por correo de la revisión, por empresa y día.
+    REVISION_RAT_PAQUETES_DIA: int = 20
+    REVISION_RAT_CORREOS_DIA: int = 5
+    # Tamaño máximo del paquete que se adjunta al correo y del que se sube para verificarlo (MB).
+    REVISION_RAT_PAQUETE_CORREO_MB: int = 8
+    REVISION_RAT_PAQUETE_VERIFICAR_MB: int = 12
+    # Enlace del recordatorio por correo (la página de la revisión interna en el frontend).
+    REVISION_RAT_URL: str = "http://localhost:3000/empresa/registro-actividades/revision"
+
     # ------------------------------------------------ HU-41: registro de tratamiento de la propia plataforma
     # El mapa, el RAT y el RoPA de ComplianceAI se generan desde app/core/catalogo_datos_personales.py y
     # estos datos del despliegue (nada de esto cambia cómo se tratan los datos: solo cómo se describen).
@@ -441,6 +459,11 @@ class Settings(BaseSettings):
             raise ValueError("RETENCION_TITULAR_MIN_DIAS debe ser >= 1 y <= RETENCION_TITULAR_MAX_DIAS.")
         if not 0 <= self.RETENCION_HORA_UTC <= 23:
             raise ValueError("RETENCION_HORA_UTC debe ser una hora entre 0 y 23.")
+        # HU-40
+        if not 1 <= self.REVISION_RAT_PLAZO_MESES <= 36:
+            raise ValueError("REVISION_RAT_PLAZO_MESES debe estar entre 1 y 36.")
+        if not 0 <= self.REVISION_RAT_HORA_UTC <= 23:
+            raise ValueError("REVISION_RAT_HORA_UTC debe ser una hora entre 0 y 23.")
         if self.RETENCION_TIMEOUT_S < 60 or self.RETENCION_BLOQUEO_MAX_MIN * 60 <= self.RETENCION_TIMEOUT_S:
             raise ValueError("RETENCION_TIMEOUT_S debe ser >= 60 y menor que RETENCION_BLOQUEO_MAX_MIN (en segundos).")
         if self.APP_ENV == "production" and not self.ENTITY_MAP_KEY:

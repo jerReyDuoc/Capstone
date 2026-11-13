@@ -98,6 +98,27 @@ class FuenteActividad:
 
 # ============================================================ resultado
 @dataclass(frozen=True)
+class MarcaRevision:
+    """HU-40: constancia de la revisión interna de ESTA versión del registro (misma huella)."""
+    id: int
+    numero: int
+    fecha: datetime
+    revisor: str
+    cargo: str | None
+    version_rat: int
+    puntos: int = 0
+    aceptados: int = 0
+    observaciones: int = 0
+
+    @property
+    def texto(self) -> str:
+        from app.application.informes.motor_pdf import fecha_local
+
+        quien = self.revisor + (f", {self.cargo}" if self.cargo else "")
+        return f"Revisada el {fecha_local(self.fecha, con_hora=False)} por {quien}"
+
+
+@dataclass(frozen=True)
 class ActividadInforme:
     numero: int                      # orden en el informe (1..n)
     id: int
@@ -154,9 +175,16 @@ class InformeRat:
     version_rat: int | None = None
     archivadas: int = 0
     nota_borrador: str = NOTA_BORRADOR
+    # HU-40: revisión interna que dejó constancia de esta versión (None si no se ha revisado)
+    revision: MarcaRevision | None = None
+    # La marca solo aplica al registro de la empresa cliente (no al de la propia plataforma)
+    revision_aplica: bool = False
 
     def con_emision(self, codigo: str, version_rat: int) -> "InformeRat":
         return replace(self, codigo=codigo, version_rat=version_rat)
+
+    def con_revision(self, marca: MarcaRevision | None) -> "InformeRat":
+        return replace(self, revision=marca, revision_aplica=True)
 
     @property
     def estado_texto(self) -> str:
@@ -485,11 +513,20 @@ def resumen_publico(inf: InformeRat) -> dict:
         } for a in inf.actividades],
         "mapa_calor": rg.mapa_calor(list(inf.riesgos)),
         "aviso": {"version": inf.aviso.version, "pie": inf.aviso.pie},
+        "revision": marca_dict(inf.revision),
     }
 
 
+def marca_dict(m: MarcaRevision | None) -> dict | None:
+    if m is None:
+        return None
+    return {"id": m.id, "numero": m.numero, "fecha": m.fecha.isoformat(), "revisor": m.revisor, "cargo": m.cargo,
+            "version_rat": m.version_rat, "texto": m.texto}
+
+
 __all__ = [
-    "AVISO_RAT", "USO_PREVISTO", "NOTA_BORRADOR", "FuenteActividad", "ActividadInforme", "InformeRat", "armar", "codigo",
+    "AVISO_RAT", "USO_PREVISTO", "NOTA_BORRADOR", "FuenteActividad", "ActividadInforme", "InformeRat", "MarcaRevision",
+    "marca_dict", "armar", "codigo",
     "leer_codigo", "huella", "huella_legible", "campos_legibles", "resumen_publico", "texto_plazo",
     "texto_fuente", "texto_rol", "texto_base", "texto_decisiones", "texto_medidas", "medidas_por_grupo",
     "texto_destinatarios", "texto_transferencias", "texto_ambito",

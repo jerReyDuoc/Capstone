@@ -181,6 +181,22 @@ class Accion:
     PLATAFORMA_INFORME_VERIFICADO = "plataforma.informe_verificado"
     PLATAFORMA_MAPA_DESCARGADO = "plataforma.mapa_descargado"
     PLATAFORMA_ROPA_DATOS_ACTUALIZADOS = "plataforma.ropa_datos_actualizados"   # detalle: campos cambiados
+    # HU-40: revisión interna del registro (modo de auditoría interna del cliente). El detalle lleva ids,
+    # claves de lo revisado ("actividad:12"), criterios, prioridades, versiones, conteos y prefijos de huellas;
+    # nunca el texto de las observaciones ni el nombre de quien revisa.
+    REVISION_RAT_INICIADA = "revision_rat.iniciada"
+    REVISION_RAT_VERIFICACION = "revision_rat.verificacion"          # detalle: objeto, criterios, estado
+    REVISION_RAT_OBSERVACION_CREADA = "revision_rat.observacion_creada"
+    REVISION_RAT_OBSERVACION_CERRADA = "revision_rat.observacion_cerrada"
+    REVISION_RAT_OBSERVACION_REABIERTA = "revision_rat.observacion_reabierta"
+    REVISION_RAT_VERSION_REVISADA = "revision_rat.version_revisada"   # detalle: version_rat, huella, cifras
+    REVISION_RAT_MARCA_RECHAZADA = "revision_rat.marca_rechazada"     # observaciones abiertas, pendientes…
+    REVISION_RAT_PAQUETE_EXPORTADO = "revision_rat.paquete_exportado"  # detalle: código, sha256, archivos
+    REVISION_RAT_PAQUETE_VERIFICADO = "revision_rat.paquete_verificado"
+    REVISION_RAT_CONSTANCIA_DESCARGADA = "revision_rat.constancia_descargada"
+    REVISION_RAT_ENVIADA = "revision_rat.enviada"
+    REVISION_RAT_CONFIGURACION = "revision_rat.configuracion"          # plazo, aviso y recordatorio por correo
+    REVISION_RAT_RECORDATORIO = "revision_rat.recordatorio"            # lo envía el sistema (cron diario)
 
 
 # HU-09: categoría de cada acción, para que el Auditor Externo filtre el historial de
@@ -260,6 +276,12 @@ _CATEGORIAS: dict[str, str] = {
     Accion.ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,      # HU-37
     Accion.ASISTENTE_PROPUESTA_DESCARTADA: Categoria.MODIFICACION,  # HU-39
     Accion.PLATAFORMA_ROPA_DATOS_ACTUALIZADOS: Categoria.MODIFICACION,  # HU-41
+    Accion.REVISION_RAT_VERIFICACION: Categoria.MODIFICACION,          # HU-40
+    Accion.REVISION_RAT_OBSERVACION_CERRADA: Categoria.MODIFICACION,
+    Accion.REVISION_RAT_OBSERVACION_REABIERTA: Categoria.MODIFICACION,
+    Accion.REVISION_RAT_VERSION_REVISADA: Categoria.MODIFICACION,
+    Accion.REVISION_RAT_MARCA_RECHAZADA: Categoria.MODIFICACION,
+    Accion.REVISION_RAT_CONFIGURACION: Categoria.MODIFICACION,
     # creaciones
     Accion.SOLICITUD_CONTRATACION_CREADA: Categoria.CREACION,
     Accion.EMPRESA_CREADA: Categoria.CREACION,
@@ -287,6 +309,9 @@ _CATEGORIAS: dict[str, str] = {
     Accion.ASISTENTE_PROPUESTA_ACEPTADA: Categoria.CREACION,
     Accion.ASISTENTE_PROPUESTA_EDITADA: Categoria.CREACION,
     Accion.PLATAFORMA_INFORME_GENERADO: Categoria.CREACION,      # HU-41 (descargas y verificaciones: acceso)
+    Accion.REVISION_RAT_INICIADA: Categoria.CREACION,            # HU-40 (descargas, envíos y verificación: acceso)
+    Accion.REVISION_RAT_OBSERVACION_CREADA: Categoria.CREACION,
+    Accion.REVISION_RAT_PAQUETE_EXPORTADO: Categoria.CREACION,
     # seguridad
     Accion.LOGIN_FALLIDO: Categoria.SEGURIDAD,
     Accion.LOGIN_BLOQUEADO: Categoria.SEGURIDAD,

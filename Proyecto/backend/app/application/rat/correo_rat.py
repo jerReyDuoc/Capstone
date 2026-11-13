@@ -27,7 +27,8 @@ def cuerpo(inf: I.InformeRat, formatos: list[str]) -> tuple[str, str]:
         f"{estado}\n\n"
         f"Actividades: {r['actividades']} · Con datos sensibles: {r['con_sensibles']}\n"
         f"Transferencias internacionales: {r['transferencias']} ({r['transferencias_sin_garantia']} sin garantía)\n"
-        f"Decisiones automatizadas: {r['con_decisiones']} · Riesgo alto o crítico: {r['riesgos_altos']}\n\n"
+        f"Decisiones automatizadas: {r['con_decisiones']} · Riesgo alto o crítico: {r['riesgos_altos']}\n"
+        + (f"Revisión interna: {inf.revision.texto}.\n" if inf.revision else "") + "\n"
         f"Adjuntamos el informe en {adjuntos}. {inf.aviso.pie}\n\n"
         "Este correo se generó automáticamente; no es necesario responderlo.\nComplianceIA\n"
     )
@@ -36,6 +37,7 @@ def cuerpo(inf: I.InformeRat, formatos: list[str]) -> tuple[str, str]:
         return (f'<td style="padding:14px;font-size:12px;color:#5b6b64;vertical-align:top">{titulo}<br>'
                 f'<span style="font-size:22px;font-weight:bold;color:#14201b">{cifra}</span><br>{pie}</td>')
 
+    revision = (f"<br><b>Revisión interna:</b> {escape(inf.revision.texto)}" if inf.revision else "")
     color_estado = "#b4233f" if inf.borrador else "#0b7a5a"
     fondo_estado = "#fbecef" if inf.borrador else "#e3f4ee"
     html = f"""<!doctype html><html lang="es"><body style="margin:0;background:#f3f6f5;font-family:Arial,Helvetica,sans-serif;color:#14201b">
@@ -59,7 +61,7 @@ def cuerpo(inf: I.InformeRat, formatos: list[str]) -> tuple[str, str]:
 <b>Código verificable:</b> {escape(inf.codigo or "")}<br>
 <b>Versión del RAT:</b> N.º {inf.version_rat}<br>
 <b>Emitido el:</b> {M.fecha_local(inf.generado)} (hora de Chile)<br>
-<b>Huella del registro:</b> {I.huella_legible(inf.huella)}
+<b>Huella del registro:</b> {I.huella_legible(inf.huella)}{revision}
 </td></tr>
 <tr><td style="padding:20px 28px 28px;font-size:12px;line-height:1.5;color:#5b6b64">
 {escape(inf.aviso.pie)} Este correo se generó automáticamente; no es necesario responderlo.

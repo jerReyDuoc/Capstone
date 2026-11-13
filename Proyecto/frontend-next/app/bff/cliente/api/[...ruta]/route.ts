@@ -97,6 +97,9 @@ async function manejar(req: NextRequest, { params }: Contexto): Promise<NextResp
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         ...(disposicion && /^attachment; filename="[\w.-]+"$/.test(disposicion) ? { "Content-Disposition": disposicion } : {}),
+        // Código del paquete de evidencia de la revisión interna (para mostrarlo al descargarlo)
+        ...(/^CIA-PAQ-\d{4}-\d{6,9}-[0-9K]$/.test(res.headers.get("x-paquete-codigo") ?? "")
+          ? { "X-Paquete-Codigo": res.headers.get("x-paquete-codigo") as string } : {}),
       },
     });
   }

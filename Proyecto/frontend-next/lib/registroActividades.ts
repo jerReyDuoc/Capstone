@@ -244,6 +244,15 @@ export interface ListaRegistro {
     metodologia_pia: string;
     referencia: string;
   };
+  /** Revisión interna periódica del registro (plazo, vencimiento y última constancia). */
+  revision_interna?: {
+    estado: "al_dia" | "por_vencer" | "vencida" | "sin_revision" | "sin_registro";
+    vence: string | null;
+    dias: number | null;
+    plazo_meses: number;
+    en_curso: number | null;
+    ultima: { fecha: string | null; version_rat: number | null; numero: number } | null;
+  } | null;
 }
 
 export interface RespuestaActividad {

@@ -184,8 +184,13 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
         ("Actividades incluidas", f"{r['actividades']}" + (f" ({r['archivadas_excluidas']} archivada(s) no se incluyen)"
                                                           if r["archivadas_excluidas"] else "")),
         ("Huella del registro", inf.huella),
+        # HU-40: la marca de la revisión interna de esta versión
         ("Uso previsto", I.USO_PREVISTO),
     ]
+    if inf.revision_aplica:
+        datos.insert(-1, ("Revisión interna", (f"{inf.revision.texto} (revisión N.º {inf.revision.numero})"
+                                               if inf.revision else
+                                               "Esta versión todavía no tiene una revisión interna registrada.")))
     for etiqueta, valor in datos:
         poner(ws, fila, 1, etiqueta, f_negrita, fill_suave, borde_=borde)
         c = poner(ws, fila, 2, valor, f_normal, borde_=borde)
@@ -375,7 +380,9 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
     fila = preparar(ws, "Verificación del informe", w, horizontal=False)
     for etiqueta, valor in (("Código verificable", inf.codigo or "Vista previa"),
                             ("Versión del RAT", f"N.º {inf.version_rat}" if inf.version_rat else "—"),
-                            ("Huella del registro (SHA-256)", inf.huella)):
+                            ("Huella del registro (SHA-256)", inf.huella),
+                            *((("Revisión interna", inf.revision.texto if inf.revision else "Sin revisión interna"),)
+                              if inf.revision_aplica else ())):
         ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=2)
         poner(ws, fila, 1, etiqueta, f_negrita, fill_suave, borde_=borde)
         ws.merge_cells(start_row=fila, start_column=3, end_row=fila, end_column=4)

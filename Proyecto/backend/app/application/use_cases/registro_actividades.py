@@ -220,7 +220,18 @@ class RegistroActividadesCasos:
             "mapa": {"version": version_mapa, "elementos": len(elementos), "flujos": len(flujos),
                      "iniciado": bool(elementos)},
             "limites": {"max_actividades": MAX_ACTIVIDADES},
+            # HU-40 criterio 5: estado de la revisión interna periódica (para el aviso de la lista)
+            "revision_interna": await self._revision_interna(),
         }
+
+    async def _revision_interna(self) -> dict | None:
+        from app.application.use_cases.revision_interna import resumen_periodicidad
+
+        try:
+            return await resumen_periodicidad(self.db, self.empresa_id)
+        except Exception:  # noqa: BLE001 - el aviso es secundario: nunca debe romper la lista del registro
+            logger.exception("HU-40: no se pudo calcular el estado de la revisión interna")
+            return None
 
     async def obtener(self, actividad_id: int) -> dict:
         f = await self._actividad(actividad_id)

@@ -248,6 +248,11 @@ export function InformeRat({
             ) : (
               <p>Todas las actividades incluidas están vigentes. Cada una se informa con su versión fija e inmutable.</p>
             )}
+            {previa.revision ? (
+              <p><Icon name="constancia" width={14} height={14} /> <strong>{previa.revision.texto}.</strong> El informe lleva la marca de la revisión interna.</p>
+            ) : !previa.borrador ? (
+              <p>Esta versión aún no tiene una revisión interna. <Link href="/empresa/registro-actividades/revision">Revisarla y dejar constancia</Link></p>
+            ) : null}
           </div>
         </section>
 

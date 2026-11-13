@@ -58,6 +58,9 @@ export const TIPOS_DOCUMENTO = [
 /** Informe del registro de actividades: PDF o planilla Excel. */
 export const TIPOS_INFORME_RAT = ["application/pdf", TIPO_XLSX] as const;
 
+/** Paquete de evidencia de la revisión interna (ZIP). */
+export const TIPOS_PAQUETE_REVISION = ["application/zip"] as const;
+
 /** HU-16: la descarga previa de un borrador es Markdown o PDF. */
 export const TIPOS_BORRADOR = ["application/pdf", "text/markdown"] as const;
 
@@ -167,6 +170,22 @@ const REGLAS: Regla[] = [
   // evaluación; usarlo como evidencia recalcula el puntaje (más tiempo).
   { metodo: "GET", patron: /^registro-actividades\/cumplimiento$/, timeoutMs: 30_000 },
   { metodo: "POST", patron: /^registro-actividades\/cumplimiento\/evidencia$/, timeoutMs: 60_000 },
+  // Revisión interna del registro (el mismo usuario, en su función de auditoría interna): lista de verificación,
+  // observaciones, marca de revisada (emite el informe con la marca: más tiempo), diferencias, constancia, paquete
+  // de evidencia (ZIP), envío por correo, verificación de un paquete subido y plazo de la revisión periódica.
+  { metodo: "GET", patron: /^registro-actividades\/revision$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/verificaciones$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/observaciones$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/observaciones\/\d{1,9}\/(cerrar|reabrir)$/, timeoutMs: 30_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/marcar$/, timeoutMs: 90_000 },
+  { metodo: "GET", patron: /^registro-actividades\/revision\/diferencias$/, timeoutMs: 30_000 },
+  { metodo: "PATCH", patron: /^registro-actividades\/revision\/configuracion$/ },
+  { metodo: "GET", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}$/, timeoutMs: 30_000 },
+  { metodo: "GET", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}\/constancia$/, binario: true, timeoutMs: 60_000 },
+  { metodo: "GET", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}\/paquete$/, binario: true, tipos: TIPOS_PAQUETE_REVISION, timeoutMs: 90_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}\/enviar$/, timeoutMs: 90_000 },
+  { metodo: "POST", patron: /^registro-actividades\/revision\/paquetes\/verificacion$/, archivo: true, timeoutMs: 60_000 },
   // Asistente de registro: entrevista guiada, documentos y propuestas que el usuario acepta o descarta.
   // Responder y analizar un documento llaman al servicio de IA: más tiempo.
   { metodo: "GET", patron: /^asistente$/ },
