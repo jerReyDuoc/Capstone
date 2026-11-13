@@ -580,6 +580,13 @@ RUTAS_CON_TOKEN_PROPIO = [
      "/api/registro-actividades/informes/1/descarga?formato=pdf", {}),
     ("POST", "/api/registro-actividades/informes/{informe_id}/enviar",
      "/api/registro-actividades/informes/1/enviar", {"json": {"formatos": ["pdf"]}}),
+    # HU-37: informe RoPA (solo cliente con contrato vigente; roles en test_hu37_informe_ropa.py)
+    ("GET", "/api/registro-actividades/ropa", "/api/registro-actividades/ropa", {}),
+    ("PATCH", "/api/registro-actividades/ropa/datos", "/api/registro-actividades/ropa/datos",
+     {"json": {"correo": "privacidad@empresa.cl"}}),
+    ("POST", "/api/registro-actividades/ropa", "/api/registro-actividades/ropa", {"json": {}}),
+    ("GET", "/api/registro-actividades/ropa/{informe_id}/descarga",
+     "/api/registro-actividades/ropa/1/descarga?formato=pdf", {}),
     # HU-39: asistente de IA del mapa y del RAT (solo cliente con contrato vigente; roles y flujo
     # completo en test_hu39_asistente_rat.py)
     ("GET", "/api/asistente", "/api/asistente", {}),

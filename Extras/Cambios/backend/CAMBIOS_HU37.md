@@ -51,6 +51,7 @@
 - `app/infrastructure/repositories/bitacora_repository.py` — `ROPA_DATOS_ACTUALIZADOS` (modificación),
   `ROPA_INFORME_GENERADO` (creación), `ROPA_INFORME_DESCARGADO` (acceso).
 - `app/main.py` — registra el router.
+- `tests/test_hu20_autorizacion.py` — las 4 rutas nuevas quedan clasificadas en `RUTAS_CON_TOKEN_PROPIO` (sin token: 401), junto a las del informe del registro. Corrige `test_todas_las_rutas_estan_clasificadas`.
 
 ## Diferencia con el plan aprobado
 
@@ -68,7 +69,7 @@ columnas JSON y estos datos llevan correos a propósito; cifrarlos sigue el prec
 
 ```bash
 docker compose exec backend alembic upgrade head
-docker compose exec backend pytest tests/test_hu37_informe_ropa.py tests/test_hu36_informe_rat.py tests/test_t06_minimizacion.py -q
+docker compose exec backend pytest tests/test_hu37_informe_ropa.py tests/test_hu36_informe_rat.py tests/test_t06_minimizacion.py tests/test_hu20_autorizacion.py tests/test_hu30_contrato.py -q
 ```
 
 En el entorno de desarrollo de esta entrega (sin acceso a PyPI) se ejecutaron las pruebas de lógica pura
