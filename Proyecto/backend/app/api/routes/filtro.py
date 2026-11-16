@@ -5,7 +5,7 @@ from app.application.use_cases.progreso_cuestionario import calcular_progreso
 from app.infrastructure.cache import catalogo_controles
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
-from app.core.alcance import alcance_evaluacion
+from app.api.dependencias.alcance import alcance_evaluacion
 from app.core.database import get_db
 from app.application.use_cases.responder_filtro import ResponderFiltroUseCase
 from app.application.schemas.api_schemas import (

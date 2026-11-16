@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.matriz import contenido as C
 from app.domain.matriz import edicion as E
@@ -39,8 +39,7 @@ from app.domain.models.matriz_version import (
 )
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.infrastructure.repositories.matriz_repository import MatrizRepository
+from app.application.fabricas import fabricas
 
 ENTIDAD_AUDIT = "matriz_version"
 PATRON_ETIQUETA = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,29}$")
@@ -66,17 +65,14 @@ def _iso(fecha: datetime | None) -> str | None:
 
 def invalidar_caches() -> None:
     """Este proceso vuelve a leer la matriz en la próxima petición (los demás, en ≤ 15 s)."""
-    from app.infrastructure.cache import arbol_aplicabilidad, catalogo_controles
-
-    catalogo_controles.invalidar()
-    arbol_aplicabilidad.invalidar()
+    fabricas().cache_matriz.invalidar()
 
 
 class MantenedorMatrizUseCase:
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.repo = MatrizRepository(session)
-        self.bitacora = BitacoraRepository(session)
+        self.repo = fabricas().matriz(session)
+        self.bitacora = fabricas().bitacora(session)
 
     # ================================================================== lectura
     async def vigente(self) -> MatrizVersion:

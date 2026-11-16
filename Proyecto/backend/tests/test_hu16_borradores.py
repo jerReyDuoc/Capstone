@@ -430,7 +430,7 @@ def test_api_solo_usuario_definitivo_con_contrato_vigente(hu27, proveedor, monke
         r = await c.post("/api/borradores", headers=x["h"], json={"tipo": "pia"})    # usuario temporal
         assert r.status_code in (401, 403)
 
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         for metodo, ruta in (("get", "/api/borradores/plantillas"), ("post", "/api/borradores"),
                              ("get", "/api/borradores/1/descarga")):

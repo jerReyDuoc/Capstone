@@ -2,17 +2,20 @@ from datetime import date
 
 from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
 from app.domain.models.respuesta_filtro import RespuestaFiltro
-from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
-from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaFiltroRepository
-from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
+from app.application.fabricas import fabricas
+from app.domain.ports.repositorios import (
+    EvaluacionRepositoryPort,
+    PreguntaFiltroRepositoryPort,
+    RespuestaFiltroRepositoryPort,
+)
 
 
 class ResponderFiltroUseCase:
     def __init__(
         self,
-        evaluacion_repo: EvaluacionRepository,
-        pregunta_repo: PreguntaFiltroRepository,
-        respuesta_repo: RespuestaFiltroRepository,
+        evaluacion_repo: EvaluacionRepositoryPort,
+        pregunta_repo: PreguntaFiltroRepositoryPort,
+        respuesta_repo: RespuestaFiltroRepositoryPort,
     ):
         self.evaluacion_repo = evaluacion_repo
         self.pregunta_repo = pregunta_repo
@@ -68,9 +71,7 @@ class ResponderFiltroUseCase:
         await self.evaluacion_repo.update(evaluacion)
 
         # 6. Calcular controles aplicables (HU-24: con el árbol de la versión vigente)
-        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
-
-        controles = get_controles_aplicables(respuestas, await arbol_vigente(self.evaluacion_repo.session))
+        controles = get_controles_aplicables(respuestas, await fabricas().cache_matriz.arbol_vigente(self.evaluacion_repo.session))
 
         return {
             "evaluacion_id": evaluacion_id,

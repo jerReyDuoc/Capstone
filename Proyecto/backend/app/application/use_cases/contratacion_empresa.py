@@ -31,7 +31,8 @@ from app.application.use_cases.activacion_cuenta import (
 )
 from app.application.use_cases import consentimientos_contratacion
 from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError, MigradorEvaluaciones
-from app.core.autenticacion import Actor, Rol
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor, Rol
 from app.core.config import settings
 from app.domain.valores.rut import RutInvalidoError, normalizar_rut
 from app.domain.models.empresa import Empresa
@@ -42,7 +43,6 @@ from app.domain.models.usuario_definitivo import (
     ROL_CLIENTE, EstadoUsuarioDefinitivo, UsuarioDefinitivo,
 )
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 E = EstadoSolicitudContratacion
 
@@ -103,7 +103,7 @@ def _email(valor: str | None, campo: str = "email") -> str:
 class SolicitudesContratacionUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     async def evaluacion_del_actor(self, actor: Actor, evaluacion_id: int) -> Evaluacion:
         evaluacion = await self.db.get(Evaluacion, evaluacion_id)
@@ -266,7 +266,7 @@ class ResultadoAlta:
 class EmpresasClienteUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self.migrador = MigradorEvaluaciones(db)
 
     async def _validar_empresa(self, d: DatosEmpresa, hoy: date) -> tuple[str, str]:

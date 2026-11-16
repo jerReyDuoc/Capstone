@@ -24,8 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.tutor_ia import TutorError, TutorIA
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ async def obtener_servicios_tutor(
     # rollback del negocio no borra la métrica, igual que en el worker.
     sesion_ia: AsyncSession = Depends(get_db, use_cache=False),
 ) -> ServiciosTutor:
-    from app.infrastructure.llm.factory import crear_agente, crear_anonimizador
+    from app.api.dependencias.contenedor import crear_agente, crear_anonimizador
     from app.infrastructure.security.prompt_guard import ReglasPromptGuard
     from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
     from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository

@@ -1,5 +1,5 @@
 """
-Emisión de tokens de acceso (ver app/core/autenticacion.py).
+Emisión de tokens de acceso (ver app/infrastructure/security/autenticacion.py).
 
   - Admin:   email + contraseña contra usuarios_admin (hash PBKDF2).
   - Titular: usuario_temporal_id + email de la invitación; la invitación no debe
@@ -27,20 +27,18 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import (
-    Rol, emitir_token, verificar_password, verificar_password_senuelo,
-)
-from app.core.cliente import huella
+from app.domain.auth.actor import Rol
+from app.application.seguridad.huella import huella
 from app.core.config import settings
 from app.application.use_cases.clave_acceso_encuestado import verificar_clave
 from app.application.use_cases.sesiones import abrir_sesion
+from app.application.fabricas import fabricas
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.cache.limitador import Limitador
+from app.domain.ports.limitador_port import Limitador
 from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 
@@ -117,7 +115,7 @@ def _normalizar_email(email: str) -> str:
 
 def _respuesta(usuario_id: int, rol: Rol, token: str | None = None, **extra) -> dict:
     return {
-        "access_token": token or emitir_token(usuario_id, rol.value),
+        "access_token": token or fabricas().credenciales.emitir_token(usuario_id, rol.value),
         "token_type": "bearer",
         "rol": rol.value,
         "usuario_id": usuario_id,
@@ -133,7 +131,7 @@ class IniciarSesionUseCase:
     # ------------------------------------------------------------ HU-28: comunes
     def _auditar_intento(self, tipo: str, entidad: str, entidad_id: int | None, motivo: str,
                          accion: str = Accion.LOGIN_FALLIDO, **extra) -> None:
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ROL_ANONIMO,
             resultado=RESULTADO_RECHAZADO, detalle={"tipo": tipo, "motivo": motivo, **extra},
         )
@@ -164,18 +162,18 @@ class IniciarSesionUseCase:
         )
         admin = result.scalar_one_or_none()
         if admin is None:
-            await asyncio.to_thread(verificar_password_senuelo, password or "")
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
             ok = False
         else:
             # PBKDF2 de 600.000 iteraciones: fuera del event loop
-            ok = await asyncio.to_thread(verificar_password, password or "", admin.password_hash) and admin.activo
+            ok = await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", admin.password_hash) and admin.activo
         if not ok:
             await self._fallo(proteccion, "admin", "usuarios_admin", admin.id if admin else None)
         await proteccion.registrar_exito()
         ahora = _ahora()
         token, sesion = await abrir_sesion(self.db, Rol.ADMIN_THERION.value, admin.id, ahora)
         admin.ultimo_acceso = ahora
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.ADMIN_LOGIN, entidad="usuarios_admin", entidad_id=admin.id,
             actor_rol=Rol.ADMIN_THERION.value, actor_id=admin.id, detalle={"sesion_id": sesion.id}, fecha=ahora,
         )
@@ -198,10 +196,10 @@ class IniciarSesionUseCase:
         auditor = await self.db.scalar(select(UsuarioAuditor).where(func.lower(UsuarioAuditor.email) == email))
         ahora = _ahora()
         if auditor is None:
-            await asyncio.to_thread(verificar_password_senuelo, password or "")
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
             ok = False
         else:
-            ok = (await asyncio.to_thread(verificar_password, password or "", auditor.password_hash)
+            ok = (await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", auditor.password_hash)
                   and auditor.vigente(ahora))
         if not ok:
             await self._fallo(proteccion, "auditor", "usuario_auditor", auditor.id if auditor else None)
@@ -211,7 +209,7 @@ class IniciarSesionUseCase:
         if sesion.fecha_expiracion > auditor.fecha_expiracion:
             sesion.fecha_expiracion = auditor.fecha_expiracion
         auditor.ultimo_acceso = ahora
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITOR_LOGIN, entidad="usuario_auditor", entidad_id=auditor.id,
             actor_rol=Rol.AUDITOR_EXTERNO.value, actor_id=auditor.id, detalle={"sesion_id": sesion.id}, fecha=ahora,
         )
@@ -248,7 +246,7 @@ class IniciarSesionUseCase:
         evaluacion = await self.db.get(Evaluacion, evaluacion_id)
         almacenado = evaluacion.clave_acceso_hash if evaluacion else None
         if almacenado is None:
-            verificar_password_senuelo(clave or "")  # mismo tiempo de respuesta
+            fabricas().credenciales.verificar_password_senuelo(clave or "")  # mismo tiempo de respuesta
             ok = False
         else:
             ok = verificar_clave(clave, almacenado)
@@ -271,10 +269,10 @@ class IniciarSesionUseCase:
         )
         if usuario is None or not usuario.password_hash:
             # Mismo tiempo de respuesta exista o no (y aunque aún no active su cuenta)
-            await asyncio.to_thread(verificar_password_senuelo, password or "")
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
             ok = False
         else:
-            ok = await asyncio.to_thread(verificar_password, password or "", usuario.password_hash) and usuario.activo
+            ok = await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", usuario.password_hash) and usuario.activo
         if not ok:
             await self._fallo(proteccion, "cliente", "usuario_definitivo", usuario.id if usuario else None)
         await proteccion.registrar_exito()
@@ -286,7 +284,7 @@ class IniciarSesionUseCase:
         ahora = _ahora()
         token, sesion = await abrir_sesion(self.db, Rol.CLIENTE.value, usuario.id, ahora)
         usuario.ultimo_acceso = ahora
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.CLIENTE_LOGIN, entidad="usuario_definitivo", entidad_id=usuario.id,
             actor_rol=Rol.CLIENTE.value, actor_id=usuario.id,
             detalle={"empresa_id": usuario.empresa_id, "sesion_id": sesion.id,

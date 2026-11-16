@@ -27,7 +27,7 @@ los datos en la BD para que puedas revisarlos (LIVE_LIMPIAR_AL_FINAL=1 los borra
 Costo: 1 llamada a Groq por corrida.
 
 HU-20: la API exige token. Define QA_TOKEN_ADMIN con el token de un admin activo
-(python -m app.core.autenticacion --usuario <id admin> --rol admin_therion).
+(python -m app.cli.emitir_token --usuario <id admin> --rol admin_therion).
 """
 import asyncio
 import json

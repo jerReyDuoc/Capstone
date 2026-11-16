@@ -146,7 +146,8 @@ async def entorno(monkeypatch, sanitizer_enabled=True):
     import httpx
 
     import app.domain.models  # noqa: F401
-    import app.infrastructure.llm.factory as factory
+    import app.bootstrap as factory
+    from app.infrastructure.llm import proveedores
     import app.worker.tasks as tasks
     from app.domain.models.base import Base
     from app.core.database import get_db
@@ -160,7 +161,7 @@ async def entorno(monkeypatch, sanitizer_enabled=True):
     await h._sembrar(Session)
 
     # Proveedor: simulado (por defecto) o Groq real, siempre envuelto por el espía
-    interno = factory.crear_proveedor() if LLM_REAL else FakeProvider(clasificacion="cumplido", confianza=0.95)
+    interno = proveedores.crear_proveedor() if LLM_REAL else FakeProvider(clasificacion="cumplido", confianza=0.95)
     espia = EspiaProveedor(interno)
     crear_sanitizador, desc_ner = _sanitizador_para_el_entorno()
 

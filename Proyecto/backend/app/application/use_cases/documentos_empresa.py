@@ -40,7 +40,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.informes.analisis import parsear_filtros
 from app.application.informes.carga import SinResultadosError, cargar_evaluacion
 from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf
-from app.core.autenticacion import Actor
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.models.documento_empresa import (
     TIPO_BORRADOR, TIPO_INFORME, TIPOS_DOCUMENTO, TIPOS_RAT, TIPOS_ROPA, DocumentoEmpresa,
@@ -52,7 +53,6 @@ from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.ruta_formativa import RutaFormativa
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +82,11 @@ def _ahora() -> datetime:
 
 
 def _storage_documentos():
-    from app.infrastructure.llm.factory import crear_storage_documentos
-    return crear_storage_documentos()
+    return fabricas().storage_documentos()
 
 
 def _storage_evidencias():
-    from app.infrastructure.llm.factory import crear_storage_evidencias
-    return crear_storage_evidencias()
+    return fabricas().storage_evidencias()
 
 
 # ------------------------------------------------------------------ guardar (informes y HU-16)
@@ -119,7 +117,7 @@ async def guardar_documento(
     except Exception:
         await storage.delete(ruta)
         raise
-    BitacoraRepository(db).registrar(
+    fabricas().bitacora(db).registrar(
         accion=Accion.DOCUMENTO_GENERADO, entidad="documento_empresa", entidad_id=doc.id,
         actor=actor, actor_rol=None if actor else "sistema",
         detalle={"empresa_id": empresa_id, "tipo": tipo, "evaluacion_id": evaluacion_id,
@@ -178,7 +176,7 @@ async def tras_completar(db: AsyncSession, evaluacion_id: int, actor: Actor | No
     if evaluacion is None or evaluacion.empresa_id is None:
         return None
     try:
-        BitacoraRepository(db).registrar(
+        fabricas().bitacora(db).registrar(
             accion=Accion.EVALUACION_COMPLETADA_EMPRESA, entidad="evaluacion", entidad_id=evaluacion.id,
             actor=actor, detalle={"empresa_id": evaluacion.empresa_id, "origen": evaluacion.origen},
         )
@@ -240,13 +238,13 @@ async def _emisiones_ropa(db: AsyncSession, empresa_id: int) -> dict[int, dict]:
 
 
 class DocumentosEmpresa:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (empresa_con_documentos)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (empresa_con_documentos)."""
 
     def __init__(self, db: AsyncSession, cliente, storage_documentos=None, storage_evidencias=None):
         self.db = db
         self.cliente = cliente
         self.empresa = cliente.empresa
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self._storage_documentos = storage_documentos
         self._storage_evidencias = storage_evidencias
 

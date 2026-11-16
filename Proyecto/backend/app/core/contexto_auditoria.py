@@ -2,11 +2,12 @@
 HU-09 · Origen (IP) de cada registro del audit_log.
 
 El criterio 2 exige la IP en TODO registro. Para no pasar la IP a mano por los ~40 lugares
-que registran acciones, un middleware ASGI la deja en una variable de contexto al comenzar
+que registran acciones, un middleware ASGI
+(app/api/middleware/contexto_auditoria.py) la deja en una variable de contexto al comenzar
 cada petición y `BitacoraRepository.registrar()` la toma de ahí.
 
   - Petición HTTP: la IP del visitante, calculada igual que en el resto de la API
-    (app/core/cliente.py): la que reenvía el BFF de Next.js en `X-Cliente-IP` si trae el
+    (app/api/dependencias/cliente.py): la que reenvía el BFF de Next.js en `X-Cliente-IP` si trae el
     `X-BFF-Secret` correcto, o la de la conexión. Se valida y normaliza con `ipaddress`
     (un encabezado con otra cosa nunca llega al log).
   - Fuera de una petición (worker de ARQ, scripts): "sistema:worker" o "sistema:cli".
@@ -17,10 +18,9 @@ catálogo de datos personales de T-06). Los límites de intentos siguen usando s
 """
 from __future__ import annotations
 
+import contextvars
 import ipaddress
 from contextvars import ContextVar
-
-from starlette.requests import Request
 
 ORIGEN_WORKER = "sistema:worker"
 ORIGEN_CLI = "sistema:cli"
@@ -55,19 +55,10 @@ def ip_actual() -> str:
     return _ip_actual.get() or _origen_por_defecto
 
 
-class ContextoAuditoriaMiddleware:
-    """Middleware ASGI puro: fija la IP de la petición para toda su duración."""
+def fijar_ip_peticion(ip: str | None) -> contextvars.Token:
+    """Fija la IP (ya normalizada con normalizar_ip) de la petición en curso."""
+    return _ip_actual.set(normalizar_ip(ip))
 
-    def __init__(self, app):
-        self.app = app
 
-    async def __call__(self, scope, receive, send):
-        if scope.get("type") != "http":
-            return await self.app(scope, receive, send)
-        from app.core.cliente import ip_cliente  # import local: cliente importa la config
-
-        token = _ip_actual.set(normalizar_ip(ip_cliente(Request(scope))))
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            _ip_actual.reset(token)
+def restablecer_ip_peticion(token: contextvars.Token) -> None:
+    _ip_actual.reset(token)

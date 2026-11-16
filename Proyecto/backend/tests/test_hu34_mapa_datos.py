@@ -401,7 +401,7 @@ def test_api_solo_usuario_definitivo_con_contrato_vigente(hu27, monkeypatch):
         assert r.status_code == 403 and hu27._codigo(r) == "NO_AUTORIZADO"
         assert (await c.get("/api/mapa-datos", headers=x["h"])).status_code in (401, 403)   # usuario temporal
 
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         for metodo, ruta, kw in (("get", "/api/mapa-datos", {}), ("get", "/api/mapa-datos/catalogo", {}),
                                  ("post", "/api/mapa-datos/elementos", {"json": {"version": 0, "tipo": "sistema",

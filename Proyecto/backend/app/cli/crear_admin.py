@@ -2,7 +2,7 @@
 Crea (o reactiva / cambia la contraseña de) un administrador admin_therion.
 
 Con Docker, desde Proyecto/:
-    docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl
+    docker compose exec api python -m app.cli.crear_admin --email admin@therionlabs.cl
 La contraseña se pide por teclado (no queda en el historial de la terminal).
 
 Opciones:
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
-from app.core.autenticacion import hash_password
+from app.infrastructure.security.autenticacion import hash_password
 from app.core.database import AsyncSessionLocal, engine
 from app.domain.models.usuario_admin import UsuarioAdmin
 

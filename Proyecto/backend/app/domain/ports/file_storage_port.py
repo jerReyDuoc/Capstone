@@ -15,3 +15,7 @@ class FileStoragePort(ABC):
     async def delete(self, storage_path: str) -> None:
         """Elimina un archivo."""
         ...
+
+
+class ClaveNoConfiguradaError(RuntimeError):
+    """Falta ENTITY_MAP_KEY: no se pueden guardar evidencias sin cifrar (fail-closed)."""

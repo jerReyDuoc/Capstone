@@ -54,7 +54,7 @@ from app.application.informes.carga import DatosEvaluacion  # noqa: E402
 from app.application.tutor.contexto import AntecedenteBrecha, DetalleControl, construir_contexto  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.ports.registro_ia_port import RegistroIAPort  # noqa: E402
-from app.infrastructure.llm.factory import crear_proveedor  # noqa: E402
+from app.infrastructure.llm.proveedores import crear_proveedor  # noqa: E402
 from app.infrastructure.security.filtro_agente import FiltroAgente  # noqa: E402
 from app.infrastructure.security.ner_sanitizer import NERSanitizer  # noqa: E402
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard  # noqa: E402

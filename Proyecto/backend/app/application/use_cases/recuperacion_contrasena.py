@@ -35,16 +35,16 @@ from app.application.use_cases.activacion_cuenta import (
     ActivacionError, generar_token, hash_token, validar_contrasena,
 )
 from app.application.use_cases.sesiones import cerrar_todas
-from app.core.autenticacion import Rol, hash_password
-from app.core.cliente import huella
+from app.domain.auth.actor import Rol
+from app.application.seguridad.huella import huella
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.sesion import MotivoCierre, TokenRecuperacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
-from app.infrastructure.cache.limitador import Limitador
+from app.domain.ports.limitador_port import Limitador
 from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 
@@ -142,7 +142,7 @@ async def enviar_en_segundo_plano(pendiente: CorreoPendiente) -> None:
 class RecuperacionContrasenaUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     async def _cuenta(self, rol: str, *, email: str | None = None, cuenta_id: int | None = None):
         modelo = UsuarioDefinitivo if rol == Rol.CLIENTE.value else UsuarioAdmin
@@ -277,7 +277,7 @@ class RecuperacionContrasenaUseCase:
             raise ActivacionError("La contraseña no cumple los requisitos.", "CONTRASENA_DEBIL", 422,
                                   problemas=problemas)
 
-        nuevo_hash = await asyncio.to_thread(hash_password, password)
+        nuevo_hash = await asyncio.to_thread(fabricas().credenciales.hash_password, password)
         marcado = (await self.db.execute(
             update(TokenRecuperacion)
             .where(TokenRecuperacion.id == fila.id, TokenRecuperacion.fecha_uso.is_(None),

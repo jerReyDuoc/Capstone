@@ -277,7 +277,7 @@ def test_c7_modelo_local_no_exige_la_clave_de_groq():
 
 
 def test_c7_la_fabrica_arma_el_proveedor_local(monkeypatch):
-    from app.infrastructure.llm import factory
+    from app.infrastructure.llm import proveedores as factory
     monkeypatch.setattr(settings, "LLM_PROVIDER", "ollama")
     monkeypatch.setattr(settings, "LLM_MODEL", "llama3.1:8b")
     p = factory.crear_proveedor()

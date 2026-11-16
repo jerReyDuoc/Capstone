@@ -44,8 +44,8 @@ from app.application.use_cases.contratacion_empresa import (
 )
 from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError
 from app.application.use_cases.gestionar_contrato import ContratoError, GestionarContratoUseCase, contrato_dict
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.empresa import Empresa

@@ -18,10 +18,13 @@ from app.application.use_cases.sesiones import cerrar_sesion
 from app.domain.models.sesion import MotivoCierre
 from app.domain.auditoria.acciones import Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
-from app.core.cliente import huella, ip_cliente
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import obtener_actor, requerir_rol
+from app.application.seguridad.huella import huella
+from app.api.dependencias.cliente import ip_cliente
 from app.core.config import settings
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 from app.core.database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

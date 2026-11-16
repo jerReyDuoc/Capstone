@@ -31,8 +31,8 @@ from app.application.use_cases.configurar_retencion import (
     proxima_ejecucion,
     ahora_utc,
 )
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.usuario_temporal import UsuarioTemporal

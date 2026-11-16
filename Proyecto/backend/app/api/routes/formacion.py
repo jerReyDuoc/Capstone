@@ -10,7 +10,7 @@ HU-26 · Recorrido de los módulos formativos y avance de la empresa (rol client
   POST /api/formacion/modulos/{ruta_id}/verificacion                corrige la actividad final
   GET  /api/formacion/modulos/{ruta_id}/constancia                  constancia PDF (solo completado)
 
-Todas exigen el servicio pagado activo (app/core/servicio_pagado.py, HU-30), salvo la
+Todas exigen el servicio pagado activo (app/api/dependencias/servicio_pagado.py, HU-30), salvo la
 constancia: es un documento de la empresa y se puede descargar también con el contrato
 suspendido o durante el plazo de gracia tras su término (HU-30 criterio 3).
 """
@@ -24,8 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.formacion.constancia_pdf import PdfNoDisponibleError
 from app.application.use_cases.formacion_empresa import FormacionEmpresa, FormacionError
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 
 router = APIRouter(prefix="/api/formacion", tags=["formación de la empresa (HU-26)"])
 

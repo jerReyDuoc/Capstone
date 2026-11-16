@@ -457,7 +457,7 @@ def test_api_solo_usuario_definitivo_con_contrato_vigente(hu27, proveedor, monke
         r = await c.post("/api/tutor/conversaciones", headers=h_temporal, json={})
         assert r.status_code == 403 and hu27._codigo(r) == "NO_AUTORIZADO"     # usuario temporal: no
 
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         for metodo, ruta in (("get", "/api/tutor/contexto"), ("post", "/api/tutor/conversaciones"),
                              ("post", "/api/tutor/conversaciones/1/mensajes")):

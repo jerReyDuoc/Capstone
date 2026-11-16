@@ -23,8 +23,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.privacidad_plataforma import PrivacidadPlataformaCasos, PrivacidadPlataformaError
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
 from app.core.database import get_db
 
 router = APIRouter(prefix="/api/admin/privacidad-plataforma", tags=["admin · privacidad de la plataforma (HU-41)"])

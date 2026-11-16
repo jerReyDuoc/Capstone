@@ -5,7 +5,7 @@
  * del encuestado pasan por app/bff/api/[...ruta]/route.ts, que agrega el Bearer.
  * Solo se reenvían las rutas que el encuestado necesita; cualquier otra -> 404.
  *
- * Segunda barrera (la primera es el backend, app/core/alcance.py): si la ruta lleva un
+ * Segunda barrera (la primera es el backend, app/api/dependencias/alcance.py): si la ruta lleva un
  * id de evaluación, debe ser el de la sesión.
  */
 

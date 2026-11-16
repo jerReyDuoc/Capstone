@@ -5,9 +5,12 @@ from fastapi import FastAPI
 from arq import create_pool
 from arq.connections import RedisSettings
 
+from app.bootstrap import configurar
 from app.core.config import settings
 from app.api.routes import api_router
-from app.core.contexto_auditoria import ContextoAuditoriaMiddleware
+from app.api.middleware.contexto_auditoria import ContextoAuditoriaMiddleware
+
+configurar()  # raíz de composición (A-40): a nivel de módulo, no solo en lifespan
 
 logger = logging.getLogger(__name__)
 

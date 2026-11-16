@@ -443,8 +443,8 @@ stateDiagram-v2
 - HU-28: los logins con contraseña (admin y cliente) abren una **sesión revocable** (`sesion_usuario`); el token lleva su `sid` y `POST /api/auth/logout` o restablecer la contraseña la cierran. Los intentos **fallidos** se limitan por cuenta (`LOGIN_MAX_FALLOS_CUENTA`, 5) y por IP (`LOGIN_MAX_FALLOS_IP`, 20) en ventanas de `LOGIN_VENTANA_FALLOS_MIN` (15) minutos → 429 `DEMASIADOS_INTENTOS`; el contador de la cuenta usa la huella del correo escrito, exista o no. Cada intento (exitoso, fallido o bloqueado) queda en la bitácora.
 - HU-28: recuperación de contraseña por enlace de un solo uso (`/restablecer#token=…`, vence en `RECUPERACION_TTL_MIN`); la respuesta no revela si el correo existe.
 - En el navegador el token nunca es visible: el BFF de Next.js lo guarda en cookies httpOnly (`cai_sesion` del encuestado, `cai_admin` del admin y `cai_cliente` del cliente; `__Host-` en producción).
-- Administradores: `docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl` (contraseña mínima de 12 caracteres; `--desactivar` corta el acceso).
-- Token de prueba solo para desarrollo: `python -m app.core.autenticacion --usuario 1 --rol referente`.
+- Administradores: `docker compose exec api python -m app.cli.crear_admin --email admin@therionlabs.cl` (contraseña mínima de 12 caracteres; `--desactivar` corta el acceso).
+- Token de prueba solo para desarrollo: `python -m app.cli.emitir_token --usuario 1 --rol referente`.
 
 ### 5.10 Plan formativo (HU-12)
 
@@ -1138,7 +1138,7 @@ Para ver los rangos reservados: `netsh interface ipv4 show excludedportrange pro
 **3. Crear un administrador** (opcional, para ARCOP):
 
 ```powershell
-docker compose exec api python -m app.core.crear_admin --email admin@therionlabs.cl
+docker compose exec api python -m app.cli.crear_admin --email admin@therionlabs.cl
 ```
 
 **4. Envío del informe por correo** (opcional). Sin configurar, el backend queda en `CORREO_MODO=archivo`: el botón funciona pero el correo se guarda en `/data/storage/correos` y el panel avisa «Entorno de desarrollo…». Para que llegue de verdad (guía paso a paso en `frontend-next/docs/Guia_envio_informe_por_correo.pdf`):

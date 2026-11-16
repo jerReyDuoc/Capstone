@@ -468,7 +468,7 @@ def test_api_solo_cliente_con_contrato_vigente(hu27, monkeypatch):
         x = await _cliente(hu27, c)
         assert (await c.get("/api/asistente")).status_code == 401
         assert (await c.get("/api/asistente", headers=hu27.admin())).status_code == 403
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         r = await c.post("/api/asistente/sesiones", headers=x["hc"], json={})
         assert r.status_code == 403 and hu27._codigo(r) == "CONTRATO_NO_VIGENTE"

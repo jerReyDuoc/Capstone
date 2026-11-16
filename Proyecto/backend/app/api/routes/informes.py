@@ -10,7 +10,7 @@ Informes de una evaluación completada.
   POST /api/evaluaciones/{id}/informe/enviar   el mismo PDF por correo
 
 Todas exigen que la evaluación tenga resumen (se completó o se cerró). El alcance es el
-de las demás rutas de evaluaciones (app/core/alcance.py): el encuestado solo ve la suya.
+de las demás rutas de evaluaciones (app/api/dependencias/alcance.py): el encuestado solo ve la suya.
 
 El correo lleva un PDF que genera el servidor con los datos de la BD: no se aceptan
 archivos del cliente, así la API no sirve para mandar contenido arbitrario a terceros.
@@ -40,14 +40,16 @@ from app.application.informes.informe import construir_informe, ficha_a_dict
 from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
 from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf, nombre_archivo
 from app.application.use_cases.limites_encuesta import ventana_diaria
-from app.core.alcance import alcance_evaluacion
-from app.core.autenticacion import Actor
-from app.core.cliente import huella, ip_cliente
+from app.api.dependencias.alcance import alcance_evaluacion
+from app.domain.auth.actor import Actor
+from app.application.seguridad.huella import huella
+from app.api.dependencias.cliente import ip_cliente
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 
 logger = logging.getLogger(__name__)
 

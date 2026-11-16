@@ -224,7 +224,8 @@ async def _bitacora(c, accion=None):
 
 @api
 def test_rutas_hu24_solo_admin():
-    from app.core.autenticacion import Rol, emitir_token
+    from app.domain.auth.actor import Rol
+    from app.infrastructure.security.autenticacion import emitir_token
 
     async def esc(c):
         await _borrador(c)

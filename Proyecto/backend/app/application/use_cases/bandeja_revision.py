@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.application.ai.metricas import precision_clasificacion
+from app.application.fabricas import fabricas
 from app.domain.models.dominio import Dominio
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
@@ -48,7 +49,6 @@ from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion, Respuesta
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 MAX_CANDIDATAS = 3000
 
@@ -412,7 +412,7 @@ class BandejaRevision:
 
     async def historial(self, respuesta_id: int) -> list[dict]:
         """C3: las revisiones de la respuesta, leídas del audit_log (lo inmutable manda)."""
-        filas, _ = await BitacoraRepository(self.s).listar(
+        filas, _ = await fabricas().bitacora(self.s).listar(
             entidad="respuestas", entidad_id=respuesta_id, accion=Accion.RESPUESTA_REVISADA, size=50)
         ids_admin = {f.actor_id for f in filas if f.actor_id}
         correos: dict[int, str] = {}

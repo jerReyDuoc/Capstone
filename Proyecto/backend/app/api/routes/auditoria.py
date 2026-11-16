@@ -25,8 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.use_cases.auditoria_externa import (
     LEY, AuditoriaError, ConsultaAuditLog, ExportarAuditLog, GestionarAuditoresUseCase, auditor_dict,
 )
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import requerir_rol
 from app.core.database import get_db
 from app.domain.models.bitacora_auditoria import RESULTADOS
 from app.domain.auditoria.acciones import Categoria, acciones_conocidas, categoria

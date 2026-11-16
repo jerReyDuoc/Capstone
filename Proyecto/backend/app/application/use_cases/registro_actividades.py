@@ -35,7 +35,8 @@ from app.domain.models.rat import RatActividad, RatActividadVersion
 from app.domain.rat import analisis, estados, modelo, riesgos, versiones, vinculo_mapa
 from app.domain.rat import catalogo as cat
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
+from app.domain.ports.bitacora_port import BitacoraPort
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def _evaluar(contenido: dict, elementos: list[Elemento], flujos: list[Flujo]) ->
 
 # ====================================================================== vínculo con el mapa (C2)
 async def marcar_afectadas_por_mapa(db: AsyncSession, empresa_id: int, cambios: list[dict], antes: dict | None,
-                                    despues: dict, version_mapa: int, actor, bitacora: BitacoraRepository) -> list[int]:
+                                    despues: dict, version_mapa: int, actor, bitacora: BitacoraPort) -> list[int]:
     """
     Lo llama el mapa de datos (MapaDatosCasos._guardar) ANTES de confirmar un cambio: las actividades
     que usan lo que cambió vuelven a revisión (las vigentes) o anotan el motivo (borradores y en
@@ -113,7 +114,7 @@ async def marcar_afectadas_por_mapa(db: AsyncSession, empresa_id: int, cambios: 
 
 # ====================================================================== casos de uso
 class RegistroActividadesCasos:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente):
         self.db = db
@@ -121,7 +122,7 @@ class RegistroActividadesCasos:
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id
         self.usuario_id: int = cliente.usuario.id
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ---------------------------------------------------------------- lectura
     async def _mapa(self) -> tuple[int, list[Elemento], list[Flujo]]:

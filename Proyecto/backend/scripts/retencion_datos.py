@@ -29,7 +29,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.application.use_cases.aplicar_retencion import ORIGEN_CLI, AplicarRetencionUseCase  # noqa: E402
 from app.core.contexto_auditoria import ORIGEN_CLI as IP_CLI, fijar_origen_por_defecto  # noqa: E402
 from app.core.database import AsyncSessionLocal  # noqa: E402
-from app.infrastructure.llm.factory import crear_storage_evidencias  # noqa: E402
+from app.bootstrap import configurar, crear_storage_evidencias  # noqa: E402
+
+configurar()  # raíz de composición (A-40)
 
 
 async def _main(aplicar: bool) -> dict:

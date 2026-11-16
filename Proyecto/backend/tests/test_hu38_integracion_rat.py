@@ -551,7 +551,7 @@ def test_api_cumplimiento_solo_con_contrato_y_aislado_por_empresa(hu27, monkeypa
         r = await c.post("/api/registro-actividades/cumplimiento/evidencia", headers=x["h"])   # usuario temporal
         assert r.status_code in (401, 403)
 
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         for metodo, ruta in (("get", "/api/registro-actividades/cumplimiento"),
                              ("post", "/api/registro-actividades/cumplimiento/evidencia")):

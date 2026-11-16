@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from app.application.fabricas import fabricas
 
 from app.application.informes.analisis import (
     BrechaCatalogo,
@@ -183,9 +184,7 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
     # HU-24 criterio 2: una evaluación respondida con una versión de la matriz se informa con
     # los textos, brechas y rutas de ESA versión, aunque el admin haya publicado otra después.
     if evaluacion.matriz_version_id:
-        from app.infrastructure.cache.versiones_matriz import contenido_de_version
-
-        contenido = await contenido_de_version(db, evaluacion.matriz_version_id)
+        contenido = await fabricas().cache_matriz.contenido_de_version(db, evaluacion.matriz_version_id)
         if contenido:
             for r in contenido.get("rutas", []):
                 rutas[int(r["id"])] = _ruta_de_version(r, nombres_dominio)

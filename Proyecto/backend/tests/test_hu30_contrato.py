@@ -14,7 +14,7 @@ Parte 2: API en proceso (SQLite), reutiliza la preparación de test_hu27_empresa
 y de test_hu26_formacion.py; necesita FastAPI, SQLAlchemy y aiosqlite (Docker).
 
 El tutor IA y los borradores aún no existen como rutas: cuando se agreguen deben depender
-de app.core.servicio_pagado.empresa_con_servicio (y la descarga de borradores, de
+de app.api.dependencias.servicio_pagado.empresa_con_servicio (y la descarga de borradores, de
 empresa_con_documentos); test_rutas_del_servicio_pagado_usan_la_guarda lo vigila.
 """
 import asyncio
@@ -287,7 +287,7 @@ def test_rutas_del_servicio_pagado_usan_la_guarda():
         pytest.skip("sin FastAPI")
     from fastapi.routing import APIRoute
 
-    from app.core.servicio_pagado import empresa_con_documentos, empresa_con_servicio
+    from app.api.dependencias.servicio_pagado import empresa_con_documentos, empresa_con_servicio
     from app.main import app
 
     def deps(route):
@@ -305,7 +305,7 @@ def test_rutas_del_servicio_pagado_usan_la_guarda():
     assert pagadas
     for r in pagadas:
         guardas = deps(r) & {empresa_con_servicio, empresa_con_documentos}
-        assert guardas, f"{r.path} no exige contrato (app/core/servicio_pagado.py)"
+        assert guardas, f"{r.path} no exige contrato (app/api/dependencias/servicio_pagado.py)"
         if not r.path.endswith("/constancia"):
             assert empresa_con_servicio in guardas, r.path
 

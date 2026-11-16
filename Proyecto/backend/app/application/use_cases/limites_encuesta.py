@@ -22,12 +22,12 @@ from datetime import datetime, time as dtime, timedelta, timezone, tzinfo
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cliente import huella
+from app.application.seguridad.huella import huella
 from app.core.config import settings
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.evidencia import Evidencia
 from app.domain.models.respuesta import Respuesta
-from app.infrastructure.cache.limitador import Limitador
+from app.domain.ports.limitador_port import Limitador
 
 
 def zona_cuotas() -> tzinfo:

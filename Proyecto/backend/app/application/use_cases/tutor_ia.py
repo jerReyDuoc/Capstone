@@ -52,16 +52,15 @@ from app.application.ai.prompts.tutor import texto_antecedentes, turno_historial
 from app.application.schemas.tutor import NivelTutor, TutorRespuesta
 from app.application.tutor.contexto import ContextoTutor, ContextoTutorError, cargar_contexto_tutor
 from app.application.use_cases.limites_encuesta import Reserva, ventana_diaria
-from app.core.cliente import huella
+from app.application.seguridad.huella import huella
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.tutor import ConversacionTutor, MensajeTutor, RolMensajeTutor, TipoMensajeTutor
 from app.domain.ports.registro_ia_port import ContextoLlamada
-from app.infrastructure.cache.limitador import Limitador
+from app.domain.ports.limitador_port import Limitador
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.infrastructure.repositories.tutor_repository import TutorRepository
 
 MAX_TITULO = 80
 TEXTO_BLOQUEADO_USUARIO = "[Mensaje bloqueado por seguridad: no se guardó su contenido]"
@@ -139,7 +138,7 @@ def conversacion_a_dict(c: ConversacionTutor, evaluacion_vigente: int | None) ->
 
 
 class TutorIA:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db, cliente, agente: AgenteIA | None, anonimizador: AnonimizadorPII | None,
                  limitador: Limitador | None, registrar_evento=None):
@@ -151,8 +150,8 @@ class TutorIA:
         self.anonimizador = anonimizador
         self.limitador = limitador
         self.registrar_evento = registrar_evento
-        self.repo = TutorRepository(db)
-        self.bitacora = BitacoraRepository(db)
+        self.repo = fabricas().tutor(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ------------------------------------------------------------------ contexto
     async def _cargar(self, ruta_id: int | None = None, tolerar_foco: bool = False) -> ContextoTutor:

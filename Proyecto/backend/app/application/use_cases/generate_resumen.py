@@ -7,9 +7,8 @@ from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion
 from app.domain.models.resumen import Resumen
-from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
 from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
-from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+from app.application.fabricas import fabricas
 
 
 # Puntajes por clasificación
@@ -43,7 +42,7 @@ class GenerateResumenUseCase:
             raise ValueError(f"Evaluación {evaluacion_id} no encontrada")
 
         # 2. Obtener respuestas del filtro y calcular controles aplicables
-        resp_filtro_repo = RespuestaFiltroRepository(self.session)
+        resp_filtro_repo = fabricas().respuestas_filtro(self.session)
         respuestas_filtro = await resp_filtro_repo.list_by_evaluacion(evaluacion_id)
         respuestas_filtro_dict = {
             r.pregunta.codigo: r.respuesta
@@ -57,13 +56,12 @@ class GenerateResumenUseCase:
         arbol = None
         dominio_de: dict[int, int | None] = {}
         if version_id:
-            from app.infrastructure.cache.versiones_matriz import arbol_de_version, contenido_de_version
-
-            arbol = await arbol_de_version(self.session, version_id)
-            contenido = await contenido_de_version(self.session, version_id) or {}
+            cache = fabricas().cache_matriz
+            arbol = await cache.arbol_de_version(self.session, version_id)
+            contenido = await cache.contenido_de_version(self.session, version_id) or {}
             dominio_de = {int(c["id"]): c.get("dominio_id") for c in contenido.get("controles", [])}
         if arbol is None:
-            arbol = await arbol_vigente(self.session)
+            arbol = await fabricas().cache_matriz.arbol_vigente(self.session)
         codigos_aplicables = set(get_controles_aplicables(respuestas_filtro_dict, arbol))
 
         # 3. Obtener todas las respuestas de la evaluación con sus controles

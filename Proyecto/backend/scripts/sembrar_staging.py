@@ -51,9 +51,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import delete, func, select  # noqa: E402
 
+from app.bootstrap import configurar  # noqa: E402
+
+configurar()  # raíz de composición (A-40)
+
 ID_BASE = 990_000          # primer ID de ejemplo = ID_BASE + 1
 ID_TOPE = ID_BASE + 9_999  # rango reservado para la semilla
-MIN_PASSWORD = 12          # igual que app/core/crear_admin.py
+MIN_PASSWORD = 12          # igual que app/cli/crear_admin.py
 
 # Texto neutro, sin datos personales (HU-06): justificación de los "parcialmente cumplido"
 JUSTIFICACION_EJEMPLO = (
@@ -94,7 +98,7 @@ def _ahora() -> datetime:
 # ---------------------------------------------------------------- administrador
 async def sembrar_admin(session, email: str | None, password: str | None,
                         actualizar_clave: bool = False, iteraciones: int | None = None) -> str:
-    from app.core.autenticacion import hash_password
+    from app.infrastructure.security.autenticacion import hash_password
     from app.domain.models.usuario_admin import UsuarioAdmin
 
     if not email:

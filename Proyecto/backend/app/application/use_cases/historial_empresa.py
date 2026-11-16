@@ -8,7 +8,7 @@ HU-29 · Evaluaciones de la empresa cliente: historial, reevaluación y "la más
                                 que nace (empresa_id, origen 'empresa') y NO crea usuario
                                 temporal: no hay encuestado anónimo, clave de acceso ni
                                 aviso legal de la landing. La responde el usuario definitivo
-                                con su sesión (app/core/alcance.py ya le da acceso a las
+                                con su sesión (app/api/dependencias/alcance.py ya le da acceso a las
                                 evaluaciones de su empresa).
   evaluacion_mas_reciente()     la regla única de "evaluación más reciente" (formación,
                                 tutor IA y el resumen del historial).
@@ -23,14 +23,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes.historial import DimensionFila, EvaluacionFila, construir_historial
-from app.core.autenticacion import Actor
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor
 from app.domain.models.dominio import Dominio
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import ESTADOS_CERRADOS, ORIGEN_EMPRESA, Evaluacion
 from app.domain.models.resumen import Resumen
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 ESTADO_EN_PROGRESO = "en_progreso"
 
@@ -126,7 +126,7 @@ class IniciarReevaluacionUseCase:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     async def execute(self, actor: Actor, empresa: Empresa) -> Evaluacion:
         # Bloquea la fila de la empresa hasta el commit: dos clics simultáneos no crean dos

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.core.contexto_auditoria import ip_actual, normalizar_ip
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADOS, ROLES_SIN_ID, BitacoraAuditoria
 from app.domain.auditoria.acciones import ROL_ANONIMO, acciones_de_categoria

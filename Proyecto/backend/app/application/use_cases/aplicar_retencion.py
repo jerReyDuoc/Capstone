@@ -61,7 +61,8 @@ from app.application.use_cases.configurar_retencion import (
     plazo_titular_vigente,
     tomar_bloqueo,
 )
-from app.core.autenticacion import Actor
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_ERROR, RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
@@ -73,12 +74,8 @@ from app.domain.models.solicitud_arcop import (
     SolicitudARCOP,
 )
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.anonimizacion_repository import (
-    TEXTO_ANONIMIZADO,
-    AnonimizacionRepository,
-)
+from app.domain.privacidad.anonimizacion import TEXTO_ANONIMIZADO
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 _MAX_IDS_EN_DETALLE = 500  # R3/R4: más ids que esto se informan solo como cantidad
 
@@ -143,7 +140,7 @@ class AplicarRetencionUseCase:
         }
 
     def _auditar(self, accion: str, entidad: str, entidad_id: int | None, regla: str, **detalle) -> None:
-        BitacoraRepository(self.s).registrar(
+        fabricas().bitacora(self.s).registrar(
             accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ACTOR_SISTEMA,
             detalle={"regla": regla, "plazo_dias": self.plazos.get(
                 {"R1": "titulares", "R2": "arcop", "R3": "eventos", "R4": "tutor"}[regla]), **detalle},
@@ -242,7 +239,7 @@ class AplicarRetencionUseCase:
             "omitida_por_ejecucion_en_curso": r.omitida_por_ejecucion_en_curso,
             "error": r.error,
         }
-        bitacora = BitacoraRepository(self.s)
+        bitacora = fabricas().bitacora(self.s)
         if self.actor is not None:
             fila = bitacora.registrar(accion=Accion.RETENCION_EJECUCION, entidad="retencion",
                                       actor=self.actor, resultado=resultado, detalle=detalle)
@@ -281,7 +278,7 @@ class AplicarRetencionUseCase:
             r.titulares += len(ids)
             return
 
-        repo = AnonimizacionRepository(self.s)
+        repo = fabricas().anonimizacion(self.s)
         for usuario_id in ids:
             ahora = _ahora()
             publicas = (await self.s.execute(
@@ -388,9 +385,7 @@ class AplicarRetencionUseCase:
 
     # ------------------------------------------------------------------ R4 (HU-15)
     async def _tutor(self, limite: date, aplicar: bool, r: ResultadoRetencion) -> None:
-        from app.infrastructure.repositories.tutor_repository import TutorRepository
-
-        repo = TutorRepository(self.s)
+        repo = fabricas().tutor(self.s)
         ids = await repo.inactivas_desde(datetime.combine(limite, datetime.min.time()))
         if not aplicar:
             r.conversaciones_tutor += len(ids)

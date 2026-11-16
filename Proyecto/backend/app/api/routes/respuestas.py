@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import actor_opcional, alcance_respuesta, solo_admin, verificar_alcance
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import actor_opcional, alcance_respuesta, solo_admin, verificar_alcance
+from app.domain.auth.actor import Actor
 from app.core.database import get_db
 from app.application.use_cases.create_respuesta import (
     CreateRespuestaUseCase,
@@ -20,12 +20,12 @@ from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepo
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
-from app.infrastructure.llm.factory import crear_anonimizador
+from app.api.dependencias.contenedor import crear_anonimizador
 from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion
 from app.domain.models.evaluacion import Evaluacion
 from app.application.ai.anonimizador import AnonimizacionError
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase
-from app.core.cliente import huella
+from app.application.seguridad.huella import huella
 from app.domain.auditoria.acciones import Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 

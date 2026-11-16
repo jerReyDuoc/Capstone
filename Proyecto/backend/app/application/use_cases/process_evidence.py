@@ -41,8 +41,7 @@ from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.application.ai.gateway import CapaIAError
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
-from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
-from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+from app.domain.ports.repositorios import EvidenciaRepositoryPort, RespuestaRepositoryPort
 
 logger = logging.getLogger("evidencias")
 
@@ -73,8 +72,8 @@ RANGO_REMEDIACION = {
 class ProcessEvidenceUseCase:
     def __init__(
         self,
-        evidencia_repo: EvidenciaRepository,
-        respuesta_repo: RespuestaRepository,
+        evidencia_repo: EvidenciaRepositoryPort,
+        respuesta_repo: RespuestaRepositoryPort,
         storage: FileStoragePort,
         validator: EvidenceValidatorPort,
         guard: PromptGuardPort | None = None,

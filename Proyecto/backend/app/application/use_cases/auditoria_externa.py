@@ -30,15 +30,13 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, Rol, hash_password
+from app.domain.auth.actor import Actor, Rol
 from app.core.config import settings
 from app.domain.auditoria import auditoria_hash
 from app.domain.models.auditoria_externa import ALGORITMO_LOTE, UsuarioAuditor
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria
-from app.infrastructure.repositories import audit_log_lotes
-from app.infrastructure.repositories.bitacora_cadena import filas_en_orden
 from app.domain.auditoria.acciones import Accion, categoria
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
 
 LEY = "Ley N.º 21.719, art. 14 ter (deber de trazabilidad)"
 SCRIPT_VERIFICACION = Path(__file__).resolve().parents[1] / "auditoria" / "recursos" / "verificar_exportacion.py"
@@ -99,7 +97,7 @@ class ConsultaAuditLog:
         desde, hasta = _sin_tz(desde), _sin_tz(hasta)
         _validar_rango(desde, hasta)
         try:
-            filas, total = await BitacoraRepository(self.db).listar(
+            filas, total = await fabricas().bitacora(self.db).listar(
                 desde=desde, hasta=hasta, categoria=categoria_, accion=accion, entidad=entidad,
                 entidad_id=entidad_id, resultado=resultado, actor_rol=actor_rol, page=page, size=size)
         except ValueError as e:
@@ -107,7 +105,7 @@ class ConsultaAuditLog:
         filtros = {k: v for k, v in {"desde": _iso(desde), "hasta": _iso(hasta), "categoria": categoria_,
                                      "accion": accion, "entidad": entidad, "entidad_id": entidad_id,
                                      "resultado": resultado, "actor_rol": actor_rol}.items() if v is not None}
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITORIA_CONSULTA, entidad="audit_log", actor=actor,
             detalle={"filtros": filtros, "page": page, "size": size, "total": total})
         await self.db.commit()
@@ -115,8 +113,8 @@ class ConsultaAuditLog:
                 "filtros": filtros}
 
     async def verificar(self, actor: Actor) -> dict:
-        resultado = await audit_log_lotes.verificar_lotes(self.db)
-        BitacoraRepository(self.db).registrar(
+        resultado = await fabricas().integridad_bitacora.verificar_lotes(self.db)
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITORIA_VERIFICACION, entidad="audit_log", actor=actor,
             resultado="ok" if resultado["integra"] else "rechazado",
             detalle={"integra": resultado["integra"], "lotes": resultado["lotes"]["total"],
@@ -126,8 +124,8 @@ class ConsultaAuditLog:
         return resultado
 
     async def lotes(self, page: int = 1, size: int = 50) -> dict:
-        filas, total = await audit_log_lotes.listar_sellos(self.db, page, size)
-        return {"items": [{**audit_log_lotes.sello_dict(s), "fecha": _iso(s.fecha)} for s in filas],
+        filas, total = await fabricas().integridad_bitacora.listar_sellos(self.db, page, size)
+        return {"items": [{**fabricas().integridad_bitacora.sello_dict(s), "fecha": _iso(s.fecha)} for s in filas],
                 "total": total, "page": page, "size": size, "algoritmo": ALGORITMO_LOTE}
 
 
@@ -190,9 +188,9 @@ class ExportarAuditLog:
         # 1) Sellar lo pendiente: así la exportación cubre todo lo registrado hasta ahora.
         #    Se confirma enseguida: el sellado toma el lock del log y armar el ZIP no debe
         #    frenar mientras tanto los registros del resto del sistema.
-        await audit_log_lotes.sellar_pendientes(self.db)
+        await fabricas().integridad_bitacora.sellar_pendientes(self.db)
         await self.db.commit()
-        sellos = await audit_log_lotes.sellos_que_cubren(self.db, desde, hasta)
+        sellos = await fabricas().integridad_bitacora.sellos_que_cubren(self.db, desde, hasta)
         if not sellos:
             raise AuditoriaError("No hay registros en el rango pedido.", "SIN_REGISTROS", 404)
         filas_total = sum(s.cantidad for s in sellos)
@@ -204,10 +202,10 @@ class ExportarAuditLog:
         registros: list[dict] = []
         lote_de: dict[int, int] = {}
         for s in sellos:
-            async for f in filas_en_orden(self.db, desde_id=s.desde_id - 1, hasta_id=s.hasta_id):
+            async for f in fabricas().integridad_bitacora.filas_en_orden(self.db, desde_id=s.desde_id - 1, hasta_id=s.hasta_id):
                 registros.append(registro_dict(f))
                 lote_de[f["id"]] = s.id
-        verificacion = await audit_log_lotes.verificar_lotes(self.db)
+        verificacion = await fabricas().integridad_bitacora.verificar_lotes(self.db)
         generado = _ahora()
         archivos = await asyncio.to_thread(self._archivos, registros, lote_de, sellos, verificacion,
                                            desde, hasta, generado, actor)
@@ -215,7 +213,7 @@ class ExportarAuditLog:
         sha = hashlib.sha256(contenido).hexdigest()
         nombre = f"audit_log_lotes_{sellos[0].id}-{sellos[-1].id}_{generado:%Y%m%dT%H%M%SZ}.zip"
 
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITORIA_EXPORTACION, entidad="audit_log", actor=actor,
             detalle={"desde": _iso(desde), "hasta": _iso(hasta), "lote_inicial": sellos[0].id,
                      "lote_final": sellos[-1].id, "filas": len(registros), "sha256_zip": sha,
@@ -240,7 +238,7 @@ class ExportarAuditLog:
                         json.dumps(r["detalle"], ensure_ascii=False, sort_keys=True) if r["detalle"] is not None else "",
                         lote_de[r["id"]], r["hash_anterior"], r["hash"]])
         csv_bytes = ("﻿" + buf.getvalue()).encode()  # BOM: Excel abre bien las tildes
-        lotes = [{**audit_log_lotes.sello_dict(s), "fecha": _iso(s.fecha)} for s in sellos]
+        lotes = [{**fabricas().integridad_bitacora.sello_dict(s), "fecha": _iso(s.fecha)} for s in sellos]
         archivos = {
             "audit_log.jsonl": jsonl,
             "audit_log.csv": csv_bytes,
@@ -325,12 +323,12 @@ class GestionarAuditoresUseCase:
         ahora = _ahora()
         auditor = UsuarioAuditor(
             email=email, organizacion=organizacion,
-            password_hash=await asyncio.to_thread(hash_password, password),
+            password_hash=await asyncio.to_thread(fabricas().credenciales.hash_password, password),
             activo=True, fecha_creacion=ahora, fecha_expiracion=ahora + timedelta(days=int(dias_vigencia)),
             creado_por_admin_id=admin.id if admin and admin.es_admin else None)
         self.db.add(auditor)
         await self.db.flush()
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITOR_CREADO, entidad="usuario_auditor", entidad_id=auditor.id,
             actor=admin, actor_rol=None if admin else "sistema",
             detalle={"dias_vigencia": int(dias_vigencia), "fecha_expiracion": _iso(auditor.fecha_expiracion)})
@@ -353,7 +351,7 @@ class GestionarAuditoresUseCase:
             cambios.append("vigencia")
         if password is not None:
             self._validar_password(password)
-            auditor.password_hash = await asyncio.to_thread(hash_password, password)
+            auditor.password_hash = await asyncio.to_thread(fabricas().credenciales.hash_password, password)
             cambios.append("password")
         if activo is not None and activo != auditor.activo:
             auditor.activo = activo
@@ -365,7 +363,7 @@ class GestionarAuditoresUseCase:
             sesiones = await cerrar_todas(self.db, Rol.AUDITOR_EXTERNO.value, auditor.id,
                                           MotivoCierre.CAMBIO_CONTRASENA if "password" in cambios else MotivoCierre.DESACTIVACION,
                                           ahora)
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=Accion.AUDITOR_ACTUALIZADO, entidad="usuario_auditor", entidad_id=auditor.id,
             actor=admin, actor_rol=None if admin else "sistema",
             detalle={"cambios": cambios, "activo": auditor.activo,

@@ -35,6 +35,7 @@ from app.application.informes.carga import SinResultadosError, cargar_evaluacion
 from app.application.use_cases.create_respuesta import normalizar_justificacion
 from app.application.use_cases.limites_encuesta import ventana_diaria
 from app.application.use_cases.upload_evidence import ArchivoDemasiadoGrandeError, TipoArchivoNoAdmitidoError, validar_archivo
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import ORIGEN_REMEDIACION, ORIGENES_REMEDIACION, EstadoValidacion, Evidencia
@@ -43,7 +44,6 @@ from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
 from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 ESTADOS_CON_BRECHA = (EstadoClasificacion.NO_CUMPLIDO.value, EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value,
                       EstadoClasificacion.REQUIERE_REVISION.value)
@@ -263,7 +263,7 @@ class Remediacion:
             )
             self.db.add(evidencia)
             await self.db.flush()
-            BitacoraRepository(self.db).registrar(
+            fabricas().bitacora(self.db).registrar(
                 accion=Accion.REMEDIACION_EVIDENCIA_SUBIDA, entidad="evidencias", entidad_id=evidencia.id_evidencia,
                 actor=self.cliente.actor,
                 detalle={"evaluacion_id": ev.id, "respuesta_id": respuesta_id, "estado_previo": actual,

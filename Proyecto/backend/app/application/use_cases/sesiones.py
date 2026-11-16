@@ -1,7 +1,7 @@
 """
 HU-28: sesiones revocables de los usuarios con contraseña (admin_therion y cliente).
 
-El token bearer sigue siendo stateless (HMAC, app/core/autenticacion.py), pero al iniciar
+El token bearer sigue siendo stateless (HMAC, app/infrastructure/security/autenticacion.py), pero al iniciar
 sesión se crea una fila en sesion_usuario y el token lleva su identificador (`sid`). En
 cada petición obtener_actor() comprueba que esa sesión siga abierta, así:
 
@@ -24,7 +24,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, emitir_token
+from app.domain.auth.actor import Actor
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.sesion import ROLES_CON_CONTRASENA, SesionUsuario
 
@@ -50,7 +51,7 @@ async def abrir_sesion(db: AsyncSession, rol: str, actor_id: int,
     )
     db.add(fila)
     await db.flush()
-    return emitir_token(actor_id, rol, sid=sid), fila
+    return fabricas().credenciales.emitir_token(actor_id, rol, sid=sid), fila
 
 
 async def _buscar(db: AsyncSession, actor: Actor) -> SesionUsuario | None:

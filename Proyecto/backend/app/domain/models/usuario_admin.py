@@ -8,7 +8,7 @@ class UsuarioAdmin(Base):
     """
     Usuario administrador (rol admin_therion) con credenciales propias.
     Gestiona las solicitudes ARCOP. Se crea con:
-        python -m app.core.crear_admin --email admin@ejemplo.cl
+        python -m app.cli.crear_admin --email admin@ejemplo.cl
     La contraseña NUNCA se guarda en claro: solo su hash PBKDF2-SHA256.
     """
     __tablename__ = "usuarios_admin"

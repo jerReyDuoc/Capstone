@@ -20,6 +20,7 @@ Convención de nombres:
                        (XPASS estricto) para quitar la marca.
 """
 import asyncio
+import dataclasses
 import hashlib
 import time
 from types import SimpleNamespace
@@ -27,7 +28,7 @@ from types import SimpleNamespace
 import pytest
 
 import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchemy)
-import app.application.use_cases.generate_resumen as gen_mod
+import app.application.fabricas as fabricas_mod
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO
 from app.domain.evidencias.validacion import EvidenceValidation
 from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, EvaluacionCerradaError
@@ -107,14 +108,17 @@ def _usar_filtro(monkeypatch, respuestas_filtro: dict[str, bool]):
         async def list_by_evaluacion(self, _id):
             return filas
 
-    monkeypatch.setattr(gen_mod, "RespuestaFiltroRepository", FakeRespFiltroRepo)
 
     # HU-24: el árbol vigente sale de la BD; la sesión falsa no la tiene → semilla
     async def _arbol_semilla(_session):
         from app.domain.matriz.arbol_aplicabilidad import ARBOL_POR_DEFECTO
         return ARBOL_POR_DEFECTO
 
-    monkeypatch.setattr(gen_mod, "arbol_vigente", _arbol_semilla)
+    class FakeCacheMatriz:
+        arbol_vigente = staticmethod(_arbol_semilla)
+
+    monkeypatch.setattr(fabricas_mod, "_actual", dataclasses.replace(
+        fabricas_mod.fabricas(), respuestas_filtro=FakeRespFiltroRepo, cache_matriz=FakeCacheMatriz()))
 
 
 def _par(codigo, final, declarada=None):

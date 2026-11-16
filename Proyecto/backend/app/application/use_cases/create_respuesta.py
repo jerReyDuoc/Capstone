@@ -23,10 +23,10 @@ from app.core.config import settings
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION, PromptGuardPort
-from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
-from app.infrastructure.repositories.respuesta_repository import (
+from app.domain.ports.repositorios import (
+    EvaluacionRepositoryPort,
     RespuestaDuplicadaError,
-    RespuestaRepository,
+    RespuestaRepositoryPort,
 )
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 
@@ -125,8 +125,8 @@ class ResultadoRespuesta:
 class CreateRespuestaUseCase:
     def __init__(
         self,
-        repo: RespuestaRepository,
-        evaluaciones: EvaluacionRepository,
+        repo: RespuestaRepositoryPort,
+        evaluaciones: EvaluacionRepositoryPort,
         guard: PromptGuardPort | None = None,
         registrar_evento: RegistrarEventoSeguridad | None = None,
         anonimizador: AnonimizadorPII | None = None,

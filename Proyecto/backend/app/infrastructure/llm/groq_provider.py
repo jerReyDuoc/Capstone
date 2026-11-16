@@ -13,7 +13,7 @@ llamadas de herramienta inválidas (HTTP 400) de forma intermitente.
     el presupuesto de tokens y deje el JSON cortado.
 
 Para agregar otro proveedor (OpenAI, Azure, Ollama...): crear un adaptador con la
-misma interfaz y registrarlo en app/infrastructure/llm/factory.py.
+misma interfaz y registrarlo en app/bootstrap.py.
 """
 from __future__ import annotations
 

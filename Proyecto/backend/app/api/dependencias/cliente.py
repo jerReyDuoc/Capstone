@@ -7,12 +7,11 @@ y se identifica con `X-BFF-Secret`. Solo si ese secreto coincide se confía en l
 reenviada; si no, se usa la IP de la conexión (un cliente directo no puede falsear
 su IP para esquivar los límites).
 
-La IP es un dato personal. Los contadores de Redis usan una huella HMAC-SHA256 truncada,
-que no permite recuperar la IP sin el secreto. La única tabla que guarda la IP en claro es
-audit_log (HU-09, criterio 2: trazabilidad del art. 14 ter), como excepción documentada en
-app/domain/privacidad/catalogo_datos_personales.py.
+La IP es un dato personal. Los contadores de Redis usan una huella HMAC-SHA256 truncada
+(app/application/seguridad/huella.py), que no permite recuperar la IP sin el secreto. La
+única tabla que guarda la IP en claro es audit_log (HU-09, criterio 2: trazabilidad del
+art. 14 ter), como excepción documentada en app/domain/privacidad/catalogo_datos_personales.py.
 """
-import hashlib
 import hmac
 
 from fastapi import Request
@@ -34,8 +33,3 @@ def ip_cliente(request: Request) -> str:
         if ip:
             return ip[:64]
     return request.client.host if request.client else _IP_DESCONOCIDA
-
-
-def huella(valor: str) -> str:
-    clave = (settings.AUTH_SECRET or settings.ENTITY_MAP_KEY or "complianceai-dev").encode()
-    return hmac.new(clave, valor.encode(), hashlib.sha256).hexdigest()[:32]

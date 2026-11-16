@@ -18,7 +18,8 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.clave_acceso_encuestado import hash_clave, nueva_clave
-from app.core.autenticacion import Rol, emitir_token
+from app.domain.auth.actor import Rol
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.rubro import Rubro
@@ -83,6 +84,6 @@ class IniciarEncuestaPublicaUseCase:
         return EncuestaIniciada(
             evaluacion_id=evaluacion.id,
             clave_acceso=clave,
-            access_token=emitir_token(evaluacion.id, Rol.ENCUESTADO.value),
+            access_token=fabricas().credenciales.emitir_token(evaluacion.id, Rol.ENCUESTADO.value),
             expira_en=int(time.time()) + settings.AUTH_TOKEN_TTL_MIN * 60,
         )

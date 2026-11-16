@@ -385,7 +385,7 @@ def test_api_ropa_aislado_por_empresa_y_solo_con_contrato(hu27, monkeypatch):
         assert r.status_code == 403
         r = await c.get("/api/registro-actividades/ropa/999/descarga", headers=x["hc"])
         assert r.status_code == 404 and hu27._codigo(r) == "INFORME_NO_ENCONTRADO"
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         r = await c.post("/api/registro-actividades/ropa", headers=x["hc"], json={})
         assert r.status_code == 403 and hu27._codigo(r) == "CONTRATO_NO_VIGENTE"

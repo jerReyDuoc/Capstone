@@ -365,7 +365,7 @@ def test_api_solo_el_cliente_con_servicio_activo(hu27, monkeypatch):
         assert (await c.get("/api/formacion/modulos/1", headers=h_enc)).status_code == 403
 
         # HU-30: si el servicio deja de estar habilitado, el recorrido se corta con 403
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         r = await c.get("/api/formacion/avance", headers=x["hc"])
         assert r.status_code == 403 and hu27._codigo(r) == "CONTRATO_NO_VIGENTE"

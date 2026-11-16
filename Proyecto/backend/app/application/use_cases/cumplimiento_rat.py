@@ -46,7 +46,7 @@ from app.domain.rat import catalogo as cat
 from app.domain.rat import cumplimiento as cu
 from app.domain.rat.modelo import completar
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +67,14 @@ def huella_registro(actividades: list[cu.ActividadRegistro]) -> str:
 
 
 class CumplimientoRegistro:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente):
         self.db = db
         self.cliente = cliente
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ================================================================ lectura
     async def _registro(self):

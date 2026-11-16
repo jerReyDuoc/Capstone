@@ -41,10 +41,11 @@ from app.application.use_cases.limites_encuesta import ventana_diaria
 from app.application.use_cases.mapa_datos import MapaDatosCasos, MapaDatosError
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 from app.domain.auditoria.acciones import Accion
 
 logger = logging.getLogger(__name__)

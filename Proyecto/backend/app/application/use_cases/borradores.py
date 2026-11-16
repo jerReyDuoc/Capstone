@@ -61,16 +61,16 @@ from app.application.borradores.plantillas import (
     plantilla as obtener_plantilla,
 )
 from app.application.use_cases.limites_encuesta import Reserva, ventana_diaria
-from app.core.cliente import huella
+from app.application.seguridad.huella import huella
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.borrador import BorradorDocumento, EstadoBorrador
 from app.domain.models.documento_empresa import TIPO_BORRADOR
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.ports.registro_ia_port import ContextoLlamada
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 ZONA = ZoneInfo("America/Santiago")
@@ -129,7 +129,7 @@ def borrador_a_dict(b: BorradorDocumento, con_contenido: bool = False) -> dict:
 
 
 class Borradores:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, agente: AgenteIA | None = None,
                  anonimizador: AnonimizadorPII | None = None, limitador: Limitador | None = None,
@@ -142,7 +142,7 @@ class Borradores:
         self.anonimizador = anonimizador
         self.limitador = limitador
         self.registrar_evento = registrar_evento
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ------------------------------------------------------------------ catálogo y cuota
     def _clave_dia(self, fecha: str) -> str:

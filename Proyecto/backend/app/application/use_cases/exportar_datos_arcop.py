@@ -34,12 +34,13 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.domain.models.solicitud_arcop import (
     EstadoSolicitudARCOP,
     SolicitudARCOP,
     TipoSolicitudARCOP,
 )
+from app.application.fabricas import fabricas
 
 FORMATOS = ("json", "csv")
 TIPOS_EXPORTABLES = frozenset({TipoSolicitudARCOP.ACCESO.value, TipoSolicitudARCOP.PORTABILIDAD.value})
@@ -374,9 +375,7 @@ class ExportarDatosARCOP:
         # Se leen antes del commit: después, el ORM podría expirar los atributos
         codigo, sid, tipo = solicitud.codigo_seguimiento, solicitud.id, solicitud.tipo
 
-        from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-
-        BitacoraRepository(self.db).registrar(
+        fabricas().bitacora(self.db).registrar(
             accion=ACCION_BITACORA, entidad="solicitudes_arcop", entidad_id=sid, actor=actor,
             detalle={"tipo_solicitud": tipo, "formato": formato, **cuenta},
         )

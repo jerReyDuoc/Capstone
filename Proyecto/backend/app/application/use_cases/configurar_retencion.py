@@ -25,7 +25,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.models.configuracion_retencion import (
     FUENTE_ENTORNO,
@@ -34,7 +34,7 @@ from app.domain.models.configuracion_retencion import (
     ConfiguracionRetencion as Conf,
 )
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
 
 MODO_ENTORNO = "entorno"
 MODO_PLAZO = "plazo"
@@ -125,7 +125,7 @@ async def actualizar_plazo(s: AsyncSession, actor: Actor, *, modo: str, dias: in
                     .execution_options(synchronize_session=False))
     despues = (PlazoTitular(settings.RETENCION_DATOS_TITULAR_DIAS, FUENTE_ENTORNO, ahora)
                if fuente == FUENTE_ENTORNO else PlazoTitular(nuevo_dias, FUENTE_PANEL, ahora))
-    BitacoraRepository(s).registrar(
+    fabricas().bitacora(s).registrar(
         accion=Accion.RETENCION_CONFIGURACION, entidad="configuracion_retencion", entidad_id=ID_UNICO,
         actor=actor, detalle={"regla": "R1", "antes": antes.como_dict(), "despues": despues.como_dict(),
                               "valor_entorno_dias": settings.RETENCION_DATOS_TITULAR_DIAS},

@@ -9,7 +9,7 @@ resumen.Evaluacion_id, y el plan formativo y el informe PDF se calculan desde es
 (GET /plan-formativo, /informe/pdf). Por eso migrar = reasignar la evaluación a la
 empresa (evaluacion.empresa_id). No se copia nada: copiar duplicaría datos (Ley 21.719,
 minimización) y dejaría dos versiones de la verdad. Al cliente se le abre el acceso por
-evaluacion.empresa_id (app/core/alcance.py) y al usuario temporal se le cierra.
+evaluacion.empresa_id (app/api/dependencias/alcance.py) y al usuario temporal se le cierra.
 
 En la MISMA transacción, por cada solicitud:
   1. Bloquea la solicitud y la evaluación (SELECT ... FOR UPDATE en PostgreSQL), para que
@@ -33,7 +33,7 @@ from datetime import datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia
@@ -43,7 +43,7 @@ from app.domain.models.solicitud_arcop import EstadoSolicitudARCOP, SolicitudARC
 from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion, SolicitudContratacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
 
 MAX_SOLICITUDES_POR_OPERACION = 20
 
@@ -81,7 +81,7 @@ class EvaluacionMigrada:
 class MigradorEvaluaciones:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     @staticmethod
     def normalizar_ids(solicitudes_ids: list[int]) -> list[int]:

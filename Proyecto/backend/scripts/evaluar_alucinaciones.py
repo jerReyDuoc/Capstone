@@ -76,7 +76,7 @@ def _proveedor(nombre: str | None, modelo: str | None):
         settings.LLM_PROVIDER = nombre
     if modelo:
         settings.LLM_MODEL = modelo
-    from app.infrastructure.llm.factory import crear_proveedor
+    from app.infrastructure.llm.proveedores import crear_proveedor
     return crear_proveedor()
 
 

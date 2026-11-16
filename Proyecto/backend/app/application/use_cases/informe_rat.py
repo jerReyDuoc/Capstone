@@ -36,6 +36,7 @@ from app.application.rat import correo_rat
 from app.application.rat import informe as I
 from app.application.use_cases.documentos_empresa import guardar_documento
 from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
@@ -45,9 +46,8 @@ from app.domain.models.rat import RatActividad, RatActividadVersion
 from app.domain.models.rat_informe import RatInforme
 from app.domain.rat import analisis
 from app.domain.rat import catalogo as cat
-from app.infrastructure.cache.limitador import LimitadorNoDisponibleError
+from app.domain.ports.limitador_port import LimitadorNoDisponibleError
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def _iso(d: datetime | None) -> str | None:
 
 
 class InformeRatCasos:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, limitador=None, storage=None):
         self.db = db
@@ -89,7 +89,7 @@ class InformeRatCasos:
         self.usuario_id: int = cliente.usuario.id
         self.email_usuario: str = cliente.usuario.email
         self.limitador = limitador
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self._storage = storage
 
     # ================================================================ lectura del registro
@@ -213,8 +213,7 @@ class InformeRatCasos:
     @property
     def storage(self):
         if self._storage is None:
-            from app.infrastructure.llm.factory import crear_storage_documentos
-            self._storage = crear_storage_documentos()
+            self._storage = fabricas().storage_documentos()
         return self._storage
 
     async def emitir(self, forzar: bool = False) -> dict:

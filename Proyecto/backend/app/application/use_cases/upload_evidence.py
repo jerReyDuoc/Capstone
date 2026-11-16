@@ -12,9 +12,11 @@ from app.application.use_cases.create_respuesta import (
     RespuestaRechazadaError,
 )
 from app.core.config import settings
-from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
-from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
-from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+from app.domain.ports.repositorios import (
+    EvaluacionRepositoryPort,
+    EvidenciaRepositoryPort,
+    RespuestaRepositoryPort,
+)
 
 
 class TipoArchivoNoAdmitidoError(RespuestaRechazadaError):
@@ -58,10 +60,10 @@ class UploadEvidenceUseCase:
 
     def __init__(
         self,
-        evidencia_repo: EvidenciaRepository,
-        respuesta_repo: RespuestaRepository,
+        evidencia_repo: EvidenciaRepositoryPort,
+        respuesta_repo: RespuestaRepositoryPort,
         storage: FileStoragePort,
-        evaluaciones: EvaluacionRepository,
+        evaluaciones: EvaluacionRepositoryPort,
         anonimizador: AnonimizadorPII | None = None,
     ):
         self.evidencia_repo = evidencia_repo

@@ -418,7 +418,7 @@ def test_api_solo_usuario_definitivo_con_contrato_vigente(hu27, monkeypatch):
         assert (await c.get("/api/registro-actividades")).status_code == 401
         r = await c.get("/api/registro-actividades", headers=hu27.admin())
         assert r.status_code == 403 and hu27._codigo(r) == "NO_AUTORIZADO"
-        import app.core.servicio_pagado as sp
+        import app.api.dependencias.servicio_pagado as sp
         monkeypatch.setattr(sp, "servicio_habilitado", lambda empresa, hoy=None: False)
         for metodo, ruta, kw in (("get", "/api/registro-actividades", {}),
                                  ("get", "/api/registro-actividades/catalogo", {}),

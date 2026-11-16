@@ -5,9 +5,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.respuestas import anonimizar_comentario, validar_comentario
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
-from app.core.cliente import huella
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
+from app.application.seguridad.huella import huella
 from app.core.database import get_db
 from app.domain.models.evento_seguridad import ResolucionEvento
 from app.domain.auditoria.acciones import Accion

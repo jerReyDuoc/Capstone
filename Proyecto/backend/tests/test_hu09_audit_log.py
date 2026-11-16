@@ -25,7 +25,7 @@ import pytest
 from sqlalchemy import select, text
 
 from _api_harness import MODO, cliente_api  # noqa: E402
-from app.core import autenticacion as auth  # noqa: E402
+import app.infrastructure.security.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.auditoria import auditoria_hash  # noqa: E402
 

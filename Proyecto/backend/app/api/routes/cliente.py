@@ -33,7 +33,7 @@ vigente, suspendido o en plazo de gracia. Cada descarga y eliminación va a la b
 
 El detalle de cada evaluación (resultados, brechas, plan formativo, informe PDF) se lee con
 las rutas de siempre de /api/evaluaciones, que limitan al cliente a las de su empresa
-(app/core/alcance.py) y que, por ser funciones gratuitas, no dependen del contrato. Las
+(app/api/dependencias/alcance.py) y que, por ser funciones gratuitas, no dependen del contrato. Las
 mismas rutas del cuestionario (filtro, respuestas, evidencias, /completar) sirven para
 responder la reevaluación con la sesión del cliente.
 """
@@ -51,11 +51,12 @@ from app.application.use_cases.historial_empresa import (
     ReevaluacionError,
     historial_de_empresa,
 )
-from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
-from app.core import servicio_pagado
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
+from app.api.dependencias import servicio_pagado
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.formacion import AvanceFormativo

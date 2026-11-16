@@ -27,7 +27,7 @@ Qué permite cada situación:
 
 Este módulo no importa SQLAlchemy a propósito: se prueba sin base de datos
 (tests/test_hu30_contrato.py) y lo usan el modelo Empresa y las guardas de
-app/core/servicio_pagado.py.
+app/api/dependencias/servicio_pagado.py.
 """
 from __future__ import annotations
 

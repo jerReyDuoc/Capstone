@@ -1,7 +1,7 @@
 """
 HU-24 · Mantenedor de la matriz normativa con versionado (solo admin_therion).
 
-Todas las rutas: 401 sin token y 403 con otro rol (app/core/alcance.py: solo_admin).
+Todas las rutas: 401 sin token y 403 con otro rol (app/api/dependencias/alcance.py: solo_admin).
 Cada cambio queda en el audit log (HU-09). Las que modifican el borrador aceptan
 `revision` (la que devolvió la última lectura) y responden 409 BORRADOR_CAMBIADO si otro
 administrador lo modificó entre medio.
@@ -36,8 +36,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.mantenedor_matriz import MantenedorMatrizUseCase, MatrizError
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
 from app.core.database import get_db
 
 router = APIRouter(prefix="/api/admin/matriz", tags=["admin · matriz normativa (HU-24)"])

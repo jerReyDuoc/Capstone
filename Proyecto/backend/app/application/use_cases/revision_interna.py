@@ -40,6 +40,7 @@ from app.application.rat import paquete_revision as P
 from app.application.rat.pdf_revision import DatosConstancia
 from app.application.use_cases.informe_rat import InformeRatCasos, InformeRatError
 from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.mapa_datos.modelo import contiene_contacto
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO, BitacoraAuditoria
@@ -49,9 +50,8 @@ from app.domain.models.rat_informe import RatInforme
 from app.domain.models.rat_revision import (ABIERTA, CERRADA, EN_CURSO, PRIORIDADES, REVISADA, RatObservacion,
                                             RatPaqueteEvidencia, RatRevision, RatRevisionConfig)
 from app.domain.rat import revision as R
-from app.infrastructure.cache.limitador import LimitadorNoDisponibleError
+from app.domain.ports.limitador_port import LimitadorNoDisponibleError
 from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ def catalogo_criterios() -> dict:
 
 
 class RevisionInternaCasos:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, limitador=None, storage=None):
         self.db = db
@@ -149,7 +149,7 @@ class RevisionInternaCasos:
         self.nombre_usuario: str = getattr(cliente.usuario, "nombre", "") or ""
         self.email_usuario: str = cliente.usuario.email
         self.limitador = limitador
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self.informes = InformeRatCasos(db, cliente, limitador, storage)
 
     # ================================================================ lectura
@@ -963,7 +963,7 @@ async def enviar_recordatorios(db: AsyncSession, ahora: datetime | None = None) 
         # Con la fecha de esta corrida (no la del reloj): así la repetición cada N días se cuenta bien
         cfg.ultimo_recordatorio = ahora.astimezone(timezone.utc).replace(tzinfo=None)
         cfg.etapa_recordatorio = etapa
-        BitacoraRepository(db).registrar(
+        fabricas().bitacora(db).registrar(
             accion=Accion.REVISION_RAT_RECORDATORIO, entidad="rat_revision_config", entidad_id=empresa_id,
             actor_rol=ROL_SISTEMA, detalle={"estado": est["estado"], "vence": est["vence"], "dias": est["dias"],
                                             "plazo_meses": plazo, "modo": modo})

@@ -4,7 +4,7 @@
  * El navegador del administrador no ve su token (cookie httpOnly), así que sus llamadas
  * pasan por app/bff/admin/api/[...ruta]/route.ts, que agrega el Bearer. Solo se reenvían
  * las rutas del panel de HU-27; cualquier otra -> 404. La autorización real (solo
- * admin_therion) la hace FastAPI (app/core/alcance.py: solo_admin).
+ * admin_therion) la hace FastAPI (app/api/dependencias/alcance.py: solo_admin).
  */
 
 export type MetodoAdmin = "GET" | "POST" | "PATCH";

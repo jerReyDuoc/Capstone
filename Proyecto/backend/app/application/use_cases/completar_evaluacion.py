@@ -31,13 +31,11 @@ from app.application.use_cases.create_respuesta import (
 )
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase
 from app.core.config import settings
+from app.application.fabricas import fabricas
 from app.application.use_cases.progreso_cuestionario import calcular_progreso
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
-from app.infrastructure.cache import catalogo_controles
-from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
-from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
 ESTADO_COMPLETADA = "completada"
 _EVIDENCIA_SIN_TERMINAR = (EstadoValidacion.PENDING.value, EstadoValidacion.PROCESSING.value)
@@ -85,9 +83,9 @@ class CompletarEvaluacionUseCase:
                 "La evaluación no tiene el filtro de aplicabilidad (F1–F7) completo"
             )
 
-        contexto = await EvaluacionRepository(self.session).get_contexto(evaluacion_id)
-        catalogo = await catalogo_controles.obtener(self.session)
-        filas = await RespuestaRepository(self.session).list_estado_por_evaluacion(evaluacion_id)
+        contexto = await fabricas().evaluaciones(self.session).get_contexto(evaluacion_id)
+        catalogo = await fabricas().cache_matriz.catalogo(self.session)
+        filas = await fabricas().respuestas(self.session).list_estado_por_evaluacion(evaluacion_id)
         progreso = calcular_progreso(contexto, catalogo, filas)
         if progreso.controles_pendientes:
             codigos = [p.codigo_control for p in progreso.pendientes]

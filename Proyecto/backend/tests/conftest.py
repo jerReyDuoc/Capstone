@@ -32,6 +32,11 @@ import tempfile  # noqa: E402
 os.environ.setdefault("STORAGE_DIR", tempfile.mkdtemp(prefix="qa_storage_"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar _api_harness
 
+# Raíz de composición (A-40): conftest no importa app.main, así que la configura aquí.
+from app.bootstrap import configurar as _configurar_composicion  # noqa: E402
+
+_configurar_composicion()
+
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "latencia: pruebas de tiempo de respuesta de la API REST")
@@ -82,7 +87,7 @@ def _motor_ner_para_la_api():
     if _spacy_disponible():
         yield
         return
-    import app.infrastructure.llm.factory as factory
+    import app.bootstrap as factory
     from app.infrastructure.security.ner_sanitizer import NERSanitizer
     from _capa_ia_fakes import StubNLP
 

@@ -5,11 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.catalogo_brechas import CatalogoBrechas
-
-
-class RespuestaDuplicadaError(Exception):
-    """Ya existe una respuesta para ese (evaluación, control): la insertó otra
-    petición concurrente entre la búsqueda y el INSERT."""
+from app.domain.ports.repositorios import RespuestaDuplicadaError
 
 
 class RespuestaRepository:

@@ -338,7 +338,8 @@ B = "/api/admin/privacidad-plataforma"
 def test_api_solo_admin():
     _api()
     from _api_harness import EVAL_ID, encabezados_qa
-    from app.core.autenticacion import Rol, emitir_token
+    from app.domain.auth.actor import Rol
+    from app.infrastructure.security.autenticacion import emitir_token
 
     async def esc(c):
         rutas = [("GET", B, {}), ("GET", f"{B}/actividades/arcop", {}),

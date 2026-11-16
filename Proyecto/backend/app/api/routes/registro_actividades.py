@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.registro_actividades import RatError, RegistroActividadesCasos
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.rat import catalogo as cat
 from app.domain.rat.estados import ACCIONES
 

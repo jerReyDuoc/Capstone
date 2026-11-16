@@ -10,7 +10,7 @@ porque los tokens se firman con el AUTH_SECRET del servidor.
 
 Cubre:
   - login de administrador y acceso del titular (app/api/routes/auth.py)
-  - firma/expiración de tokens, roles y revocación (app/core/autenticacion.py)
+  - firma/expiración de tokens, roles y revocación (app/infrastructure/security/autenticacion.py)
   - anonimización al aprobar una supresión
   - plazos legales (30 días corridos, prórroga única, bloqueo en 2 días hábiles)
   - código de seguimiento único y consulta pública sin datos personales
@@ -32,7 +32,8 @@ from _api_harness import (  # noqa: E402
     ADMIN_EMAIL, ADMIN_PASSWORD, EVAL_NA_ID, MODO, body_filtro, cliente_api,
 )
 
-from app.core import autenticacion as auth  # noqa: E402
+import app.infrastructure.security.autenticacion as auth  # noqa: E402
+from app.domain.auth.actor import Actor  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.models.solicitud_arcop import (  # noqa: E402
     TRANSICIONES_ARCOP, EstadoSolicitudARCOP, transicion_permitida,
@@ -90,7 +91,7 @@ async def _crear(c, tipo="acceso", descripcion=DESCRIPCION):
 # ---------------------------------------------------------------- unitarias
 def test_token_valido_y_manipulado():
     tok = auth.emitir_token(5, "referente", secreto=SECRETO)
-    assert auth.verificar_token(tok, SECRETO) == auth.Actor(id=5, rol="referente")
+    assert auth.verificar_token(tok, SECRETO) == Actor(id=5, rol="referente")
     with pytest.raises(auth.TokenInvalidoError):
         auth.verificar_token(tok, "otro-secreto")
     cuerpo, firma = tok.split(".")

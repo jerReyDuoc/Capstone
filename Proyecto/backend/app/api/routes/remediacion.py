@@ -9,7 +9,7 @@ HU-17 · Remediación: re-evaluar un control con evidencia nueva (rol cliente).
                                                                 recalculado (el panel lo consulta
                                                                 hasta que termina)
 
-Todas exigen el servicio pagado activo (app/core/servicio_pagado.py).
+Todas exigen el servicio pagado activo (app/api/dependencias/servicio_pagado.py).
 """
 from __future__ import annotations
 
@@ -21,9 +21,10 @@ from app.application.use_cases.registrar_evento_seguridad import RegistrarEvento
 from app.application.use_cases.remediacion import Remediacion, RemediacionError, evidencia_dict
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
-from app.infrastructure.llm.factory import ClaveNoConfiguradaError, crear_anonimizador, crear_storage_evidencias
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
+from app.api.dependencias.contenedor import ClaveNoConfiguradaError, crear_anonimizador, crear_storage_evidencias
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 

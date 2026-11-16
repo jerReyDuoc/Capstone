@@ -5,7 +5,7 @@ Como Usuario definitivo de una empresa cliente, quiero realizar los módulos rec
 el plan formativo y registrar el avance, para cerrar las brechas detectadas mediante
 formación y demostrar el progreso alcanzado.
 
-  C1  Con el servicio activo (contrato vigente, HU-30: app/core/servicio_pagado.py) cada
+  C1  Con el servicio activo (contrato vigente, HU-30: app/api/dependencias/servicio_pagado.py) cada
       módulo del plan (HU-12) se recorre: lecciones con contenido y material de apoyo
       (placeholders) y una actividad de verificación al final que corrige el servidor.
   C2  El avance queda en la EMPRESA (avance_formativo): módulos iniciados y completados y el
@@ -38,12 +38,12 @@ from app.application.formacion.logica import (
 from app.application.informes.analisis import PlanFormativo, RutaCatalogo, construir_brechas, construir_plan
 from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
 from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance, LeccionFormativa, PreguntaVerificacion
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 
 class FormacionError(Exception):
@@ -99,7 +99,7 @@ class FormacionEmpresa:
         self.db = db
         self.cliente = cliente
         self.empresa = cliente.empresa
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ------------------------------------------------------------ lectura
     async def _avances(self) -> dict[int, AvanceFormativo]:
@@ -372,6 +372,6 @@ async def avance_de_empresa_para_admin(db: AsyncSession, empresa, evaluacion_id:
     """Vista del administrador de Therion Labs (panel interno): el mismo resumen del cliente."""
     from types import SimpleNamespace
 
-    from app.core.autenticacion import Actor
+    from app.domain.auth.actor import Actor
     falso = SimpleNamespace(actor=Actor(id=0, rol="admin_therion"), usuario=None, empresa=empresa)
     return await FormacionEmpresa(db, falso).avance(evaluacion_id)

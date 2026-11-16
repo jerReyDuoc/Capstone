@@ -4,7 +4,8 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-from app.infrastructure.llm.factory import (
+from app.bootstrap import (
+    configurar,
     crear_anonimizador,
     crear_storage_evidencias,
     crear_validador_evidencias,
@@ -20,6 +21,8 @@ from app.application.use_cases.registrar_evento_seguridad import RegistrarEvento
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard
 from app.core.contexto_auditoria import ORIGEN_WORKER, fijar_origen_por_defecto
+
+configurar()  # raíz de composición (A-40)
 
 async def process_evidence_task(ctx, evidencia_id: int):
     # Sesión aparte para métricas/auditoría de IA: un rollback del negocio no las borra.
@@ -91,7 +94,7 @@ async def aplicar_retencion_task(ctx, origen: str = "cron", admin_id: int | None
     ejecución desde /admin/retencion, la API la encola con origen "manual" y su id (queda
     como actor en el audit_log). Sin plazos configurados no anonimiza nada, pero la
     ejecución igual queda registrada (HU-25 criterio 3)."""
-    from app.core.autenticacion import Actor, Rol
+    from app.domain.auth.actor import Actor, Rol
     actor = Actor(id=admin_id, rol=Rol.ADMIN_THERION.value) if origen == "manual" and admin_id else None
     async with AsyncSessionLocal() as session:
         resultado = await AplicarRetencionUseCase(

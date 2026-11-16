@@ -178,7 +178,7 @@ class EventoSolicitud(Base):
     tipo_evento: Mapped[str] = mapped_column("tipo_evento", String(25), nullable=False)
     estado_anterior: Mapped[str | None] = mapped_column("estado_anterior", String(25), nullable=True)
     estado_nuevo: Mapped[str] = mapped_column("estado_nuevo", String(25), nullable=False)
-    # Rol e id del actor tal como los entrega la autenticación (app/core/autenticacion.py)
+    # Rol e id del actor tal como los entrega la autenticación (app/domain/auth/actor.py)
     actor_rol: Mapped[str] = mapped_column("actor_rol", String(20), nullable=False)
     actor_id: Mapped[int | None] = mapped_column("actor_id", Integer, nullable=True)
     comentario: Mapped[str | None] = mapped_column("comentario", TextoCifrado, nullable=True)  # HU-06: cifrado

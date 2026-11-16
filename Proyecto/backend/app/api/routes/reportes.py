@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import actor_de_evaluaciones, alcance_evaluacion
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez

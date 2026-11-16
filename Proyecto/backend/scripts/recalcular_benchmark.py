@@ -13,7 +13,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase  # noqa: E402
+from app.bootstrap import configurar  # noqa: E402
 from app.core.database import AsyncSessionLocal  # noqa: E402
+
+configurar()  # raíz de composición (A-40)
 
 
 async def main() -> None:

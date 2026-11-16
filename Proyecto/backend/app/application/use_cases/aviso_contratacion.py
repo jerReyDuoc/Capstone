@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
+from app.application.fabricas import fabricas
 from app.core.config import settings
 # HU-09: el audit_log admite ok / rechazado / error / omitido (CHECK en PostgreSQL); un aviso
 # que falla al enviarse queda como "error"
@@ -27,7 +28,6 @@ from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.models.resumen import Resumen
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ async def avisar_nueva_solicitud(db: AsyncSession, solicitud: SolicitudContratac
             logger.warning("No se pudo enviar el aviso de contratación (%s)", type(e).__name__)
             resultado = ResultadoAviso(enviado=False, motivo="CORREO_FALLIDO")
 
-    BitacoraRepository(db).registrar(
+    fabricas().bitacora(db).registrar(
         accion=Accion.SOLICITUD_CONTRATACION_AVISO, entidad="solicitud_contratacion", entidad_id=solicitud.id,
         actor_rol="sistema",
         resultado=RESULTADO_OK if resultado.enviado else (

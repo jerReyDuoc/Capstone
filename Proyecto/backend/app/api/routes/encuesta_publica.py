@@ -25,13 +25,16 @@ from app.application.use_cases.iniciar_encuesta_publica import (
     IniciarEncuestaPublicaUseCase,
 )
 from app.application.use_cases.limites_encuesta import LimitesEncuesta, ventana_diaria
-from app.core.autenticacion import Actor, Rol, requerir_rol
-from app.core.cliente import huella, ip_cliente, viene_del_bff
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import requerir_rol
+from app.application.seguridad.huella import huella
+from app.api.dependencias.cliente import ip_cliente, viene_del_bff
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 from app.infrastructure.security.captcha import verificar_captcha
 
 logger = logging.getLogger(__name__)

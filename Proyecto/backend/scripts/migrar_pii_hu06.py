@@ -35,8 +35,10 @@ from sqlalchemy import text  # noqa: E402
 from app.infrastructure.persistencia.tipos_cifrados import cifrador_arcop  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.database import AsyncSessionLocal  # noqa: E402
-from app.infrastructure.llm.factory import crear_anonimizador, crear_storage_evidencias  # noqa: E402
+from app.bootstrap import configurar, crear_anonimizador, crear_storage_evidencias  # noqa: E402
 from app.infrastructure.security.cifrado import CifradorDatos  # noqa: E402
+
+configurar()  # raíz de composición (A-40)
 
 PROCESADAS = ("validated", "rejected", "error")
 TEXTOS_ARCOP = [

@@ -26,7 +26,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
-from app.core.autenticacion import Actor, hash_password
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.empresa import Empresa
@@ -34,7 +35,6 @@ from app.domain.models.usuario_definitivo import (
     EstadoUsuarioDefinitivo, TokenActivacion, UsuarioDefinitivo,
 )
 from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 
@@ -129,7 +129,7 @@ async def emitir_token(db: AsyncSession, usuario: UsuarioDefinitivo, actor: Acto
     )
     db.add(fila)
     await db.flush()
-    BitacoraRepository(db).registrar(
+    fabricas().bitacora(db).registrar(
         accion=Accion.ACTIVACION_EMITIDA, entidad="usuario_definitivo", entidad_id=usuario.id, actor=actor,
         detalle={"token_activacion_id": fila.id, "vence_horas": settings.ACTIVACION_TTL_HORAS},
         fecha=ahora,
@@ -181,7 +181,7 @@ async def enviar_correo_activacion(db: AsyncSession, usuario: UsuarioDefinitivo,
     except (correo.CorreoFallidoError, ValueError) as e:
         logger.warning("No se pudo enviar el enlace de activación (%s)", type(e).__name__)
         resultado = ResultadoCorreo(enviado=False, motivo="CORREO_FALLIDO")
-    BitacoraRepository(db).registrar(
+    fabricas().bitacora(db).registrar(
         accion=Accion.ACTIVACION_CORREO, entidad="usuario_definitivo", entidad_id=usuario.id, actor=actor,
         resultado="ok" if resultado.enviado else RESULTADO_RECHAZADO,
         detalle={"modo": resultado.modo, "motivo": resultado.motivo},
@@ -193,7 +193,7 @@ async def enviar_correo_activacion(db: AsyncSession, usuario: UsuarioDefinitivo,
 class ActivarCuentaUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     async def _buscar(self, token: str) -> tuple[TokenActivacion | None, UsuarioDefinitivo | None]:
         if not token or len(token) > _LARGO_TOKEN_MAX or not _FORMATO_TOKEN.match(token):
@@ -263,7 +263,7 @@ class ActivarCuentaUseCase:
                                   problemas=problemas)
 
         # PBKDF2 de 600.000 iteraciones (~0,5 s de CPU): fuera del event loop
-        nuevo_hash = await asyncio.to_thread(hash_password, password)
+        nuevo_hash = await asyncio.to_thread(fabricas().credenciales.hash_password, password)
 
         # Un solo uso, también ante dos peticiones simultáneas: solo una cambia la fila
         marcado = (await self.db.execute(

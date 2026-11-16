@@ -28,7 +28,8 @@ from datetime import date
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
 

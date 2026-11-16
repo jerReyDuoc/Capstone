@@ -33,7 +33,8 @@ from app.application.informes.motor_pdf import ZONA, PdfNoDisponibleError, fecha
 from app.application.plataforma import registro as R
 from app.application.plataforma import revision as V
 from app.application.rat import informe as I
-from app.core.autenticacion import Actor
+from app.application.fabricas import fabricas
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos.modelo import ErrorValidacion
@@ -41,7 +42,6 @@ from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.plataforma import ID_REGISTRO, TIPO_RAT, TIPO_ROPA, TIPOS, PlataformaInforme, PlataformaRegistro
 from app.domain.ropa import datos as D
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +78,13 @@ class PrivacidadPlataformaCasos:
         self.db = db
         self.actor = actor
         self.conf = conf or settings
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self._storage = storage
 
     @property
     def storage(self):
         if self._storage is None:
-            from app.infrastructure.llm.factory import crear_storage_documentos
-            self._storage = crear_storage_documentos()
+            self._storage = fabricas().storage_documentos()
         return self._storage
 
     # ================================================================ lectura

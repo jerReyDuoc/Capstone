@@ -19,7 +19,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from app.core.autenticacion import Actor, Rol
+from app.domain.auth.actor import Actor, Rol
 from app.domain.models.solicitud_arcop import (
     EstadoSolicitudARCOP as Estado,
     EventoSolicitud,

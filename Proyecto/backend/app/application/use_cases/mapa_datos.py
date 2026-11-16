@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.mapa_datos import plantillas as mod_plantillas
 from app.application.mapa_datos import sugerencias as mod_sugerencias
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis, versiones
@@ -46,7 +47,6 @@ from app.domain.mapa_datos.modelo import (
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.mapa_datos import MapaDatos, MapaDatosVersion, MapaElemento, MapaFlujo
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def flujo_de_fila(r: MapaFlujo) -> Flujo:
 
 
 class MapaDatosCasos:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, limitador=None):
         self.db = db
@@ -99,7 +99,7 @@ class MapaDatosCasos:
         self.usuario_id: int = cliente.usuario.id
         self.email_usuario: str = cliente.usuario.email
         self.limitador = limitador
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self.ultimo_id: int | None = None   # HU-39: id del último elemento o flujo creado
 
     # ================================================================ lectura

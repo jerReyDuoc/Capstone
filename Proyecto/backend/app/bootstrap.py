@@ -1,6 +1,8 @@
 """
-Ensamblado de la capa de IA a partir de la configuración.
-Es el ÚNICO lugar que sabe qué proveedor concreto se usa (LLM_PROVIDER).
+Raíz de composición (A-21/A-40): único lugar que conecta casos de uso con infraestructura.
+Ensambla la capa de IA a partir de la configuración (proveedor concreto: LLM_PROVIDER)
+y registra las fábricas que consumen los casos de uso (app/application/fabricas.py).
+Cada punto de entrada (API, worker, CLI, scripts, tests) llama a `configurar()`.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,33 +11,27 @@ from app.application.ai.anonimizador import AnonimizadorPII
 from app.application.ai.evidence_validator import GatewayEvidenceValidator
 from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import crear_politicas
+from app.application import fabricas as _fabricas
 from app.core.config import settings
-from app.domain.ports.llm_provider_port import LLMProviderPort
+from app.domain.ports.file_storage_port import ClaveNoConfiguradaError
+from app.infrastructure.llm.proveedores import crear_proveedor
+from app.infrastructure.cache.cache_matriz import CacheMatriz
+from app.infrastructure.repositories.anonimizacion_repository import AnonimizacionRepository
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
+from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
+from app.infrastructure.repositories.integridad_bitacora import IntegridadBitacora
+from app.infrastructure.repositories.matriz_repository import MatrizRepository
+from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaFiltroRepository
+from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
+from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+from app.infrastructure.repositories.tutor_repository import TutorRepository
 from app.infrastructure.repositories.registro_ia_repository import RegistroIARepository
+from app.infrastructure.security.autenticacion import CredencialesPBKDF2
 from app.infrastructure.security.cifrado import CifradorDatos, CifradorEntidades
 from app.infrastructure.security.ner_sanitizer import NERSanitizer
 from app.infrastructure.storage.archivo_cifrado_storage import ArchivoCifradoStorage
 from app.infrastructure.storage.local_storage import LocalFileStorage
-
-
-def crear_proveedor() -> LLMProviderPort:
-    if settings.LLM_PROVIDER == "groq":
-        from app.infrastructure.llm.groq_provider import GroqProvider
-        return GroqProvider(
-            api_key=settings.GROQ_API_KEY,
-            modelo_por_defecto=settings.LLM_MODEL,
-            max_reintentos=settings.LLM_MAX_REINTENTOS,
-            reasoning_effort=settings.LLM_REASONING_EFFORT,
-            reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
-        )
-    if settings.LLM_PROVIDER == "ollama":  # HU-07: modelo local
-        from app.infrastructure.llm.ollama_provider import OllamaProvider
-        return OllamaProvider(
-            url=settings.OLLAMA_URL,
-            modelo_por_defecto=settings.LLM_MODEL,
-            reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
-        )
-    raise ValueError(f"LLM_PROVIDER no soportado: {settings.LLM_PROVIDER}")
 
 
 def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
@@ -107,10 +103,6 @@ def crear_anonimizador() -> AnonimizadorPII:
     return AnonimizadorPII(NERSanitizer())
 
 
-class ClaveNoConfiguradaError(RuntimeError):
-    """Falta ENTITY_MAP_KEY: no se pueden guardar evidencias sin cifrar (fail-closed)."""
-
-
 def crear_storage_evidencias() -> ArchivoCifradoStorage:
     """Storage de evidencias: archivos cifrados en reposo hasta que el worker los anonimiza."""
     if not settings.ENTITY_MAP_KEY:
@@ -129,3 +121,23 @@ def crear_storage_documentos() -> ArchivoCifradoStorage:
             "ENTITY_MAP_KEY no configurada: los documentos de la empresa se guardan cifrados (HU-29)."
         )
     return ArchivoCifradoStorage(LocalFileStorage(), CifradorDatos(settings.ENTITY_MAP_KEY, "documentos"))
+
+
+def configurar() -> None:
+    """Registra las fábricas concretas. Idempotente."""
+    _fabricas.configurar(_fabricas.Fabricas(
+        bitacora=BitacoraRepository,
+        storage_documentos=crear_storage_documentos,
+        storage_evidencias=crear_storage_evidencias,
+        credenciales=CredencialesPBKDF2(),
+        integridad_bitacora=IntegridadBitacora(),
+        cache_matriz=CacheMatriz(),
+        evaluaciones=EvaluacionRepository,
+        respuestas=RespuestaRepository,
+        evidencias=EvidenciaRepository,
+        tutor=TutorRepository,
+        preguntas_filtro=PreguntaFiltroRepository,
+        respuestas_filtro=RespuestaFiltroRepository,
+        matriz=MatrizRepository,
+        anonimizacion=AnonimizacionRepository,
+    ))

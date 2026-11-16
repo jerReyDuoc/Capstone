@@ -43,7 +43,8 @@ from app.application.ai.gateway import CapaIAError
 from app.application.ai.prompts.asistente_rat import PROMPT_VERSION, ContextoAsistente
 from app.application.asistente import anclaje, banco, contexto, documento, inconsistencias
 from app.application.use_cases.limites_encuesta import Reserva, ventana_diaria
-from app.core.cliente import huella
+from app.application.seguridad.huella import huella
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.asistente import (
     DECIDIDAS, MOTIVOS_DESCARTE, AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion,
@@ -52,9 +53,8 @@ from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZA
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.rat import RatActividad
 from app.domain.ports.registro_ia_port import ContextoLlamada
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ def sesion_a_dict(s: AsistenteSesion) -> dict:
 
 # ============================================================================ caso de uso
 class AsistenteRat:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, agente=None, anonimizador: AnonimizadorPII | None = None,
                  limitador: Limitador | None = None, registrar_evento=None):
@@ -181,7 +181,7 @@ class AsistenteRat:
         self.anonimizador = anonimizador
         self.limitador = limitador
         self.registrar_evento = registrar_evento
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     # ------------------------------------------------------------------ cuota (C5)
     def _clave(self, tipo: str, fecha: str) -> str:

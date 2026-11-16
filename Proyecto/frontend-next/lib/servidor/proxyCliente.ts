@@ -23,7 +23,7 @@
  * consultar, cancelar, aportar información y descargar sus datos (JSON o CSV) cuando una
  * solicitud de acceso o portabilidad está resuelta.
  *
- * La autorización real la hace FastAPI (app/core/alcance.py): el rol cliente solo ve las
+ * La autorización real la hace FastAPI (app/api/dependencias/alcance.py): el rol cliente solo ve las
  * evaluaciones migradas a SU empresa (404 en cualquier otra).
  */
 

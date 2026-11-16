@@ -343,7 +343,7 @@ def test_r3_extracto_de_eventos_revisados_y_antiguos():
 def test_h1_por_la_api_encuestado_deja_email_pide_supresion_y_el_email_se_borra(monkeypatch):
     """Landing -> email opcional -> solicitud de supresión -> el admin la resuelve -> sin email en BD."""
     from _api_harness import MODO, cliente_api
-    from app.core import autenticacion as auth
+    import app.infrastructure.security.autenticacion as auth
     from app.core.config import settings
     from app.core.database import get_db
     from app.infrastructure.cache.limitador import LimitadorMemoria, obtener_limitador

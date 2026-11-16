@@ -23,7 +23,7 @@ import pytest
 from sqlalchemy import select, update
 
 import app.domain.models  # noqa: F401  (registra todas las tablas en Base.metadata)
-from app.core.autenticacion import Actor, Rol
+from app.domain.auth.actor import Actor, Rol
 from app.core.config import settings
 from app.domain.models.base import Base
 from app.domain.models import AuditLog
@@ -409,7 +409,7 @@ def test_api_panel_configura_previsualiza_simula_y_encola(sin_plazos_entorno):
 def test_api_retencion_solo_admin():
     _api()
     from _api_harness import EVAL_ID, encabezados_qa
-    from app.core.autenticacion import emitir_token
+    from app.infrastructure.security.autenticacion import emitir_token
 
     async def esc(c):
         rutas = [("GET", B, {}), ("PATCH", B, {"json": {"modo": "entorno"}}),

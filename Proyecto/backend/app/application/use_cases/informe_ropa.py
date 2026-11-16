@@ -33,6 +33,7 @@ from app.application.rat import informe as I
 from app.application.ropa import informe as R
 from app.application.use_cases.documentos_empresa import guardar_documento
 from app.application.use_cases.informe_rat import InformeRatCasos
+from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.mapa_datos.modelo import ErrorValidacion
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
@@ -41,7 +42,6 @@ from app.domain.models.empresa import Empresa
 from app.domain.models.ropa import RopaDatos, RopaInforme
 from app.domain.ropa import datos as D
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def _fecha_txt(d: datetime | None) -> str:
 
 
 class InformeRopaCasos:
-    """`cliente` es el ClienteConServicio de app/core/servicio_pagado.py (contrato vigente)."""
+    """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, storage=None):
         self.db = db
@@ -82,15 +82,14 @@ class InformeRopaCasos:
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id
         self.usuario_id: int = cliente.usuario.id
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
         self._storage = storage
         self._rat = InformeRatCasos(db, cliente)
 
     @property
     def storage(self):
         if self._storage is None:
-            from app.infrastructure.llm.factory import crear_storage_documentos
-            self._storage = crear_storage_documentos()
+            self._storage = fabricas().storage_documentos()
         return self._storage
 
     # ================================================================ lectura

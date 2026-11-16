@@ -22,8 +22,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import solo_admin
-from app.core.autenticacion import Actor
+from app.api.dependencias.alcance import solo_admin
+from app.domain.auth.actor import Actor
 from app.core.database import get_db
 from app.domain.models.empresa import Empresa
 from app.domain.models.rubro import Rubro

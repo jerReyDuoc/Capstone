@@ -25,8 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.informe_rat import FORMATOS, InformeRatCasos, InformeRatError
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
-from app.infrastructure.cache.limitador import Limitador, obtener_limitador
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.domain.ports.limitador_port import Limitador
+from app.api.dependencias.contenedor import obtener_limitador
 
 router = APIRouter(prefix="/api/registro-actividades/informes", tags=["informe del registro de actividades (HU-36)"])
 

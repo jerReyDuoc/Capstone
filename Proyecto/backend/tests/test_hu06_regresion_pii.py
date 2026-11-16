@@ -42,7 +42,7 @@ pytest.importorskip("httpx")
 
 import _api_harness as h  # noqa: E402
 from _capa_ia_fakes import FakeProvider, StubNLP  # noqa: E402
-from app.core import autenticacion as auth  # noqa: E402
+import app.infrastructure.security.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.ports.llm_provider_port import LLMProviderPort  # noqa: E402
 import app.infrastructure.security.ner_sanitizer as ner_sanitizer_mod  # noqa: E402
@@ -127,7 +127,7 @@ async def entorno(monkeypatch, storage_dir: Path):
     from sqlalchemy.pool import StaticPool
 
     import app.domain.models  # noqa: F401
-    import app.infrastructure.llm.factory as factory
+    import app.bootstrap as factory
     import app.worker.tasks as tasks
     from app.domain.models.base import Base
     from app.core.database import get_db

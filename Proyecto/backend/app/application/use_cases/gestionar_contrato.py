@@ -28,12 +28,12 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor
+from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.domain.contrato.vigencia import PERMITIDAS, EstadoContrato, MotivoContrato, Operacion, SituacionContrato
 from app.domain.models.empresa import Empresa
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.application.fabricas import fabricas
 
 # Una renovación no puede ir más allá de esto (protege de un año mal escrito: 2206 en vez de 2026).
 MAX_ANIOS_RENOVACION = 10
@@ -82,7 +82,7 @@ def _motivo(valor: str | None) -> str:
 class GestionarContratoUseCase:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.bitacora = BitacoraRepository(db)
+        self.bitacora = fabricas().bitacora(db)
 
     async def _empresa(self, empresa_id: int) -> Empresa:
         empresa = (await self.db.execute(

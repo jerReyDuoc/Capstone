@@ -2,7 +2,7 @@
 HU-09 · Crea, extiende o desactiva la cuenta de un Auditor Externo (rol auditor_externo).
 
 Con Docker, desde Proyecto/:
-    docker compose exec api python -m app.core.crear_auditor --email auditora@firma.cl --organizacion "Firma Auditora SpA" --dias 30
+    docker compose exec api python -m app.cli.crear_auditor --email auditora@firma.cl --organizacion "Firma Auditora SpA" --dias 30
 La contraseña se pide por teclado (no queda en el historial de la terminal).
 
 Opciones:
@@ -20,11 +20,14 @@ import getpass
 
 from sqlalchemy import func, select
 
+from app.bootstrap import configurar
 from app.application.use_cases.auditoria_externa import AuditoriaError, GestionarAuditoresUseCase
 from app.core.config import settings
 from app.core.contexto_auditoria import ORIGEN_CLI, fijar_origen_por_defecto
 from app.core.database import AsyncSessionLocal, engine
 from app.domain.models.auditoria_externa import UsuarioAuditor
+
+configurar()  # raíz de composición (A-40)
 
 
 def _pedir_password() -> str:

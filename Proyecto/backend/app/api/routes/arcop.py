@@ -2,7 +2,7 @@
 Solicitudes de derechos ARCOP del titular de datos personales
 (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
 
-Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.py):
+Roles (app/domain/auth/actor.py) y cómo obtener el token (app/api/routes/auth.py):
   referente      -> titular invitado (POST /api/auth/titular)
   encuestado     -> titular anónimo de la encuesta pública (POST /api/auth/encuestado)
   cliente        -> usuario de una empresa cliente (POST /api/auth/cliente). HU-30: con o sin
@@ -17,7 +17,8 @@ Roles (app/core/autenticacion.py) y cómo obtener el token (app/api/routes/auth.
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.domain.auth.actor import Actor, Rol
+from app.api.dependencias.autenticacion import requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
 from app.application.schemas.arcop_schemas import (

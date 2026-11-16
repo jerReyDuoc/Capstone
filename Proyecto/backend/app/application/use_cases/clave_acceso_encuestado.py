@@ -17,8 +17,8 @@ import secrets
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.autenticacion import hash_password, verificar_password
 from app.domain.models.evaluacion import Evaluacion
+from app.application.fabricas import fabricas
 
 _ALFABETO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32 (sin I, L, O, U)
 _TRADUCCION = str.maketrans({"O": "0", "I": "1", "L": "1"})
@@ -44,13 +44,13 @@ def normalizar_clave(clave: str) -> str:
 
 
 def hash_clave(clave: str) -> str:
-    return hash_password(normalizar_clave(clave))
+    return fabricas().credenciales.hash_password(normalizar_clave(clave))
 
 
 def verificar_clave(clave: str, almacenado: str | None) -> bool:
     if not almacenado:
         return False
-    return verificar_password(normalizar_clave(clave), almacenado)
+    return fabricas().credenciales.verificar_password(normalizar_clave(clave), almacenado)
 
 
 async def generar_clave_acceso(db: AsyncSession, evaluacion_id: int, actor=None) -> str:
@@ -66,8 +66,7 @@ async def generar_clave_acceso(db: AsyncSession, evaluacion_id: int, actor=None)
     evaluacion.clave_acceso_hash = hash_clave(clave)
     if actor is not None:
         from app.domain.auditoria.acciones import Accion
-        from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-        BitacoraRepository(db).registrar(
+        fabricas().bitacora(db).registrar(
             accion=Accion.ENCUESTADO_CLAVE_GENERADA, entidad="evaluacion", entidad_id=evaluacion_id,
             actor=actor, detalle={"reemplaza_clave_anterior": reemplaza},
         )

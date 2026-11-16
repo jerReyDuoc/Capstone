@@ -233,7 +233,7 @@ async def _procesar(m, evidencia_id, clasificacion, confianza):
     from app.application.use_cases.generate_resumen import GenerateResumenUseCase
     from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
     from app.application.use_cases.remediacion import puntaje_general_actual
-    from app.infrastructure.llm.factory import crear_storage_evidencias
+    from app.bootstrap import crear_storage_evidencias
     from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
     from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
     from app.infrastructure.security.prompt_guard import ReglasPromptGuard

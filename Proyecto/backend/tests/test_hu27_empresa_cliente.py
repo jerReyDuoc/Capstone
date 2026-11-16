@@ -21,7 +21,7 @@ import pytest
 from sqlalchemy import func, select
 
 from _api_harness import MODO, TODOS_LOS_CONTROLES, cliente_api  # noqa: E402
-from app.core import autenticacion as auth  # noqa: E402
+import app.infrastructure.security.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 if MODO == "en_proceso":

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.use_cases.bandeja_revision import (
     ESTADOS_REVISION, MOTIVOS, ORDENES, BandejaRevision, FiltrosBandeja,
 )
-from app.core.alcance import solo_admin
+from app.api.dependencias.alcance import solo_admin
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.evento_seguridad import OrigenEvento

@@ -1,18 +1,19 @@
 from fastapi import APIRouter, Depends, File, Request, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.alcance import alcance_evidencia, alcance_respuesta
-from app.core.cliente import ip_cliente
+from app.api.dependencias.alcance import alcance_evidencia, alcance_respuesta
+from app.api.dependencias.cliente import ip_cliente
 from app.core.database import get_db
 from app.application.use_cases.limites_encuesta import LimiteEncuestaError, LimitesEncuesta
-from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
+from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
+from app.api.dependencias.contenedor import obtener_limitador
 from app.application.use_cases.upload_evidence import UploadEvidenceUseCase
 from app.application.schemas.api_schemas import EvidenciaUploadResponse, EvidenciaDetalleResponse
 from app.application.use_cases.create_respuesta import RespuestaRechazadaError
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-from app.infrastructure.llm.factory import (
+from app.api.dependencias.contenedor import (
     ClaveNoConfiguradaError,
     crear_anonimizador,
     crear_storage_evidencias,

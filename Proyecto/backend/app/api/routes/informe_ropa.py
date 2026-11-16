@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.informe_ropa import InformeRopaCasos, InformeRopaError
 from app.core.database import get_db
-from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 
 router = APIRouter(prefix="/api/registro-actividades/ropa", tags=["informe RoPA del registro (HU-37)"])
 

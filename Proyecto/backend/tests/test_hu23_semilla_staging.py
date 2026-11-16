@@ -63,7 +63,7 @@ async def _ejecutar(Session, **kw):
 
 def test_crea_admin_evaluaciones_y_benchmark():
     async def caso(Session):
-        from app.core.autenticacion import verificar_password
+        from app.infrastructure.security.autenticacion import verificar_password
         from app.domain.models import Benchmark, Evaluacion, Resumen, UsuarioAdmin, UsuarioTemporal
 
         r = await _ejecutar(Session)
@@ -102,7 +102,7 @@ def test_crea_admin_evaluaciones_y_benchmark():
 
 def test_es_idempotente_y_no_pisa_la_clave():
     async def caso(Session):
-        from app.core.autenticacion import verificar_password
+        from app.infrastructure.security.autenticacion import verificar_password
         from app.domain.models import Evaluacion, Respuesta, UsuarioAdmin
 
         await _ejecutar(Session)

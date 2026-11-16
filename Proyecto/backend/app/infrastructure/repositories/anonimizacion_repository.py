@@ -11,9 +11,9 @@ from app.domain.models.sanitizacion import Sanitizacion
 from app.domain.models.solicitud_arcop import EventoSolicitud, SolicitudARCOP
 from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion, SolicitudContratacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.core.autenticacion import Rol
+from app.domain.auth.actor import Rol
+from app.domain.privacidad.anonimizacion import TEXTO_ANONIMIZADO
 
-TEXTO_ANONIMIZADO = "[anonimizado]"
 
 
 class AnonimizacionRepository:

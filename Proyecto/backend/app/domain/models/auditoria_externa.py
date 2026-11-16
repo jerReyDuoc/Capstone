@@ -53,7 +53,7 @@ class UsuarioAuditor(Base):
     Puede consultar, verificar y exportar el log; no ve ni cambia nada más del sistema.
     La cuenta vence (`fecha_expiracion`, máx. AUDITOR_VIGENCIA_MAX_DIAS): la auditoría es una
     actividad acotada. La crea un admin (POST /api/admin/auditores o
-    `python -m app.core.crear_auditor`) y cada acceso del auditor queda en el propio log.
+    `python -m app.cli.crear_auditor`) y cada acceso del auditor queda en el propio log.
     `organizacion` es la firma auditora (no un dato personal); no se guarda su nombre.
     """
     __tablename__ = "usuario_auditor"
