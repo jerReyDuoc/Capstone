@@ -42,10 +42,10 @@ from app.application.use_cases.mapa_datos import MapaDatosCasos, MapaDatosError
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.servicio_pagado import ClienteConServicio, empresa_con_servicio
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis
 from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError, obtener_limitador
-from app.infrastructure.repositories.bitacora_repository import Accion
+from app.domain.auditoria.acciones import Accion
 
 logger = logging.getLogger(__name__)
 

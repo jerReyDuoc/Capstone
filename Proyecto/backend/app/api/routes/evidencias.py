@@ -72,7 +72,8 @@ async def upload_evidencia(
     )
 
     try:
-        evidencia = await use_case.execute(respuesta_id, file)
+        contenido = await file.read()
+        evidencia = await use_case.execute(respuesta_id, file.filename, contenido, file.content_type)
     except RespuestaRechazadaError as e:
         if reserva:
             await reserva.devolver()

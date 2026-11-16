@@ -9,7 +9,7 @@ comparto, y usarlo como base del RAT y del RoPA.
       interno), terceros y los flujos entre ellos; las transferencias internacionales se
       calculan con el país de cada extremo (app/domain/mapa_datos/analisis.py).
   C2  Cada elemento y flujo lleva categorías de datos (sensibles marcadas) y de titulares (con
-      NNA) del catálogo común con el RAT (app/domain/catalogo_tratamiento.py).
+      NNA) del catálogo común con el RAT (app/domain/catalogos/catalogo_tratamiento.py).
   C3  La vista navegable y sus filtros viven en el panel; aquí se entregan el mapa completo, sus
       hallazgos y el informe PDF con los mismos filtros (además de su envío por correo).
   C4  Se inicia desde una plantilla por rubro (app/application/mapa_datos/plantillas.py) o desde
@@ -38,14 +38,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.mapa_datos import plantillas as mod_plantillas
 from app.application.mapa_datos import sugerencias as mod_sugerencias
 from app.core.config import settings
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis, versiones
 from app.domain.mapa_datos.modelo import (
     CAMPOS_ELEMENTO, CAMPOS_FLUJO, Elemento, ErrorValidacion, Flujo, normalizar_elemento, normalizar_flujo,
 )
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.mapa_datos import MapaDatos, MapaDatosVersion, MapaElemento, MapaFlujo
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

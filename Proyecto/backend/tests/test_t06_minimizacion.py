@@ -5,7 +5,7 @@ Ejecutar desde Proyecto/backend/ (en Docker):
     docker compose exec worker pytest tests/test_t06_minimizacion.py -v
 
   1. Inventario: cada columna del modelo está clasificada en
-     app/core/catalogo_datos_personales.py (y nada sobra). Si alguien agrega una
+     app/domain/privacidad/catalogo_datos_personales.py (y nada sobra). Si alguien agrega una
      columna sin clasificarla, esta prueba falla.
   2. Cada columna con datos personales declara finalidad, base de licitud y plazo.
   3. Toda columna de texto o JSON de las tablas operativas tiene un control de contenido.
@@ -25,10 +25,10 @@ import pytest
 from sqlalchemy import JSON, Text, select, text
 
 import app.domain.models  # noqa: F401  (registra todas las tablas en Base.metadata)
-from app.core.catalogo_datos_personales import (
+from app.domain.privacidad.catalogo_datos_personales import (
     CATALOGO, CATEGORIAS, NO_SE_GUARDA, columnas_personales,
 )
-from app.core.database import Base
+from app.domain.models.base import Base
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.evidencia import EstadoValidacion, Evidencia
@@ -56,7 +56,7 @@ def test_toda_columna_del_modelo_esta_clasificada_y_nada_sobra():
     catalogo = {t: set(cols) for t, cols in CATALOGO.items()}
     sin_clasificar = sorted(f"{t}.{c}" for t, cols in modelo.items() for c in cols - catalogo.get(t, set()))
     sobran = sorted(f"{t}.{c}" for t, cols in catalogo.items() for c in cols - modelo.get(t, set()))
-    assert not sin_clasificar, f"Clasifica estas columnas en catalogo_datos_personales.py: {sin_clasificar}"
+    assert not sin_clasificar, f"Clasifica estas columnas en app/domain/privacidad/catalogo_datos_personales.py: {sin_clasificar}"
     assert not sobran, f"Columnas clasificadas que ya no existen en el modelo: {sobran}"
 
 
@@ -86,7 +86,7 @@ def test_textos_y_json_operativos_tienen_control_de_contenido():
 
 
 def test_textos_arcop_cifrados_segun_el_modelo_y_el_inventario():
-    from app.core.cifrado_columnas import TextoCifrado
+    from app.infrastructure.persistencia.tipos_cifrados import TextoCifrado
     cifradas_modelo = {(t.name, c.name) for t in Base.metadata.sorted_tables for c in t.columns
                        if isinstance(c.type, TextoCifrado)}
     cifradas_catalogo = {(t, c) for t, cols in CATALOGO.items() for c, d in cols.items() if d.escaneo == "cifrado"}
@@ -181,7 +181,7 @@ def test_h1_supresion_del_encuestado_no_toca_al_invitado():
 
 # ------------------------------------------------------------------ 6. H2
 def test_h2_datos_extraidos_por_el_llm_no_se_persisten():
-    from app.application.schemas.evidence_validation import EvidenceValidation
+    from app.domain.evidencias.validacion import EvidenceValidation
     from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
     from test_hu06_anonimizacion import _anon, _storage
     from test_seguridad_integracion import FakeEvidenciaRepo, FakeRespuestaRepo, _control, _respuesta

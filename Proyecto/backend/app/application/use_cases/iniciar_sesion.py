@@ -39,7 +39,8 @@ from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.infrastructure.cache.limitador import Limitador
-from app.infrastructure.repositories.bitacora_repository import ROL_ANONIMO, Accion, BitacoraRepository
+from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 
@@ -281,7 +282,7 @@ class IniciarSesionUseCase:
         # en el plazo de gracia y sus derechos ARCOP); el servicio pagado responde 403
         # CONTRATO_NO_VIGENTE. La respuesta trae la situación para que el frontend la muestre.
         empresa = await self.db.get(Empresa, usuario.empresa_id)
-        vigencia = empresa.vigencia() if empresa else None
+        vigencia = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS) if empresa else None
         ahora = _ahora()
         token, sesion = await abrir_sesion(self.db, Rol.CLIENTE.value, usuario.id, ahora)
         usuario.ultimo_acceso = ahora

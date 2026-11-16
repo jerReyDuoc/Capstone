@@ -7,7 +7,7 @@ partir de una hoja en blanco: todo lo que se agrega desde una plantilla queda "p
 (pendiente_revision) hasta que la empresa lo revise, y nunca reemplaza lo que ya existe
 (se omite lo que ya está en el mapa, por clave o por nombre).
 
-Las categorías y los titulares usan los códigos del catálogo común (catalogo_tratamiento.py);
+Las categorías y los titulares usan los códigos del catálogo común (catalogos/catalogo_tratamiento.py);
 tests/test_hu34_mapa_datos.py verifica que todos existan y que cada flujo apunte a elementos
 de la misma plantilla.
 """

@@ -24,8 +24,8 @@ pytest.importorskip("httpx")
 import app.domain.models  # noqa: E402,F401
 from _api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api  # noqa: E402
 from app.application.ai.prompts import validar_evidencia  # noqa: E402
-from app.application.filters.control_tree import CONTROLES_BASE  # noqa: E402
-from app.application.schemas.evidence_validation import EvidenceValidation  # noqa: E402
+from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE  # noqa: E402
+from app.domain.evidencias.validacion import EvidenceValidation  # noqa: E402
 from app.application.use_cases.create_respuesta import (  # noqa: E402
     JustificacionObligatoriaError, normalizar_justificacion, validar_justificacion,
 )

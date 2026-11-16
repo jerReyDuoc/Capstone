@@ -28,7 +28,8 @@ from app.core.database import get_db
 from app.domain.models.empresa import Empresa
 from app.domain.models.rubro import Rubro
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 router = APIRouter(prefix="/api/admin/rubros", tags=["admin · rubros"])
 

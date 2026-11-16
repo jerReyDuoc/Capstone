@@ -20,7 +20,7 @@ from enum import Enum
 from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 NIVELES_TUTOR = ("Inicial", "Intermedio", "Avanzado")
 

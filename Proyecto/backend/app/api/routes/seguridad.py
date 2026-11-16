@@ -10,7 +10,8 @@ from app.core.autenticacion import Actor
 from app.core.cliente import huella
 from app.core.database import get_db
 from app.domain.models.evento_seguridad import ResolucionEvento
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 
 # HU-20: la bandeja de eventos de seguridad es solo para administradores de Therion Labs

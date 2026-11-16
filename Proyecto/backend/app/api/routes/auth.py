@@ -16,7 +16,8 @@ from app.application.use_cases.recuperacion_contrasena import (
 )
 from app.application.use_cases.sesiones import cerrar_sesion
 from app.domain.models.sesion import MotivoCierre
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.core.autenticacion import Actor, Rol, obtener_actor, requerir_rol
 from app.core.cliente import huella, ip_cliente
 from app.core.config import settings

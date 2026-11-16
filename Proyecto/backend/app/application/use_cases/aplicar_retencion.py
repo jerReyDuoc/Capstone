@@ -77,7 +77,8 @@ from app.infrastructure.repositories.anonimizacion_repository import (
     TEXTO_ANONIMIZADO,
     AnonimizacionRepository,
 )
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 _MAX_IDS_EN_DETALLE = 500  # R3/R4: más ids que esto se informan solo como cantidad
 

@@ -65,7 +65,8 @@ async def generar_clave_acceso(db: AsyncSession, evaluacion_id: int, actor=None)
     clave = nueva_clave()
     evaluacion.clave_acceso_hash = hash_clave(clave)
     if actor is not None:
-        from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+        from app.domain.auditoria.acciones import Accion
+        from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
         BitacoraRepository(db).registrar(
             accion=Accion.ENCUESTADO_CLAVE_GENERADA, entidad="evaluacion", entidad_id=evaluacion_id,
             actor=actor, detalle={"reemplaza_clave_anterior": reemplaza},

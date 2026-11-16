@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.filters.control_tree import get_controles_aplicables
+from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
 from app.domain.matriz.contenido import ArbolAplicabilidad
 from app.domain.models.evaluacion import ESTADOS_CERRADOS, Evaluacion
 from app.domain.models.pregunta_filtro import PreguntaFiltro
@@ -20,7 +20,7 @@ class ContextoEvaluacion:
     estado_progreso: str | None
     filtro_completado: bool
     respuestas_filtro: dict[str, bool] = field(default_factory=dict)
-    # HU-24: árbol de la versión vigente de la matriz (None = semilla de control_tree.py)
+    # HU-24: árbol de la versión vigente de la matriz (None = semilla de app/domain/matriz/arbol_aplicabilidad.py)
     arbol: ArbolAplicabilidad | None = None
 
     @property

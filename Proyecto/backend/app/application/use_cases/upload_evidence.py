@@ -1,8 +1,6 @@
 import hashlib
 from datetime import date
 
-from fastapi import UploadFile
-
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion
 from app.domain.ports.file_storage_port import FileStoragePort
@@ -72,7 +70,9 @@ class UploadEvidenceUseCase:
         self.evaluaciones = evaluaciones
         self.anonimizador = anonimizador
 
-    async def execute(self, respuesta_id: int, file: UploadFile) -> Evidencia:
+    async def execute(
+        self, respuesta_id: int, nombre: str | None, contenido: bytes, tipo_mime: str | None
+    ) -> Evidencia:
         # 1. Verificar que la respuesta existe
         respuesta = await self.respuesta_repo.get(respuesta_id)
         if not respuesta:
@@ -103,17 +103,17 @@ class UploadEvidenceUseCase:
             )
 
         # 3. Leer contenido y calcular hash
-        content = await file.read()
+        content = contenido
         if not content:
             raise ValueError("El archivo está vacío")
 
         # 3a. HU-17: tamaño máximo y solo PDF, DOCX o TXT (por contenido, no solo por extensión)
-        validar_archivo(file.filename, content)
+        validar_archivo(nombre, content)
 
         hash_archivo = hashlib.sha256(content).hexdigest()
 
         # 3b. HU-06: el nombre del archivo también puede traer datos personales
-        nombre_archivo = file.filename or "evidencia"
+        nombre_archivo = nombre or "evidencia"
         if self.anonimizador is not None:
             try:
                 nombre_archivo = await self.anonimizador.anonimizar_nombre_archivo(nombre_archivo)
@@ -131,7 +131,7 @@ class UploadEvidenceUseCase:
             respuesta_id=respuesta_id,
             nombre_archivo=nombre_archivo,
             storage_path=storage_path,
-            mime_type=file.content_type or "application/octet-stream",
+            mime_type=tipo_mime or "application/octet-stream",
             hash_archivo=hash_archivo,
             estado_validacion=EstadoValidacion.PENDING.value,
             fecha_subida=date.today(),

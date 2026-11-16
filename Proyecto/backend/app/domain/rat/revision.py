@@ -39,7 +39,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Iterable, Protocol
 
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos import analisis as am
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import catalogo as cat

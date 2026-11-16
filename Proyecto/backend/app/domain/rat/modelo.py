@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import copy
 
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos.modelo import ErrorValidacion, contiene_contacto
 from app.domain.rat import catalogo as cat
 

@@ -20,7 +20,7 @@ from datetime import datetime
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 ESTADOS_RAT = ("borrador", "en_revision", "vigente", "archivada")
 

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis, disposicion
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 

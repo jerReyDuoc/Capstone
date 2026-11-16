@@ -16,7 +16,7 @@ import asyncio
 
 import pytest
 
-from app.application.benchmark.k_anonimato import (
+from app.domain.benchmark.k_anonimato import (
     SUPRIMIDA,
     FilaCandidata,
     calcular,

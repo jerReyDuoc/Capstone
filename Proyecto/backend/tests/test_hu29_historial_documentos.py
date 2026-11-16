@@ -165,7 +165,7 @@ async def _cliente(hu27, c) -> dict:
 
 async def _responder_reevaluacion(hu27, c, h, ev: int, estado: str = "cumplido") -> dict:
     """Responde la reevaluación con la sesión del CLIENTE (mismas rutas del cuestionario)."""
-    from app.application.filters.control_tree import CONTROLES_BASE
+    from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
 
     r = await c.post(f"/api/evaluaciones/{ev}/filtro", json=hu27.SOLO_BASE, headers=h)
     assert r.status_code == 200, r.text

@@ -43,7 +43,8 @@ from app.domain.models.sesion import MotivoCierre, TokenRecuperacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 from app.infrastructure.cache.limitador import Limitador
-from app.infrastructure.repositories.bitacora_repository import ROL_ANONIMO, Accion, BitacoraRepository
+from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 

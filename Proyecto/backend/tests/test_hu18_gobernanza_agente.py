@@ -31,7 +31,7 @@ from app.application.ai.agente import AgenteIA, SkillIA
 from app.application.ai.agente import salida as validacion
 from app.application.ai.prompts import tutor as prompt_tutor
 from app.application.schemas.tutor import PasoAccion, TutorRespuesta
-from app.domain import auditoria_hash
+from app.domain.auditoria import auditoria_hash
 from app.domain.ports.filtro_agente_port import CategoriaAtaque
 from app.infrastructure.security.filtro_agente import FiltroAgente
 from app.infrastructure.security.prompt_guard import ReglasPromptGuard

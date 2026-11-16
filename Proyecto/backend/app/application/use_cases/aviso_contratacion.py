@@ -26,7 +26,8 @@ from app.domain.models.bitacora_auditoria import RESULTADO_ERROR as RESULTADO_FA
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.models.resumen import Resumen
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

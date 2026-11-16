@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from sqlalchemy import Integer, String, Date, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
-from app.domain.contrato import EstadoContrato, SituacionContrato, Vigencia, evaluar
+from app.domain.models.base import Base
+from app.domain.contrato.vigencia import EstadoContrato, SituacionContrato, Vigencia, evaluar
 
 _ESTADOS = ", ".join(f"'{v}'" for v in EstadoContrato.valores())
 _MOTIVOS = "('no_pago', 'solicitud_cliente', 'incumplimiento', 'fin_acuerdo', 'otro')"
@@ -17,11 +17,11 @@ class Empresa(Base):
     evaluacion.empresa_id y su único usuario en usuario_definitivo.
 
     El RUT es el de la persona JURÍDICA (no es un dato personal); se guarda normalizado
-    sin puntos y con guion: 76123456-7 (ver app/core/rut.py).
+    sin puntos y con guion: 76123456-7 (ver app/domain/valores/rut.py).
 
     HU-30: el contrato tiene un estado que fija el admin (activo, suspendido, terminado) y
     sus fechas. La situación (vigente, vencido, en plazo de gracia...) se calcula con
-    `vigencia()`; las reglas están en app/domain/contrato.py.
+    `vigencia()`; las reglas están en app/domain/contrato/vigencia.py.
     """
     __tablename__ = "empresa"
     __table_args__ = (
@@ -57,18 +57,16 @@ class Empresa(Base):
         "fecha_actualizacion_contrato", DateTime, nullable=True
     )
 
-    def vigencia(self, hoy: date | None = None, gracia_dias: int | None = None) -> Vigencia:
-        from app.core.config import settings
-
+    def vigencia(self, gracia_dias: int, hoy: date | None = None) -> Vigencia:
         return evaluar(
             estado=self.estado_contrato or EstadoContrato.ACTIVO.value,
             inicio=self.fecha_inicio_contrato,
             termino=self.fecha_termino_contrato,
             fecha_terminacion=self.fecha_terminacion.date() if self.fecha_terminacion else None,
             hoy=hoy or date.today(),
-            gracia_dias=settings.CONTRATO_GRACIA_DIAS if gracia_dias is None else gracia_dias,
+            gracia_dias=gracia_dias,
         )
 
-    def contrato_vigente(self, hoy: date | None = None) -> bool:
+    def contrato_vigente(self, gracia_dias: int, hoy: date | None = None) -> bool:
         """Vigente = el servicio pagado está habilitado (HU-30: además no suspendido ni terminado)."""
-        return self.vigencia(hoy).situacion is SituacionContrato.VIGENTE
+        return self.vigencia(gracia_dias, hoy=hoy).situacion is SituacionContrato.VIGENTE

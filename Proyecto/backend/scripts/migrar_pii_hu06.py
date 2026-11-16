@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import text  # noqa: E402
 
-from app.core.cifrado_columnas import cifrador_arcop  # noqa: E402
+from app.infrastructure.persistencia.tipos_cifrados import cifrador_arcop  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.database import AsyncSessionLocal  # noqa: E402
 from app.infrastructure.llm.factory import crear_anonimizador, crear_storage_evidencias  # noqa: E402

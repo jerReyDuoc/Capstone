@@ -14,7 +14,7 @@ from app.application.schemas.api_schemas import (
     RespuestaFiltroResponse,
     GuardarRespuestasFiltroRequest,
 )
-from app.application.filters.control_tree import get_controles_aplicables
+from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaFiltroRepository
 from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository

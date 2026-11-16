@@ -42,7 +42,8 @@ from app.domain.models.resumen import Resumen
 from app.domain.models.solicitud_arcop import EstadoSolicitudARCOP, SolicitudARCOP
 from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion, SolicitudContratacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 MAX_SOLICITUDES_POR_OPERACION = 20
 

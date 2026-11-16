@@ -154,7 +154,7 @@ async def _verificar_catalogos(session) -> None:
 
 
 async def _crear_evaluacion(session, ev_id: int, rubro_id: int) -> None:
-    from app.application.filters.control_tree import get_controles_aplicables
+    from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
     from app.application.informes.carga import version_matriz_vigente
     from app.application.use_cases.generate_resumen import GenerateResumenUseCase
     from app.core.config import settings

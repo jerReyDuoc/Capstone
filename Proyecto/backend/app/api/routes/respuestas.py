@@ -26,7 +26,8 @@ from app.domain.models.evaluacion import Evaluacion
 from app.application.ai.anonimizador import AnonimizacionError
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase
 from app.core.cliente import huella
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

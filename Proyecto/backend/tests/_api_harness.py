@@ -35,7 +35,7 @@ from datetime import datetime
 import httpx
 import pytest
 
-from app.application.filters.control_tree import CONTROLES_BASE, CONTROLES_POR_FILTRO
+from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO
 
 TODOS_LOS_CONTROLES = sorted(set(CONTROLES_BASE).union(*CONTROLES_POR_FILTRO.values()))
 DOMINIOS = {"DAT": (1, "Datos"), "GOB": (2, "Gobernanza"), "RIE": (3, "Riesgos"), "SEG": (4, "Seguridad")}
@@ -263,7 +263,8 @@ async def cliente_api(rol: str | None = "admin"):
     from sqlalchemy.pool import StaticPool
 
     import app.domain.models  # noqa: F401
-    from app.core.database import Base, get_db
+    from app.domain.models.base import Base
+    from app.core.database import get_db
     from app.main import app
 
     engine = create_async_engine(

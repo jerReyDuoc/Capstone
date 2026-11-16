@@ -28,8 +28,8 @@ import pytest
 
 import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchemy)
 import app.application.use_cases.generate_resumen as gen_mod
-from app.application.filters.control_tree import CONTROLES_BASE, CONTROLES_POR_FILTRO
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, EvaluacionCerradaError
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
@@ -111,7 +111,7 @@ def _usar_filtro(monkeypatch, respuestas_filtro: dict[str, bool]):
 
     # HU-24: el árbol vigente sale de la BD; la sesión falsa no la tiene → semilla
     async def _arbol_semilla(_session):
-        from app.application.filters.control_tree import ARBOL_POR_DEFECTO
+        from app.domain.matriz.arbol_aplicabilidad import ARBOL_POR_DEFECTO
         return ARBOL_POR_DEFECTO
 
     monkeypatch.setattr(gen_mod, "arbol_vigente", _arbol_semilla)
@@ -203,14 +203,6 @@ class FakeStorage:
         if self.error:
             raise self.error
         return self.contenido
-
-
-class FakeUpload:
-    def __init__(self, contenido: bytes, filename="evidencia.txt", content_type="text/plain"):
-        self._contenido, self.filename, self.content_type = contenido, filename, content_type
-
-    async def read(self):
-        return self._contenido
 
 
 class FakeValidator:
@@ -470,29 +462,29 @@ class TestCrearRespuestasNA:
 # =====================================================================
 class TestSubidaSinEvidencia:
 
-    def _subir(self, respuesta, archivo):
+    def _subir(self, respuesta, contenido, tipo_mime="text/plain"):
         storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
         uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(respuesta), storage, FakeEvaluaciones())
-        return asyncio.run(uc.execute(10, archivo)), storage, evid_repo
+        return asyncio.run(uc.execute(10, "evidencia.txt", contenido, tipo_mime)), storage, evid_repo
 
     def test_archivo_vacio_se_rechaza_y_no_se_guarda(self):
         storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
         uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(_respuesta()), storage, FakeEvaluaciones())
         with pytest.raises(ValueError, match="vacío"):
-            asyncio.run(uc.execute(10, FakeUpload(b"")))
+            asyncio.run(uc.execute(10, "evidencia.txt", b"", "text/plain"))
         assert storage.guardados == [] and evid_repo.creadas == []
 
     def test_respuesta_inexistente(self):
         uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(None), FakeStorage(), FakeEvaluaciones())
         with pytest.raises(ValueError, match="no encontrada"):
-            asyncio.run(uc.execute(10, FakeUpload(b"x")))
+            asyncio.run(uc.execute(10, "evidencia.txt", b"x", "text/plain"))
 
     def test_respuesta_sin_clasificacion_declarada(self):
         r = _respuesta()
         r.estado_clasificacion = None
         uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(r), FakeStorage(), FakeEvaluaciones())
         with pytest.raises(ValueError, match="no tiene clasificación"):
-            asyncio.run(uc.execute(10, FakeUpload(b"x")))
+            asyncio.run(uc.execute(10, "evidencia.txt", b"x", "text/plain"))
 
     @pytest.mark.parametrize("estado", ["completada", "cerrada"])
     def test_evaluacion_cerrada_rechaza_evidencia_y_no_guarda_el_archivo(self, estado):
@@ -500,7 +492,7 @@ class TestSubidaSinEvidencia:
         uc = UploadEvidenceUseCase(evid_repo, FakeRespuestaRepo(_respuesta()), storage,
                                    FakeEvaluaciones(estado=estado))
         with pytest.raises(EvaluacionCerradaError, match="no admite evidencias"):
-            asyncio.run(uc.execute(10, FakeUpload(b"Politica de IA v1")))
+            asyncio.run(uc.execute(10, "evidencia.txt", b"Politica de IA v1", "text/plain"))
         assert storage.guardados == [] and evid_repo.creadas == []
 
     @pytest.mark.parametrize("clasif", [NOC, NA])
@@ -508,17 +500,17 @@ class TestSubidaSinEvidencia:
         storage = FakeStorage()
         uc = UploadEvidenceUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(_respuesta(clasif)), storage, FakeEvaluaciones())
         with pytest.raises(ValueError, match="No se puede subir evidencia"):
-            asyncio.run(uc.execute(10, FakeUpload(b"contenido")))
+            asyncio.run(uc.execute(10, "evidencia.txt", b"contenido", "text/plain"))
         assert storage.guardados == []
 
     def test_requiere_revision_admite_evidencia_para_que_la_resuelva_el_llm(self):
         """HU-02: el usuario declara 'requiere_revision' y sube la evidencia que el LLM clasifica."""
-        ev, storage, _ = self._subir(_respuesta(REV), FakeUpload(b"Inventario de modelos v1"))
+        ev, storage, _ = self._subir(_respuesta(REV), b"Inventario de modelos v1")
         assert ev.estado_validacion == EstadoValidacion.PENDING.value and len(storage.guardados) == 1
 
     def test_subida_valida_queda_pending_con_hash_y_mime_por_defecto(self):
         contenido = b"Politica de IA v1"
-        ev, storage, _ = self._subir(_respuesta(PARC), FakeUpload(contenido, content_type=None))
+        ev, storage, _ = self._subir(_respuesta(PARC), contenido, None)
         assert ev.estado_validacion == EstadoValidacion.PENDING.value
         assert ev.hash_archivo == hashlib.sha256(contenido).hexdigest()
         assert ev.mime_type == "application/octet-stream"

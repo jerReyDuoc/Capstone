@@ -22,7 +22,7 @@ from datetime import datetime
 from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 class RatInforme(Base):

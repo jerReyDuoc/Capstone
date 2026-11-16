@@ -16,7 +16,7 @@ from sqlalchemy import event, inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.domain import auditoria_hash
+from app.domain.auditoria import auditoria_hash
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria
 
 LOCK_BITACORA = 918_273_645  # identificador arbitrario del advisory lock

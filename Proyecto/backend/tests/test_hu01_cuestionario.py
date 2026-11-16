@@ -26,7 +26,7 @@ pytest.importorskip("httpx")
 from _api_harness import (  # noqa: E402
     EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api,
 )
-from app.application.filters.control_tree import CONTROLES_BASE, CONTROLES_POR_FILTRO  # noqa: E402
+from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO  # noqa: E402
 from app.application.use_cases.create_respuesta import CreateRespuestaUseCase  # noqa: E402
 from app.domain.models.respuesta import Respuesta  # noqa: E402
 from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion  # noqa: E402

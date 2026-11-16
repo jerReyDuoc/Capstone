@@ -24,7 +24,7 @@ from types import SimpleNamespace
 
 from app.application.asistente.contexto import clave_segura
 from app.application.schemas.asistente_rat import AsistenteRatRespuesta, PropuestaIA
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import modelo as modelo_mapa
 from app.domain.mapa_datos.modelo import ErrorValidacion
 from app.domain.rat import catalogo as cat_rat

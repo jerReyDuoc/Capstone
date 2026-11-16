@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.application.filters.control_tree import get_controles_aplicables
+from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
 from app.domain.models.respuesta_filtro import RespuestaFiltro
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaFiltroRepository

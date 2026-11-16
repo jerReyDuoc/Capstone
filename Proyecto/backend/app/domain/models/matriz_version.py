@@ -24,7 +24,7 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 ESTADO_BORRADOR = "borrador"
 ESTADO_PUBLICADA = "publicada"

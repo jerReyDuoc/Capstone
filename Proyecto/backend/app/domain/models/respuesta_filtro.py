@@ -1,7 +1,7 @@
 from datetime import date
 from sqlalchemy import Integer, Boolean, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 from app.domain.models.pregunta_filtro import PreguntaFiltro
 
 class RespuestaFiltro(Base):

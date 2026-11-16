@@ -2,7 +2,7 @@ from datetime import date
 from enum import Enum
 from sqlalchemy import Integer, String, Text, Float, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class EstadoClasificacion(str, Enum):
     CUMPLIDO = "cumplido"

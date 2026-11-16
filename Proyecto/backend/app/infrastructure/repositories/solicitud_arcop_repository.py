@@ -9,7 +9,8 @@ from app.domain.models.solicitud_arcop import (
 )
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 # HU-09: cada evento del historial de una solicitud ARCOP queda también en el audit_log
 _ACCION_POR_EVENTO = {

@@ -46,8 +46,7 @@ class AnonimizacionRepository:
         contrato con la empresa (sus evidencias ya están anonimizadas desde HU-06) y su
         conservación la deciden la vigencia del contrato (HU-30) y la retención (HU-25).
         """
-        from app.application.use_cases.sesiones import cerrar_todas
-        from app.domain.models.sesion import MotivoCierre, TokenRecuperacion
+        from app.domain.models.sesion import TokenRecuperacion
         from app.domain.models.usuario_definitivo import (
             EstadoUsuarioDefinitivo, TokenActivacion, UsuarioDefinitivo,
         )
@@ -72,7 +71,7 @@ class AnonimizacionRepository:
                    .where(TokenRecuperacion.actor_rol == Rol.CLIENTE.value, TokenRecuperacion.actor_id == usuario_id,
                           TokenRecuperacion.fecha_uso.is_(None), TokenRecuperacion.fecha_revocacion.is_(None))
                    .values(fecha_revocacion=ahora))
-        conteo["sesiones"] = await cerrar_todas(s, Rol.CLIENTE.value, usuario_id, MotivoCierre.SUPRESION_ARCOP, ahora)
+        # El cierre de sesiones (caso de uso `cerrar_todas`) lo hace el llamador, en la misma transacción.
 
         sols = select(SolicitudARCOP.id).where(SolicitudARCOP.usuario_definitivo_id == usuario_id)
         await _upd("comentarios_titular", update(EventoSolicitud)

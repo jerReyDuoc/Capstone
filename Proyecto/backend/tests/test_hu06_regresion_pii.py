@@ -129,7 +129,8 @@ async def entorno(monkeypatch, storage_dir: Path):
     import app.domain.models  # noqa: F401
     import app.infrastructure.llm.factory as factory
     import app.worker.tasks as tasks
-    from app.core.database import Base, get_db
+    from app.domain.models.base import Base
+    from app.core.database import get_db
     from app.main import app
 
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool,
@@ -172,7 +173,7 @@ async def entorno(monkeypatch, storage_dir: Path):
 # ---------------------------------------------------------------- inspección
 async def _volcar_bd(engine) -> dict[str, str]:
     """Todas las tablas, todas las columnas, leídas en CRUDO (sin TypeDecorator)."""
-    from app.core.database import Base
+    from app.domain.models.base import Base
 
     volcado = {}
     async with engine.connect() as conn:

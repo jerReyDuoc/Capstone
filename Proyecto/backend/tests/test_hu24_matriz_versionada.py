@@ -14,7 +14,7 @@ import itertools
 
 import pytest
 
-from app.application.filters.control_tree import ARBOL_POR_DEFECTO, CONTROLES_BASE, CONTROLES_POR_FILTRO
+from app.domain.matriz.arbol_aplicabilidad import ARBOL_POR_DEFECTO, CONTROLES_BASE, CONTROLES_POR_FILTRO
 from app.domain.matriz import contenido as C
 from app.domain.matriz import edicion as E
 from app.domain.matriz.diferencias import conteo, diferencias, estado_de
@@ -27,7 +27,7 @@ DOM = {"DAT": 1, "GOB": 2, "RIE": 3, "SEG": 4}
 
 
 def _semilla() -> dict:
-    """Contenido como el de la migración: 40 controles, 7 filtros, F1 compuerta, el árbol de control_tree.py."""
+    """Contenido como el de la migración: 40 controles, 7 filtros, F1 compuerta, el árbol de app/domain/matriz/arbol_aplicabilidad.py."""
     ids_c = {codigo: i + 1 for i, codigo in enumerate(TODOS)}
     ids_p = {f"F{i}": i for i in range(1, 8)}
     reglas = [(ids_c[c], None) for c in CONTROLES_BASE]

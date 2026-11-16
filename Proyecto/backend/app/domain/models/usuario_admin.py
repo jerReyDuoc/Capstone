@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Integer, String, Boolean, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 class UsuarioAdmin(Base):

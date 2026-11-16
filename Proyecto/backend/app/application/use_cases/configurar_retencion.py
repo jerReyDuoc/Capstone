@@ -33,7 +33,8 @@ from app.domain.models.configuracion_retencion import (
     ID_UNICO,
     ConfiguracionRetencion as Conf,
 )
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 MODO_ENTORNO = "entorno"
 MODO_PLAZO = "plazo"

@@ -5,7 +5,7 @@ Como Administrador de Therion Labs, quiero generar el mapeo de datos y el RAT de
 ComplianceAI desde el inventario, auditar internamente el tratamiento que hace la plataforma y demostrarlo
 con las mismas herramientas que vendemos.
 
-  C1  Las actividades salen de app/core/catalogo_datos_personales.py con finalidad, base y plazo
+  C1  Las actividades salen de app/domain/privacidad/catalogo_datos_personales.py con finalidad, base y plazo
       → app/application/plataforma/registro.py (generar).
   C2  Los plazos son el valor VIGENTE de cada ajuste (el de titulares, el del panel de retención si se fijó
       allí). tests/test_hu41_registro_plataforma.py falla si difieren o si aparece una tabla sin actividad.
@@ -35,12 +35,13 @@ from app.application.plataforma import revision as V
 from app.application.rat import informe as I
 from app.core.autenticacion import Actor
 from app.core.config import settings
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos.modelo import ErrorValidacion
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
 from app.domain.models.plataforma import ID_REGISTRO, TIPO_RAT, TIPO_ROPA, TIPOS, PlataformaInforme, PlataformaRegistro
 from app.domain.ropa import datos as D
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

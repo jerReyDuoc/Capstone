@@ -8,7 +8,7 @@ VALIDAR_EVIDENCIA, así que sanitización, prompt, proveedor y métricas no camb
 """
 from app.application.ai.agente import AgenteIA, SkillIA
 from app.application.ai.gateway import AIGateway
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.domain.ports.evidence_validator_port import EvidenceValidatorPort
 from app.domain.ports.registro_ia_port import ContextoLlamada
 

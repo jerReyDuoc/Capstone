@@ -532,7 +532,7 @@ def test_api_recordatorio_periodico(hu35, monkeypatch):
 
         await _registro_vigente(m35, hu27, c)
         futuro = datetime.now(timezone.utc) + timedelta(days=400)
-        monkeypatch.setattr("app.domain.models.empresa.Empresa.contrato_vigente", lambda self, hoy=None: True)
+        monkeypatch.setattr("app.domain.models.empresa.Empresa.contrato_vigente", lambda self, gracia_dias, hoy=None: True)
         r1 = await hu27._bd(lambda s: enviar_recordatorios(s, futuro))
         r2 = await hu27._bd(lambda s: enviar_recordatorios(s, futuro))
         assert r1["enviados"] == 1 and r2["enviados"] == 0          # una vez por etapa

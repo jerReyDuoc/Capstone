@@ -8,7 +8,7 @@ from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion
 from app.domain.models.resumen import Resumen
 from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
-from app.application.filters.control_tree import get_controles_aplicables
+from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
 from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
 
 

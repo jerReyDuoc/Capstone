@@ -40,7 +40,8 @@ from app.domain.models.documento_empresa import TIPO_ROPA_PDF, TIPO_ROPA_XLSX, D
 from app.domain.models.empresa import Empresa
 from app.domain.models.ropa import RopaDatos, RopaInforme
 from app.domain.ropa import datos as D
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

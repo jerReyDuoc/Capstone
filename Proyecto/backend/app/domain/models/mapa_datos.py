@@ -16,7 +16,7 @@ HU-34 · Mapa de datos personales de la empresa cliente (base del RAT y del RoPA
 Minimización (T-06): el mapa describe sistemas de la ORGANIZACIÓN. El responsable interno es un
 cargo o un área; los textos libres se rechazan si traen correos, RUT o teléfonos
 (app/domain/mapa_datos/modelo.py). Las categorías se guardan como listas de códigos del catálogo
-(app/domain/catalogo_tratamiento.py), las mismas que usará el RAT.
+(app/domain/catalogos/catalogo_tratamiento.py), las mismas que usará el RAT.
 """
 from datetime import datetime
 
@@ -25,7 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 TIPOS_ELEMENTO = ("sistema", "base_datos", "tercero")
 ORIGENES = ("manual", "plantilla", "evaluacion", "ia")  # HU-39: "ia" = propuesta del asistente aceptada

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 class OrigenEvento(str, Enum):

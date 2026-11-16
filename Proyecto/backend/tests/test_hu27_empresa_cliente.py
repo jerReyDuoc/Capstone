@@ -106,7 +106,7 @@ async def _bd(fn):
 # ------------------------------------------------------------------ preparación
 async def _evaluacion_completada(c, con_evidencia: bool = True) -> dict:
     """Encuestado público con su evaluación COMPLETADA (respuestas, evidencia validada y resumen)."""
-    from app.application.filters.control_tree import CONTROLES_BASE
+    from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
 
     r = await c.post("/api/encuesta-publica/iniciar", json={
         "rubro_id": 1, "aviso_legal": {"version": settings.AVISO_LEGAL_VERSION, "aceptado": True},
@@ -218,7 +218,7 @@ async def _activar_y_entrar(c, destino="gerencia@acme.cl") -> dict:
 
 # ===================================================================== utilidades puras
 def test_rut_se_normaliza_y_valida_el_digito_verificador():
-    from app.core.rut import RutInvalidoError, normalizar_rut, rut_valido
+    from app.domain.valores.rut import RutInvalidoError, normalizar_rut, rut_valido
 
     assert normalizar_rut("76.086.428-5") == "76086428-5"
     assert normalizar_rut("760864285") == "76086428-5"

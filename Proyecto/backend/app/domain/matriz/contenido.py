@@ -15,7 +15,7 @@ Una versión es un documento JSON con TODO lo que define el autodiagnóstico:
 
 Las reglas de aplicabilidad viven dentro de cada control (`aplica_siempre` y `filtros`):
 el control aplica si la organización pasó las compuertas y (aplica_siempre o respondió SÍ
-a alguno de sus filtros). Es el mismo árbol que estaba fijo en control_tree.py, ahora como
+a alguno de sus filtros). Es el mismo árbol que estaba fijo en app/domain/matriz/arbol_aplicabilidad.py, ahora como
 dato editable.
 
 Los elementos retirados NO se borran: quedan con activo=false (las respuestas, brechas y

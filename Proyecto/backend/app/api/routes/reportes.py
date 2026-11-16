@@ -16,7 +16,7 @@ from app.domain.models.dominio import Dominio
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.rubro import Rubro
 from app.domain.models.evaluacion import Evaluacion
-from app.application.benchmark.k_anonimato import SUPRIMIDA, diferencia, posicion
+from app.domain.benchmark.k_anonimato import SUPRIMIDA, diferencia, posicion
 from app.application.benchmark.sector import bloque_sector, filas_del_rubro, publicar_fila
 
 GENERAL = "Puntaje general"

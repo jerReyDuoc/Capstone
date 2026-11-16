@@ -42,7 +42,8 @@ from app.domain.models.formacion import AvanceFormativo, EstadoAvance
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
 from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 ESTADOS_CON_BRECHA = (EstadoClasificacion.NO_CUMPLIDO.value, EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value,
                       EstadoClasificacion.REQUIERE_REVISION.value)

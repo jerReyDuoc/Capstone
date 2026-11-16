@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 
 SEVERIDADES = ("Crítica", "Alta", "Media", "Baja")

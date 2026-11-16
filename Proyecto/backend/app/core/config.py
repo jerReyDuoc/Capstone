@@ -389,7 +389,7 @@ class Settings(BaseSettings):
     REVISION_RAT_URL: str = "http://localhost:3000/empresa/registro-actividades/revision"
 
     # ------------------------------------------------ HU-41: registro de tratamiento de la propia plataforma
-    # El mapa, el RAT y el RoPA de ComplianceAI se generan desde app/core/catalogo_datos_personales.py y
+    # El mapa, el RAT y el RoPA de ComplianceAI se generan desde app/domain/privacidad/catalogo_datos_personales.py y
     # estos datos del despliegue (nada de esto cambia cómo se tratan los datos: solo cómo se describen).
     # Razón social y RUT de Therion Labs para la portada de los informes (el RUT es opcional).
     THERION_RAZON_SOCIAL: str = "Therion Labs SpA"
@@ -576,7 +576,7 @@ class Settings(BaseSettings):
         if not 0 <= self.ASISTENTE_PENDIENTES_EN_PROMPT <= 60:
             raise ValueError("ASISTENTE_PENDIENTES_EN_PROMPT debe estar entre 0 y 60 (HU-39).")
         # HU-41: datos del despliegue para el registro de la plataforma
-        from app.domain import catalogo_tratamiento as _cat_mapa
+        from app.domain.catalogos import catalogo_tratamiento as _cat_mapa
         for nombre in ("PLATAFORMA_PAIS_ALOJAMIENTO", "CORREO_PROVEEDOR_PAIS"):
             valor = getattr(self, nombre)
             if valor is not None:

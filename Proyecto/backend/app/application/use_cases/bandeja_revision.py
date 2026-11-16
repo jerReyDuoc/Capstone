@@ -47,7 +47,8 @@ from app.domain.models.evidencia import Evidencia
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion, Respuesta
 from app.domain.models.usuario_admin import UsuarioAdmin
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 MAX_CANDIDATAS = 3000
 

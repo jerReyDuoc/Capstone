@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, text
 
 from app.core.config import settings
-from app.domain import auditoria_hash
+from app.domain.auditoria import auditoria_hash
 from app.domain.models.auditoria_externa import ALGORITMO_LOTE, AuditLogSello
 from app.infrastructure.repositories.bitacora_cadena import LOCK_BITACORA, clave_bitacora, filas_en_orden
 

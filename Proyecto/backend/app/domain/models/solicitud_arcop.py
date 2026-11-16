@@ -2,8 +2,8 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import CheckConstraint, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.cifrado_columnas import TextoCifrado
-from app.core.database import Base
+from app.infrastructure.persistencia.tipos_cifrados import TextoCifrado
+from app.domain.models.base import Base
 
 
 class TipoSolicitudARCOP(str, Enum):

@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Integer, String, DateTime, CheckConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 # HU-28: roles con inicio de sesión por email y contraseña (los demás usan otros accesos)
 # HU-09: también el Auditor Externo

@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import CheckConstraint, Integer, String, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 RESULTADO_OK = "ok"
 RESULTADO_RECHAZADO = "rechazado"
@@ -35,7 +35,7 @@ class BitacoraAuditoria(Base):
          y cambia algo, la verificación lo detecta y dice en qué lote.
 
     `ip` es dato personal (la única excepción de minimización de la tabla, documentada en
-    app/core/catalogo_datos_personales.py). `detalle` NO lleva datos personales: ids, conteos,
+    app/domain/privacidad/catalogo_datos_personales.py). `detalle` NO lleva datos personales: ids, conteos,
     estados y códigos; nada de emails, nombres, contraseñas ni tokens.
 
     Las acciones de negocio se registran en la MISMA transacción que la acción: si la acción

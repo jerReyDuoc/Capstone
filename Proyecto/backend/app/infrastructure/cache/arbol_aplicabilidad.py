@@ -10,7 +10,7 @@ así que se carga una vez por proceso y se reutiliza. Se recarga:
     (version_vigente_id). Si cambió, se recargan este árbol y el catálogo de controles.
 
 Sin reglas en la BD (BD nueva o la SQLite de las pruebas) se usa la semilla de
-control_tree.py, igual que antes de HU-24.
+app/domain/matriz/arbol_aplicabilidad.py, igual que antes de HU-24.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.filters.control_tree import ARBOL_POR_DEFECTO
+from app.domain.matriz.arbol_aplicabilidad import ARBOL_POR_DEFECTO
 from app.domain.matriz.contenido import ArbolAplicabilidad
 
 VERIFICAR_CADA_SEGUNDOS = 15.0

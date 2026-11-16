@@ -26,7 +26,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field, replace
 
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.rat import catalogo as cat
 from app.domain.rat import riesgos as rg
 

@@ -32,15 +32,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.autenticacion import Actor, Rol, hash_password
 from app.core.config import settings
-from app.domain import auditoria_hash
+from app.domain.auditoria import auditoria_hash
 from app.domain.models.auditoria_externa import ALGORITMO_LOTE, UsuarioAuditor
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria
 from app.infrastructure.repositories import audit_log_lotes
 from app.infrastructure.repositories.bitacora_cadena import filas_en_orden
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository, categoria
+from app.domain.auditoria.acciones import Accion, categoria
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 LEY = "Ley N.º 21.719, art. 14 ter (deber de trazabilidad)"
-SCRIPT_VERIFICACION = Path(__file__).resolve().parents[2] / "domain" / "verificar_exportacion.py"
+SCRIPT_VERIFICACION = Path(__file__).resolve().parents[1] / "auditoria" / "recursos" / "verificar_exportacion.py"
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 
 

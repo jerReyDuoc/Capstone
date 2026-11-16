@@ -4,7 +4,7 @@ T-06 — Auditoría de minimización de datos sobre la base de datos REAL.
 Qué hace (todo en una transacción de SOLO LECTURA; nunca imprime valores, solo conteos):
 
   1. Lee el esquema de PostgreSQL (tablas, columnas, tipos, PK y FK).
-  2. Lo cruza con el inventario de app/core/catalogo_datos_personales.py:
+  2. Lo cruza con el inventario de app/domain/privacidad/catalogo_datos_personales.py:
      columna sin clasificar o clasificada pero inexistente = hallazgo.
   3. Revisa el CONTENIDO de las columnas según su clasificación:
        pii     -> cuenta filas con RUT (dígito verificador válido), correos o
@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine, inspect, text  # noqa: E402
 
-from app.core.catalogo_datos_personales import CATALOGO, Dato  # noqa: E402
+from app.domain.privacidad.catalogo_datos_personales import CATALOGO, Dato  # noqa: E402
 
 # ----------------------------------------------------------------------- detectores
 # Independientes del motor NER del sistema: una auditoría no debe depender solo de

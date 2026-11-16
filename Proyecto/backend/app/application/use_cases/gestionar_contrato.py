@@ -29,9 +29,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.autenticacion import Actor
-from app.domain.contrato import PERMITIDAS, EstadoContrato, MotivoContrato, Operacion, SituacionContrato
+from app.core.config import settings
+from app.domain.contrato.vigencia import PERMITIDAS, EstadoContrato, MotivoContrato, Operacion, SituacionContrato
 from app.domain.models.empresa import Empresa
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 # Una renovación no puede ir más allá de esto (protege de un año mal escrito: 2206 en vez de 2026).
 MAX_ANIOS_RENOVACION = 10
@@ -62,7 +64,7 @@ def operaciones_posibles(situacion: SituacionContrato) -> list[str]:
 
 def _foto(e: Empresa, hoy: date) -> dict:
     """Lo que se guarda en la bitácora antes y después (sin datos personales)."""
-    v = e.vigencia(hoy)
+    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy)
     return {
         "estado": e.estado_contrato, "situacion": v.situacion.value,
         "fecha_inicio": e.fecha_inicio_contrato.isoformat(), "fecha_termino": e.fecha_termino_contrato.isoformat(),
@@ -92,7 +94,7 @@ class GestionarContratoUseCase:
         return empresa
 
     def _exigir(self, op: Operacion, e: Empresa, hoy: date) -> None:
-        situacion = e.vigencia(hoy).situacion
+        situacion = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).situacion
         if situacion in PERMITIDAS[op]:
             return
         if situacion is SituacionContrato.FINALIZADO:
@@ -175,7 +177,7 @@ class GestionarContratoUseCase:
 
 def contrato_dict(e: Empresa, hoy: date | None = None) -> dict:
     """Contrato para el panel interno y para el propio cliente (sin datos personales)."""
-    v = e.vigencia(hoy)
+    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy)
     return {
         "estado": e.estado_contrato,
         "fecha_inicio_contrato": e.fecha_inicio_contrato,
@@ -191,7 +193,7 @@ def contrato_dict(e: Empresa, hoy: date | None = None) -> dict:
 async def empresas_con_gracia_vencida(db: AsyncSession, hoy: date | None = None) -> list[int]:
     """
     Criterio 3: empresas cuyo plazo de gracia ya venció, para que HU-25 aplique la retención.
-    Se calcula en Python con la misma regla de app/domain/contrato.py (son pocas empresas).
+    Se calcula en Python con la misma regla de app/domain/contrato/vigencia.py (son pocas empresas).
     """
     hoy = hoy or date.today()
     filas = (await db.execute(
@@ -199,4 +201,4 @@ async def empresas_con_gracia_vencida(db: AsyncSession, hoy: date | None = None)
             (Empresa.fecha_termino_contrato < hoy) | (Empresa.estado_contrato == EstadoContrato.TERMINADO.value)
         )
     )).scalars().all()
-    return sorted(e.id for e in filas if e.vigencia(hoy).situacion is SituacionContrato.FINALIZADO)
+    return sorted(e.id for e in filas if e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).situacion is SituacionContrato.FINALIZADO)

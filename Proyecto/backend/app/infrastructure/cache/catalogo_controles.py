@@ -8,7 +8,7 @@ cada uno con Pydantic. Con 10 usuarios simultáneos era el endpoint más lento
 (p95 542 ms en el reporte live del 11-oct).
 
 El catálogo es dato semilla (lo cambian las migraciones, no los usuarios), así que
-se carga una vez, se serializa con el MISMO esquema ControlResponse y se guarda:
+se carga una vez, se serializa con el MISMO formato JSON que ControlResponse y se guarda:
   * el dict de cada control (para armar listas y el progreso), y
   * el JSON ya codificado de cada combinación de controles aplicables (el filtro
     F2–F7 da como máximo 64 combinaciones).
@@ -28,7 +28,6 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.schemas.api_schemas import ControlResponse
 from app.domain.models.matriz_control import MatrizControl
 
 CATALOGO_TTL_SEGUNDOS = 300.0
@@ -40,7 +39,45 @@ class ControlCatalogo:
     codigo_control: str
     dominio_id: int | None
     dominio: str | None
-    datos: dict            # ControlResponse serializado (modo JSON)
+    datos: dict            # control serializado (mismo formato que ControlResponse, modo JSON)
+
+
+def _serializar_ruta(r) -> dict | None:
+    if r is None:
+        return None
+    return {
+        "id": r.id, "nombre": r.nombre, "dominio_id": r.dominio_id, "nivel": r.nivel,
+        "objetivo": r.objetivo, "horas": r.horas, "modalidad": r.modalidad,
+        "publico_objetivo": r.publico_objetivo,
+    }
+
+
+def _serializar(control: MatrizControl) -> dict:
+    """Dict JSON del control con las mismas claves, orden y tipos que ControlResponse (modo JSON)."""
+    d, b = control.dominio, control.brecha
+    return {
+        "id_control": control.id_control,
+        "codigo_control": control.codigo_control,
+        "framework_fuente": control.framework_fuente,
+        "articulo_referencia": control.articulo_referencia,
+        "tipo_fuente": control.tipo_fuente,
+        "obligacion": control.obligacion,
+        "pregunta_evaluacion": control.pregunta_evaluacion,
+        "aplicabilidad": control.aplicabilidad,
+        "evidencia_esperada": control.evidencia_esperada,
+        "criticidad": control.criticidad,
+        "recomendacion": control.recomendacion,
+        "test_asociado": control.test_asociado,
+        "dominio": None if d is None else {"id": d.id, "nombre_dominio": d.nombre_dominio},
+        "brecha": None if b is None else {
+            "id_brecha": b.id_brecha,
+            "codigo_brecha": b.codigo_brecha,
+            "comportamiento_detectado": b.comportamiento_detectado,
+            "criticidad": b.criticidad,
+            "accion_sistema": b.accion_sistema,
+            "ruta_formativa": _serializar_ruta(b.ruta_formativa),
+        },
+    }
 
 
 class _Catalogo:
@@ -98,7 +135,7 @@ async def obtener(session: AsyncSession) -> _Catalogo:
             codigo_control=m.codigo_control,
             dominio_id=m.dominio_id,
             dominio=m.dominio.nombre_dominio if m.dominio else None,
-            datos=ControlResponse.model_validate(m).model_dump(mode="json"),
+            datos=_serializar(m),
         ))
     _catalogo = _Catalogo(controles, version_id)
     return _catalogo

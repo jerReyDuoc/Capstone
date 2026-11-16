@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 AREAS = ("personas", "clientes", "proveedores", "marketing", "ti", "ia")
 ESTADOS_SESION = ("activa", "cerrada")

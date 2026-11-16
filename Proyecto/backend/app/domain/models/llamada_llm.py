@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Integer, String, Text, Boolean, DateTime, Float, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 class LlamadaLLM(Base):

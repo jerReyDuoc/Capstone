@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 from app.domain.models.ruta_formativa import RutaFormativa
 
 class CatalogoBrechas(Base):

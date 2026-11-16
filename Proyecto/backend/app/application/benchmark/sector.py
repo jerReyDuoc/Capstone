@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.benchmark.k_anonimato import SUPRIMIDA, Publicacion, diferencia, posicion, publicar
+from app.domain.benchmark.k_anonimato import SUPRIMIDA, Publicacion, diferencia, posicion, publicar
 from app.core.config import settings
 from app.domain.models.benchmark import Benchmark
 

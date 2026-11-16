@@ -216,7 +216,7 @@ Capstone/
             ├── main.py             # App FastAPI, routers y pool ARQ
             ├── core/
             │   ├── config.py       # Settings (pydantic-settings) + validaciones de producción
-            │   ├── database.py     # Engine async, sesión, Base
+            │   ├── database.py     # Engine async, sesión
             │   ├── autenticacion.py# Tokens HMAC, roles, hash de contraseñas, dependencias
             │   └── crear_admin.py  # CLI para crear/desactivar administradores
             ├── api/routes/         # arcop, auth, catalogos, controles, encuesta_publica, evaluaciones,
@@ -225,7 +225,6 @@ Capstone/
             ├── application/
             │   ├── ai/             # gateway.py, politicas.py, metricas.py, evidence_validator.py,
             │   │                   # prompts/ (base.py, validar_evidencia.py)
-            │   ├── filters/control_tree.py   # Árbol de aplicabilidad F1–F7
             │   ├── informes/       # HU-12: analisis.py (severidad, brechas, plan formativo; lógica pura),
             │   │                   # carga.py, pdf_informe.py (reportlab), correo.py (SMTP / .eml)
             │   ├── schemas/        # api_schemas, arcop_schemas, evidence_validation
@@ -234,7 +233,8 @@ Capstone/
             │                       # obtener_metricas_ia, registrar_evento_seguridad,
             │                       # gestionar_solicitud_arcop, iniciar_sesion
             ├── domain/
-            │   ├── models/         # 19 entidades SQLAlchemy (ver sección 6)
+            │   ├── matriz/         # arbol_aplicabilidad.py: árbol de aplicabilidad F1–F7 (antes application/filters/control_tree.py)
+            │   ├── models/         # 19 entidades SQLAlchemy (ver sección 6); base.py con Base
             │   └── ports/          # Interfaces ABC
             ├── infrastructure/
             │   ├── llm/            # groq_provider.py, factory.py
@@ -288,7 +288,7 @@ Las 7 preguntas se responden SI/NO y deben venir **todas** en un mismo envío (s
 | F6 | ¿La IA toma decisiones que afectan derechos, personas, crédito o contrataciones? | RIE-005, RIE-006, SEG-010 |
 | F7 | ¿La empresa desarrolla, entrena o adapta internamente modelos o agentes de IA? | RIE-007, GOB-006 |
 
-La tabla es la **semilla** (versión `2026.1`). Desde HU-24 el árbol vive en la BD (`regla_aplicabilidad` y `preguntas_filtro.es_compuerta`) y el administrador lo cambia desde `/admin/matriz`, con versionado (ver 5.16). `app/application/filters/control_tree.py` conserva la semilla y la evaluación del árbol; en ejecución se usa `app/infrastructure/cache/arbol_aplicabilidad.py`.
+La tabla es la **semilla** (versión `2026.1`). Desde HU-24 el árbol vive en la BD (`regla_aplicabilidad` y `preguntas_filtro.es_compuerta`) y el administrador lo cambia desde `/admin/matriz`, con versionado (ver 5.16). `app/domain/matriz/arbol_aplicabilidad.py` conserva la semilla y la evaluación del árbol; en ejecución se usa `app/infrastructure/cache/arbol_aplicabilidad.py`.
 
 ### 5.3 Respuesta a un control
 
@@ -499,7 +499,7 @@ Cada versión se guarda completa en `matriz_version` (JSON + huella SHA-256). Re
 
 ### 5.17 Mapa de datos personales (HU-34)
 
-El usuario definitivo (con contrato vigente) registra en `/empresa/mapa-datos` **dónde trata datos personales su empresa**: sistemas, bases de datos y terceros (nombre, categoría, proveedor, país de alojamiento ISO 3166 y responsable interno como cargo o área) y los **flujos** entre ellos. Cada elemento y flujo lleva categorías de datos y de titulares de `app/domain/catalogo_tratamiento.py`, el **catálogo común con el RAT y el RoPA** (mismos códigos; las sensibles siguen la Ley 21.719 y los titulares marcan a niños, niñas y adolescentes). Las **transferencias internacionales no se declaran: se calculan** con el país de cada extremo.
+El usuario definitivo (con contrato vigente) registra en `/empresa/mapa-datos` **dónde trata datos personales su empresa**: sistemas, bases de datos y terceros (nombre, categoría, proveedor, país de alojamiento ISO 3166 y responsable interno como cargo o área) y los **flujos** entre ellos. Cada elemento y flujo lleva categorías de datos y de titulares de `app/domain/catalogos/catalogo_tratamiento.py`, el **catálogo común con el RAT y el RoPA** (mismos códigos; las sensibles siguen la Ley 21.719 y los titulares marcan a niños, niñas y adolescentes). Las **transferencias internacionales no se declaran: se calculan** con el país de cada extremo.
 
 El backend (`app/domain/mapa_datos/`) calcula el resumen, la completitud y **10 reglas de hallazgos de riesgo** priorizados (transferencias sin garantía, proveedor de IA con datos sensibles, terceros sin contrato, sensibles sin cifrar, NNA, sin responsable, sin país…), con recomendación y referencia. El panel dibuja un **mapa navegable** (disposición por capas con puntos de paso, zoom, arrastre, teclado) con filtros por dato sensible, NNA, transferencia, tercero, país y tipo, y lo exporta a **PDF** (A4 horizontal, generado por el servidor con diagrama, inventario, transferencias, riesgos y base para el RAT), **PNG**, **CSV** y por **correo**.
 
@@ -542,7 +542,7 @@ Desde `/empresa/registro-actividades` › **Informe RoPA**, el usuario definitiv
 
 El administrador de Therion Labs genera el registro de tratamiento de la **propia** plataforma y lo demuestra con las mismas herramientas que se venden (Panel interno › **Privacidad de la plataforma**).
 
-- **Fuente única** (`app/core/catalogo_datos_personales.py`, sección HU-41): `ACTIVIDADES_PLATAFORMA` (encuesta pública, contratación, cuentas, tutor, evidencias, borradores, ARCOP, auditoría y herramientas de registro de las empresas), `TABLAS_SIN_TRATAMIENTO` (catálogos y agregados), `ELEMENTOS_PLATAFORMA`, `PROVEEDORES_PLATAFORMA` y `AJUSTE_POR_CONSERVACION` (cada conservación enlazada al ajuste que la ejecuta). Las categorías de datos y los plazos salen de las columnas personales de cada tabla.
+- **Fuente única** (`app/domain/privacidad/catalogo_datos_personales.py`, sección HU-41): `ACTIVIDADES_PLATAFORMA` (encuesta pública, contratación, cuentas, tutor, evidencias, borradores, ARCOP, auditoría y herramientas de registro de las empresas), `TABLAS_SIN_TRATAMIENTO` (catálogos y agregados), `ELEMENTOS_PLATAFORMA`, `PROVEEDORES_PLATAFORMA` y `AJUSTE_POR_CONSERVACION` (cada conservación enlazada al ajuste que la ejecuta). Las categorías de datos y los plazos salen de las columnas personales de cada tabla.
 - **Generador** (`app/application/plataforma/registro.py`, lógica pura): arma `Elemento`, `Flujo`, contenido de actividad e instantánea con el mismo formato del cliente y usa `rat/analisis.py`, `rat/informe.py`, `pdf_rat`, `xlsx_rat`, `pdf_ropa`, `xlsx_ropa` y `pdf_mapa` sin cambiarlos. El plazo de cada categoría es el **valor vigente** del ajuste (el de titulares, el del panel de retención si se fijó allí); sin valor, queda sin número y se informa.
 - **Proveedores**: Microsoft Azure (alojamiento), Groq (con `LLM_PROVIDER=groq`), proveedor de correo (con `CORREO_MODO=smtp`) y Cloudflare Turnstile (con `TURNSTILE_SECRET_KEY`), como encargados con país y garantía. Los flujos desde la plataforma (operada desde Chile) hacia el alojamiento y los proveedores se calculan como transferencias internacionales. Ajustes nuevos: `THERION_RAZON_SOCIAL`, `THERION_RUT`, `PLATAFORMA_PAIS_ALOJAMIENTO`, `CORREO_PROVEEDOR_NOMBRE/PAIS/GARANTIA`, `PROVEEDORES_CONTRATO_CONFIRMADO`, `PLATAFORMA_INFORMES_DIA`.
 - **Revisión interna** (`app/application/plataforma/revision.py`): cobertura del inventario, reglas de retención desactivadas, plazos pendientes de decisión (registro de auditoría, sesiones, contrataciones descartadas), actividades incompletas, proveedores sin país o garantía, contratos por confirmar, última ejecución de la retención y capa de IA.
@@ -697,7 +697,7 @@ Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
 
 ### 6.4 Minimización y conservación de datos personales (T-06)
 
-Cada columna del modelo está clasificada en `app/core/catalogo_datos_personales.py` con su categoría, tratamiento (en claro, anonimizado, cifrado, hash, HMAC o no se guarda), finalidad, base de licitud y plazo de conservación. `tests/test_t06_minimizacion.py` falla si una migración agrega una columna sin clasificarla. La auditoría sobre la BD real se corre con un rol de solo lectura y genera el DER, la matriz en CSV y un informe de controles; nunca imprime valores, solo conteos:
+Cada columna del modelo está clasificada en `app/domain/privacidad/catalogo_datos_personales.py` con su categoría, tratamiento (en claro, anonimizado, cifrado, hash, HMAC o no se guarda), finalidad, base de licitud y plazo de conservación. `tests/test_t06_minimizacion.py` falla si una migración agrega una columna sin clasificarla. La auditoría sobre la BD real se corre con un rol de solo lectura y genera el DER, la matriz en CSV y un informe de controles; nunca imprime valores, solo conteos:
 
 ```powershell
 docker compose cp backend/scripts/sql/t06_rol_auditor.sql db:/tmp/t06_rol_auditor.sql
@@ -1006,7 +1006,7 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 |---|---|---|
 | Datos personales enviados a un tercero (LLM) | Anonimización NER obligatoria, fail-closed; recorte después de sanitizar para no cortar PII a medias | `ner_sanitizer.py`, `gateway.py` |
 | Re-identificación desde la auditoría | Mapa de entidades sin valores originales (solo huellas HMAC y conteos, HU-06); métricas sin texto del usuario | `cifrado.py`, `registro_ia_repository.py` |
-| PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `cifrado_columnas.py`, `test_hu06_regresion_pii.py` |
+| PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `tipos_cifrados.py`, `test_hu06_regresion_pii.py` |
 | Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); perfil **estricto**; bloqueo 422 y registro con la regla que disparó | `seguridad.py`, `prompt_guard.py`, `create_respuesta.py` |
 | Prompt injection en evidencias | Perfil **evidencia** (HU-33): el vocabulario de cumplimiento (aprobar, ejecutar, registrar, marcar...) solo bloquea si va dirigido a la IA o al resultado; las señales fuertes (texto oculto, bidi/"tag", codificado, "si eres una IA", delimitadores, cambio de rol) siempre. `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `seguridad.py`, `process_evidence.py`, `test_hu33_*.py` |
 | Prompt injection multilenguaje e indirecta (HU-07) | Reglas en inglés, portugués, francés, alemán e italiano (notas para la IA, "si eres una IA", ignorar instrucciones, forzar el resultado, cambio de rol), nombres de campos del schema, pedidos de reglas recibidas y de datos anonimizados; antes del prompt se quitan caracteres invisibles, bidi, "tag" y de control y se neutralizan separadores (`═══`) y marcadores de turno (`[INST]`, `<<SYS>>`, `<\|...\|>`) | `seguridad.py`, `prompts/base.py`, `test_hu07_owasp_entrada.py` |

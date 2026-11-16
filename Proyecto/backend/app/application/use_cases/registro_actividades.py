@@ -34,7 +34,8 @@ from app.domain.models.mapa_datos import MapaDatos, MapaElemento, MapaFlujo
 from app.domain.models.rat import RatActividad, RatActividadVersion
 from app.domain.rat import analisis, estados, modelo, riesgos, versiones, vinculo_mapa
 from app.domain.rat import catalogo as cat
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

@@ -19,8 +19,8 @@ from datetime import datetime
 from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.cifrado_columnas import TextoCifradoRopa
-from app.core.database import Base
+from app.infrastructure.persistencia.tipos_cifrados import TextoCifradoRopa
+from app.domain.models.base import Base
 
 TIPO_RAT = "rat"
 TIPO_ROPA = "ropa"

@@ -22,7 +22,7 @@ def _bd():
     from sqlalchemy.pool import StaticPool
 
     import app.domain.models  # noqa: F401
-    from app.core.database import Base
+    from app.domain.models.base import Base
 
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool,
                                  connect_args={"check_same_thread": False})
@@ -157,7 +157,7 @@ def test_sin_catalogos_pide_ejecutar_las_migraciones():
         from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
         from sqlalchemy.pool import StaticPool
 
-        from app.core.database import Base
+        from app.domain.models.base import Base
 
         engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool,
                                      connect_args={"check_same_thread": False})

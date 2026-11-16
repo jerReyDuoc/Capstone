@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, Float, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class Benchmark(Base):
     """
@@ -8,7 +8,7 @@ class Benchmark(Base):
 
     HU-10: una fila con dominio_id NULL guarda el puntaje GENERAL del rubro. Los valores de
     esta tabla son internos: hacia la API, la interfaz o el PDF solo salen a través de
-    app/application/benchmark/k_anonimato.publicar(), que suprime las cohortes con menos de
+    app/domain/benchmark/k_anonimato.publicar(), que suprime las cohortes con menos de
     K_ANONIMATO_MINIMO empresas. puntaje_maximo y puntaje_minimo NUNCA se publican.
     """
     __tablename__ = "benchmark"

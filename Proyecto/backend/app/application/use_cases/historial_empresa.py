@@ -29,7 +29,8 @@ from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import ESTADOS_CERRADOS, ORIGEN_EMPRESA, Evaluacion
 from app.domain.models.resumen import Resumen
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 ESTADO_EN_PROGRESO = "en_progreso"
 

@@ -42,7 +42,8 @@ from app.core.config import settings
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance, LeccionFormativa, PreguntaVerificacion
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 
 class FormacionError(Exception):

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from sqlalchemy import Integer, String, Text, Float, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class EstadoValidacion(str, Enum):
     PENDING = "pending"

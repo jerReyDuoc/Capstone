@@ -36,7 +36,8 @@ from app.core.autenticacion import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 router = APIRouter(prefix="/api/admin/retencion", tags=["admin · retención (HU-25)"])
 

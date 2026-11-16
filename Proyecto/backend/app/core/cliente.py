@@ -10,7 +10,7 @@ su IP para esquivar los límites).
 La IP es un dato personal. Los contadores de Redis usan una huella HMAC-SHA256 truncada,
 que no permite recuperar la IP sin el secreto. La única tabla que guarda la IP en claro es
 audit_log (HU-09, criterio 2: trazabilidad del art. 14 ter), como excepción documentada en
-app/core/catalogo_datos_personales.py.
+app/domain/privacidad/catalogo_datos_personales.py.
 """
 import hashlib
 import hmac

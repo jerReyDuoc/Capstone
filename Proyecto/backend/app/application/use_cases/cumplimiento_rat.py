@@ -45,7 +45,8 @@ from app.domain.rat import analisis, cobertura, riesgos
 from app.domain.rat import catalogo as cat
 from app.domain.rat import cumplimiento as cu
 from app.domain.rat.modelo import completar
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

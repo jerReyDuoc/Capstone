@@ -33,7 +33,7 @@ from app.application.use_cases import consentimientos_contratacion
 from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError, MigradorEvaluaciones
 from app.core.autenticacion import Actor, Rol
 from app.core.config import settings
-from app.core.rut import RutInvalidoError, normalizar_rut
+from app.domain.valores.rut import RutInvalidoError, normalizar_rut
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
 from app.domain.models.rubro import Rubro
@@ -41,7 +41,8 @@ from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion
 from app.domain.models.usuario_definitivo import (
     ROL_CLIENTE, EstadoUsuarioDefinitivo, UsuarioDefinitivo,
 )
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 E = EstadoSolicitudContratacion
 

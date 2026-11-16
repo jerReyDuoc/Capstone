@@ -27,7 +27,7 @@ from datetime import datetime
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 TIPO_INFORME = "informe_pdf"
 TIPO_BORRADOR = "borrador"

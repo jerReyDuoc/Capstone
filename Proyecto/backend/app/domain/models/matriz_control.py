@@ -2,7 +2,7 @@ from app.domain.models.catalogo_brechas import CatalogoBrechas
 from app.domain.models.dominio import Dominio
 from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class MatrizControl(Base):
     __tablename__ = "matriz_controles"

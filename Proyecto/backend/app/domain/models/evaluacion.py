@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from sqlalchemy import Integer, Date, DateTime, String, Boolean, ForeignKey, false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 # Estados de `estado_progreso` en los que la evaluación ya no admite respuestas.

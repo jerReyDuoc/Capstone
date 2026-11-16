@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, Float, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class Resumen(Base):
     """Resumen agregado de resultados de una evaluación por dominio."""

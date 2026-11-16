@@ -28,7 +28,7 @@ from sqlalchemy import (JSON, Boolean, CheckConstraint, DateTime, ForeignKey, In
                         UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.models.base import Base
 
 EN_CURSO, REVISADA = "en_curso", "revisada"
 ESTADOS_REVISION = (EN_CURSO, REVISADA)

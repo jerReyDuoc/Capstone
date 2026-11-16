@@ -159,8 +159,8 @@ class MatrizRepository:
 
 
 def _reglas_semilla(controles: list[dict], preguntas: list[dict]) -> tuple[list[tuple[int, int | None]], set[str]]:
-    """El árbol fijo de control_tree.py traducido a ids (BD sin reglas guardadas)."""
-    from app.application.filters.control_tree import ARBOL_POR_DEFECTO
+    """El árbol fijo de app/domain/matriz/arbol_aplicabilidad.py traducido a ids (BD sin reglas guardadas)."""
+    from app.domain.matriz.arbol_aplicabilidad import ARBOL_POR_DEFECTO
 
     ids_control = {c["codigo_control"]: c["id_control"] for c in controles if c.get("codigo_control")}
     ids_pregunta = {p["codigo"]: p["id_pregunta"] for p in preguntas}

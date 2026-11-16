@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import Integer, String, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 # HU-27 (decisión del PO, 26-oct): un solo rol con acceso a todo el servicio pagado.
 ROL_CLIENTE = "cliente"

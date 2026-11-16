@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from sqlalchemy import Integer, String, Date, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 class UsuarioTemporal(Base):
     """Usuario invitado por link, sin registro completo. Expira en una fecha."""

@@ -122,7 +122,7 @@ async def _audit(accion: str):
 async def _respuesta_divergente(c) -> int:
     """El usuario declara 'cumplido'; el LLM (confianza alta) lo baja a 'no_cumplido'."""
     from _api_harness import TODOS_LOS_CONTROLES, body_filtro
-    from app.application.filters.control_tree import CONTROLES_BASE
+    from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
     from app.domain.models import Evidencia, Respuesta
 
     assert (await c.post("/api/evaluaciones/1/filtro", json=body_filtro())).status_code == 200

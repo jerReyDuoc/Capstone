@@ -58,7 +58,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from app.core.rut import digito_verificador
+from app.domain.valores.rut import digito_verificador
 
 CLASIFICACIONES = ("cumplido", "parcialmente_cumplido", "no_cumplido")
 FAVORABLES = ("cumplido", "parcialmente_cumplido")

@@ -2,7 +2,7 @@
 QA - HU-41: registro de tratamiento de la propia plataforma (mapa, RAT y RoPA de ComplianceAI).
 
   C1  Las actividades (encuesta pública, contratación, cuentas, tutor, evidencias, borradores, ARCOP y auditoría)
-      se generan desde catalogo_datos_personales.py con finalidad, base de licitud y plazo.
+      se generan desde app/domain/privacidad/catalogo_datos_personales.py con finalidad, base de licitud y plazo.
   C2  Los plazos del RAT coinciden con los ajustes de retención configurados; esta prueba falla si difieren o si
       aparece una tabla nueva sin actividad (como test_t06_minimizacion.py).
   C3  Los proveedores (LLM, Azure, correo) figuran como encargados con su país y la garantía de la transferencia.
@@ -24,8 +24,8 @@ import pytest
 
 from app.application.plataforma import registro as R
 from app.application.plataforma import revision as REV
-from app.core import catalogo_datos_personales as inv
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.privacidad import catalogo_datos_personales as inv
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.rat import catalogo as cat_rat
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -100,7 +100,7 @@ def test_cada_tabla_del_inventario_esta_en_una_actividad_o_declarada_sin_tratami
 def test_cada_tabla_del_modelo_esta_en_el_registro():
     pytest.importorskip("sqlalchemy")
     import app.domain.models  # noqa: F401
-    from app.core.database import Base
+    from app.domain.models.base import Base
     p = inv.problemas_de_cobertura({t.name for t in Base.metadata.sorted_tables})
     assert not any(p.values()), p
 
@@ -412,7 +412,7 @@ def test_api_registro_emision_descarga_y_verificacion():
 
 def test_api_bitacora_sin_datos_de_contacto():
     _api()
-    from app.infrastructure.repositories.bitacora_repository import Accion
+    from app.domain.auditoria.acciones import Accion
 
     async def esc(c):
         await c.patch(f"{B}/ropa-datos", json=DATOS_ROPA)

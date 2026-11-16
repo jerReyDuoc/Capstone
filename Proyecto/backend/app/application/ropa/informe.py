@@ -36,7 +36,7 @@ from datetime import datetime
 from app.application.informes.ficha import AvisoInforme, digito_verificador
 from app.application.informes.motor_pdf import fecha_local
 from app.application.rat import informe as I
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.ropa import datos as D
 
 PREFIJO_CODIGO = "CIA-ROPA"

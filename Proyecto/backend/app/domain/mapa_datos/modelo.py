@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 
 MAX_CATEGORIAS = 30
 LARGOS = {

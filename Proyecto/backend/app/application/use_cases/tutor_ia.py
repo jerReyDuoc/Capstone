@@ -59,7 +59,8 @@ from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.tutor import ConversacionTutor, MensajeTutor, RolMensajeTutor, TipoMensajeTutor
 from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.infrastructure.cache.limitador import Limitador
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.infrastructure.repositories.tutor_repository import TutorRepository
 
 MAX_TITULO = 80

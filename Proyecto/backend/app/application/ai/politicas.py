@@ -37,7 +37,7 @@ from app.application.ai.prompts.base import PromptRenderizado
 from app.application.ai.verificacion_salida import verificar_evidencia
 from app.application.schemas.asistente_rat import AsistenteRatRespuesta
 from app.application.schemas.borrador import BorradorIA
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 
 

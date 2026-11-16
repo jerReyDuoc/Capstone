@@ -36,7 +36,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from app.application.informes.ficha import AvisoInforme, digito_verificador
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.rat import catalogo as cat
 from app.domain.rat import riesgos as rg
 from app.domain.rat.modelo import completar

@@ -22,7 +22,7 @@ import pytest
 pytest.importorskip("httpx")
 
 from _api_harness import EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api  # noqa: E402
-from app.application.filters.control_tree import CONTROLES_BASE  # noqa: E402
+from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE  # noqa: E402
 
 if MODO == "en_proceso":
     pytest.importorskip("aiosqlite", reason="pip install aiosqlite")

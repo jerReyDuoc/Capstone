@@ -2,7 +2,7 @@
 HU-39 · Lo que ve el LLM, separado en lo confiable y lo no confiable.
 
   catalogos_texto()   CONFIABLE: los códigos válidos de los catálogos comunes del mapa y del RAT
-                      (app/domain/catalogo_tratamiento.py y app/domain/rat/catalogo.py) con su nombre.
+                      (app/domain/catalogos/catalogo_tratamiento.py y app/domain/rat/catalogo.py) con su nombre.
   mapa_texto()        NO CONFIABLE: los nombres de los sistemas, flujos y actividades los escribió la
                       empresa. Va al campo no confiable "mapa" de la política: pasa por el filtro del agente
                       (línea por línea) y por el NER del gateway. Una línea por cosa, con su referencia
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis as am
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import catalogo as cat_rat

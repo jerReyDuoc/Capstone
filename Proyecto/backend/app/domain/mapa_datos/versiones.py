@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos.modelo import CAMPOS_ELEMENTO, CAMPOS_FLUJO, Elemento, Flujo
 
 FORMATO_INSTANTANEA = 1

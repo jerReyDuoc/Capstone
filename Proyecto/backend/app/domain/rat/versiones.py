@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.rat import catalogo as cat
 from app.domain.rat.modelo import completar
 

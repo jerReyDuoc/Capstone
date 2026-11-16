@@ -15,7 +15,7 @@ Lógica pura y determinista: se prueba sin BD ni LLM.
 from __future__ import annotations
 
 from app.application.asistente.anclaje import parsear_ref
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis as am
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import analisis as rat_an

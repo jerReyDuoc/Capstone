@@ -53,7 +53,8 @@ from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.rat import RatActividad
 from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.infrastructure.cache.limitador import Limitador, LimitadorNoDisponibleError
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

@@ -25,7 +25,7 @@ import math
 
 from app.application.informes import motor_pdf as M
 from app.application.rat import informe as I
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.rat import catalogo as cat
 from app.domain.rat import riesgos as rg
 

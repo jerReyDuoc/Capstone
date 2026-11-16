@@ -50,7 +50,8 @@ from app.domain.models.rat_revision import (ABIERTA, CERRADA, EN_CURSO, PRIORIDA
                                             RatPaqueteEvidencia, RatRevision, RatRevisionConfig)
 from app.domain.rat import revision as R
 from app.infrastructure.cache.limitador import LimitadorNoDisponibleError
-from app.infrastructure.repositories.bitacora_repository import ROL_SISTEMA, Accion, BitacoraRepository
+from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -928,7 +929,7 @@ async def enviar_recordatorios(db: AsyncSession, ahora: datetime | None = None) 
     enviados, fallidos, revisadas = 0, 0, 0
     for empresa_id in sorted(primeras):
         empresa = await db.get(Empresa, empresa_id)
-        if empresa is None or not empresa.contrato_vigente(hoy):
+        if empresa is None or not empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS, hoy=hoy):
             continue
         usuario = (await db.execute(select(UsuarioDefinitivo).where(
             UsuarioDefinitivo.empresa_id == empresa_id))).scalar_one_or_none()

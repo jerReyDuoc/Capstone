@@ -51,7 +51,8 @@ from app.domain.models.formacion import AvanceFormativo
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.ruta_formativa import RutaFormativa
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +312,7 @@ class DocumentosEmpresa:
                 "fecha_completado": a.fecha_completado, "codigo": a.codigo_constancia,
                 "descarga": f"/api/formacion/modulos/{a.ruta_formativa_id}/constancia",
             } for a, nombre in constancias if a.completado],
-            "documentos_disponibles_hasta": self.empresa.vigencia().como_dict()["documentos_disponibles_hasta"],
+            "documentos_disponibles_hasta": self.empresa.vigencia(settings.CONTRATO_GRACIA_DIAS).como_dict()["documentos_disponibles_hasta"],
         }
 
     # ---------------------------------------------------------------- informes y borradores

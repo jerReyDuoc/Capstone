@@ -46,7 +46,8 @@ from app.domain.models.rat_informe import RatInforme
 from app.domain.rat import analisis
 from app.domain.rat import catalogo as cat
 from app.infrastructure.cache.limitador import LimitadorNoDisponibleError
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger(__name__)
 

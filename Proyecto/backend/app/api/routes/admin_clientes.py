@@ -46,6 +46,7 @@ from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, Migra
 from app.application.use_cases.gestionar_contrato import ContratoError, GestionarContratoUseCase, contrato_dict
 from app.core.alcance import solo_admin
 from app.core.autenticacion import Actor
+from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
@@ -54,7 +55,8 @@ from app.domain.models.rubro import Rubro
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository, categoria
+from app.domain.auditoria.acciones import Accion, categoria
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 router = APIRouter(prefix="/api/admin", tags=["admin · empresas cliente (HU-27)"])
 
@@ -148,7 +150,7 @@ def _empresa(e: Empresa) -> dict:
     return {
         "id": e.id, "razon_social": e.razon_social, "rut": e.rut, "rubro_id": e.rubro_id,
         "fecha_inicio_contrato": e.fecha_inicio_contrato, "fecha_termino_contrato": e.fecha_termino_contrato,
-        "contrato_vigente": e.contrato_vigente(), "fecha_creacion": e.fecha_creacion,
+        "contrato_vigente": e.contrato_vigente(settings.CONTRATO_GRACIA_DIAS), "fecha_creacion": e.fecha_creacion,
         "contrato": contrato_dict(e),  # HU-30: estado, situación y plazo de gracia
     }
 

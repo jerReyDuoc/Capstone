@@ -245,7 +245,7 @@ def test_mapa_reversible_solo_si_se_activa():
 
 # ---------------------------------------------------------------- textos ARCOP (excepción)
 def test_texto_arcop_se_cifra_al_escribir_y_se_descifra_al_leer():
-    from app.core.cifrado_columnas import TEXTO_ILEGIBLE, TextoCifrado
+    from app.infrastructure.persistencia.tipos_cifrados import TEXTO_ILEGIBLE, TextoCifrado
 
     tipo = TextoCifrado()
     guardado = tipo.process_bind_param(JUST_PII, None)
@@ -258,7 +258,7 @@ def test_texto_arcop_se_cifra_al_escribir_y_se_descifra_al_leer():
 
 
 def test_texto_arcop_sin_clave_no_se_escribe(monkeypatch):
-    from app.core.cifrado_columnas import TextoCifrado
+    from app.infrastructure.persistencia.tipos_cifrados import TextoCifrado
     from app.infrastructure.security.cifrado import ClaveCifradoInvalida
 
     monkeypatch.setattr(settings, "ENTITY_MAP_KEY", None)

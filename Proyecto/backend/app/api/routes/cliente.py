@@ -52,6 +52,7 @@ from app.application.use_cases.historial_empresa import (
     historial_de_empresa,
 )
 from app.core.autenticacion import Actor, Rol, requerir_rol
+from app.core.config import settings
 from app.core.database import get_db
 from app.core import servicio_pagado
 from app.core.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
@@ -95,7 +96,7 @@ async def mi_empresa(cliente: ClienteConServicio = Depends(empresa_con_servicio)
             "id": empresa.id, "razon_social": empresa.razon_social, "rut": empresa.rut, "rubro": rubro,
             "fecha_inicio_contrato": empresa.fecha_inicio_contrato,
             "fecha_termino_contrato": empresa.fecha_termino_contrato,
-            "contrato_vigente": empresa.contrato_vigente(),
+            "contrato_vigente": empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS),
             "contrato": contrato_dict(empresa),
         },
         "evaluaciones": [

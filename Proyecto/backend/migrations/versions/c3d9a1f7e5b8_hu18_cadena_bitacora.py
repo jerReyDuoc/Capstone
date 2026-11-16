@@ -1,6 +1,6 @@
 """HU-18: cadena de hashes en la bitácora de auditoría (registro inmutable verificable)
 
-  - bitacora_auditoria.hash_anterior / hash   HMAC-SHA256 encadenado (app/domain/auditoria_hash.py)
+  - bitacora_auditoria.hash_anterior / hash   HMAC-SHA256 encadenado (app/domain/auditoria/auditoria_hash.py)
 
 Las filas existentes se encadenan aquí, en orden de id, con la misma clave que usa la
 aplicación (BITACORA_CLAVE_HASH o, si está vacía, AUTH_SECRET). Para eso se desactiva un
@@ -38,7 +38,7 @@ def upgrade() -> None:
     # Encadenar lo que ya existe (offline --sql no tiene filas: se omite)
     if context_offline():
         return
-    from app.domain import auditoria_hash
+    from app.domain.auditoria import auditoria_hash
     from app.infrastructure.repositories.bitacora_cadena import clave_bitacora
 
     bind = op.get_bind()

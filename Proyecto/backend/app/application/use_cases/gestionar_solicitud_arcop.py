@@ -28,6 +28,8 @@ from app.domain.models.solicitud_arcop import (
     TipoSolicitudARCOP,
     transicion_permitida,
 )
+from app.domain.models.sesion import MotivoCierre
+from app.application.use_cases.sesiones import cerrar_todas
 
 logger = logging.getLogger("arcop")
 
@@ -368,9 +370,22 @@ class GestionarSolicitudARCOPUseCase:
                     solicitud.usuario_temporal_id, _ahora()
                 )
             elif solicitud.usuario_definitivo_id is not None:  # HU-30
+                ahora = _ahora()
                 conteo, rutas = await self.anonimizacion_repo.anonimizar_usuario_definitivo(
-                    solicitud.usuario_definitivo_id, _ahora()
+                    solicitud.usuario_definitivo_id, ahora
                 )
+                # El cierre de sesiones es un caso de uso, no del repositorio; misma sesión/transacción.
+                # `sesiones` conserva su posición (tras enlaces_recuperacion) para no alterar la bitácora.
+                sesiones = await cerrar_todas(
+                    self.anonimizacion_repo.session, Rol.CLIENTE.value,
+                    solicitud.usuario_definitivo_id, MotivoCierre.SUPRESION_ARCOP, ahora,
+                )
+                reordenado = {}
+                for k, v in conteo.items():
+                    reordenado[k] = v
+                    if k == "enlaces_recuperacion":
+                        reordenado["sesiones"] = sesiones
+                conteo = reordenado
             else:
                 conteo, rutas = await self.anonimizacion_repo.anonimizar_encuestado(
                     solicitud.evaluacion_id, _ahora()

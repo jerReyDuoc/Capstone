@@ -23,8 +23,8 @@ from enum import Enum
 from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.cifrado_columnas import TextoCifradoBorrador
-from app.core.database import Base
+from app.infrastructure.persistencia.tipos_cifrados import TextoCifradoBorrador
+from app.domain.models.base import Base
 
 TIPOS_BORRADOR = ("politica_llm", "aviso_privacidad", "pia")
 

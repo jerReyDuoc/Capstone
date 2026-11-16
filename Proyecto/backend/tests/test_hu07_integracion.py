@@ -28,7 +28,7 @@ from test_seguridad_integracion import (
 )
 from _capa_ia_fakes import FakeProvider, FakeRegistro, crear_gateway
 from app.application.ai.politicas import TareaIA
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.application.use_cases import process_evidence as pe
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad

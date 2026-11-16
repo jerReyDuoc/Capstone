@@ -17,12 +17,13 @@ import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchem
 from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.core.config import settings
 from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard, escapar_para_prompt
+from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.application.ai.prompts.base import escapar_para_prompt
 
 RUT = "15.444.333-2"
 CORREO = "juan.perez@empresa.cl"

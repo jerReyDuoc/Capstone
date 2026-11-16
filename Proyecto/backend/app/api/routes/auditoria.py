@@ -29,7 +29,7 @@ from app.core.alcance import solo_admin
 from app.core.autenticacion import Actor, Rol, requerir_rol
 from app.core.database import get_db
 from app.domain.models.bitacora_auditoria import RESULTADOS
-from app.infrastructure.repositories.bitacora_repository import Categoria, acciones_conocidas, categoria
+from app.domain.auditoria.acciones import Categoria, acciones_conocidas, categoria
 
 router = APIRouter(prefix="/api/auditoria", tags=["auditoría externa (HU-09)"])
 router_admin = APIRouter(prefix="/api/admin/auditores", tags=["auditoría externa (HU-09)"])

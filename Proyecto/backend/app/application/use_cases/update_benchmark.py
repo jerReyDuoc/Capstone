@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.benchmark.k_anonimato import FilaCandidata, calcular, evaluaciones_por_organizacion
+from app.domain.benchmark.k_anonimato import FilaCandidata, calcular, evaluaciones_por_organizacion
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion

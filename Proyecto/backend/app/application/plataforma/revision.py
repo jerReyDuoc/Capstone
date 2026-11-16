@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from app.application.plataforma.registro import RegistroPlataforma
-from app.core import catalogo_datos_personales as inv
+from app.domain.privacidad import catalogo_datos_personales as inv
 
 NIVELES = ("critico", "alto", "medio", "bajo")
 _ORDEN = {n: i for i, n in enumerate(NIVELES)}

@@ -38,7 +38,8 @@ from app.domain.models.matriz_version import (
     ESTADO_BORRADOR, ESTADO_PUBLICADA, ESTADO_REEMPLAZADA, MatrizVersion,
 )
 from app.domain.models.usuario_admin import UsuarioAdmin
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.infrastructure.repositories.matriz_repository import MatrizRepository
 
 ENTIDAD_AUDIT = "matriz_version"

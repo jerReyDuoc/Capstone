@@ -20,7 +20,7 @@ import pytest
 
 from app.application.mapa_datos import plantillas as P
 from app.application.mapa_datos import sugerencias as S
-from app.domain import catalogo_tratamiento as cat
+from app.domain.catalogos import catalogo_tratamiento as cat
 from app.domain.mapa_datos import analisis as A
 from app.domain.mapa_datos import disposicion as D
 from app.domain.mapa_datos import versiones as V

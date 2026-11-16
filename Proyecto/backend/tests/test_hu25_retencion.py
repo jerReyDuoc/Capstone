@@ -25,7 +25,7 @@ from sqlalchemy import select, update
 import app.domain.models  # noqa: F401  (registra todas las tablas en Base.metadata)
 from app.core.autenticacion import Actor, Rol
 from app.core.config import settings
-from app.core.database import Base
+from app.domain.models.base import Base
 from app.domain.models import AuditLog
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.configuracion_retencion import ConfiguracionRetencion
@@ -253,7 +253,7 @@ def test_cada_ejecucion_queda_en_el_log_aunque_no_haya_nada(sin_plazos_entorno):
             assert set(d["reglas_desactivadas"]) == {"titulares", "arcop", "eventos", "tutor"}
             assert simulada.detalle["simulacion"] is True
             # categoría "supresion": el Auditor Externo la ve al filtrar supresiones
-            from app.infrastructure.repositories.bitacora_repository import categoria
+            from app.domain.auditoria.acciones import categoria
             assert categoria("retencion.ejecucion") == "supresion"
             assert categoria("retencion.configuracion_cambiada") == "modificacion"
     _con_bd(esc)
@@ -426,6 +426,6 @@ def test_api_retencion_solo_admin():
 
 
 def test_catalogo_de_datos_personales_incluye_la_tabla_nueva():
-    from app.core.catalogo_datos_personales import CATALOGO
+    from app.domain.privacidad.catalogo_datos_personales import CATALOGO
     assert set(CATALOGO["configuracion_retencion"]) == {c.name for c in ConfiguracionRetencion.__table__.columns}
     assert not any(d.es_personal for d in CATALOGO["configuracion_retencion"].values())

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.catalogo_brechas import CatalogoBrechas

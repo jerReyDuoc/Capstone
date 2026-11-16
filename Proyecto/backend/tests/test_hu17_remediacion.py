@@ -229,7 +229,7 @@ def entorno(monkeypatch, tmp_path):
 
 async def _procesar(m, evidencia_id, clasificacion, confianza):
     """Lo que hace el worker ARQ (process_evidence_task) con un LLM simulado."""
-    from app.application.schemas.evidence_validation import EvidenceValidation
+    from app.domain.evidencias.validacion import EvidenceValidation
     from app.application.use_cases.generate_resumen import GenerateResumenUseCase
     from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
     from app.application.use_cases.remediacion import puntaje_general_actual
@@ -367,7 +367,7 @@ def test_api_cuestionario_tambien_rechaza_tipos_no_admitidos(entorno):
         datos = r.json()
         ev, h = datos["evaluacion_id"], m._bearer(datos["access_token"])
         await c.post(f"/api/evaluaciones/{ev}/filtro", json=m.SOLO_BASE, headers=h)
-        from app.application.filters.control_tree import CONTROLES_BASE
+        from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
         rid = (await c.post("/api/respuestas/", headers=h, json={
             "evaluacion_id": ev, "matriz_control_id": m.ID_CONTROL[CONTROLES_BASE[0]],
             "estado_clasificacion": "cumplido", "justificacion": m.JUST})).json()["id_respuesta"]

@@ -12,7 +12,8 @@ from app.infrastructure.llm.factory import (
 from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
 from app.application.use_cases.generate_resumen import GenerateResumenUseCase
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
-from app.infrastructure.repositories.bitacora_repository import ROL_SISTEMA, Accion, BitacoraRepository
+from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
 from app.application.use_cases.aplicar_retencion import AplicarRetencionUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad

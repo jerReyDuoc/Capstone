@@ -33,7 +33,8 @@ from app.domain.models.empresa import Empresa
 from app.domain.models.usuario_definitivo import (
     EstadoUsuarioDefinitivo, TokenActivacion, UsuarioDefinitivo,
 )
-from app.infrastructure.repositories.bitacora_repository import ROL_ANONIMO, Accion, BitacoraRepository
+from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 
 logger = logging.getLogger("seguridad")
 

@@ -251,7 +251,7 @@ JUST = "Existe una política aprobada, pero aún no se aplica en todas las área
 
 
 async def _completar(c, eval_id, todos):
-    from app.application.filters.control_tree import CONTROLES_BASE
+    from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
     ids = {codigo: i + 1 for i, codigo in enumerate(todos)}
     assert (await c.post(f"/api/evaluaciones/{eval_id}/filtro", json=SOLO_BASE)).status_code == 200
     for n, codigo in enumerate(CONTROLES_BASE):

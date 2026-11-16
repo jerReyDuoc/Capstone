@@ -7,7 +7,7 @@ registro de una empresa cliente (Elemento, Flujo, contenido de actividad, Fuente
 los mismos módulos del cliente sin cambiarlos: rat/analisis.py calcula lo que la actividad toma del mapa y
 su completitud, rat/informe.py arma el informe y pdf_rat/xlsx_rat/pdf_ropa/xlsx_ropa lo dibujan.
 
-  Actividades   app/core/catalogo_datos_personales.py: ACTIVIDADES_PLATAFORMA (tablas, finalidades, base,
+  Actividades   app/domain/privacidad/catalogo_datos_personales.py: ACTIVIDADES_PLATAFORMA (tablas, finalidades, base,
                 titulares, elementos y medidas). Las categorías de datos salen de las columnas personales
                 de sus tablas.
   Plazos        uno por categoría de datos. Se agrupan las columnas de la categoría por su conservación; las
@@ -33,8 +33,8 @@ from datetime import datetime
 
 from app.application.informes.ficha import AvisoInforme
 from app.application.rat import informe as I
-from app.core import catalogo_datos_personales as inv
-from app.domain import catalogo_tratamiento as cat_mapa
+from app.domain.privacidad import catalogo_datos_personales as inv
+from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import analisis
 from app.domain.rat import catalogo as cat

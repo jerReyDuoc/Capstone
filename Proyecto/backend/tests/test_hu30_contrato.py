@@ -9,7 +9,7 @@ QA - HU-30: vigencia del contrato de la empresa cliente.
   C3  Al terminar el contrato el usuario descarga sus documentos durante un plazo de gracia;
       después los datos quedan para la retención (HU-25). ARCOP sigue disponible siempre.
 
-Parte 1: reglas puras (app/domain/contrato.py); corre en cualquier entorno, sin BD.
+Parte 1: reglas puras (app/domain/contrato/vigencia.py); corre en cualquier entorno, sin BD.
 Parte 2: API en proceso (SQLite), reutiliza la preparación de test_hu27_empresa_cliente.py
 y de test_hu26_formacion.py; necesita FastAPI, SQLAlchemy y aiosqlite (Docker).
 
@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-from app.domain.contrato import (
+from app.domain.contrato.vigencia import (
     PERMITIDAS, EstadoContrato, Operacion, SituacionContrato as S, evaluar, fin_de_gracia,
 )
 

@@ -27,7 +27,7 @@ from sqlalchemy import select, text
 from _api_harness import MODO, cliente_api  # noqa: E402
 from app.core import autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.domain import auditoria_hash  # noqa: E402
+from app.domain.auditoria import auditoria_hash  # noqa: E402
 
 if MODO == "en_proceso":
     pytest.importorskip("aiosqlite", reason="pip install aiosqlite")
@@ -373,7 +373,7 @@ def _abrir_zip(contenido: bytes, destino: Path) -> dict:
 
 
 def _verificar(destino: Path, *args) -> int:
-    from app.domain import verificar_exportacion
+    from app.application.auditoria.recursos import verificar_exportacion
     return verificar_exportacion.main([str(destino), *args])
 
 
@@ -398,7 +398,7 @@ def test_exportacion_zip_verificable_sin_el_sistema(tmp_path):
             assert {"fecha", "actor_rol", "actor_id", "ip", "accion", "resultado", "categoria", "hash", "lote"} <= set(reg)
         assert manifiesto["log_integro_al_exportar"] is True
         # el script copiado en el ZIP es el mismo del sistema
-        assert archivos["verificar_exportacion.py"] == (RAIZ / "app" / "domain" / "verificar_exportacion.py").read_bytes()
+        assert archivos["verificar_exportacion.py"] == (RAIZ / "app" / "application" / "auditoria" / "recursos" / "verificar_exportacion.py").read_bytes()
         assert _verificar(tmp_path / "exp1") == 0
         ancla = manifiesto["ultimo_sello"]
 
@@ -428,7 +428,7 @@ def test_exportacion_adulterada_la_detecta_el_script(tmp_path):
         reg["resultado"] = "rechazado" if reg["resultado"] == "ok" else "ok"
         lineas[1] = json.dumps(reg, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         (d / "audit_log.jsonl").write_text("\n".join(lineas) + "\n", encoding="utf-8")
-        from app.domain import verificar_exportacion
+        from app.application.auditoria.recursos import verificar_exportacion
         res = verificar_exportacion.verificar(d)
         assert res["ok"] is False
         assert any("SHA-256" in f for f in res["fallas"]) and any("hash recalculado" in f for f in res["fallas"])
@@ -578,7 +578,7 @@ def test_rutas_hu09_por_rol(metodo, url, kwargs):
 def test_modificacion_de_respuesta_y_revision_quedan_en_el_log_sin_texto():
     async def esc(c):
         from _api_harness import TODOS_LOS_CONTROLES
-        from app.application.filters.control_tree import CONTROLES_BASE
+        from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
 
         cuerpo = {"respuestas": [{"codigo": f"F{i}", "respuesta": i == 1} for i in range(1, 8)]}
         assert (await c.post("/api/evaluaciones/1/filtro", json=cuerpo, headers=admin())).status_code == 200

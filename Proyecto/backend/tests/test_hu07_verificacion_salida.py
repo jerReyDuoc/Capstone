@@ -34,7 +34,7 @@ import pytest
 
 from app.application.ai import verificacion_salida as vs
 from app.application.ai.metricas import FilaLlamada, resumen_verificacion
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 
 DATASET = Path(__file__).parent / "data" / "alucinaciones_evidencias.jsonl"
 MIN_CASOS = 100

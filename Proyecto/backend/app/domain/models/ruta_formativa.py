@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Integer, String, Text, ForeignKey, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column
-from app.core.database import Base
+from app.domain.models.base import Base
 
 
 def _lineas(texto: str | None) -> tuple[str, ...]:

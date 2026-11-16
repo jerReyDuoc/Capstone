@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import crear_politicas
-from app.application.schemas.evidence_validation import EvidenceValidation
+from app.domain.evidencias.validacion import EvidenceValidation
 from app.domain.ports.llm_provider_port import LLMProviderError, LLMProviderPort, LLMResponse
 from app.domain.ports.registro_ia_port import RegistroIAPort
 from app.infrastructure.security.ner_sanitizer import NERSanitizer

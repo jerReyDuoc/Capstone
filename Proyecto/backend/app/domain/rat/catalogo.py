@@ -17,7 +17,7 @@ Reglas (las verifica tests/test_hu35_rat.py):
     usando). Para retirar una opción se marca `vigente=False`.
   - El texto que ve el cliente no lleva códigos internos ni números de historia o tarea.
   - Las categorías de datos y de titulares NO se repiten aquí: son las del catálogo común con el
-    mapa (app/domain/catalogo_tratamiento.py).
+    mapa (app/domain/catalogos/catalogo_tratamiento.py).
 """
 from __future__ import annotations
 

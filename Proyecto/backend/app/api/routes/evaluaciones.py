@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.alcance import actor_de_evaluaciones, alcance_evaluacion, empresa_del_cliente, solo_admin
 from app.core.autenticacion import Actor, Rol
-from app.infrastructure.repositories.bitacora_repository import Accion, BitacoraRepository
+from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.core.database import get_db
 from app.application.schemas.api_schemas import (
     EvaluacionResumenResponse,
