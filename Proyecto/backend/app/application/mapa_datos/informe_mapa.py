@@ -1,6 +1,6 @@
 """
 HU-34 criterio 3 · Datos del informe PDF del mapa de datos personales (puro): DTOs, nombre del archivo,
-huella legible y cuerpo del correo. El PDF se dibuja en app/infrastructure/documentos/pdf/mapa_datos.py (A-14).
+huella legible y cuerpo del correo. El PDF se dibuja en app/infrastructure/documentos/pdf/mapa_datos_pdf.py (A-14).
 """
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from html import escape
 
-from app.domain.mapa_datos import analisis
-from app.domain.mapa_datos.modelo import Elemento, Flujo
+from app.domain.mapa_datos import analisis_mapa as analisis
+from app.domain.mapa_datos.modelo_mapa import Elemento, Flujo
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,7 @@ Registro de Actividades de Tratamiento (RAT) y el RoPA: ambos guardan los mismos
 que un elemento del mapa y una actividad del RAT hablan el mismo idioma y se pueden cruzar
 (qué categorías trata cada sistema, de qué titulares, dónde están y con quién se comparten).
 
-Reglas del catálogo (las verifica tests/test_hu34_mapa_datos.py):
+Reglas del catálogo (las verifica tests/integracion/test_hu34_mapa_datos.py):
   - Los códigos son estables: NO se renombran ni se borran (un mapa o un RAT antiguo los
     sigue usando). Para retirar una categoría se marca `vigente=False`: deja de ofrecerse en
     la interfaz, pero lo ya registrado se sigue leyendo.

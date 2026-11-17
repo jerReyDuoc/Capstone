@@ -12,7 +12,7 @@ Uso (desde Proyecto/backend, con el venv activo o dentro del contenedor):
     # En Docker (servidor de pruebas):
     docker compose exec worker python scripts/evaluacion/benchmark_ner.py --paginas 100
 
-Mide el MISMO camino que usa el worker: NERSanitizer().sanitizar(texto, max_chars),
+Mide el MISMO camino que usa el worker: SanitizadorNer().sanitizar(texto, max_chars),
 con el modelo ya cargado (la carga se mide aparte, ocurre una sola vez al iniciar).
 """
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _percentil(valores: list[float], p: float) -> float:
 
 
 def medir(textos: list[str], max_chars: int | None, repeticiones: int) -> dict:
-    s = ner_sanitizer.NERSanitizer()
+    s = ner_sanitizer.SanitizadorNer()
     tiempos, entidades = [], 0
     for _ in range(repeticiones):
         for t in textos:
@@ -114,7 +114,7 @@ def main() -> int:
 
     if a.perfil:
         textos = paginas(min(a.paginas, 20), chars=a.chars)
-        s = ner_sanitizer.NERSanitizer()
+        s = ner_sanitizer.SanitizadorNer()
         prof = cProfile.Profile()
         prof.enable()
         for t in textos:

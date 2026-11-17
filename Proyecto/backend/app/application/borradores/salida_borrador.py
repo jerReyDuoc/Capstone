@@ -21,13 +21,13 @@ from __future__ import annotations
 import re
 
 from app.application.ai.agente import salida_tutor as validacion
-from app.application.borradores.generador import (
+from app.application.borradores.generador_markdown import (
     CODIGO_INTERNO,
     AdaptacionIA,
     ContextoBorrador,
     articulos_validos,
 )
-from app.application.borradores.plantillas import Plantilla
+from app.application.borradores.plantillas_borrador import Plantilla
 from app.application.ai.schemas.borrador import BorradorIA
 
 MAX_SECCIONES = 6

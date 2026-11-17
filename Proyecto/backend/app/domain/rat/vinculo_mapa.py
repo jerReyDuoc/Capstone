@@ -12,7 +12,7 @@ lo eligió todavía.
 """
 from __future__ import annotations
 
-from app.domain.mapa_datos.versiones import ETIQUETA_CAMPO, NOMBRE_TIPO
+from app.domain.mapa_datos.versiones_mapa import ETIQUETA_CAMPO, NOMBRE_TIPO
 
 _IGNORADOS = frozenset({"pendiente_revision"})
 

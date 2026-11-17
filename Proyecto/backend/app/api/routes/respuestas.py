@@ -1,5 +1,4 @@
 import logging
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,45 +6,43 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencias.alcance import actor_opcional, alcance_respuesta, solo_admin, verificar_alcance
 from app.domain.auth.actor import Actor
 from app.core.database import get_db
-from app.application.use_cases.crear_respuesta import (
-    CreateRespuestaUseCase,
+from app.application.evaluacion.casos_uso.crear_respuesta import (
+    CrearRespuestaUseCase,
     InyeccionDetectadaError,
     RespuestaRechazadaError,
     ResultadoRespuesta,
 )
-from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
-from app.api.schemas.api_schemas import RespuestaDetalleResponse, EvidenciaDetalleResponse
+from app.application.auditoria.casos_uso.registrar_evento_seguridad import RegistrarEventoSeguridad
+from app.api.schemas.comunes import RespuestaDetalleResponse, EvidenciaDetalleResponse
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.guardia_prompt import ReglasGuardiaPrompt
 from app.api.dependencias.contenedor import crear_anonimizador
-from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion
-from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.respuesta import EstadoClasificacion
 from app.application.ai.anonimizador import AnonimizacionError
-from app.application.use_cases.generar_resumen import GenerateResumenUseCase
-from app.application.seguridad.huella import huella
+from app.application.fabricas import fabricas
+from app.application.evaluacion.casos_uso.revisar_respuesta import RevisarRespuestaUseCase, RespuestaNoEncontradaError
 from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.api.schemas.respuestas import CreateRespuestaRequest, UpdateRespuestaRequest, RevisionRequest
+from app.api.schemas.respuestas_esquemas import CrearRespuestaRequest, ActualizarRespuestaRequest, RevisionRequest
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
 
 
-def _use_case(db: AsyncSession, actor: Actor | None = None) -> CreateRespuestaUseCase:
-    guard = ReglasPromptGuard()
+def _use_case(db: AsyncSession, actor: Actor | None = None) -> CrearRespuestaUseCase:
+    guard = ReglasGuardiaPrompt()
 
     def auditar(respuesta, detalle: dict) -> None:
         # HU-09: la modificación queda en el audit_log en la MISMA transacción que el cambio.
         # Sin token (solo con EXIGIR_TOKEN_EVALUACIONES=false, desarrollo) el actor es anónimo.
-        BitacoraRepository(db).registrar(
+        fabricas().bitacora(db).registrar(
             accion=Accion.RESPUESTA_MODIFICADA, entidad="respuestas", entidad_id=respuesta.id,
             actor=actor, detalle=detalle,
         )
 
-    return CreateRespuestaUseCase(
+    return CrearRespuestaUseCase(
         RespuestaRepository(db),
         EvaluacionRepository(db),
         guard=guard,
@@ -86,7 +83,7 @@ def _cuerpo(resultado: ResultadoRespuesta) -> dict:
     },
 )
 async def create_respuesta(
-    payload: CreateRespuestaRequest,
+    payload: CrearRespuestaRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
     actor: Actor | None = Depends(actor_opcional),
@@ -112,7 +109,7 @@ async def create_respuesta(
 @router.put("/{respuesta_id}")
 async def update_respuesta(
     respuesta_id: int,
-    payload: UpdateRespuestaRequest,
+    payload: ActualizarRespuestaRequest,
     db: AsyncSession = Depends(get_db),
     actor: Actor | None = Depends(alcance_respuesta),
 ):
@@ -188,15 +185,6 @@ async def anonimizar_comentario(texto: str) -> str:
                        "Intenta nuevamente en unos minutos."})
 
 
-def _ultima_clasificacion_llm(respuesta) -> str | None:
-    """Clasificación que propuso el LLM en la evidencia procesada más reciente (o None)."""
-    con_llm = [e for e in (respuesta.evidencias or []) if e.clasificacion_llm]
-    if not con_llm:
-        return None
-    con_llm.sort(key=lambda e: (e.fecha_procesada or date.min, e.id_evidencia))
-    return con_llm[-1].clasificacion_llm
-
-
 @router.patch("/{respuesta_id}/revision")
 async def revisar_respuesta(
     respuesta_id: int,
@@ -223,67 +211,19 @@ async def revisar_respuesta(
             detail=f"Clasificación inválida. Debe ser una de: {', '.join(valores)}",
         )
     comentario = validar_comentario(payload.comentario)
-    repo = RespuestaRepository(db)
-    respuesta = await repo.get(respuesta_id)
-    if not respuesta:
+    try:
+        r = await RevisarRespuestaUseCase(db, RespuestaRepository(db)).revisar(
+            respuesta_id, payload.clasificacion_revisada, comentario, _admin, anonimizar_comentario)
+    except RespuestaNoEncontradaError:
         raise HTTPException(status_code=404, detail="Respuesta no encontrada")
-    comentario = await anonimizar_comentario(comentario)
-
-    anterior = respuesta.estado_clasificacion_final or respuesta.estado_clasificacion
-    decision = (DecisionRevision.CONFIRMADA if payload.clasificacion_revisada == anterior
-                else DecisionRevision.CORREGIDA).value
-    clasificacion_llm = _ultima_clasificacion_llm(respuesta)
-
-    # HU-09: la revisión cambia la clasificación final: queda en el audit_log (misma transacción).
-    # HU-22: con la decisión, lo que había declarado el usuario y propuesto el LLM (la verdad de
-    # referencia) y solo la huella HMAC y el largo del comentario: el log nunca guarda texto libre.
-    BitacoraRepository(db).registrar(
-        accion=Accion.RESPUESTA_REVISADA, entidad="respuestas", entidad_id=respuesta.id, actor=_admin,
-        detalle={"evaluacion_id": respuesta.evaluacion_id,
-                 "estado_final_anterior": respuesta.estado_clasificacion_final,
-                 "fuente_anterior": respuesta.fuente_clasificacion,
-                 "estado_final_nuevo": payload.clasificacion_revisada,
-                 "decision": decision,
-                 "estado_declarado": respuesta.estado_clasificacion,
-                 "clasificacion_llm": clasificacion_llm,
-                 "revision_previa": respuesta.clasificacion_revisada,
-                 "comentario_huella": huella(comentario),
-                 "comentario_largo": len(comentario)},
-    )
-    respuesta.clasificacion_revisada = payload.clasificacion_revisada
-    respuesta.fecha_revision = date.today()
-    respuesta.estado_clasificacion_final = payload.clasificacion_revisada
-    respuesta.fuente_clasificacion = FuenteClasificacion.REVISION.value
-    respuesta.comentario_revision = comentario
-    respuesta.decision_revision = decision
-    respuesta.revisor_admin_id = _admin.id
-    # HU-02: la brecha sigue al estado vigente (se asigna en no_cumplido y se quita
-    # en cualquier otro), también cuando la revisión corrige una decisión del LLM.
-    control = None
-    if payload.clasificacion_revisada == EstadoClasificacion.NO_CUMPLIDO.value:
-        control = await repo.get_control(respuesta.matriz_controles_id_control)
-    respuesta.sincronizar_brecha(control)
-    await repo.update(respuesta)
-
-    # HU-22: una corrección sobre una evaluación ya cerrada cambia su puntaje (como HU-17)
-    puntajes_recalculados = False
-    if decision == DecisionRevision.CORREGIDA.value and respuesta.evaluacion_id:
-        evaluacion = await db.get(Evaluacion, respuesta.evaluacion_id)
-        if evaluacion is not None and evaluacion.esta_cerrada:
-            try:
-                await GenerateResumenUseCase(db).execute(respuesta.evaluacion_id)
-                puntajes_recalculados = True
-            except Exception:  # noqa: BLE001 - la revisión ya quedó; el resumen se puede regenerar
-                await db.rollback()
-                logger.exception("[HU-22] no se pudo recalcular el resumen de la evaluación %s",
-                                 respuesta.evaluacion_id)
+    respuesta = r.respuesta
     return {
         "id_respuesta": respuesta.id,
         "clasificacion_revisada": respuesta.clasificacion_revisada,
         "estado_clasificacion_final": respuesta.estado_clasificacion_final,
         "fuente_clasificacion": respuesta.fuente_clasificacion,
-        "decision": decision,
-        "comentario": comentario,
+        "decision": r.decision,
+        "comentario": r.comentario,
         "fecha_revision": respuesta.fecha_revision.isoformat(),
-        "puntajes_recalculados": puntajes_recalculados,
+        "puntajes_recalculados": r.puntajes_recalculados,
     }

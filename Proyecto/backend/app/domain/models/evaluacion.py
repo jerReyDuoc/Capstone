@@ -74,6 +74,16 @@ class Evaluacion(Base):
     def esta_cerrada(self) -> bool:
         return self.estado_progreso in ESTADOS_CERRADOS
 
+    def cerrar(self, fecha: datetime, matriz_version_id: int | None, version_matriz: str | None) -> None:
+        """Cierre definitivo (POST /completar): estado, fecha y versión de la matriz. Sin I/O.
+
+        Sin versión publicada (matriz_version_id None) no se toca matriz_version_id."""
+        self.estado_progreso = "completada"
+        self.fecha_completado = fecha
+        if matriz_version_id is not None:
+            self.matriz_version_id = matriz_version_id
+        self.version_matriz = version_matriz
+
     @property
     def es_de_empresa(self) -> bool:
         """HU-29: la inició el usuario definitivo desde la cuenta (no viene del autodiagnóstico)."""

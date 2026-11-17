@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencias.alcance import actor_de_evaluaciones, alcance_evaluacion, solo_admin
 from app.api.dependencias.consultas import consultar_evaluaciones_uc
-from app.api.schemas.api_schemas import (
+from app.api.schemas.comunes import (
     EvaluacionResumenResponse,
     RespuestaResumenResponse,
 )
-from app.api.schemas.evaluaciones import MarcarPruebaRequest
-from app.application.use_cases.consultar_evaluaciones import (
+from app.api.schemas.evaluaciones_esquemas import MarcarPruebaRequest
+from app.application.evaluacion.casos_uso.consultar_evaluaciones import (
     ConsultarEvaluacionesUseCase,
     EvaluacionNoEncontradaError,
 )

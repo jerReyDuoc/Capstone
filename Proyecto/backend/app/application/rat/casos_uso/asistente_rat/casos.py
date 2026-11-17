@@ -7,7 +7,7 @@ from app.application.ai.anonimizador import AnonimizadorPII
 from app.application.rat.casos_uso.asistente_rat.conversacion import ConversacionMixin
 from app.application.rat.casos_uso.asistente_rat.decisiones import DecisionesMixin
 from app.application.rat.casos_uso.asistente_rat.documentos import DocumentosMixin
-from app.application.rat.casos_uso.asistente_rat.sesion import SesionMixin
+from app.application.rat.casos_uso.asistente_rat.sesion_asistente import SesionMixin
 from app.application.fabricas import fabricas
 from app.domain.ports.limitador_port import Limitador
 

@@ -1,14 +1,12 @@
 """Mapa de datos: lectura del mapa, la vista completa y el dominio."""
 from __future__ import annotations
 
-from sqlalchemy import select
-
 from app.application.mapa_datos.casos_uso.comun import _iso, elemento_de_fila, flujo_de_fila
 from app.core.config import settings
 from app.domain.catalogos import catalogo_tratamiento as cat
-from app.domain.mapa_datos import analisis
-from app.domain.mapa_datos.modelo import Elemento, Flujo
-from app.domain.models.mapa_datos import MapaDatos, MapaElemento, MapaFlujo
+from app.domain.mapa_datos import analisis_mapa as analisis
+from app.domain.mapa_datos.modelo_mapa import Elemento, Flujo
+from app.domain.models.mapa_datos_tablas import MapaDatos, MapaElemento, MapaFlujo
 
 
 class LecturaMixin:
@@ -16,24 +14,17 @@ class LecturaMixin:
 
     # ================================================================ lectura
     async def _mapa(self, bloquear: bool = False) -> MapaDatos | None:
-        q = select(MapaDatos).where(MapaDatos.empresa_id == self.empresa_id)
-        if bloquear:
-            q = q.with_for_update()
-        return (await self.db.execute(q)).scalar_one_or_none()
+        return await self.repo.mapa(self.empresa_id, bloquear=bloquear)
 
     async def _filas(self, mapa_id: int) -> tuple[list[MapaElemento], list[MapaFlujo]]:
-        el = (await self.db.execute(
-            select(MapaElemento).where(MapaElemento.mapa_id == mapa_id).order_by(MapaElemento.id))).scalars().all()
-        fl = (await self.db.execute(
-            select(MapaFlujo).where(MapaFlujo.mapa_id == mapa_id).order_by(MapaFlujo.id))).scalars().all()
+        el = await self.repo.elementos(mapa_id)
+        fl = await self.repo.flujos(mapa_id)
         return list(el), list(fl)
 
     async def rubro(self) -> str | None:
-        from app.domain.models.rubro import Rubro
-
         if self.rubro_id is None:
             return None
-        return (await self.db.execute(select(Rubro.nombre_rubro).where(Rubro.id == self.rubro_id))).scalar_one_or_none()
+        return await self.repo.nombre_rubro(self.rubro_id)
 
     def _armar_vista(self, mapa: MapaDatos | None, el_filas: list[MapaElemento], fl_filas: list[MapaFlujo]) -> dict:
         els = [elemento_de_fila(r) for r in el_filas]

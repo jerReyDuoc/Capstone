@@ -95,7 +95,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
 | Derechos ARCOP en la página web (HU-32) | ✅ Hecho | Usuario temporal (N.º de evaluación + clave) en `/panel/mis-derechos`, usuario definitivo en `/empresa/mis-derechos` (con o sin contrato), bandeja del admin en `/admin/arcop`, seguimiento público en `/mis-derechos` y descarga de datos en JSON/CSV al resolverse un acceso o una portabilidad. Ver `Extras/Cambios/frontend/CAMBIOS_HU32.md` |
 | Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios; un solo `Proyecto/.env` para todo, con los puertos del host configurables (ver 12.1) |
-| Suite de pruebas (pytest) | ✅ Hecho | 133 funciones de prueba (212 casos) + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
+| Suite de pruebas (pytest) | ✅ Hecho | 1506 casos en `tests/unit`, `tests/integracion` y `tests/ia` + prueba en vivo, prueba de latencia y pruebas de rendimiento del NER |
 | Panel web (HU-13, HU-11, HU-12) | ✅ Hecho | `frontend-next/` (Next.js 15 + React 19): diagnóstico, dominios, brechas priorizadas por severidad (HU-11) y capacitación (HU-12), con radar y barras interactivos, meta de cumplimiento, descarga del informe PDF y envío por correo; conectado a la API real; responsivo ≥ 1024 px y WCAG 2.1 AA. Ver [sección 10.1](#101-panel-web-hu-13-hu-11-hu-12) |
 | Resto del frontend (backoffice de matriz y árbol) | 🟡 Demo estática | Cuestionario (HU-01/02), landing (HU-19), informe y formación ya están en `frontend-next/`; el backoffice solo existía en el prototipo HTML (API **simulada** en `localStorage`), archivado en `Extras/frontend-prototipo/` |
 | Alta de invitaciones (usuario temporal) y evaluaciones por API | 🔴 Pendiente | Hoy se crean por SQL |
@@ -162,7 +162,7 @@ Orden de arranque: `db` sano → `migrate` termina bien → `api` y `worker` →
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**Regla de dependencia:** las capas externas dependen de las internas, nunca al revés. Cambiar el LLM (Groq → otro proveedor) o el storage (local → S3) es reemplazar un adaptador sin tocar la lógica de negocio. Puertos definidos: `LLMProviderPort`, `SanitizerPort`, `RegistroIAPort`, `PromptGuardPort`, `EvidenceValidatorPort`, `FileStoragePort`.
+**Regla de dependencia:** las capas externas dependen de las internas, nunca al revés. Cambiar el LLM (Groq → otro proveedor) o el storage (local → S3) es reemplazar un adaptador sin tocar la lógica de negocio. Puertos definidos: `ProveedorLlmPort`, `SanitizadorPort`, `RegistroIAPort`, `GuardiaPromptPort`, `ValidadorEvidenciasPort`, `AlmacenamientoPort`.
 
 ### Principios de diseño
 
@@ -209,9 +209,9 @@ Capstone/
         ├── migrations/versions/    # 18 migraciones Alembic
         ├── scripts/evaluacion/benchmark_ner.py  # Benchmark y profiling del motor NER (T-04)
         ├── scripts/evaluacion/auditoria_minimizacion.py  # T-06: DER, matriz y escaneo de la BD (solo lectura)
-        ├── scripts/operacion/retencion_datos.py         # T-06: plazos de conservación (simulación / --aplicar)
+        ├── app/cli/retencion.py                         # T-06: plazos de conservación (simulación / --aplicar)
         ├── scripts/sql/t06_rol_auditor.sql    # T-06: rol de solo lectura para auditar
-        ├── tests/                  # Suite pytest (ver sección 14); data/evidencias_ejemplo/ para pruebas manuales
+        ├── tests/                  # Suite pytest (ver sección 14); data/evidencia.txt y evidencia_maliciosa.txt para pruebas manuales
         └── app/
             ├── main.py             # App FastAPI, routers y pool ARQ
             ├── core/
@@ -221,28 +221,40 @@ Capstone/
             │   └── crear_admin.py  # CLI para crear/desactivar administradores
             ├── api/routes/         # arcop, auth, catalogos, controles, encuesta_publica, evaluaciones,
             │                       # evidencias, filtro, informes (HU-12), metricas_ia, reportes,
-            │                       # respuestas, seguridad
+            │                       # respuestas, eventos_seguridad
+            ├── api/schemas/        # esquemas HTTP (Pydantic) por módulo: *_esquemas.py, comunes.py
             ├── application/
             │   ├── ai/             # gateway.py, politicas.py, metricas.py, validador_evidencias.py,
-            │   │                   # prompts/ (base.py, validar_evidencia.py)
-            │   ├── informes/       # HU-12: analisis.py (severidad, brechas, plan formativo; lógica pura),
-            │   │                   # carga.py, pdf_informe.py (reportlab), correo.py (SMTP / .eml)
-            │   ├── schemas/        # api_schemas, arcop_schemas, evidence_validation
-            │   └── use_cases/      # crear_respuesta, subir_evidencia, procesar_evidencia,
-            │                       # responder_filtro, generar_resumen, actualizar_benchmark,
-            │                       # obtener_metricas_ia, registrar_evento_seguridad,
-            │                       # gestionar_solicitud_arcop, iniciar_sesion
+            │   │                   # prompts/ (renderizado_prompt.py, validar_evidencia.py), schemas/ (salidas del LLM: asistente_rat, borrador, tutor)
+            │   ├── informes/       # HU-12: analisis_informe.py (filtros y JSON del plan; la lógica pura de severidad, brechas y plan formativo está en `domain/evaluacion/analisis_brechas.py`),
+            │   │                   # carga.py, correo.py (SMTP / .eml); el PDF está en infrastructure/documentos/pdf/informe_evaluacion_pdf.py
+            │   ├── evaluacion/casos_uso/       # crear_respuesta, responder_filtro, generar_resumen, revisar_respuesta, ...
+            │   ├── evidencias/casos_uso/       # subir_evidencia, procesar_evidencia
+            │   ├── cuentas/casos_uso/          # iniciar_sesion, recuperacion_contrasena, sesiones, ...
+            │   ├── encuesta_publica/casos_uso/ # iniciar_encuesta_publica, limites_encuesta, recordar_email_encuestado
+            │   ├── contratacion/casos_uso/     # aviso_contratacion, consentimientos_contratacion, contratacion_empresa, gestionar_contrato
+            │   ├── arcop/casos_uso/            # exportar_datos_arcop, gestionar_solicitud_arcop
+            │   ├── retencion/casos_uso/        # aplicar_retencion, configurar_retencion
+            │   ├── administracion/casos_uso/   # mantenedor_matriz, mantenedor_rubros, panel_clientes
+            │   ├── empresa/casos_uso/          # documentos_empresa, espacio_empresa, formacion_empresa, historial_empresa
+            │   ├── auditoria/casos_uso/        # auditoria_externa, registrar_evento_seguridad, resolver_evento_seguridad
+            │   ├── benchmark/casos_uso/        # actualizar_benchmark
+            │   ├── ai/casos_uso/               # obtener_metricas_ia
+            │   ├── borradores/casos_uso/       # generar_borradores
+            │   ├── ropa/casos_uso/             # generar_informe_ropa
+            │   ├── plataforma/casos_uso/       # privacidad_plataforma
+            │   └── tutor/casos_uso/            # tutor_ia
             ├── domain/
             │   ├── matriz/         # arbol_aplicabilidad.py: árbol de aplicabilidad F1–F7 (antes application/filters/control_tree.py)
             │   ├── models/         # 19 entidades SQLAlchemy (ver sección 6); base.py con Base
             │   └── ports/          # Interfaces ABC
             ├── infrastructure/
-            │   ├── llm/            # groq_provider.py, factory.py
+            │   ├── llm/            # proveedor_groq.py, factory.py
             │   ├── repositories/   # 10 repositorios
-            │   ├── security/       # cripto/ (cifrado.py, autenticacion.py), prompt_injection/ (seguridad.py, filtro_agente.py, prompt_guard.py), pii/ (sanitizador_ner.py)
+            │   ├── security/       # cripto/ (cifrado.py, contrasenas_y_tokens.py), prompt_injection/ (seguridad.py, filtro_agente.py, guardia_prompt.py), pii/ (sanitizador_ner.py)
 │   ├── servicios_externos/ # captcha.py
-            │   └── storage/        # local_storage.py, archivo_cifrado_storage.py (HU-06)
-            └── worker/tasks.py     # process_evidence_task + cron update_benchmark_task
+            │   └── storage/        # almacenamiento_local.py, archivo_cifrado_almacenamiento.py (HU-06)
+            └── worker/tasks.py     # procesar_evidencia_task + cron actualizar_benchmark_task
 ```
 
 ---
@@ -289,7 +301,7 @@ Las 7 preguntas se responden SI/NO y deben venir **todas** en un mismo envío (s
 | F6 | ¿La IA toma decisiones que afectan derechos, personas, crédito o contrataciones? | RIE-005, RIE-006, SEG-010 |
 | F7 | ¿La empresa desarrolla, entrena o adapta internamente modelos o agentes de IA? | RIE-007, GOB-006 |
 
-La tabla es la **semilla** (versión `2026.1`). Desde HU-24 el árbol vive en la BD (`regla_aplicabilidad` y `preguntas_filtro.es_compuerta`) y el administrador lo cambia desde `/admin/matriz`, con versionado (ver 5.16). `app/domain/matriz/arbol_aplicabilidad.py` conserva la semilla y la evaluación del árbol; en ejecución se usa `app/infrastructure/cache/arbol_aplicabilidad.py`.
+La tabla es la **semilla** (versión `2026.1`). Desde HU-24 el árbol vive en la BD (`regla_aplicabilidad` y `preguntas_filtro.es_compuerta`) y el administrador lo cambia desde `/admin/matriz`, con versionado (ver 5.16). `app/domain/matriz/arbol_aplicabilidad.py` conserva la semilla y la evaluación del árbol; en ejecución se usa `app/infrastructure/cache/arbol_aplicabilidad_cache.py`.
 
 ### 5.3 Respuesta a un control
 
@@ -324,7 +336,7 @@ sequenceDiagram
     participant FS as Storage
     participant Q as Redis (ARQ)
     participant W as Worker
-    participant G as Capa IA (AIGateway)
+    participant G as Capa IA (GatewayIA)
     participant L as Groq
     participant DB as PostgreSQL
 
@@ -332,7 +344,7 @@ sequenceDiagram
     API->>DB: valida respuesta (solo cumplido/parcial)
     API->>FS: guarda archivo (uuid_nombre) + hash SHA-256
     API->>DB: evidencia estado=pending
-    API->>Q: enqueue process_evidence_task
+    API->>Q: enqueue procesar_evidencia_task
     API-->>C: 202 Accepted
     Q->>W: job
     W->>DB: evidencia → processing; carga respuesta, control y brecha
@@ -352,7 +364,7 @@ sequenceDiagram
     end
 ```
 
-**Reglas de decisión** (`ProcessEvidenceUseCase._apply_classification_decision`), con `UMBRAL_CONFIANZA = 0.8` por defecto:
+**Reglas de decisión** (`ProcesarEvidenciaUseCase._apply_classification_decision`), con `UMBRAL_CONFIANZA = 0.8` por defecto:
 
 | # | Condición | Resultado en la respuesta | Evidencia | Fuente |
 |---|---|---|---|---|
@@ -388,7 +400,7 @@ Si todos los controles quedan fuera (F1 = NO o 100 % `no_aplica`), no se genera 
 
 ### 5.7 Benchmark sectorial y meta de cumplimiento
 
-`UpdateBenchmarkUseCase` borra y recalcula `benchmark` agrupando los resúmenes por **rubro × dominio** (promedio, mediana, máximo, mínimo, cantidad) de las evaluaciones con `estado_progreso = 'completada'` (sin las de prueba). Se ejecuta **al completar cada evaluación** (`BENCHMARK_AL_COMPLETAR=true`; si falla, `/completar` responde igual) y en el cron diario de ARQ (02:00 UTC), que lo repara.
+`ActualizarBenchmarkUseCase` borra y recalcula `benchmark` agrupando los resúmenes por **rubro × dominio** (promedio, mediana, máximo, mínimo, cantidad) de las evaluaciones con `estado_progreso = 'completada'` (sin las de prueba). Se ejecuta **al completar cada evaluación** (`BENCHMARK_AL_COMPLETAR=true`; si falla, `/completar` responde igual) y en el cron diario de ARQ (02:00 UTC), que lo repara.
 
 > Antes solo corría el cron: quien terminaba el cuestionario no veía la comparativa hasta el día siguiente. Ese era el motivo de que "no saliera la comparativa con la industria".
 
@@ -449,7 +461,7 @@ stateDiagram-v2
 
 ### 5.10 Plan formativo (HU-12)
 
-`GET /api/evaluaciones/{id}/plan-formativo` arma el plan de estudio a partir de las brechas de la evaluación (lógica pura en `application/informes/analisis.py`, la misma que usa el PDF):
+`GET /api/evaluaciones/{id}/plan-formativo` arma el plan de estudio a partir de las brechas de la evaluación (lógica pura en `domain/evaluacion/analisis_brechas.py`, la misma que usa el PDF):
 
 1. **Mapeo automático:** cada brecha (no cumplida o parcial) activa la ruta que el catálogo le asigna (`catalogo_brechas.ruta_formativa_id`). Los parciales, que no llevan brecha en la respuesta, se mapean por la brecha de su control. Las brechas sin ruta se informan aparte (cobertura del mapeo).
 2. **Nivel por dimensión** según el puntaje del dominio: ≤ 50 **Inicial** · ≤ 75 **Intermedio** · > 75 **Avanzado**, con su objetivo. La ruta de ese nivel entra siempre como "Base del nivel".
@@ -466,7 +478,7 @@ Cada módulo trae objetivo general, objetivos específicos, contenidos, horas, m
 
 ### 5.12 Agente IA Tutor (HU-15)
 
-La capa de IA pasó a ser un **agente de LangGraph** (`application/ai/agente/`). El grafo tiene un nodo `guardia` (prompt injection, antes del LLM y del NER), un router **determinista** que elige la skill según lo que pide el caso de uso, y una skill por tarea: `validar_evidencia` (la evaluación de evidencias de siempre, sin cambios de comportamiento) y `tutor` (con un nodo final que ancla la salida a las brechas del contexto). Cada skill llama al `AIGateway` con su `TareaIA`, así que sanitización, prompt versionado (`tutor/1.2.0` desde HU-18), schema estricto y métricas siguen en un solo lugar. El LLM no tiene herramientas ni toca la BD: el caso de uso `TutorIA` carga el contexto, invoca el agente y persiste.
+La capa de IA pasó a ser un **agente de LangGraph** (`application/ai/agente/`). El grafo tiene un nodo `guardia` (prompt injection, antes del LLM y del NER), un router **determinista** que elige la skill según lo que pide el caso de uso, y una skill por tarea: `validar_evidencia` (la evaluación de evidencias de siempre, sin cambios de comportamiento) y `tutor` (con un nodo final que ancla la salida a las brechas del contexto). Cada skill llama al `GatewayIA` con su `TareaIA`, así que sanitización, prompt versionado (`tutor/1.2.0` desde HU-18), schema estricto y métricas siguen en un solo lugar. El LLM no tiene herramientas ni toca la BD: el caso de uso `TutorIA` carga el contexto, invoca el agente y persiste.
 
 1. **Contexto aislado:** la empresa sale del token; se usan solo las brechas `no_cumplido` y `parcialmente_cumplido` de la evaluación más reciente con resultados, con datos de catálogo y del control; para las brechas en foco van además la obligación, la evidencia esperada y la fuente normativa real del control, y los antecedentes de la propia empresa (su justificación y su última evidencia, que pasan otra vez por el NER). No van la razón social ni datos de contacto. Se recarga en cada mensaje, así que el tutor ve las mejoras de la remediación (HU-17).
 2. **Nivel:** por defecto el de la ruta (la del módulo desde el que se abrió o la de la brecha más prioritaria); el usuario lo cambia con `PATCH`.
@@ -486,7 +498,7 @@ Cada registro trae fecha (UTC), actor (rol e id, o `sistema`), **IP** (la del vi
 
 ### 5.15 Borradores de cumplimiento (HU-16)
 
-El usuario definitivo (con contrato vigente) genera desde `/empresa/borradores` una **Política de uso de LLM**, un **Aviso de privacidad** o una **Evaluación de impacto (PIA/EIPD)**. Cada plantilla (`application/borradores/plantillas.py`) es una lista de cláusulas atadas a una dimensión del modelo de madurez y a los controles de la matriz que ayudan a cerrar. El backend arma el Markdown con la evaluación más reciente de la empresa: las cláusulas que tratan una brecha abierta llevan una *medida prioritaria*, cada una cierra con su fundamento real (framework y artículo de `matriz_controles`) y el documento termina con el Anexo A (alineación por dimensión) y el Anexo B (plan de implementación). La razón social y el RUT los escribe el backend; el LLM nunca los ve.
+El usuario definitivo (con contrato vigente) genera desde `/empresa/borradores` una **Política de uso de LLM**, un **Aviso de privacidad** o una **Evaluación de impacto (PIA/EIPD)**. Cada plantilla (`application/borradores/plantillas_borrador.py`) es una lista de cláusulas atadas a una dimensión del modelo de madurez y a los controles de la matriz que ayudan a cerrar. El backend arma el Markdown con la evaluación más reciente de la empresa: las cláusulas que tratan una brecha abierta llevan una *medida prioritaria*, cada una cierra con su fundamento real (framework y artículo de `matriz_controles`) y el documento termina con el Anexo A (alineación por dimensión) y el Anexo B (plan de implementación). La razón social y el RUT los escribe el backend; el LLM nunca los ve.
 
 Si se pide, la skill `borrador` del agente adapta hasta 6 cláusulas al rubro, a las brechas y a las indicaciones de la empresa. Las indicaciones pasan por la guardia (un ataque bloquea sin llamar al NER ni al LLM) y por el NER del gateway; la salida se ancla a la plantilla (`borradores/salida_borrador.py`: sin cláusulas inventadas ni fijas, sin artículos no verificados, sin código, enlaces ni códigos internos) y una fuga del system prompt descarta todo lo del modelo. Si la IA no está habilitada, falla o se agotó `BORRADORES_IA_DIA_EMPRESA`, el borrador se arma igual con la plantilla y se avisa.
 
@@ -510,7 +522,7 @@ Se inicia desde una **plantilla por rubro** (8, más una base común) o desde la
 
 El usuario definitivo (con contrato vigente) lleva en `/empresa/registro-actividades` el **registro de actividades de tratamiento** de su empresa. Cada actividad cubre los **11 campos mínimos del reglamento** (tipos de datos con los sensibles, ámbito territorial, bases de datos, categorías de titulares, finalidades, fuentes y si son de acceso público, base de licitud e interés legítimo, terceros destinatarios, transferencias internacionales y garantías, plazos de conservación por categoría, decisiones automatizadas o perfilamiento con su lógica) más **medidas de seguridad** y **rol de la empresa** (responsable o encargado), en un formulario de 6 pasos.
 
-**Sin doble ingreso:** sistemas, bases, terceros y flujos se eligen del mapa de datos (con el subconjunto de categorías que usa la actividad); tipos de datos, titulares, países, terceros y transferencias **se calculan** con el mapa actual (`app/domain/rat/analisis.py`). Cuando el mapa cambia algo que una actividad usa, en la **misma transacción** la actividad vigente vuelve a «en revisión» con el motivo (y el mapa avisa cuántas actividades afectó).
+**Sin doble ingreso:** sistemas, bases, terceros y flujos se eligen del mapa de datos (con el subconjunto de categorías que usa la actividad); tipos de datos, titulares, países, terceros y transferencias **se calculan** con el mapa actual (`app/domain/rat/analisis_rat.py`). Cuando el mapa cambia algo que una actividad usa, en la **misma transacción** la actividad vigente vuelve a «en revisión» con el motivo (y el mapa avisa cuántas actividades afectó).
 
 **Completitud** por actividad (13 campos, con condicionales: interés legítimo, base para sensibles, garantías, lógica de decisiones, organización mandante) y global (promedio de las activas). **Estados** borrador → en revisión → vigente → archivada: aprueba el mismo usuario; no queda vigente con datos obligatorios vacíos (422 `ACTIVIDAD_INCOMPLETA`); al quedar vigente se guarda una **versión inmutable** (`rat_actividad_version`, instantánea + huella SHA-256; un trigger impide `UPDATE`/`DELETE`). Editar una vigente abre una nueva versión en borrador y la vigente sigue valiendo; aprobar sin cambios no crea otra versión; una archivada se reactiva sin duplicarla. Cada cambio queda en el `audit_log` (`rat.*`). Los textos de ayuda y el catálogo de bases de licitud (`app/domain/rat/catalogo.py`) son una **propuesta pendiente de validación por asesoría legal**. Detalle en `Extras/Cambios/backend/CAMBIOS_HU35.md`.
 
@@ -518,9 +530,9 @@ El usuario definitivo (con contrato vigente) lleva en `/empresa/registro-activid
 
 Desde `/empresa/registro-actividades` › **Informe del registro**, el usuario definitivo (contrato vigente) ve una vista previa (si saldrá **oficial** o **borrador** y por qué, las cifras del resumen y la matriz de riesgos) y descarga el informe en **PDF** o **Excel**, lo envía por correo, revisa el historial de emisiones y **verifica un código**.
 
-- **Armado** (`app/application/rat/informe_rat.py`, lógica pura): entra la **instantánea inmutable** de la versión vigente de cada actividad no archivada (aunque esté en revisión o tenga una nueva versión en preparación); las que nunca estuvieron vigentes entran con su contenido actual, marcadas. Huella SHA-256 de lo que afirma el registro (no de la fecha). Textos legibles de los 13 campos compartidos por el PDF y el Excel.
-- **PDF** (`app/application/rat/pdf_rat.py`) con el motor común `app/application/informes/motor_pdf.py` (paleta, ficha de identificación, aviso legal, pie con «Página X de Y» y marca de agua): portada, resumen ejecutivo, índice, detalle por actividad con plazos por categoría, matriz de riesgos (mapa de calor 5 × 5, factores y tratamientos) y verificación.
-- **Excel** (`app/application/rat/xlsx_rat.py`, openpyxl): Portada, Resumen, Actividades (el RAT), Datos y plazos, Destinatarios, Transferencias, Decisiones, Matriz de riesgos y Verificación. Ningún texto se escribe como fórmula.
+- **Armado** (`app/application/rat/armado_informe_rat.py`, lógica pura): entra la **instantánea inmutable** de la versión vigente de cada actividad no archivada (aunque esté en revisión o tenga una nueva versión en preparación); las que nunca estuvieron vigentes entran con su contenido actual, marcadas. Huella SHA-256 de lo que afirma el registro (no de la fecha). Textos legibles de los 13 campos compartidos por el PDF y el Excel.
+- **PDF** (`app/infrastructure/documentos/pdf/rat_pdf.py`) con el motor común `app/infrastructure/documentos/pdf/motor.py` (paleta, ficha de identificación, aviso legal, pie con «Página X de Y» y marca de agua): portada, resumen ejecutivo, índice, detalle por actividad con plazos por categoría, matriz de riesgos (mapa de calor 5 × 5, factores y tratamientos) y verificación.
+- **Excel** (`app/infrastructure/documentos/xlsx/rat_xlsx.py`, openpyxl): Portada, Resumen, Actividades (el RAT), Datos y plazos, Destinatarios, Transferencias, Decisiones, Matriz de riesgos y Verificación. Ningún texto se escribe como fórmula.
 - **Matriz de riesgos** (`app/domain/rat/riesgos.py`): riesgo inherente = probabilidad × impacto (1–5 cada uno) calculado con lo registrado (sensibles, NNA, decisiones automatizadas, transferencias sin garantía, terceros sin contrato, medidas, información incompleta). Pesos en un solo archivo para que HU-38 los ajuste.
 - **Emisión** (`rat_informe`): versión del RAT correlativa por empresa (sube cuando cambia la huella), código verificable con dígito módulo 11, ambos archivos con el mismo código en **Mis documentos** (`documento_empresa` tipos `rat_pdf` y `rat_xlsx`). Si el registro no cambió, se reutiliza la última emisión. Un trigger impide modificar o borrar una emisión. Límites: `RAT_INFORMES_DIA_EMPRESA` (20) y `RAT_CORREOS_DIA_EMPRESA` (5).
 - **Borrador** (criterio 4): si alguna actividad incluida no está vigente, marca de agua «BORRADOR» en todas las páginas, aviso en el encabezado de cada página y recuadro con los motivos en la portada (también en el Excel).
@@ -531,9 +543,9 @@ Desde `/empresa/registro-actividades` › **Informe del registro**, el usuario d
 
 Desde `/empresa/registro-actividades` › **Informe RoPA**, el usuario definitivo (contrato vigente) genera el registro en formato RoPA sin volver a ingresar las actividades. Todo está en una ventana con scroll; las explicaciones van en el ícono ⓘ junto al título.
 
-- **Traducción** (`app/application/ropa/informe_ropa.py`, lógica pura): parte del armado del informe del registro y toma **solo las actividades con versión vigente** (las demás se cuentan y no entran). Cada campo se traduce a los del RoPA (estructura del art. 30 usada como estándar de formato; los documentos no citan RGPD ni la UE): responsable y delegado, finalidades, categorías de titulares y de datos, destinatarios, transferencias internacionales, plazos de supresión y medidas de seguridad. Como encargado: organización por cuenta de la cual se actúa (agrupado), categorías de tratamientos, transferencias y medidas.
+- **Traducción** (`app/application/ropa/armado_informe_ropa.py`, lógica pura): parte del armado del informe del registro y toma **solo las actividades con versión vigente** (las demás se cuentan y no entran). Cada campo se traduce a los del RoPA (estructura del art. 30 usada como estándar de formato; los documentos no citan RGPD ni la UE): responsable y delegado, finalidades, categorías de titulares y de datos, destinatarios, transferencias internacionales, plazos de supresión y medidas de seguridad. Como encargado: organización por cuenta de la cual se actúa (agrupado), categorías de tratamientos, transferencias y medidas.
 - **Datos que faltan** (`app/domain/ropa/datos.py`): dirección y correo de la empresa (teléfono opcional), delegado de protección de datos (sí/no; cargo o área y correo) y dirección y correo de cada organización mandante. Se guardan en `ropa_datos` **cifrados en reposo** (`TextoCifradoRopa`, subclave `ropa`) y vuelven prellenados. Sin ellos no se emite (422 `ROPA_DATOS_INCOMPLETOS`).
-- **PDF** (`app/application/ropa/pdf_ropa.py`) y **Excel** (`app/application/ropa/xlsx_ropa.py`): portada (empresa, código, versión, fecha, partes), organización, una sección/hoja por parte, transferencias y aviso legal. Se puede generar solo una parte.
+- **PDF** (`app/infrastructure/documentos/pdf/ropa_pdf.py`) y **Excel** (`app/infrastructure/documentos/xlsx/ropa_xlsx.py`): portada (empresa, código, versión, fecha, partes), organización, una sección/hoja por parte, transferencias y aviso legal. Se puede generar solo una parte.
 - **Emisión** (`ropa_informe`): versión correlativa por empresa (sube cuando cambia la huella: versiones vigentes, partes y datos de contacto), ambos archivos en **Mis documentos** (`documento_empresa` tipos `ropa_pdf` y `ropa_xlsx`, pestaña Registro de actividades). Si nada cambió, se reutiliza la última. Un trigger impide modificar o borrar una emisión. Límite diario: `RAT_INFORMES_DIA_EMPRESA`.
 - **Auditoría**: `ropa.datos_actualizados` (solo nombres de campos), `ropa.informe_generado`, `ropa.informe_descargado`. Nunca direcciones ni correos.
 
@@ -544,11 +556,11 @@ Desde `/empresa/registro-actividades` › **Informe RoPA**, el usuario definitiv
 El administrador de Therion Labs genera el registro de tratamiento de la **propia** plataforma y lo demuestra con las mismas herramientas que se venden (Panel interno › **Privacidad de la plataforma**).
 
 - **Fuente única** (`app/domain/privacidad/catalogo_datos_personales.py`, sección HU-41): `ACTIVIDADES_PLATAFORMA` (encuesta pública, contratación, cuentas, tutor, evidencias, borradores, ARCOP, auditoría y herramientas de registro de las empresas), `TABLAS_SIN_TRATAMIENTO` (catálogos y agregados), `ELEMENTOS_PLATAFORMA`, `PROVEEDORES_PLATAFORMA` y `AJUSTE_POR_CONSERVACION` (cada conservación enlazada al ajuste que la ejecuta). Las categorías de datos y los plazos salen de las columnas personales de cada tabla.
-- **Generador** (`app/application/plataforma/registro.py`, lógica pura): arma `Elemento`, `Flujo`, contenido de actividad e instantánea con el mismo formato del cliente y usa `rat/analisis.py`, `rat/informe_rat.py`, `pdf_rat`, `xlsx_rat`, `pdf_ropa`, `xlsx_ropa` y `pdf_mapa` sin cambiarlos. El plazo de cada categoría es el **valor vigente** del ajuste (el de titulares, el del panel de retención si se fijó allí); sin valor, queda sin número y se informa.
+- **Generador** (`app/application/plataforma/registro_plataforma.py`, lógica pura): arma `Elemento`, `Flujo`, contenido de actividad e instantánea con el mismo formato del cliente y usa `rat/analisis_rat.py`, `rat/armado_informe_rat.py`, `rat_pdf`, `rat_xlsx`, `ropa_pdf`, `ropa_xlsx` y `mapa_datos_pdf` sin cambiarlos. El plazo de cada categoría es el **valor vigente** del ajuste (el de titulares, el del panel de retención si se fijó allí); sin valor, queda sin número y se informa.
 - **Proveedores**: Microsoft Azure (alojamiento), Groq (con `LLM_PROVIDER=groq`), proveedor de correo (con `CORREO_MODO=smtp`) y Cloudflare Turnstile (con `TURNSTILE_SECRET_KEY`), como encargados con país y garantía. Los flujos desde la plataforma (operada desde Chile) hacia el alojamiento y los proveedores se calculan como transferencias internacionales. Ajustes nuevos: `THERION_RAZON_SOCIAL`, `THERION_RUT`, `PLATAFORMA_PAIS_ALOJAMIENTO`, `CORREO_PROVEEDOR_NOMBRE/PAIS/GARANTIA`, `PROVEEDORES_CONTRATO_CONFIRMADO`, `PLATAFORMA_INFORMES_DIA`.
-- **Revisión interna** (`app/application/plataforma/revision.py`): cobertura del inventario, reglas de retención desactivadas, plazos pendientes de decisión (registro de auditoría, sesiones, contrataciones descartadas), actividades incompletas, proveedores sin país o garantía, contratos por confirmar, última ejecución de la retención y capa de IA.
+- **Revisión interna** (`app/application/plataforma/revision_plataforma.py`): cobertura del inventario, reglas de retención desactivadas, plazos pendientes de decisión (registro de auditoría, sesiones, contrataciones descartadas), actividades incompletas, proveedores sin país o garantía, contratos por confirmar, última ejecución de la retención y capa de IA.
 - **Informes**: el RAT es **oficial** solo si todas las actividades están completas; si no, sale como borrador con los motivos exactos. El RoPA (Therion Labs como responsable) pide una vez los datos de contacto (cifrados en `plataforma_registro`). Cada emisión queda en `plataforma_informe` (archivos cifrados en `STORAGE_DIR`, inmutable en PostgreSQL) y en el audit log (`plataforma.*`, sin datos de contacto).
-- **Prueba de cobertura** (`tests/test_hu41_registro_plataforma.py`): falla si una tabla nueva no está en una actividad ni en `TABLAS_SIN_TRATAMIENTO`, si una conservación nombra un ajuste sin enlazarlo o si los plazos generados difieren de los ajustes configurados.
+- **Prueba de cobertura** (`tests/integracion/test_hu41_registro_plataforma.py`): falla si una tabla nueva no está en una actividad ni en `TABLAS_SIN_TRATAMIENTO`, si una conservación nombra un ajuste sin enlazarlo o si los plazos generados difieren de los ajustes configurados.
 
 ### 5.22 Registro conectado con el cumplimiento (HU-38)
 
@@ -556,8 +568,8 @@ El registro de actividades deja de ser un documento aislado: alimenta la evaluac
 
 - **Riesgo explicable** (`app/domain/rat/riesgos.py`): probabilidad × impacto (1–5) con factores que dicen por qué y qué hacer. Nuevos: **uso de inteligencia artificial** (sistemas con IA, bases vectoriales o proveedores de IA del mapa; se calcula con el mapa actual, también para las versiones vigentes) y **gran volumen de personas** (dato opcional `volumen` de la actividad, paso 2; solo se guarda si tiene valor, así las versiones y huellas anteriores no cambian). Cada actividad trae su `riesgo` en `/api/registro-actividades`.
 - **Matriz de mayor riesgo y evaluación de impacto**: `matriz_mayor_riesgo()` (Decreto 662, art. 3 letra e) y `motivos_pia()`: se recomienda con riesgo alto o crítico, decisiones automatizadas o perfilamiento, datos sensibles o de NNA a gran escala (10.000 personas o más) o IA con esos datos. El PDF y el Excel del informe del registro la incluyen.
-- **Borradores** (`app/application/borradores/registro.py`): la **PIA** toma las actividades con evaluación recomendada (o las que elija la empresa, máximo 10: `POST /api/borradores {tipo: "pia", actividades}`) y completa identificación, motivos, descripción sistemática, base de licitud, riesgos del registro y medidas sugeridas; el **aviso de privacidad** toma finalidades y bases (tabla), datos, proveedores, transferencias, sensibles/NNA, IA y plazos, sin nombrar sistemas internos. Se usa la versión vigente de cada actividad; esas cláusulas no las reescribe el Agente IA y el LLM no las ve.
-- **El registro como evidencia** (`app/domain/rat/cumplimiento.py`, `app/application/rat/casos_uso/cumplimiento.py`): con el registro **vigente y completo** (todas las actividades vigentes, completas, sin cambios del mapa por revisar y sin envíos del mapa fuera del registro) se mejoran, en la evaluación completada más reciente, los controles que respalda (registro actualizado, base de licitud, finalidades —parcial—, transferencias, contratos con encargados, medidas reforzadas —parcial—). Igual que una remediación: fila en `evidencias` (origen `rat`, sin archivo), brecha sincronizada, resumen y radar recalculados control por control (aparece en la evolución del puntaje) y `rat.evidencia_aplicada` en el audit log. **Nunca baja** un control ni toca un "no aplica". Se aplica al dejar vigente una actividad y con el botón de Mi empresa.
+- **Borradores** (`app/application/borradores/registro_borrador.py`): la **PIA** toma las actividades con evaluación recomendada (o las que elija la empresa, máximo 10: `POST /api/borradores {tipo: "pia", actividades}`) y completa identificación, motivos, descripción sistemática, base de licitud, riesgos del registro y medidas sugeridas; el **aviso de privacidad** toma finalidades y bases (tabla), datos, proveedores, transferencias, sensibles/NNA, IA y plazos, sin nombrar sistemas internos. Se usa la versión vigente de cada actividad; esas cláusulas no las reescribe el Agente IA y el LLM no las ve.
+- **El registro como evidencia** (`app/domain/rat/evidencia_controles.py`, `app/application/rat/casos_uso/cruce_cumplimiento.py`): con el registro **vigente y completo** (todas las actividades vigentes, completas, sin cambios del mapa por revisar y sin envíos del mapa fuera del registro) se mejoran, en la evaluación completada más reciente, los controles que respalda (registro actualizado, base de licitud, finalidades —parcial—, transferencias, contratos con encargados, medidas reforzadas —parcial—). Igual que una remediación: fila en `evidencias` (origen `rat`, sin archivo), brecha sincronizada, resumen y radar recalculados control por control (aparece en la evolución del puntaje) y `rat.evidencia_aplicada` en el audit log. **Nunca baja** un control ni toca un "no aplica". Se aplica al dejar vigente una actividad y con el botón de Mi empresa.
 - **Mi empresa**: tarjetas del mapa, del registro, de las actividades de mayor riesgo y de la evaluación; lo que el registro respalda; la matriz de mayor riesgo con acceso a la PIA; y las **brechas del registro** (actividad sin base de licitud, sin plazo, transferencia sin garantía, envío sin actividad) con su ruta: corregir (abre la actividad en su paso), el módulo formativo del plan con su avance y re-evaluar el control.
 - Sin tablas nuevas ni migración: `evidencias.origen` admite `rat` y `respuestas.fuente_clasificacion` admite `rat`.
 
@@ -567,14 +579,14 @@ El registro de actividades deja de ser un documento aislado: alimenta la evaluac
 
 El usuario definitivo, en su función de **auditoría interna**, verifica que el registro sea fiel y esté al día antes de presentarlo, certificarlo o informarlo al directorio. No hay roles ni cuentas nuevas: es el mismo usuario con contrato vigente.
 
-- **Lista de verificación** (`app/domain/rat/revision.py`, lógica pura). Se revisa lo que afirmaría el informe (la versión vigente de cada actividad) y el mapa actual:
+- **Lista de verificación** (`app/domain/rat/lista_verificacion.py`, lógica pura). Se revisa lo que afirmaría el informe (la versión vigente de cada actividad) y el mapa actual:
   - *Actividades*: versión vigente y al día · campos obligatorios completos (ambos **bloqueantes**) · base de licitud (interés legítimo ponderado, base para sensibles) · plazos por categoría (con fundamento) · transferencias con garantía válida · terceros encargados con contrato · revisión humana de decisiones automatizadas.
   - *Elementos*: ficha completa · confirmado (no una propuesta) · considerado en alguna actividad · contrato (terceros encargados). *Flujos*: ficha completa · confirmado · garantía si sale de Chile · cifrado · considerado en el registro.
   - Cada punto trae el **resultado automático** (cumple, advertencia, falla, no aplica) y la **pregunta** que la persona confirma mirando la realidad. La persona lo marca *verificado*, lo *acepta con justificación* (fallas no bloqueantes y advertencias, mínimo 10 caracteres) o lo deja pendiente. Cada elemento guarda su **huella**: si cambia después de verificarlo, la verificación queda *desactualizada* sola.
 - **Observaciones** (`rat_observacion`): por actividad, elemento, flujo o el registro completo, con prioridad. Se cierran con una nota de qué se corrigió; se registra si el elemento cambió entre la apertura y el cierre. **Con alguna abierta no se puede marcar la versión** (409 `REVISION_INCOMPLETA`). No se borran (trigger).
 - **Marca de revisada** (`POST /marcar`): exige lista completa, sin bloqueos, sin observaciones abiertas y la misma huella que vio la persona. Fija versión del RAT, huella, fecha, nombre y cargo, conclusión y una copia de la lista (`rat_revision`, inmutable en PostgreSQL). Luego emite el informe del registro, que imprime «Revisada el … por …» en la portada y en la verificación (`rat_informe.revision_id`; el informe se reemite si la marca es nueva aunque el registro no cambie). Queda `revision_rat.version_revisada` en el audit log.
 - **Diferencias** (`GET /diferencias`): entre dos versiones del registro o hasta el registro actual (actividades nuevas, quitadas y campo por campo antes/después, desde las versiones inmutables).
-- **Informe de la revisión** (`app/application/rat/pdf_revision.py`): portada con cifras, conclusión, declaración con espacio para firma y alcance; resultado por criterio, detalle por actividad, mapa, puntos aceptados con su justificación, observaciones, cambios desde la revisión anterior y verificación. En curso lleva la marca de agua «EN CURSO».
+- **Informe de la revisión** (`app/infrastructure/documentos/pdf/revision_interna_pdf.py`): portada con cifras, conclusión, declaración con espacio para firma y alcance; resultado por criterio, detalle por actividad, mapa, puntos aceptados con su justificación, observaciones, cambios desde la revisión anterior y verificación. En curso lleva la marca de agua «EN CURSO».
 - **Paquete de evidencia** (`app/application/rat/paquete_revision.py`), como el ZIP del Auditor Externo: informe del registro (PDF y Excel), informe de la revisión, lista de verificación y observaciones (CSV y JSON), versiones de las actividades con su huella, historial del audit log (con el hash de cada registro, sin IP), emisiones, diferencias, `manifiesto.json` (SHA-256 de cada archivo) y `verificar_paquete.py` (solo librería estándar: recalcula hashes y la huella del registro). ZIP determinista; su SHA-256 y el código `CIA-PAQ-AAAA-NNNNNN-D` quedan en `rat_paquete_evidencia` para verificar un ZIP subido (`POST /paquetes/verificacion`).
 - **Correo**: el informe de la revisión y, opcionalmente, el paquete (hasta `REVISION_RAT_PAQUETE_CORREO_MB`).
 - **Revisión periódica** (`rat_revision_config`): plazo de 1 a 36 meses (12 por defecto), aviso previo y recordatorio por correo. Estados: al día, por vencer, vencida, sin revisión (se cuenta desde la primera actividad vigente). Aviso en la lista del registro y en la página; el worker envía un correo por etapa a las `REVISION_RAT_HORA_UTC` (y lo repite cada `REVISION_RAT_REPETIR_DIAS` si sigue vencida), como acción del sistema en el audit log.
@@ -698,7 +710,7 @@ Alembic toma la URL de `DATABASE_URL_SYNC` (`migrations/env.py`).
 
 ### 6.4 Minimización y conservación de datos personales (T-06)
 
-Cada columna del modelo está clasificada en `app/domain/privacidad/catalogo_datos_personales.py` con su categoría, tratamiento (en claro, anonimizado, cifrado, hash, HMAC o no se guarda), finalidad, base de licitud y plazo de conservación. `tests/test_t06_minimizacion.py` falla si una migración agrega una columna sin clasificarla. La auditoría sobre la BD real se corre con un rol de solo lectura y genera el DER, la matriz en CSV y un informe de controles; nunca imprime valores, solo conteos:
+Cada columna del modelo está clasificada en `app/domain/privacidad/catalogo_datos_personales.py` con su categoría, tratamiento (en claro, anonimizado, cifrado, hash, HMAC o no se guarda), finalidad, base de licitud y plazo de conservación. `tests/integracion/test_t06_minimizacion.py` falla si una migración agrega una columna sin clasificarla. La auditoría sobre la BD real se corre con un rol de solo lectura y genera el DER, la matriz en CSV y un informe de controles; nunca imprime valores, solo conteos:
 
 ```powershell
 docker compose cp backend/scripts/sql/t06_rol_auditor.sql db:/tmp/t06_rol_auditor.sql
@@ -715,7 +727,7 @@ Los plazos `RETENCION_*` (vacíos por defecto) los aplica el worker cada día a 
 
 Base: `http://localhost:8000` (o a través del proxy del frontend en `http://localhost:3000`). Documentación interactiva en `/docs`. Columna **Auth**: 🔓 público · 🔑 cualquier token válido · 👤 titular (`referente` o `encuestado`) · 📋 dueño de la evaluación (su `encuestado` o su `referente`) o `admin_therion` · 🛡️ `admin_therion` · 🏢 `cliente` (usuario definitivo, HU-28).
 
-**HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/test_hu20_autorizacion.py`; detalle en `Extras/Cambios/backend/CAMBIOS_HU20.md`.
+**HU-20 (confidencialidad):** las rutas 📋 responden 401 sin token y **404** con el token de otra organización (no 403, para no confirmar ids correlativos). Las rutas 🛡️ responden 401 sin token y 403 con otro rol. `EXIGIR_TOKEN_EVALUACIONES=false` (solo desarrollo, prohibido en production) vuelve a abrir sin token las evaluaciones por invitación. Matriz completa por endpoint: `backend/tests/integracion/test_hu20_autorizacion.py`; detalle en `Extras/Cambios/backend/CAMBIOS_HU20.md`.
 
 ### Sistema
 
@@ -971,19 +983,19 @@ Rol `auditor_externo` o admin (🔍). Fechas en UTC; `hasta` no se incluye.
 Intermediario entre la lógica de negocio y el LLM (`app/application/ai/`). Los casos de uso solo piden una **tarea** (`TareaIA.VALIDAR_EVIDENCIA`); la capa se encarga del resto.
 
 ```
-caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
+caso de uso ─► GatewayIA.ejecutar(tarea, textos, datos, contexto)
    1. Router        PoliticaTarea: prompt versionado, schema, límites, campos no confiables
    2. Sanitización  motor NER sobre cada texto no confiable ── falla ⇒ ABORTA (no llama al LLM)
    3. Auditoría     mapa de entidades CIFRADO en `sanitizaciones` ── no se puede guardar ⇒ ABORTA
    4. Prompt        plantilla versionada (validar_evidencia/1.2.0) SOLO con texto sanitizado
-   5. Proveedor     LLMProviderPort → GroqProvider (reintentos 429/5xx, timeout)
+   5. Proveedor     ProveedorLlmPort → ProveedorGroq (reintentos 429/5xx, timeout)
    6. Validación    schema Pydantic + reglas post-salida (HU-07: formato, alucinaciones, fuga de contexto e inyección)
    7. Métricas      una fila en `llamadas_llm` por ejecución, con éxito o con tipo de error
 ```
 
 **Reglas de negocio:** R1 el texto original nunca llega al LLM · R2 el mapa de entidades se guarda en BD y no va al proveedor · R3 si la sanitización falla se aborta y se registra · R4 si el LLM falla se registra `exito=False` con el tipo de error (`sanitizacion`, `auditoria`, `timeout`, `rate_limit`, `autenticacion`, `conexion`, `proveedor`, `salida_invalida`, `desconocido`) · R5 etiquetas fijas por tipo · R6 `SANITIZER_ENABLED=false` solo para depurar (prohibido con `APP_ENV=production`).
 
-**Salida esperada del LLM** (`EvidenceValidation`): `clasificacion` (`cumplido` | `parcialmente_cumplido` | `no_cumplido`), `confianza` (0–1), `justificacion`, `respalda_clasificacion_usuario`, `divergencia_explicada`, `evidencia_suficiente`, `datos_extraidos`, `errores`.
+**Salida esperada del LLM** (`ValidacionEvidencia`): `clasificacion` (`cumplido` | `parcialmente_cumplido` | `no_cumplido`), `confianza` (0–1), `justificacion`, `respalda_clasificacion_usuario`, `divergencia_explicada`, `evidencia_suficiente`, `datos_extraidos`, `errores`.
 
 **Modelo por defecto:** `openai/gpt-oss-safeguard-20b` vía Groq (debe soportar *structured outputs*), temperatura 0.
 
@@ -993,11 +1005,11 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 
 **Cifrado:** Fernet con `ENTITY_MAP_KEY`; las entidades además llevan una huella HMAC que permite buscar coincidencias sin descifrar. Guarda la clave fuera del repositorio: sin ella los mapas ya guardados no se pueden descifrar.
 
-**Verificación de la salida (HU-07):** `app/application/ai/verificacion_salida_evidencias.py` revisa cada respuesta de `validar_evidencia` contra lo que recibió el modelo. El gateway deja los códigos en `llamadas_llm.advertencias` y `ProcessEvidenceUseCase` decide: con un hallazgo grave (cita, cifra, fecha, artículo o dato sin respaldo; "cumplido" sobre evidencia vacía; datos personales o system prompt en la salida; inyección obedecida; formato inválido) la propuesta no se aplica, la pregunta queda en `requiere_revision` (en la remediación, el control no cambia) y se registra el evento `salida_llm`. Una alucinación con confianza bajo el umbral no se retiene porque esa propuesta ya se descarta. `GET /api/ia/metricas` trae `verificacion_salida` con la tasa de alucinación (umbral 2 %).
+**Verificación de la salida (HU-07):** `app/application/ai/verificacion_salida_evidencias.py` revisa cada respuesta de `validar_evidencia` contra lo que recibió el modelo. El gateway deja los códigos en `llamadas_llm.advertencias` y `ProcesarEvidenciaUseCase` decide: con un hallazgo grave (cita, cifra, fecha, artículo o dato sin respaldo; "cumplido" sobre evidencia vacía; datos personales o system prompt en la salida; inyección obedecida; formato inválido) la propuesta no se aplica, la pregunta queda en `requiere_revision` (en la remediación, el control no cambia) y se registra el evento `salida_llm`. Una alucinación con confianza bajo el umbral no se retiene porque esa propuesta ya se descarta. `GET /api/ia/metricas` trae `verificacion_salida` con la tasa de alucinación (umbral 2 %).
 
-**Modelo local (HU-07):** `LLM_PROVIDER=ollama` usa `infrastructure/llm/ollama_provider.py` (salida estructurada con el JSON Schema en `format`). Se levanta con `docker compose --profile modelo-local up -d` y `docker compose exec ollama ollama pull qwen2.5:7b-instruct`.
+**Modelo local (HU-07):** `LLM_PROVIDER=ollama` usa `infrastructure/llm/proveedor_ollama.py` (salida estructurada con el JSON Schema en `format`). Se levanta con `docker compose --profile modelo-local up -d` y `docker compose exec ollama ollama pull qwen2.5:7b-instruct`.
 
-**Agregar una tarea nueva** (p. ej. recomendación de ruta formativa): crear su prompt en `ai/prompts/<tarea>.py` con `PROMPT_VERSION`, su schema Pydantic y registrar una `PoliticaTarea` en `crear_politicas`. **Cambiar de proveedor:** crear un adaptador de `LLMProviderPort` en `infrastructure/llm/`, registrarlo en `factory.py` y cambiar `LLM_PROVIDER`/`LLM_MODEL`.
+**Agregar una tarea nueva** (p. ej. recomendación de ruta formativa): crear su prompt en `ai/prompts/<tarea>.py` con `PROMPT_VERSION`, su schema Pydantic y registrar una `PoliticaTarea` en `crear_politicas`. **Cambiar de proveedor:** crear un adaptador de `ProveedorLlmPort` en `infrastructure/llm/`, registrarlo en `factory.py` y cambiar `LLM_PROVIDER`/`LLM_MODEL`.
 
 ---
 
@@ -1007,18 +1019,18 @@ caso de uso ─► AIGateway.ejecutar(tarea, textos, datos, contexto)
 |---|---|---|
 | Datos personales enviados a un tercero (LLM) | Anonimización NER obligatoria, fail-closed; recorte después de sanitizar para no cortar PII a medias | `sanitizador_ner.py`, `gateway.py` |
 | Re-identificación desde la auditoría | Mapa de entidades sin valores originales (solo huellas HMAC y conteos, HU-06); métricas sin texto del usuario | `cifrado.py`, `registro_ia_repository.py` |
-| PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_storage.py`, `tipos_cifrados.py`, `test_hu06_regresion_pii.py` |
-| Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); perfil **estricto**; bloqueo 422 y registro con la regla que disparó | `seguridad.py`, `prompt_guard.py`, `crear_respuesta.py` |
+| PII guardada en BD, disco o logs (HU-06) | Justificación y nombre de archivo anonimizados antes de persistir (503 si el motor falla); evidencias cifradas en reposo y reemplazadas por su texto anonimizado tras validar; nombres de archivo en disco = UUID; textos ARCOP cifrados (excepción); prueba de regresión que siembra PII | `anonimizador.py`, `archivo_cifrado_almacenamiento.py`, `tipos_cifrados.py`, `ia/test_hu06_regresion_pii.py` |
+| Prompt injection en justificaciones | Detector por reglas con normalización (URL-decode, NFKC, homoglifos, invisibles, leetspeak, datos codificados); perfil **estricto**; bloqueo 422 y registro con la regla que disparó | `seguridad.py`, `guardia_prompt.py`, `crear_respuesta.py` |
 | Prompt injection en evidencias | Perfil **evidencia** (HU-33): el vocabulario de cumplimiento (aprobar, ejecutar, registrar, marcar...) solo bloquea si va dirigido a la IA o al resultado; las señales fuertes (texto oculto, bidi/"tag", codificado, "si eres una IA", delimitadores, cambio de rol) siempre. `MODO_SEGURIDAD_EVIDENCIA=bloquear` (no se llama al LLM, respuesta en `requiere_revision`) o `marcar` (se registra y no hay fallback al usuario) | `seguridad.py`, `procesar_evidencia.py`, `test_hu33_*.py` |
-| Prompt injection multilenguaje e indirecta (HU-07) | Reglas en inglés, portugués, francés, alemán e italiano (notas para la IA, "si eres una IA", ignorar instrucciones, forzar el resultado, cambio de rol), nombres de campos del schema, pedidos de reglas recibidas y de datos anonimizados; antes del prompt se quitan caracteres invisibles, bidi, "tag" y de control y se neutralizan separadores (`═══`) y marcadores de turno (`[INST]`, `<<SYS>>`, `<\|...\|>`) | `seguridad.py`, `prompts/base.py`, `test_hu07_owasp_entrada.py` |
+| Prompt injection multilenguaje e indirecta (HU-07) | Reglas en inglés, portugués, francés, alemán e italiano (notas para la IA, "si eres una IA", ignorar instrucciones, forzar el resultado, cambio de rol), nombres de campos del schema, pedidos de reglas recibidas y de datos anonimizados; antes del prompt se quitan caracteres invisibles, bidi, "tag" y de control y se neutralizan separadores (`═══`) y marcadores de turno (`[INST]`, `<<SYS>>`, `<\|...\|>`) | `seguridad.py`, `prompts/renderizado_prompt.py`, `ia/test_hu07_owasp_entrada.py` |
 | Alucinaciones y salidas inseguras del modelo (HU-07) | Verificador determinista de cada salida: formato, citas, cifras, fechas, artículos, códigos de control y datos extraídos sin respaldo; datos personales, reidentificación y system prompt en la salida; señales de inyección obedecida. Salida saneada antes de guardarla; con un hallazgo grave la pregunta queda en `requiere_revision` y se registra la alerta `salida_llm` | `verificacion_salida_evidencias.py`, `procesar_evidencia.py`, `test_hu07_*.py` |
 | Que una inyección suba el puntaje | `requiere_revision` vale 0 y cuenta en el denominador | `generar_resumen.py` |
 | Derechos del titular | Solicitudes ARCOP con trazabilidad completa y anonimización irreversible al aprobar una supresión | `gestionar_solicitud_arcop.py`, `anonimizacion_repository.py` |
-| Credenciales | PBKDF2-SHA256 600k, tokens HMAC con expiración, revocación inmediata, errores genéricos | `autenticacion.py` |
+| Credenciales | PBKDF2-SHA256 600k, tokens HMAC con expiración, revocación inmediata, errores genéricos | `contrasenas_y_tokens.py` |
 | Configuración insegura en producción | La app no arranca con `APP_ENV=production` si `SANITIZER_ENABLED=false`, falta `ENTITY_MAP_KEY` o `AUTH_SECRET` < 32 caracteres | `config.py` |
 | Exposición de servicios | Puertos publicados solo en `127.0.0.1`; contenedor con usuario sin privilegios | `docker-compose.yml`, `Dockerfile` |
 
-> `infrastructure/security/prompt_injection/seguridad.py` nació en el proyecto **ComplianceAI-Prompt-Injection** (ver `Extras/Guia_ComplianceAI_PromptInjection.docx.pdf`), que no está publicado: hoy la única copia vigente es la de este repositorio (HU-33). Si ese proyecto se publica, copiar este archivo allá y verificar que son idénticos con `RUTA_REPO_PROMPT_INJECTION=<carpeta del repo> pytest tests/test_hu33_detector_contexto.py -k copia`.
+> `infrastructure/security/prompt_injection/seguridad.py` nació en el proyecto **ComplianceAI-Prompt-Injection** (ver `Extras/Guia_ComplianceAI_PromptInjection.docx.pdf`), que no está publicado: hoy la única copia vigente es la de este repositorio (HU-33). Si ese proyecto se publica, copiar este archivo allá y verificar que son idénticos con `RUTA_REPO_PROMPT_INJECTION=<carpeta del repo> pytest tests/ia/test_hu33_detector_contexto.py -k copia`.
 
 ---
 
@@ -1212,12 +1224,12 @@ Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json
 
 # 3. Cumplido + evidencia (procesada por el worker)
 $r = Invoke-RestMethod -Method Post "$api/respuestas/" -ContentType "application/json" -Body '{"evaluacion_id":1,"matriz_control_id":1,"estado_clasificacion":"cumplido","justificacion":"Politica aprobada."}'
-curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencias_ejemplo/evidencia.txt"
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencia.txt"
 Start-Sleep 10
 Invoke-RestMethod "$api/respuestas/$($r.id_respuesta)" | ConvertTo-Json -Depth 5
 
 # 4. Evidencia maliciosa -> bloqueo preventivo y evento de seguridad
-curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencias_ejemplo/evidencia_maliciosa.txt"
+curl.exe -X POST "$api/respuestas/$($r.id_respuesta)/evidencias" -F "file=@backend/tests/data/evidencia_maliciosa.txt"
 Invoke-RestMethod "$api/seguridad/eventos"
 
 # 5. Cerrar y ver reporte
@@ -1280,38 +1292,69 @@ El recorrido ARCOP (login, titular, solicitudes) está en [`Extras/Cambios/backe
 
 ## 14. Pruebas y calidad
 
+Carpetas: `unit/` (funciones puras), `integracion/` (API en proceso con repositorios falsos) e `ia/` (capa de IA; `test_live_capa_ia.py` y las pruebas en vivo se omiten sin variables `LIVE_*`). Total: 1506 casos recolectados.
+
 Las pruebas unitarias e integración **no necesitan PostgreSQL, Redis ni Groq**: usan repositorios falsos o SQLite en memoria (`aiosqlite`).
 
-| Archivo | Pruebas | Qué cubre |
+| Archivo (bajo `tests/`) | Pruebas (`--collect-only`) | Qué cubre |
 |---|---:|---|
-| `test_bordes_na_y_evidencia.py` | 42 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje, una respuesta por control, evidencias en evaluación cerrada |
-| `test_hu01_cuestionario.py` | 14 | HU-01: upsert y PUT de respuestas, rechazo de controles no aplicables y evaluaciones cerradas, `controles-aplicables` optimizado, progreso (la de carrera de 10 POST corre solo live) |
-| `test_completar_evaluacion.py` | 9 | `POST /completar`: condiciones, cierre atómico y bloqueo de respuestas, filtro y evidencias |
-| `test_hu02_matriz_estados.py` | 24 | HU-02: 5 estados, justificación obligatoria (unitarias y API), `requiere_revision` resuelta por el LLM, revisión humana, requisito de evidencia al completar y brecha coherente con el estado vigente |
-| `test_solicitudes_arcop.py` | 24 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
-| `test_ner_sanitizer.py` | 18 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
-| `test_rendimiento_ner.py` | 14 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
-| `test_capa_ia.py` | 17 | AIGateway contra las reglas R1–R6 |
-| `test_seguridad_integracion.py` | 11 | Capa anti prompt-injection en el backend |
-| `test_hu07_verificacion_salida.py` | 20 (144 casos) | HU-07: test-set de 124 salidas (alucinación residual < 2 %, 100 % de fugas, inyecciones y salidas inseguras, ≤ 5 % de falsos positivos), saneamiento de la salida y métricas |
-| `test_hu07_owasp_entrada.py` | 13 (54 casos) | HU-07: 96 ataques OWASP LLM01 (directos, indirectos, multilenguaje, codificados, ofuscados, delimitadores, fuga y exfiltración) al 100 %, legítimos multilenguaje y frases frontera sin bloqueo, saneamiento antes del prompt |
-| `test_hu07_integracion.py` | 19 (22 casos) | HU-07: revisión humana y alerta al retener una salida, confianza baja, remediación, modo `marcar`, hallazgos en `llamadas_llm`, proveedor local (Ollama) y configuración |
-| `test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
-| `test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
-| `test_latencia_api.py` | 1 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |
-| `test_hu06_anonimizacion.py` | 20 | HU-06: etiquetas fijas, fail-closed, archivo cifrado y reemplazado por el texto anonimizado, mapa irreversible, textos ARCOP cifrados |
-| `test_hu06_regresion_pii.py` | 1 | HU-06 C3: siembra PII por todas las entradas y verifica que no aparece en ninguna tabla (lectura en crudo), en disco, en los logs ni en lo enviado al LLM |
-| `test_hu12_plan_formativo.py` | 32 | HU-12: severidad igual al panel, mapeo brecha → ruta, niveles y objetivos, agrupación por dimensión, PDF válido; API: plan, comparativa con meta y benchmark al completar, descarga del PDF, envío por correo (modo archivo y límite diario), correo desactivado y `ruta_formativa` en `/api/brechas` |
-| `test_hu19_encuesta_publica.py` | 19 | HU-19: encuesta pública sin invitación, aislamiento entre encuestados, retomar con clave, límites por IP, CAPTCHA, cuota de IA y benchmark |
-| `test_t06_minimizacion.py` | 15 | T-06: inventario de datos personales, plazos de conservación y validaciones de producción |
-| `test_hu20_autorizacion.py` | 15 (75 casos) | HU-20: matriz de autorización **por endpoint** (6 actores), solo-admin, rutas públicas y una prueba que falla si aparece una ruta sin clasificar |
-| `test_hu23_semilla_staging.py` | 5 | HU-23: datos semilla de staging (administrador sin teclado, evaluaciones sintéticas con k ≥ 5 en el benchmark, idempotencia y `--eliminar`) |
-| `test_hu38_integracion_rat.py` | 14 | HU-38: factores de IA y volumen, reglas de la evaluación de impacto y matriz de mayor riesgo, volumen sin cambiar versiones, PDF y Excel; aportes del registro y que nunca baja un control; brechas con su paso; PIA y aviso pre-llenados; API: evidencia al dejar vigente (estado, brecha, puntaje, evolución y audit log), brechas con su ruta, borradores desde el registro, contrato y roles |
-| `test_hu40_revision_interna.py` | 17 | HU-40: lista por actividad y por elemento del mapa, bloqueos, verificar/aceptar/desactualizar, requisitos (observaciones abiertas bloquean), periodicidad y recordatorio por etapa, diferencias, marca en el PDF y el Excel del registro, informe de la revisión, paquete determinista verificable (script independiente) y API completa |
-| `test_hu41_registro_plataforma.py` | 28 | HU-41: actividades desde el inventario, cobertura (tabla nueva sin actividad = falla), plazos iguales a los ajustes configurados, proveedores como encargados con país y garantía, revisión interna, RAT y RoPA con los generadores del cliente y API solo admin |
-| `test_live_capa_ia.py` | 1 | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
+| `unit/test_bordes_na_y_evidencia.py` | 61 | Escenarios borde: N/A masivo, falta de evidencia, cálculo de puntaje, una respuesta por control, evidencias en evaluación cerrada |
+| `unit/test_catalogo_controles_serializacion.py` | 2 | A-20: la serialización de la caché del catálogo es idéntica tras dejar de usar `ControlResponse` |
+| `integracion/test_admin_rubros.py` | 2 | Correcciones 05-11: rubros desde el panel interno (solo admin, audit log, sin duplicados, aparece en el catálogo público) |
+| `integracion/test_completar_evaluacion.py` | 9 | `POST /completar`: condiciones, cierre atómico y bloqueo de respuestas, filtro y evidencias |
+| `integracion/test_correcciones_cuestionario.py` | 4 | Correcciones 05-11: reglas de justificación y de evidencia del cuestionario (valores por defecto y con monkeypatch) |
+| `integracion/test_hu01_cuestionario.py` | 22 | HU-01: upsert y PUT de respuestas, rechazo de controles no aplicables y evaluaciones cerradas, `controles-aplicables` optimizado, progreso (la de carrera de 10 POST corre solo live) |
+| `integracion/test_hu02_matriz_estados.py` | 81 | HU-02: 5 estados, justificación obligatoria (unitarias y API), `requiere_revision` resuelta por el LLM, revisión humana, requisito de evidencia al completar y brecha coherente con el estado vigente |
+| `integracion/test_hu09_audit_log.py` | 32 | HU-09: log de auditoría inmutable (append-only), exportación y verificación del ZIP para el auditor externo |
+| `integracion/test_hu10_benchmark_sectorial.py` | 15 | HU-10: comparativa de madurez contra el sector con k-anonimato (k < 5 se oculta) |
+| `integracion/test_hu12_plan_formativo.py` | 32 | HU-12: severidad igual al panel, mapeo brecha → ruta, niveles y objetivos, agrupación por dimensión, PDF válido; API: plan, comparativa con meta y benchmark al completar, descarga del PDF, envío por correo (modo archivo y límite diario), correo desactivado y `ruta_formativa` en `/api/brechas` |
+| `integracion/test_hu17_remediacion.py` | 15 | HU-17: carga de evidencia para que el Agente IA re-evalúe el control y recalcule el puntaje |
+| `integracion/test_hu19_encuesta_publica.py` | 19 | HU-19: encuesta pública sin invitación, aislamiento entre encuestados, retomar con clave, límites por IP, CAPTCHA, cuota de IA y benchmark |
+| `integracion/test_hu20_autorizacion.py` | 186 | HU-20: matriz de autorización **por endpoint** (6 actores), solo-admin, rutas públicas y una prueba que falla si aparece una ruta sin clasificar |
+| `integracion/test_hu21_informe_pdf.py` | 30 | HU-21: informe del autodiagnóstico en PDF (datos desde la API, aviso legal, puntajes, brechas y rutas) |
+| `integracion/test_hu22_bandeja_revision.py` | 15 | HU-22: bandeja de revisión de divergencias del LLM y de eventos de seguridad |
+| `integracion/test_hu23_semilla_staging.py` | 5 | HU-23: datos semilla de staging (administrador sin teclado, evaluaciones sintéticas con k ≥ 5 en el benchmark, idempotencia y `--eliminar`) |
+| `integracion/test_hu24_matriz_versionada.py` | 26 | HU-24: matriz versionada (controles, brechas, rutas y aplicabilidad) editable sin tocar código |
+| `integracion/test_hu25_retencion.py` | 18 | HU-25: anonimización automática de usuarios temporales vencidos (plazo de retención) |
+| `integracion/test_hu26_formacion.py` | 11 | HU-26: avance de los módulos formativos completados, con contrato vigente |
+| `integracion/test_hu27_empresa_cliente.py` | 16 | HU-27: alta de la empresa cliente, usuario definitivo y migración de la evaluación |
+| `integracion/test_hu28_sesion.py` | 10 | HU-28: inicio y cierre de sesión con email y contraseña, recuperación de contraseña |
+| `integracion/test_hu29_historial_documentos.py` | 11 | HU-29: historial de evaluaciones, reevaluación desde la cuenta y "Mis documentos" |
+| `integracion/test_hu30_contrato.py` | 22 | HU-30: vigencia del contrato de la empresa cliente (renovar, suspender, reactivar, terminar) |
+| `integracion/test_hu31_solicitud_contratacion.py` | 22 | HU-31: solicitud de contratación desde los resultados de la encuesta |
+| `integracion/test_hu32_exportacion_arcop.py` | 11 | HU-32: exportación de datos del titular (derechos de Acceso y Portabilidad) |
+| `integracion/test_hu34_mapa_datos.py` | 44 | HU-34: mapa de datos personales del cliente (base del RAT y del RoPA) |
+| `integracion/test_hu35_rat.py` | 41 | HU-35: registro de actividades de tratamiento (RAT) del cliente: 11 campos mínimos, medidas y rol |
+| `integracion/test_hu36_informe_rat.py` | 13 | HU-36: informe PDF del RAT desde la versión vigente |
+| `integracion/test_hu37_informe_ropa.py` | 16 | HU-37: informe RoPA generado desde el RAT vigente, sin volver a ingresar datos |
+| `integracion/test_hu38_integracion_rat.py` | 14 | HU-38: factores de IA y volumen, reglas de la evaluación de impacto y matriz de mayor riesgo, volumen sin cambiar versiones, PDF y Excel; aportes del registro y que nunca baja un control; brechas con su paso; PIA y aviso pre-llenados; API: evidencia al dejar vigente (estado, brecha, puntaje, evolución y audit log), brechas con su ruta, borradores desde el registro, contrato y roles |
+| `integracion/test_hu40_revision_interna.py` | 17 | HU-40: lista por actividad y por elemento del mapa, bloqueos, verificar/aceptar/desactualizar, requisitos (observaciones abiertas bloquean), periodicidad y recordatorio por etapa, diferencias, marca en el PDF y el Excel del registro, informe de la revisión, paquete determinista verificable (script independiente) y API completa |
+| `integracion/test_hu41_registro_plataforma.py` | 28 | HU-41: actividades desde el inventario, cobertura (tabla nueva sin actividad = falla), plazos iguales a los ajustes configurados, proveedores como encargados con país y garantía, revisión interna, RAT y RoPA con los generadores del cliente y API solo admin |
+| `integracion/test_solicitudes_arcop.py` | 46 | ARCOP: ciclo de vida, roles, login, anonimización, plazos |
+| `integracion/test_t06_minimizacion.py` | 15 | T-06: inventario de datos personales, plazos de conservación y validaciones de producción |
+| `ia/test_capa_ia.py` | 20 | GatewayIA contra las reglas R1–R6 |
+| `ia/test_e2e_capa_ia.py` | 2 | Caso end-to-end del sistema con la capa de IA |
+| `ia/test_hu06_anonimizacion.py` | 20 | HU-06: etiquetas fijas, fail-closed, archivo cifrado y reemplazado por el texto anonimizado, mapa irreversible, textos ARCOP cifrados |
+| `ia/test_hu06_regresion_pii.py` | 1 | HU-06 C3: siembra PII por todas las entradas y verifica que no aparece en ninguna tabla (lectura en crudo), en disco, en los logs ni en lo enviado al LLM |
+| `ia/test_hu07_integracion.py` | 22 | HU-07: revisión humana y alerta al retener una salida, confianza baja, remediación, modo `marcar`, hallazgos en `llamadas_llm`, proveedor local (Ollama) y configuración |
+| `ia/test_hu07_owasp_entrada.py` | 54 | HU-07: 96 ataques OWASP LLM01 (directos, indirectos, multilenguaje, codificados, ofuscados, delimitadores, fuga y exfiltración) al 100 %, legítimos multilenguaje y frases frontera sin bloqueo, saneamiento antes del prompt |
+| `ia/test_hu07_verificacion_salida.py` | 144 | HU-07: test-set de 124 salidas (alucinación residual < 2 %, 100 % de fugas, inyecciones y salidas inseguras, ≤ 5 % de falsos positivos), saneamiento de la salida y métricas |
+| `ia/test_hu15_tutor.py` | 25 | HU-15: Agente IA Tutor en el panel de formación; contexto aislado (solo brechas no conformes) |
+| `ia/test_hu16_borradores.py` | 24 | HU-16: borradores de políticas, avisos y procedimientos generados por el Agente IA |
+| `ia/test_hu18_gobernanza_agente.py` | 24 | HU-18: el Agente IA cumple los estándares de gobernanza (scope locking, filtro de ataques y validación de salida) |
+| `ia/test_hu33_detector_contexto.py` | 84 | HU-33: el detector de prompt injection distingue un ataque de un documento de cumplimiento (motor de reglas, sin BD ni LLM) |
+| `ia/test_hu33_integracion.py` | 19 | HU-33: integración del detector con contexto en el backend (evidencia con su propio perfil) |
+| `ia/test_hu39_asistente_rat.py` | 46 | HU-39: asistente de IA para el mapa de datos, el RAT y los informes (sin BD, spaCy ni LLM real) |
+| `ia/test_latencia_api.py` | 14 | Latencia de la API REST: p95 < 500 ms por endpoint (en proceso o live) |
+| `ia/test_live_capa_ia.py` | 0 (se omite sin `LIVE_BASE_URL`) | Sistema real: uvicorn + ARQ + PostgreSQL + Redis + Groq + spaCy (se activa con `LIVE_BASE_URL`) |
+| `ia/test_metricas_ia.py` | 6 | Cálculo de métricas (funciones puras) |
+| `ia/test_ner_sanitizer.py` | 36 | Motor NER, cifrado del mapa y precisión contra `tests/data/ner_gold.jsonl` (17 casos) |
+| `ia/test_proveedor_groq.py` | 15 | Adaptador ProveedorGroq con el SDK real y un servidor HTTP simulado (qué se envía a Groq y cómo se interpreta cada respuesta) |
+| `ia/test_rendimiento_ner.py` | 18 | T-04: < 2,0 s por página, pipeline mínimo, segunda pasada acotada, NER fuera del event loop y precisión ≥ 0,95 / cobertura 100 % sobre 40 páginas etiquetadas |
+| `ia/test_seguridad_integracion.py` | 15 | Capa anti prompt-injection en el backend |
+| `ia/test_tutor_lenguaje_cliente.py` | 6 | Correcciones 05-11: el tutor no muestra códigos internos al cliente (prompt y humanización de la salida) |
 
-Soporte: `conftest.py` (variables mínimas y storage temporal), `apoyo/api_harness.py` (siembra datos de prueba), `apoyo/capa_ia_fakes.py` (dobles de prueba), `apoyo/corpus_ner.py` (corpus sintético etiquetado para medir el NER).
+Soporte: `conftest.py` (variables mínimas, storage temporal y rutas a `unit/`, `integracion/` e `ia/` en `sys.path`), `apoyo/rutas.py` (rutas calculadas `TESTS`, `DATOS`, `RAIZ`), `apoyo/api_harness.py` (siembra datos de prueba), `apoyo/capa_ia_fakes.py` (dobles de prueba), `apoyo/corpus_ner.py` (corpus sintético etiquetado para medir el NER).
 
 ```powershell
 # Suite completa en Docker (no toca la BD real)
@@ -1320,16 +1363,21 @@ docker compose run --rm --no-deps api pytest tests -q
 # Suite local (Windows, venv en backend/)
 pytest tests -v -rxX
 
+# Por carpeta
+pytest tests/unit -q
+pytest tests/integracion -q
+pytest tests/ia -q
+
 # Precisión del NER con detalle
-pytest tests/test_ner_sanitizer.py -s
+pytest tests/ia/test_ner_sanitizer.py -s
 
 # Rendimiento del NER (T-04): pruebas y benchmark
-docker compose exec worker pytest tests/test_rendimiento_ner.py -v -s
+docker compose exec worker pytest tests/ia/test_rendimiento_ner.py -v -s
 docker compose exec worker python scripts/evaluacion/benchmark_ner.py --paginas 100 --evidencia 8000
 docker compose exec worker python scripts/evaluacion/benchmark_ner.py --paginas 20 --perfil   # + profiling
 
 # Prueba en vivo contra el sistema levantado (usa la BD real, evaluación 9101)
-docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/test_live_capa_ia.py -v -s'
+docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/ia/test_live_capa_ia.py -v -s'
 ```
 
 **Frontend (`frontend-next`):** `npm test` corre 5 suites vitest (66 pruebas, 13 de HU-12: meta, BFF, CSV del plan, plan demo).
@@ -1392,7 +1440,7 @@ alembic revision --autogenerate -m "descripcion"                   # nueva migra
 | «No pudimos enviar el correo» + `SSLCertVerificationError` en `docker compose logs api` | Avast/AVG u otro antivirus intercepta el correo cifrado | Desactivar «Analizar correo saliente (SMTP)» en el Escudo de correo |
 | `SMTPAuthenticationError` / `535` | Clave que no es de aplicación, con espacios o de otra cuenta | Crear una contraseña de aplicación con la misma cuenta de `SMTP_USUARIO` |
 | `TimeoutError` al enviar | La red bloquea el puerto 587 | Otra red, o `SMTP_PORT=465`, `SMTP_SSL=true`, `SMTP_STARTTLS=false` |
-| La comparativa no muestra el promedio del rubro | Menos de `K_ANONIMATO_MINIMO` (5) empresas distintas del rubro, o el benchmark no se recalculó tras la migración HU-10 | Es lo esperado (HU-10: se muestra la advertencia y la meta). Tras migrar: `docker compose exec worker python scripts/operacion/recalcular_benchmark.py`; en demos locales `K_ANONIMATO_MINIMO=1` |
+| La comparativa no muestra el promedio del rubro | Menos de `K_ANONIMATO_MINIMO` (5) empresas distintas del rubro, o el benchmark no se recalculó tras la migración HU-10 | Es lo esperado (HU-10: se muestra la advertencia y la meta). Tras migrar: `docker compose exec worker python -m app.cli.recalcular_benchmark`; en demos locales `K_ANONIMATO_MINIMO=1` |
 | Caracteres raros (`polÃtica`) | Codificación de la consola | Verificar en `psql`; suele ser solo visual |
 
 ---

@@ -23,7 +23,7 @@ import copy
 import re
 import unicodedata
 
-from app.domain.mapa_datos.modelo import ErrorValidacion
+from app.domain.mapa_datos.modelo_mapa import ErrorValidacion
 
 PARTES = ("responsable", "encargado")
 MAX_MANDANTES = 100

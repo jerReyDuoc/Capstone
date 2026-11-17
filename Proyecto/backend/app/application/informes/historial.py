@@ -1,8 +1,8 @@
 """
 HU-29 · Historial de evaluaciones de la empresa y su evolución (lógica PURA).
 
-No importa SQLAlchemy ni FastAPI (se prueba sin BD en tests/test_hu29_historial_documentos.py).
-La lectura de la BD está en app/application/use_cases/historial_empresa.py.
+No importa SQLAlchemy ni FastAPI (se prueba sin BD en tests/integracion/test_hu29_historial_documentos.py).
+La lectura de la BD está en app/application/empresa/casos_uso/historial_empresa.py.
 
 Reglas:
   - Puntaje global de una evaluación = promedio de sus dimensiones ponderado por los
@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Iterable
 
-from app.application.informes.analisis import ETIQUETA_MADUREZ, nivel_madurez
+from app.domain.evaluacion.analisis_brechas import ETIQUETA_MADUREZ, nivel_madurez
 
 ESTADOS_CERRADOS = frozenset({"completada", "cerrada"})
 ORIGEN_EMPRESA = "empresa"

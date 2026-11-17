@@ -10,21 +10,21 @@ from app.bootstrap import (
     crear_storage_evidencias,
     crear_validador_evidencias,
 )
-from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
-from app.application.use_cases.generar_resumen import GenerateResumenUseCase
+from app.application.evidencias.casos_uso.procesar_evidencia import ProcesarEvidenciaUseCase
+from app.application.evaluacion.casos_uso.generar_resumen import GenerarResumenUseCase
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
-from app.application.use_cases.aplicar_retencion import AplicarRetencionUseCase
-from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
+from app.application.benchmark.casos_uso.actualizar_benchmark import ActualizarBenchmarkUseCase
+from app.application.retencion.casos_uso.aplicar_retencion import AplicarRetencionUseCase
+from app.application.auditoria.casos_uso.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.guardia_prompt import ReglasGuardiaPrompt
 from app.core.contexto_auditoria import ORIGEN_WORKER, fijar_origen_por_defecto
 
 configurar()  # raíz de composición (A-40)
 
-async def process_evidence_task(ctx, evidencia_id: int):
+async def procesar_evidencia_task(ctx, evidencia_id: int):
     # Sesión aparte para métricas/auditoría de IA: un rollback del negocio no las borra.
     async with AsyncSessionLocal() as session, AsyncSessionLocal() as sesion_ia:
         evidencia_repo = EvidenciaRepository(session)
@@ -32,21 +32,21 @@ async def process_evidence_task(ctx, evidencia_id: int):
         # HU-06: lee el archivo cifrado y, al terminar, deja solo el texto anonimizado
         storage = crear_storage_evidencias()
         validator = crear_validador_evidencias(sesion_ia)  # capa de Políticas e IA
-        guard = ReglasPromptGuard()
+        guard = ReglasGuardiaPrompt()
 
         async def recalcular(evaluacion_id: int):
             # HU-17 C3: puntaje global y radar se recalculan con el nuevo estado del control
-            resultado = await GenerateResumenUseCase(session).execute(evaluacion_id)
+            resultado = await GenerarResumenUseCase(session).execute(evaluacion_id)
             if settings.BENCHMARK_AL_COMPLETAR:
                 # la evaluación ya entra al benchmark de su rubro: se actualiza como al completar
                 try:
-                    await UpdateBenchmarkUseCase(session).execute()
+                    await ActualizarBenchmarkUseCase(session).execute()
                 except Exception:  # noqa: BLE001 - lo repara el cron de las 02:00
                     await session.rollback()
             return resultado
 
         async def puntaje_actual(evaluacion_id: int):
-            from app.application.use_cases.remediacion import puntaje_general_actual
+            from app.application.evaluacion.casos_uso.reevaluar_control import puntaje_general_actual
             return await puntaje_general_actual(session, evaluacion_id)
 
         async def auditar(evidencia, respuesta):
@@ -67,7 +67,7 @@ async def process_evidence_task(ctx, evidencia_id: int):
                 actor_rol=ROL_SISTEMA, detalle={"motivo": "hu06_solo_texto_anonimizado"},
             )
 
-        use_case = ProcessEvidenceUseCase(
+        use_case = ProcesarEvidenciaUseCase(
             evidencia_repo, respuesta_repo, storage, validator,
             guard=guard,
             registrar_evento=RegistrarEventoSeguridad(EventoSeguridadRepository(session), guard),
@@ -79,10 +79,10 @@ async def process_evidence_task(ctx, evidencia_id: int):
         )
         await use_case.execute(evidencia_id)
 
-async def update_benchmark_task(ctx):
+async def actualizar_benchmark_task(ctx):
     """Recalcula la tabla benchmark con las evaluaciones completadas."""
     async with AsyncSessionLocal() as session:
-        use_case = UpdateBenchmarkUseCase(session)
+        use_case = ActualizarBenchmarkUseCase(session)
         result = await use_case.execute()
         print(f"[benchmark] actualizado: {result}")
         return result
@@ -102,9 +102,9 @@ async def aplicar_retencion_task(ctx, origen: str = "cron", admin_id: int | None
         ).execute()
         return resultado.como_dict()
 
-async def sellar_audit_log_task(ctx):
+async def sellar_bitacora_task(ctx):
     """HU-09 criterio 3: sella en lotes (hash SHA-256 encadenado) las filas nuevas del audit_log."""
-    from app.infrastructure.repositories.audit_log_lotes import sellar_pendientes
+    from app.infrastructure.repositories.lotes_bitacora import sellar_pendientes
     async with AsyncSessionLocal() as session:
         nuevos = await sellar_pendientes(session)
         await session.commit()
@@ -118,7 +118,7 @@ async def recordar_revision_rat_task(ctx):
         return await enviar_recordatorios(session)
 
 
-async def startup(ctx):
+async def al_iniciar(ctx):
     """Carga el motor NER al iniciar: si falta spaCy/modelo, el worker no arranca
     (mejor fallar al inicio que en cada evidencia)."""
     # HU-09: lo que el worker registre fuera de una petición HTTP queda con origen "sistema:worker"
@@ -132,16 +132,18 @@ class WorkerSettings:
     # HU-25: aplicar_retencion_task también se encola a mano (con un timeout más largo). La API
     # la encola con un id fijo para no acumular duplicados; keep_result=0 libera ese id al
     # terminar (el resultado ya queda en el audit_log).
-    functions = [process_evidence_task,
+    functions = [procesar_evidencia_task,
+                 # alias de transición A-63: quitar en el despliegue siguiente
+                 func(procesar_evidencia_task, name="process_evidence_task"),
                  func(aplicar_retencion_task, timeout=settings.RETENCION_TIMEOUT_S, keep_result=0)]
-    on_startup = startup
+    on_startup = al_iniciar
     cron_jobs = [
-        cron(update_benchmark_task, hour=2, minute=0),  # 02:00 UTC diario
+        cron(actualizar_benchmark_task, hour=2, minute=0),  # 02:00 UTC diario
         # T-06 / HU-25: diario a RETENCION_HORA_UTC (03:00 UTC por defecto); unique evita duplicados
         cron(aplicar_retencion_task, hour=settings.RETENCION_HORA_UTC, minute=0,
              timeout=settings.RETENCION_TIMEOUT_S, unique=True),
         # HU-09: sellado por lote del audit_log cada AUDIT_SELLO_CADA_MIN minutos
-        cron(sellar_audit_log_task, minute=set(range(0, 60, settings.AUDIT_SELLO_CADA_MIN)), run_at_startup=True),
+        cron(sellar_bitacora_task, minute=set(range(0, 60, settings.AUDIT_SELLO_CADA_MIN)), run_at_startup=True),
         # HU-40: recordatorio de la revisión interna del registro, diario a REVISION_RAT_HORA_UTC
         cron(recordar_revision_rat_task, hour=settings.REVISION_RAT_HORA_UTC, minute=15, unique=True),
     ]

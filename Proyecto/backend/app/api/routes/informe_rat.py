@@ -27,7 +27,7 @@ from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.informe_rat import EmitirEntrada, EnviarEntrada
+from app.api.schemas.informe_rat_esquemas import EmitirEntrada, EnviarEntrada
 
 router = APIRouter(prefix="/api/registro-actividades/informes", tags=["informe del registro de actividades (HU-36)"])
 

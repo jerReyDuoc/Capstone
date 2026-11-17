@@ -25,12 +25,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
+from app.application.ai.prompts.renderizado_prompt import PromptRenderizado, escapar_para_prompt
 from app.domain.ports.sanitizador_port import TipoEntidad
 
 if TYPE_CHECKING:  # solo tipos
-    from app.application.borradores.generador import ContextoBorrador
-    from app.application.borradores.plantillas import Plantilla
+    from app.application.borradores.generador_markdown import ContextoBorrador
+    from app.application.borradores.plantillas_borrador import Plantilla
 
 PROMPT_VERSION = "borrador/1.0.0"
 MAX_SECCIONES = 6
@@ -111,7 +111,7 @@ def construir(
     prioritarias: list[str],
     canario: str | None = None,
 ) -> PromptRenderizado:
-    from app.application.borradores.generador import ETIQUETA_ESTADO, ETIQUETA_MADUREZ, fundamento
+    from app.application.borradores.generador_markdown import ETIQUETA_ESTADO, ETIQUETA_MADUREZ, fundamento
 
     dims = "\n".join(
         f"- {d.nombre}: {_puntaje(d.puntaje)} / 100 ({ETIQUETA_MADUREZ.get(d.nivel or '', 'sin nivel')})"

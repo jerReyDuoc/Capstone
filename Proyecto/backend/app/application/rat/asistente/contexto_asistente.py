@@ -16,10 +16,10 @@ from __future__ import annotations
 import re
 
 from app.domain.catalogos import catalogo_tratamiento as cat
-from app.domain.mapa_datos import analisis as am
-from app.domain.mapa_datos.modelo import Elemento, Flujo
+from app.domain.mapa_datos import analisis_mapa as am
+from app.domain.mapa_datos.modelo_mapa import Elemento, Flujo
 from app.domain.rat import catalogo as cat_rat
-from app.domain.rat.modelo import completar
+from app.domain.rat.modelo_actividad import completar
 
 MAX_LINEAS_MAPA = 160
 _CLAVE = re.compile(r"[^a-z0-9_]+")

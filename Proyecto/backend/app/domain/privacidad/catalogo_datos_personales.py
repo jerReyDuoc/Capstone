@@ -5,7 +5,7 @@ Cada columna de cada tabla del modelo está aquí, con su categoría y, si conti
 personales, su finalidad, base de licitud (Ley 21.719), plazo de conservación y
 tratamiento. Es la "matriz de minimización" en forma de código:
 
-  - tests/test_t06_minimizacion.py falla si alguien agrega una columna al modelo sin
+  - tests/integracion/test_t06_minimizacion.py falla si alguien agrega una columna al modelo sin
     clasificarla aquí (o deja aquí una columna que ya no existe). Así la auditoría no
     queda obsoleta con la primera migración nueva.
   - scripts/evaluacion/auditoria_minimizacion.py la cruza con el esquema REAL de PostgreSQL,
@@ -583,7 +583,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # Describe los sistemas, bases de datos, terceros y flujos de la ORGANIZACIÓN: no guarda datos
     # de titulares (solo CATEGORÍAS del catálogo común). El responsable interno es un cargo o un
     # área; los textos libres se rechazan al guardar si traen correos, RUT o teléfonos
-    # (app/domain/mapa_datos/modelo.py) y la auditoría de contenido los vuelve a revisar ("pii").
+    # (app/domain/mapa_datos/modelo_mapa.py) y la auditoría de contenido los vuelve a revisar ("pii").
     "mapa_datos": {
         **_sin_dp("id", "empresa_id", "version", "plantilla_inicial", "fecha_creacion", "fecha_actualizacion"),
         "sugerencias_descartadas": Dato(SIN_DP, escaneo="pii"),
@@ -618,7 +618,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
     # Describe ACTIVIDADES de la organización con categorías del catálogo común y los ids de lo
     # elegido del mapa: no guarda datos de titulares. Los textos libres (nombre, finalidades,
     # interés legítimo, lógica de decisiones…) se rechazan al guardar si traen correos, RUT o
-    # teléfonos (app/domain/rat/modelo.py) y la auditoría de contenido los vuelve a revisar ("pii").
+    # teléfonos (app/domain/rat/modelo_actividad.py) y la auditoría de contenido los vuelve a revisar ("pii").
     "rat_actividad": {
         **_sin_dp("id", "empresa_id", "estado", "estado_previo", "revision", "completitud", "version_vigente",
                   "fecha_creacion", "fecha_actualizacion", "fecha_vigencia", "fecha_archivo",
@@ -812,7 +812,7 @@ def columnas_personales() -> list[tuple[str, str, Dato]]:
 # El mapa de datos, el RAT y el RoPA de ComplianceAI salen de aquí (app/application/plataforma/):
 #
 #   - cada tabla del modelo pertenece a UNA actividad de tratamiento o está en TABLAS_SIN_TRATAMIENTO
-#     (catálogos y agregados sin datos personales). tests/test_hu41_registro_plataforma.py falla si
+#     (catálogos y agregados sin datos personales). tests/integracion/test_hu41_registro_plataforma.py falla si
 #     aparece una tabla nueva sin decidir dónde va, o si una tabla con datos personales queda fuera;
 #   - las categorías de datos de cada actividad se calculan de sus columnas personales;
 #   - los plazos se calculan agrupando esas columnas por su conservación: cada conservación que

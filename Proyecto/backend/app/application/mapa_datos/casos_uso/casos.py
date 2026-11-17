@@ -4,11 +4,11 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.fabricas import fabricas
-from app.application.mapa_datos.casos_uso.edicion import EdicionMixin
+from app.application.mapa_datos.casos_uso.edicion_mapa import EdicionMixin
 from app.application.mapa_datos.casos_uso.exportacion import ExportacionMixin
 from app.application.mapa_datos.casos_uso.lectura import LecturaMixin
 from app.application.mapa_datos.casos_uso.plantillas_y_sugerencias import PlantillasYSugerenciasMixin
-from app.application.mapa_datos.casos_uso.versiones import VersionesMixin
+from app.application.mapa_datos.casos_uso.historial_mapa import VersionesMixin
 
 
 class MapaDatosCasos(LecturaMixin, EdicionMixin, PlantillasYSugerenciasMixin, VersionesMixin, ExportacionMixin):
@@ -24,4 +24,5 @@ class MapaDatosCasos(LecturaMixin, EdicionMixin, PlantillasYSugerenciasMixin, Ve
         self.email_usuario: str = cliente.usuario.email
         self.limitador = limitador
         self.bitacora = fabricas().bitacora(db)
+        self.repo = fabricas().mapa_datos(db)
         self.ultimo_id: int | None = None   # HU-39: id del último elemento o flujo creado

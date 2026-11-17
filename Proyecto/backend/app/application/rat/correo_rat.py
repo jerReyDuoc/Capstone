@@ -4,7 +4,7 @@ from __future__ import annotations
 from html import escape
 
 from app.application.informes import formato as M
-from app.application.rat import informe_rat as I
+from app.application.rat import armado_informe_rat as I
 
 
 def asunto(inf: I.InformeRat) -> str:

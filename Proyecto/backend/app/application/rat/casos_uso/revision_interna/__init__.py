@@ -6,7 +6,7 @@ informes en un modo de auditoría interna y dejar constancia de esa revisión, p
 es fiel y está al día antes de presentarlo, certificarlo o informarlo al directorio.
 
   C1  El MISMO usuario definitivo entra al modo de revisión (sin rol ni cuenta adicional) y recorre la lista de
-      verificación por actividad y por elemento del mapa (app/domain/rat/revision.py).
+      verificación por actividad y por elemento del mapa (app/domain/rat/lista_verificacion.py).
   C2  Deja observaciones por actividad, elemento o flujo (o del registro en general) y las cierra al corregir.
       Con observaciones abiertas la versión no se puede marcar revisada.
   C3  Marca la versión del RAT como revisada con fecha y nombre: la marca aparece en el informe del registro

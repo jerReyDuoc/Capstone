@@ -7,7 +7,7 @@ from app.application.fabricas import fabricas
 from app.application.rat.casos_uso.generar_informe import InformeRatCasos
 from app.application.rat.casos_uso.revision_interna.entregables import EntregablesMixin
 from app.application.rat.casos_uso.revision_interna.lectura import LecturaMixin
-from app.application.rat.casos_uso.revision_interna.revision import RevisionMixin
+from app.application.rat.casos_uso.revision_interna.ciclo_revision import RevisionMixin
 
 
 class RevisionInternaCasos(LecturaMixin, RevisionMixin, EntregablesMixin):

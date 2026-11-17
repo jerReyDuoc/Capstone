@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.schemas.api_schemas import ControlResponse
-from app.application.use_cases.progreso_cuestionario import ProgresoCuestionarioResponse, calcular_progreso
+from app.api.schemas.comunes import ControlResponse
+from app.application.evaluacion.casos_uso.progreso_cuestionario import ProgresoCuestionarioResponse, calcular_progreso
 from app.infrastructure.cache import catalogo_controles
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
 from app.api.dependencias.alcance import alcance_evaluacion
 from app.core.database import get_db
-from app.application.use_cases.responder_filtro import ResponderFiltroUseCase
-from app.api.schemas.api_schemas import (
+from app.application.evaluacion.casos_uso.responder_filtro import ResponderFiltroUseCase
+from app.api.schemas.comunes import (
     PreguntaFiltroResponse,
     EstadoFiltroResponse,
     RespuestaFiltroResponse,
@@ -48,7 +48,7 @@ async def get_estado_filtro(evaluacion_id: int, db: AsyncSession = Depends(get_d
             for r in respuestas
             if r.pregunta is not None
         }
-        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+        from app.infrastructure.cache.arbol_aplicabilidad_cache import arbol_vigente
 
         controles_count = len(get_controles_aplicables(respuestas_dict, await arbol_vigente(db)))
 

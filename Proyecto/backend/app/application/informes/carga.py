@@ -1,6 +1,6 @@
 """
 Lee de la BD todo lo que necesitan los informes y lo entrega como las dataclasses de
-analisis.py (la lógica no toca la BD).
+domain/evaluacion/analisis_brechas.py (la lógica no toca la BD).
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.fabricas import fabricas
 
-from app.application.informes.analisis import (
+from app.domain.evaluacion.analisis_brechas import (
     BrechaCatalogo,
     ComparativaDominio,
     DominioResultado,
@@ -194,7 +194,7 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
 
     usuario = await repo.usuario_temporal(evaluacion.usuario_temporal_id) if evaluacion.usuario_temporal_id else None
     # HU-29: el rubro de la empresa cliente manda (la reevaluación no tiene usuario temporal)
-    from app.application.use_cases.historial_empresa import rubro_id_de_evaluacion
+    from app.application.empresa.casos_uso.historial_empresa import rubro_id_de_evaluacion
 
     rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
     rubro = await repo.rubro(rubro_id) if rubro_id else None

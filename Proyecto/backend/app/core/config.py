@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # true reactiva el mapa cifrado (reversible) y debe documentarse como excepción.
     GUARDAR_MAPA_ENTIDADES_CIFRADO: bool = False
     # ------------------------------------------------ Autenticación de la API
-    # Secreto HMAC para firmar/verificar los tokens bearer (app/infrastructure/security/cripto/autenticacion.py).
+    # Secreto HMAC para firmar/verificar los tokens bearer (app/infrastructure/security/cripto/contrasenas_y_tokens.py).
     AUTH_SECRET: str | None = None
     AUTH_TOKEN_TTL_MIN: int = 480
     # ------------------------------------------------ Plazos de solicitudes ARCOP

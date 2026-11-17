@@ -12,9 +12,9 @@ from app.application.rat import correo_revision as CR
 from app.application.rat.casos_uso.revision_interna.comun import _ahora, _fecha_txt, _hoy_chile, _iso
 from app.core.config import settings
 from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
-from app.domain.models.rat_revision import RatRevisionConfig
+from app.domain.models.rat_revision import ConfiguracionRevisionRat
 from app.domain.ports.correo_port import CorreoFallidoError, CorreoNoDisponibleError
-from app.domain.rat import revision as R
+from app.domain.rat import lista_verificacion as R
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,9 @@ async def enviar_recordatorios(db: AsyncSession, ahora: datetime | None = None) 
             logger.warning("[revision_rat] recordatorio fallido empresa %s: %s", empresa_id, type(e).__name__)
             continue
         if cfg is None:
-            cfg = RatRevisionConfig(empresa_id=empresa_id, plazo_meses=plazo, aviso_dias=aviso, recordatorio_correo=True,
+            cfg = ConfiguracionRevisionRat(empresa_id=empresa_id, plazo_meses=plazo, aviso_dias=aviso, recordatorio_correo=True,
                                     fecha_actualizacion=_ahora())
-            db.add(cfg)
+            repo.agregar(cfg)
         # Con la fecha de esta corrida (no la del reloj): así la repetición cada N días se cuenta bien
         cfg.ultimo_recordatorio = ahora.astimezone(timezone.utc).replace(tzinfo=None)
         cfg.etapa_recordatorio = etapa

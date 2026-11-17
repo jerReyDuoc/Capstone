@@ -9,7 +9,7 @@ de lo que afirma el registro; además el resumen que se mostró y los documentos
   version_rat   correlativo por empresa: sube cuando cambia la huella respecto de la emisión anterior.
                 Dos emisiones con la misma versión afirman lo mismo.
   codigo        CIA-REG-AAAA-NNNNNN-D (dígito verificador módulo 11 sobre el id): lo calcula el caso
-                de uso apenas conoce el id (app/application/rat/informe_rat.py: codigo()).
+                de uso apenas conoce el id (app/application/rat/armado_informe_rat.py: codigo()).
   documento_*   si la empresa elimina el archivo desde "Mis documentos", queda en NULL (ON DELETE SET
                 NULL) y la emisión se sigue pudiendo verificar.
 

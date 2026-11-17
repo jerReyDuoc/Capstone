@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.formacion import AvanceFormativo
+from app.domain.models.formacion_recorrido import AvanceFormativo
 from app.domain.models.resumen import Resumen
 from app.domain.models.rubro import Rubro
 from app.domain.models.ruta_formativa import RutaFormativa

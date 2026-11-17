@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models.llamada_llm import LlamadaLLM
+from app.domain.models.llamada_llm import LlamadaLlm
 from app.domain.models.sanitizacion import Sanitizacion
 from app.domain.ports.registro_ia_port import RegistroIAPort, RegistroLlamada, RegistroSanitizacion
 from app.infrastructure.security.cripto.cifrado import CifradorEntidades
@@ -23,7 +23,7 @@ class RegistroIARepository(RegistroIAPort):
         self.guardar_mapa = guardar_mapa
 
     async def guardar_llamada(self, r: RegistroLlamada) -> int:
-        fila = LlamadaLLM(
+        fila = LlamadaLlm(
             traza_id=r.traza_id,
             fecha=r.fecha,
             tarea=r.tarea,

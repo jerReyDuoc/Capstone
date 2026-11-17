@@ -1,13 +1,13 @@
 """
 Datos del PDF del informe de evaluación (HU-11, HU-12, HU-21): DTO puro y nombre del archivo.
-El dibujo del PDF vive en app/infrastructure/documentos/pdf/informe_evaluacion.py (A-14).
+El dibujo del PDF vive en app/infrastructure/documentos/pdf/informe_evaluacion_pdf.py (A-14).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.application.informes.analisis import Brecha, ComparativaDominio, FiltrosBrechas, PlanFormativo
+from app.domain.evaluacion.analisis_brechas import Brecha, ComparativaDominio, FiltrosBrechas, PlanFormativo
 from app.application.informes.ficha import FichaInforme
 
 

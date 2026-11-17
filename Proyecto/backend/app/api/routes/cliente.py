@@ -42,10 +42,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.espacio_empresa import EmpresaNoEncontradaError, EspacioEmpresa
-from app.application.use_cases.documentos_empresa import DocumentoError, DocumentosEmpresa
-from app.application.use_cases.gestionar_contrato import contrato_dict
-from app.application.use_cases.historial_empresa import (
+from app.application.empresa.casos_uso.espacio_empresa import EmpresaNoEncontradaError, EspacioEmpresa
+from app.application.empresa.casos_uso.documentos_empresa import DocumentoError, DocumentosEmpresa
+from app.application.contratacion.casos_uso.gestionar_contrato import contrato_dict
+from app.application.empresa.casos_uso.historial_empresa import (
     IniciarReevaluacionUseCase,
     ReevaluacionError,
     historial_de_empresa,
@@ -56,7 +56,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias import servicio_pagado
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
-from app.api.schemas.cliente import ArchivarInformeRequest
+from app.api.schemas.cliente_esquemas import ArchivarInformeRequest
 from app.infrastructure.repositories.espacio_empresa_repository import EspacioEmpresaRepository
 
 router = APIRouter(prefix="/api/cliente", tags=["cliente · espacio de la empresa (HU-28, HU-29, HU-30)"])

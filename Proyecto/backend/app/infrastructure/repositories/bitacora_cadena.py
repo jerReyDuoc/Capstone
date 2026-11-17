@@ -6,7 +6,7 @@ es el único que inserta). En PostgreSQL toma un advisory lock de transacción a
 el último hash: dos transacciones simultáneas no pueden encadenarse al mismo eslabón (el
 lock se libera al commit o rollback). En SQLite (pruebas) no hace falta.
 
-HU-09: el mismo lock lo toma el sellado por lote (audit_log_lotes.py). Como cada
+HU-09: el mismo lock lo toma el sellado por lote (lotes_bitacora.py). Como cada
 transacción que inserta lo conserva hasta su commit, al sellar no puede quedar una fila
 "en vuelo" con un id menor que otra ya confirmada: los lotes no tienen huecos falsos.
 """

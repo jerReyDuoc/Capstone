@@ -13,8 +13,10 @@ Nunca borra filas de catálogo: lo retirado queda con activo=false.
 from __future__ import annotations
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.errores import ConflictoIntegridadError
 from app.domain.matriz.contenido import CAMPOS, construir, copiar, normalizar, reglas_de
 from app.domain.models.catalogo_brechas import CatalogoBrechas
 from app.domain.models.dominio import Dominio
@@ -25,6 +27,7 @@ from app.domain.models.matriz_version import (
 )
 from app.domain.models.pregunta_filtro import PreguntaFiltro
 from app.domain.models.ruta_formativa import RutaFormativa
+from app.domain.models.usuario_admin import UsuarioAdmin
 
 # entidad del contenido -> (modelo, columna de id, {campo del contenido: atributo del modelo})
 _MAPEO = {
@@ -71,6 +74,40 @@ class MatrizRepository:
         return list((await self.session.execute(
             select(MatrizVersion).order_by(MatrizVersion.id.desc())
         )).scalars().all())
+
+    async def anterior_publicada(self, version_id: int) -> MatrizVersion | None:
+        return (await self.session.execute(
+            select(MatrizVersion).where(MatrizVersion.id < version_id, MatrizVersion.estado != ESTADO_BORRADOR)
+            .order_by(MatrizVersion.id.desc()).limit(1)
+        )).scalar_one_or_none()
+
+    async def existe_etiqueta(self, etiqueta: str) -> bool:
+        return (await self.session.execute(
+            select(MatrizVersion.id).where(MatrizVersion.etiqueta == etiqueta)
+        )).scalar_one_or_none() is not None
+
+    async def etiquetas(self) -> list[str]:
+        return list((await self.session.execute(
+            select(MatrizVersion.etiqueta).where(MatrizVersion.etiqueta.is_not(None))
+        )).scalars().all())
+
+    async def email_admin(self, admin_id: int) -> str | None:
+        a = await self.session.get(UsuarioAdmin, admin_id)
+        return a.email if a else None
+
+    async def agregar(self, version: MatrizVersion) -> None:
+        self.session.add(version)
+        await self.session.flush()
+
+    async def agregar_borrador(self, borrador: MatrizVersion) -> None:
+        self.session.add(borrador)
+        try:
+            await self.session.flush()
+        except IntegrityError as e:
+            raise ConflictoIntegridadError(str(e)) from e
+
+    async def eliminar(self, version: MatrizVersion) -> None:
+        await self.session.delete(version)
 
     async def evaluaciones_por_version(self) -> dict[int, int]:
         filas = (await self.session.execute(

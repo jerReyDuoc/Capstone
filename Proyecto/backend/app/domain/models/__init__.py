@@ -12,7 +12,7 @@ from app.domain.models.resumen import Resumen
 from app.domain.models.pregunta_filtro import PreguntaFiltro
 from app.domain.models.respuesta_filtro import RespuestaFiltro
 from app.domain.models.evento_seguridad import EventoSeguridad, OrigenEvento
-from app.domain.models.llamada_llm import LlamadaLLM
+from app.domain.models.llamada_llm import LlamadaLlm
 from app.domain.models.sanitizacion import Sanitizacion
 from app.domain.models.usuario_admin import UsuarioAdmin
 from app.domain.models.solicitud_arcop import (
@@ -34,11 +34,11 @@ from app.domain.models.solicitud_contratacion import (
 )
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria, AuditLog
 # HU-09: sellos por lote del audit_log y cuentas del Auditor Externo
-from app.domain.models.auditoria_externa import AuditLogSello, UsuarioAuditor
+from app.domain.models.auditoria_externa_modelo import SelloBitacora, UsuarioAuditor
 # HU-28: sesiones revocables y recuperación de contraseña
-from app.domain.models.sesion import SesionUsuario, TokenRecuperacion
+from app.domain.models.sesion_modelo import SesionUsuario, TokenRecuperacion
 # HU-26: recorrido de módulos formativos y avance de la empresa
-from app.domain.models.formacion import (
+from app.domain.models.formacion_recorrido import (
     AvanceFormativo,
     EstadoAvance,
     LeccionFormativa,
@@ -47,11 +47,11 @@ from app.domain.models.formacion import (
 # HU-29: documentos generados de la empresa ("Mis documentos")
 from app.domain.models.documento_empresa import DocumentoEmpresa
 # HU-16: borradores de documentos de cumplimiento
-from app.domain.models.borrador import BorradorDocumento, EstadoBorrador
+from app.domain.models.borrador_modelo import BorradorDocumento, EstadoBorrador
 # HU-15: conversaciones del Agente IA Tutor
 # HU-24: versiones de la matriz normativa y reglas de aplicabilidad
 from app.domain.models.matriz_version import MatrizVersion, ReglaAplicabilidad
-from app.domain.models.tutor import (
+from app.domain.models.tutor_conversaciones import (
     ConversacionTutor,
     MensajeTutor,
     RolMensajeTutor,
@@ -59,16 +59,16 @@ from app.domain.models.tutor import (
 )
 # HU-25: plazo de retención de usuarios temporales configurable desde el panel
 from app.domain.models.configuracion_retencion import ConfiguracionRetencion
-from app.domain.models.mapa_datos import MapaDatos, MapaDatosVersion, MapaElemento, MapaFlujo  # HU-34
-from app.domain.models.rat import RatActividad, RatActividadVersion  # HU-35
+from app.domain.models.mapa_datos_tablas import MapaDatos, MapaDatosVersion, MapaElemento, MapaFlujo  # HU-34
+from app.domain.models.rat_modelo import RatActividad, RatActividadVersion  # HU-35
 from app.domain.models.rat_informe import RatInforme  # HU-36
-from app.domain.models.ropa import RopaDatos, RopaInforme  # HU-37
+from app.domain.models.ropa_modelo import RopaDatos, RopaInforme  # HU-37
 from app.domain.models.asistente import (  # HU-39
     AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion,
 )
 from app.domain.models.plataforma import PlataformaInforme, PlataformaRegistro  # HU-41
 from app.domain.models.rat_revision import (  # HU-40: revisión interna del registro
-    RatObservacion, RatPaqueteEvidencia, RatRevision, RatRevisionConfig,
+    RatObservacion, RatPaqueteEvidencia, RatRevision, ConfiguracionRevisionRat,
 )
 
 __all__ = [
@@ -92,7 +92,7 @@ __all__ = [
     "RespuestaFiltro",
     "EventoSeguridad",
     "OrigenEvento",
-    "LlamadaLLM",
+    "LlamadaLlm",
     "Sanitizacion",
     "UsuarioAdmin",
     "SolicitudARCOP",
@@ -108,7 +108,7 @@ __all__ = [
     "EstadoSolicitudContratacion",
     "BitacoraAuditoria",
     "AuditLog",
-    "AuditLogSello",
+    "SelloBitacora",
     "UsuarioAuditor",
     "SesionUsuario",
     "TokenRecuperacion",
@@ -139,6 +139,6 @@ __all__ = [
     "PlataformaRegistro",
     "RatRevision",
     "RatObservacion",
-    "RatRevisionConfig",
+    "ConfiguracionRevisionRat",
     "RatPaqueteEvidencia",
 ]

@@ -1,6 +1,6 @@
 """
 HU-40 · Datos de la constancia de revisión interna del RAT (puro): DTO y nombre del archivo.
-El PDF se dibuja en app/infrastructure/documentos/pdf/revision_interna.py (A-14).
+El PDF se dibuja en app/infrastructure/documentos/pdf/revision_interna_pdf.py (A-14).
 """
 from __future__ import annotations
 

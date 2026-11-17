@@ -67,7 +67,7 @@ QA_TOKEN_ADMIN_LIVE = os.getenv("QA_TOKEN_ADMIN") or None
 def token_qa(rol: str = "admin") -> str:
     """Token firmado con el AUTH_SECRET vigente (en proceso). rol: admin | referente."""
     from app.domain.auth.actor import Rol
-    from app.infrastructure.security.cripto.autenticacion import emitir_token
+    from app.infrastructure.security.cripto.contrasenas_y_tokens import emitir_token
 
     if rol == "admin":
         return emitir_token(ADMIN_ID, Rol.ADMIN_THERION.value)
@@ -213,7 +213,7 @@ async def _sembrar(Session):
         CatalogoBrechas, Dominio, Evaluacion, MatrizControl, PreguntaFiltro,
         Rubro, RutaFormativa, UsuarioAdmin, UsuarioTemporal,
     )
-    from app.infrastructure.security.cripto.autenticacion import hash_password
+    from app.infrastructure.security.cripto.contrasenas_y_tokens import hash_password
     async with Session() as s:
         s.add_all([Dominio(id=i, nombre_dominio=n) for i, n in DOMINIOS.values()])
         s.add(Rubro(id=1, nombre_rubro="Retail"))

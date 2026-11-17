@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.bitacora_auditoria import BitacoraAuditoria
 from app.domain.models.empresa import Empresa
-from app.domain.models.rat import RatActividad, RatActividadVersion
+from app.domain.models.rat_modelo import RatActividad, RatActividadVersion
 from app.domain.models.rat_informe import RatInforme
 from app.domain.models.rat_revision import (ABIERTA, EN_CURSO, REVISADA, RatObservacion, RatPaqueteEvidencia,
-                                            RatRevision, RatRevisionConfig)
+                                            RatRevision, ConfiguracionRevisionRat)
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 
 
@@ -96,7 +96,7 @@ class RevisionInternaRepository:
 
     # ---- configuración / vigencias
     async def config(self, empresa_id: int) -> Any | None:
-        return await self.session.get(RatRevisionConfig, empresa_id)
+        return await self.session.get(ConfiguracionRevisionRat, empresa_id)
 
     async def primera_vigencia(self, empresa_id: int) -> datetime | None:
         return (await self.session.execute(select(func.min(RatActividadVersion.fecha)).where(
@@ -166,3 +166,6 @@ class RevisionInternaRepository:
 
     async def paquete(self, paquete_id: int) -> Any | None:
         return await self.session.get(RatPaqueteEvidencia, paquete_id)
+
+    def agregar(self, entidad: Any) -> None:
+        self.session.add(entidad)

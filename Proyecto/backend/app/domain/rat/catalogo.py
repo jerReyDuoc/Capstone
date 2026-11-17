@@ -12,7 +12,7 @@ reglamento (Decreto 662). Son una PROPUESTA: `ESTADO_REVISION_LEGAL` queda en
   3. cambiar ESTADO_REVISION_LEGAL a "validado", anotar la fecha y subir VERSION_TEXTOS.
 Las referencias a artículos (campo `referencia`) se citan como orientación y deben confirmarse.
 
-Reglas (las verifica tests/test_hu35_rat.py):
+Reglas (las verifica tests/integracion/test_hu35_rat.py):
   - Los códigos son estables: NO se renombran ni se borran (una versión vigente antigua los sigue
     usando). Para retirar una opción se marca `vigente=False`.
   - El texto que ve el cliente no lleva códigos internos ni números de historia o tarea.

@@ -4,12 +4,12 @@ No requieren spaCy, BD ni API key: el NLP, el proveedor y el registro son falsos
 """
 from types import SimpleNamespace
 
-from app.application.ai.gateway import AIGateway, PreciosModelo
+from app.application.ai.gateway import GatewayIA, PreciosModelo
 from app.application.ai.politicas import crear_politicas
-from app.domain.evidencias.validacion import EvidenceValidation
-from app.domain.ports.proveedor_llm_port import LLMProviderError, LLMProviderPort, LLMResponse
+from app.domain.evidencias.validacion_evidencia import ValidacionEvidencia
+from app.domain.ports.proveedor_llm_port import ProveedorLlmError, ProveedorLlmPort, RespuestaLlm
 from app.domain.ports.registro_ia_port import RegistroIAPort
-from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
+from app.infrastructure.security.pii.sanitizador_ner import SanitizadorNer
 
 
 class StubNLP:
@@ -33,14 +33,14 @@ class StubNLP:
 
 
 def sanitizer_stub(nombres=("Juan Pérez", "María González"), lugares=()):
-    return NERSanitizer(lambda: StubNLP(nombres, lugares))
+    return SanitizadorNer(lambda: StubNLP(nombres, lugares))
 
 
-class FakeProvider(LLMProviderPort):
+class FakeProvider(ProveedorLlmPort):
     nombre = "fake"
     modelo_por_defecto = "fake-model"
 
-    def __init__(self, clasificacion="cumplido", confianza=0.95, error: LLMProviderError | None = None):
+    def __init__(self, clasificacion="cumplido", confianza=0.95, error: ProveedorLlmError | None = None):
         self.clasificacion, self.confianza, self.error = clasificacion, confianza, error
         self.requests = []
 
@@ -48,8 +48,8 @@ class FakeProvider(LLMProviderPort):
         self.requests.append(req)
         if self.error:
             raise self.error
-        return LLMResponse(
-            data=EvidenceValidation(
+        return RespuestaLlm(
+            data=ValidacionEvidencia(
                 clasificacion=self.clasificacion, confianza=self.confianza,
                 justificacion="simulado", respalda_clasificacion_usuario=True,
                 evidencia_suficiente=True,
@@ -79,7 +79,7 @@ class FakeRegistro(RegistroIAPort):
 
 def crear_gateway(provider=None, sanitizer=None, registro=None, sanitizer_enabled=True,
                   max_chars_evidencia=8000):
-    return AIGateway(
+    return GatewayIA(
         provider=provider or FakeProvider(),
         sanitizer=sanitizer or sanitizer_stub(),
         registro=registro or FakeRegistro(),
@@ -90,6 +90,6 @@ def crear_gateway(provider=None, sanitizer=None, registro=None, sanitizer_enable
 
 
 def crear_validador(**kw):
-    from app.application.ai.validador_evidencias import GatewayEvidenceValidator  # usa modelos SQLAlchemy
+    from app.application.ai.validador_evidencias import ValidadorEvidenciasGateway  # usa modelos SQLAlchemy
     gw = crear_gateway(**kw)
-    return GatewayEvidenceValidator(gw), gw
+    return ValidadorEvidenciasGateway(gw), gw

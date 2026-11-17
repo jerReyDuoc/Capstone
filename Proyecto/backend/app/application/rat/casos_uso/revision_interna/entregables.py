@@ -17,14 +17,14 @@ from app.application.rat.casos_uso.revision_interna.comun import (
     observacion_vista,
 )
 from app.application.rat.casos_uso.generar_informe import InformeRatError
-from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.encuesta_publica.casos_uso.limites_encuesta import ventana_diaria
 from app.core.config import settings
 from app.domain.auditoria.acciones import Accion
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.models.rat_revision import REVISADA, RatPaqueteEvidencia, RatRevision
 from app.domain.ports.correo_port import Adjunto, CorreoFallidoError, CorreoNoDisponibleError
 from app.domain.ports.limitador_port import LimitadorNoDisponibleError
-from app.domain.rat import revision as R
+from app.domain.rat import lista_verificacion as R
 
 
 class EntregablesMixin:
@@ -151,7 +151,7 @@ class EntregablesMixin:
                                    sha256=secrets.token_hex(32), huella_manifiesto="0" * 64, archivos=0,
                                    tamano_bytes=0, fecha=ahora_tz.replace(tzinfo=None),
                                    usuario_definitivo_id=self.usuario_id)
-        self.db.add(fila)
+        self.repo.agregar(fila)
         await self.db.flush()
         codigo = P.codigo(fila.id, ahora_tz.astimezone(ZONA).year)
         datos = P.DatosPaquete(

@@ -22,7 +22,7 @@ os.environ["EXIGIR_TOKEN_EVALUACIONES"] = "true"
 # Correcciones 05-11: las suites existentes (HU-02, HU-12, HU-29…) se escribieron con la regla
 # original (justificación obligatoria y "cumplido" sin evidencia). Se fuerzan esos valores;
 # las reglas nuevas, que son el valor por defecto de la app, se prueban con monkeypatch en
-# tests/test_correcciones_cuestionario.py.
+# tests/integracion/test_correcciones_cuestionario.py.
 os.environ["JUSTIFICACION_OBLIGATORIA"] = "true"
 os.environ["EVIDENCIA_OBLIGATORIA_CUMPLIDO"] = "false"
 
@@ -31,6 +31,10 @@ import tempfile  # noqa: E402
 
 os.environ.setdefault("STORAGE_DIR", tempfile.mkdtemp(prefix="qa_storage_"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar apoyo.api_harness
+# Los tests viven en subcarpetas (unit/, integracion/, ia/) sin __init__.py: para importarse
+# entre ellos por nombre base (p. ej. `import test_hu27_empresa_cliente`) hace falta la ruta.
+for _sub in ("unit", "integracion", "ia"):
+    sys.path.insert(0, str(Path(__file__).resolve().parent / _sub))
 
 # Raíz de composición (A-40): conftest no importa app.main, así que la configura aquí.
 from app.bootstrap import configurar as _configurar_composicion  # noqa: E402
@@ -88,11 +92,11 @@ def _motor_ner_para_la_api():
         yield
         return
     import app.bootstrap as factory
-    from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
+    from app.infrastructure.security.pii.sanitizador_ner import SanitizadorNer
     from apoyo.capa_ia_fakes import StubNLP
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(factory, "NERSanitizer", lambda: NERSanitizer(lambda: StubNLP()))
+        mp.setattr(factory, "SanitizadorNer", lambda: SanitizadorNer(lambda: StubNLP()))
         yield
 
 
@@ -101,7 +105,7 @@ def _catalogo_controles_limpio():
     """HU-01: el catálogo de controles se cachea en memoria; cada prueba en proceso
     crea su propia BD SQLite, así que se invalida antes y después de cada test.
     HU-24: lo mismo con el árbol de aplicabilidad y la versión vigente de la matriz."""
-    from app.infrastructure.cache import arbol_aplicabilidad, catalogo_controles, versiones_matriz
+    from app.infrastructure.cache import arbol_aplicabilidad_cache as arbol_aplicabilidad, catalogo_controles, versiones_matriz
 
     catalogo_controles.invalidar()
     arbol_aplicabilidad.invalidar()

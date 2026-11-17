@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
+from app.application.ai.prompts.renderizado_prompt import PromptRenderizado, escapar_para_prompt
 from app.domain.ports.sanitizador_port import TipoEntidad
 
 PROMPT_VERSION = "asistente_rat/1.1.0"

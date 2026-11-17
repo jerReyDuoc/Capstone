@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
-
 from app.application.mapa_datos.casos_uso.comun import MapaDatosError
-from app.domain.mapa_datos import analisis, versiones
-from app.domain.models.mapa_datos import MapaDatos, MapaDatosVersion
+from app.domain.mapa_datos import analisis_mapa as analisis, versiones_mapa as versiones
+from app.domain.models.mapa_datos_tablas import MapaDatos
 
 
 class ExportacionMixin:
@@ -19,9 +17,7 @@ class ExportacionMixin:
 
         if mapa is None:
             return []
-        filas = (await self.db.execute(
-            select(MapaDatosVersion.numero, MapaDatosVersion.fecha, MapaDatosVersion.resumen)
-            .where(MapaDatosVersion.mapa_id == mapa.id).order_by(MapaDatosVersion.numero.desc()).limit(cuantos))).all()
+        filas = await self.repo.versiones_recientes(mapa.id, cuantos)
         return [VersionResumen(n, f, r) for n, f, r in filas]
 
     async def datos_informe(self, filtros: analisis.FiltrosMapa):
@@ -36,7 +32,9 @@ class ExportacionMixin:
             fecha_version=mapa.fecha_actualizacion if mapa else None, huella=huella, elementos=els, flujos=fls,
             filtros=filtros, generado=datetime.now(timezone.utc), historial=await self.historial_reciente(mapa))
 
-    def registrar_informe(self, accion: str, version: int, filtros: analisis.FiltrosMapa, **extra) -> None:
+    async def registrar_informe(self, accion: str, version: int, filtros: analisis.FiltrosMapa, **extra) -> None:
+        """Deja el evento en la bitácora y confirma la transacción."""
         self.bitacora.registrar(
             accion=accion, entidad="mapa_datos", entidad_id=None, actor=self.actor,
             detalle={"version": version, "filtrado": filtros.activos, "empresa_id": self.empresa_id, **extra})
+        await self.db.commit()

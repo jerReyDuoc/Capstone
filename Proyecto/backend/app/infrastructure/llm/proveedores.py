@@ -1,12 +1,12 @@
 """Selección del proveedor LLM concreto a partir de la configuración (LLM_PROVIDER)."""
 from app.core.config import settings
-from app.domain.ports.proveedor_llm_port import LLMProviderPort
+from app.domain.ports.proveedor_llm_port import ProveedorLlmPort
 
 
-def crear_proveedor() -> LLMProviderPort:
+def crear_proveedor() -> ProveedorLlmPort:
     if settings.LLM_PROVIDER == "groq":
-        from app.infrastructure.llm.groq_provider import GroqProvider
-        return GroqProvider(
+        from app.infrastructure.llm.proveedor_groq import ProveedorGroq
+        return ProveedorGroq(
             api_key=settings.GROQ_API_KEY,
             modelo_por_defecto=settings.LLM_MODEL,
             max_reintentos=settings.LLM_MAX_REINTENTOS,
@@ -14,8 +14,8 @@ def crear_proveedor() -> LLMProviderPort:
             reintentos_salida=settings.LLM_REINTENTOS_SALIDA,
         )
     if settings.LLM_PROVIDER == "ollama":  # HU-07: modelo local
-        from app.infrastructure.llm.ollama_provider import OllamaProvider
-        return OllamaProvider(
+        from app.infrastructure.llm.proveedor_ollama import ProveedorOllama
+        return ProveedorOllama(
             url=settings.OLLAMA_URL,
             modelo_por_defecto=settings.LLM_MODEL,
             reintentos_salida=settings.LLM_REINTENTOS_SALIDA,

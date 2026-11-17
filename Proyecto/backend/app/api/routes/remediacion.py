@@ -17,8 +17,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
-from app.application.use_cases.remediacion import Remediacion, RemediacionError, evidencia_dict
+from app.application.auditoria.casos_uso.registrar_evento_seguridad import RegistrarEventoSeguridad
+from app.application.evaluacion.casos_uso.reevaluar_control import Remediacion, RemediacionError, evidencia_dict
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
@@ -26,7 +26,7 @@ from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleErro
 from app.api.dependencias.contenedor import obtener_limitador
 from app.api.dependencias.contenedor import ClaveNoConfiguradaError, crear_anonimizador, crear_storage_evidencias
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.guardia_prompt import ReglasGuardiaPrompt
 
 router = APIRouter(prefix="/api/remediacion", tags=["remediación con evidencia (HU-17)"])
 
@@ -68,7 +68,7 @@ async def subir(
             "codigo": "CIFRADO_NO_CONFIGURADO",
             "mensaje": "El servidor no tiene configurado el cifrado de evidencias (ENTITY_MAP_KEY).",
         })
-    guard = ReglasPromptGuard()
+    guard = ReglasGuardiaPrompt()
     try:
         evidencia = await Remediacion(db, cliente).subir(
             respuesta_id, file.filename, contenido, estado_declarado, justificacion,
@@ -81,7 +81,7 @@ async def subir(
     except LimitadorNoDisponibleError:
         raise HTTPException(status_code=503, detail={
             "codigo": "LIMITADOR_NO_DISPONIBLE", "mensaje": "No podemos recibir evidencias ahora. Intenta en unos minutos."})
-    await request.app.state.arq.enqueue_job("process_evidence_task", evidencia.id_evidencia)
+    await request.app.state.arq.enqueue_job("procesar_evidencia_task", evidencia.id_evidencia)
     return {**evidencia_dict(evidencia), "mensaje": "Recibimos la evidencia. La estamos analizando."}
 
 

@@ -31,7 +31,7 @@ import re
 import unicodedata
 
 from app.domain.ports.filtro_agente_port import CategoriaAtaque, FiltroAgentePort, ResultadoFiltro
-from app.domain.ports.guardia_prompt_port import PromptGuardPort
+from app.domain.ports.guardia_prompt_port import GuardiaPromptPort
 from app.infrastructure.security.prompt_injection import seguridad
 
 C = CategoriaAtaque
@@ -272,9 +272,9 @@ def _decodificados(texto: str) -> list[str]:
 
 
 class FiltroAgente(FiltroAgentePort):
-    """Reglas del agente + `seguridad.py` (vía PromptGuardPort) para todo lo demás."""
+    """Reglas del agente + `seguridad.py` (vía GuardiaPromptPort) para todo lo demás."""
 
-    def __init__(self, guard: PromptGuardPort, max_previos: int = 2):
+    def __init__(self, guard: GuardiaPromptPort, max_previos: int = 2):
         self.guard = guard
         self.max_previos = max_previos
 

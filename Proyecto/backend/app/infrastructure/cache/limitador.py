@@ -6,7 +6,7 @@ solo. La creación es atómica (SET NX EX + INCR en una transacción), así dos 
 simultáneas no pueden pasarse del límite.
 
 Las claves nunca llevan la IP en claro: quien llama pasa una huella HMAC (ver
-app/api/dependencias/cliente.py).
+app/api/dependencias/identificacion_cliente.py).
 
 Si Redis no responde se lanza LimitadorNoDisponibleError y la ruta responde 503:
 fallar "cerrado" es lo correcto aquí, porque fallar "abierto" dejaría crear

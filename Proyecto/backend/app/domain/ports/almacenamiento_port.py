@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class FileStoragePort(ABC):
+class AlmacenamientoPort(ABC):
     @abstractmethod
     async def save(self, content: bytes, filename: str) -> str:
         """Guarda el archivo y devuelve la ruta de almacenamiento."""

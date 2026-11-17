@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.matriz.contenido import ArbolAplicabilidad
-from app.infrastructure.cache import arbol_aplicabilidad, catalogo_controles, versiones_matriz
+from app.infrastructure.cache import arbol_aplicabilidad_cache as arbol_aplicabilidad, catalogo_controles, versiones_matriz
 
 
 class CacheMatriz:

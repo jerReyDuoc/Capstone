@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Iterable
 
-from app.application.informes.analisis import (
+from app.domain.evaluacion.analisis_brechas import (
     ETIQUETA_MADUREZ,
     Brecha,
     DominioResultado,

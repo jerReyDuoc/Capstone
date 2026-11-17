@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
 from app.application.informes.formato import ZONA, fecha_local
-from app.application.rat import informe_rat as I
+from app.application.rat import armado_informe_rat as I
 from app.domain.models.rat_revision import ABIERTA, RatObservacion
-from app.domain.rat import revision as R
+from app.domain.rat import lista_verificacion as R
 
 
 CLAVE_REGISTRO = "registro:0"

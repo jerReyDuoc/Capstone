@@ -46,7 +46,7 @@ class AnonimizacionRepository:
         contrato con la empresa (sus evidencias ya están anonimizadas desde HU-06) y su
         conservación la deciden la vigencia del contrato (HU-30) y la retención (HU-25).
         """
-        from app.domain.models.sesion import TokenRecuperacion
+        from app.domain.models.sesion_modelo import TokenRecuperacion
         from app.domain.models.usuario_definitivo import (
             EstadoUsuarioDefinitivo, TokenActivacion, UsuarioDefinitivo,
         )

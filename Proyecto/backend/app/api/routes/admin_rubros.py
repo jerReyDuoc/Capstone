@@ -18,8 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencias.alcance import solo_admin
-from app.api.schemas.admin_rubros import RubroRequest
-from app.application.use_cases.mantenedor_rubros import MantenedorRubrosUseCase, RubroError
+from app.api.schemas.admin_rubros_esquemas import RubroRequest
+from app.application.administracion.casos_uso.mantenedor_rubros import MantenedorRubrosUseCase, RubroError
 from app.core.database import get_db
 from app.domain.auth.actor import Actor
 from app.infrastructure.repositories.rubros_repository import RubrosRepository

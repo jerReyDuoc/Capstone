@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.domain.models.base import Base
 
 
-class LlamadaLLM(Base):
+class LlamadaLlm(Base):
     """
     Métrica de cada ejecución de la capa de IA (exitosa o fallida).
     Base para: tasa de error, latencia, consumo de tokens, costo y precisión

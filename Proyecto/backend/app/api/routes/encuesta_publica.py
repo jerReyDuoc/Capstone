@@ -19,23 +19,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.iniciar_encuesta_publica import (
+from app.application.encuesta_publica.casos_uso.iniciar_encuesta_publica import (
     EncuestaPublicaError,
     IniciarEncuestaPublicaUseCase,
 )
-from app.application.use_cases.limites_encuesta import LimitesEncuesta, ventana_diaria
+from app.application.encuesta_publica.casos_uso.recordar_email_encuestado import RecordarEmailEncuestadoUseCase
+from app.application.encuesta_publica.casos_uso.limites_encuesta import LimitesEncuesta, ventana_diaria
 from app.domain.auth.actor import Actor, Rol
 from app.api.dependencias.autenticacion import requerir_rol
 from app.application.seguridad.huella import huella
-from app.api.dependencias.cliente import ip_cliente, viene_del_bff
+from app.api.dependencias.identificacion_cliente import ip_cliente, viene_del_bff
 from app.core.config import settings
 from app.core.database import get_db
-from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
 from app.infrastructure.servicios_externos.captcha import verificar_captcha
-from app.api.schemas.encuesta_publica import IniciarEncuestaRequest, EmailOpcionalRequest
+from app.api.schemas.encuesta_publica_esquemas import IniciarEncuestaRequest, EmailOpcionalRequest
 
 logger = logging.getLogger(__name__)
 
@@ -152,12 +151,11 @@ async def registrar_email(
     if email is not None and not _EMAIL.match(email):
         raise _error(422, "EMAIL_INVALIDO", "Revisa el formato del correo (ejemplo: nombre@empresa.cl).")
 
-    evaluacion = await db.get(Evaluacion, actor.id)
-    usuario = await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id) if evaluacion else None
+    uc = RecordarEmailEncuestadoUseCase(db)
+    usuario = await uc.usuario_de_evaluacion(actor.id)
     if usuario is None:
         raise _error(404, "EVALUACION_NO_ENCONTRADA", "Evaluación no encontrada")
-    usuario.email = email
-    await db.commit()
+    await uc.guardar_email(usuario, email)
     return Response(status_code=204, headers=_SIN_CACHE)
 
 

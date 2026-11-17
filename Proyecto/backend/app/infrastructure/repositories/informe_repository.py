@@ -65,5 +65,9 @@ class InformeRepository:
     async def usuario_temporal(self, usuario_temporal_id: int) -> UsuarioTemporal | None:
         return await self.session.get(UsuarioTemporal, usuario_temporal_id)
 
+    async def actualizar_email_usuario_temporal(self, usuario: UsuarioTemporal, email: str | None) -> None:
+        """Asigna el correo; la confirmación (commit) es de quien orquesta la transacción."""
+        usuario.email = email
+
     async def rubro(self, rubro_id: int) -> Rubro | None:
         return await self.session.get(Rubro, rubro_id)

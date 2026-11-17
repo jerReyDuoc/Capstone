@@ -7,12 +7,12 @@ comparto, y usarlo como base del RAT y del RoPA.
 
   C1  Sistemas y bases de datos (nombre, tipo, proveedor, país de alojamiento y responsable
       interno), terceros y los flujos entre ellos; las transferencias internacionales se
-      calculan con el país de cada extremo (app/domain/mapa_datos/analisis.py).
+      calculan con el país de cada extremo (app/domain/mapa_datos/analisis_mapa.py).
   C2  Cada elemento y flujo lleva categorías de datos (sensibles marcadas) y de titulares (con
       NNA) del catálogo común con el RAT (app/domain/catalogos/catalogo_tratamiento.py).
   C3  La vista navegable y sus filtros viven en el panel; aquí se entregan el mapa completo, sus
       hallazgos y el informe PDF con los mismos filtros (además de su envío por correo).
-  C4  Se inicia desde una plantilla por rubro (app/application/mapa_datos/plantillas.py) o desde
+  C4  Se inicia desde una plantilla por rubro (app/application/mapa_datos/plantillas_mapa.py) o desde
       las respuestas de la evaluación (app/application/mapa_datos/sugerencias.py).
   C5  Cada cambio crea una versión con la instantánea completa (mapa_datos_version, inalterable)
       y queda en el audit_log (HU-09) en la MISMA transacción. Solo con contrato vigente (la ruta

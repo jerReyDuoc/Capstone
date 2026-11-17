@@ -32,7 +32,7 @@ class DecisionesMixin:
     async def aceptar(self, propuesta_id: int, payload_editado: dict | None = None,
                       version_mapa: int | None = None) -> dict:
         from app.application.mapa_datos.casos_uso import MapaDatosCasos, MapaDatosError
-        from app.application.rat.casos_uso.registro import RatError, RegistroActividadesCasos
+        from app.application.rat.casos_uso.registro_actividades_casos import RatError, RegistroActividadesCasos
 
         p = await self._propuesta(propuesta_id)
         if p.estado != "sugerida":

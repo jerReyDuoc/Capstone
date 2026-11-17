@@ -44,7 +44,7 @@ llamar a otro modelo y sin salir del servidor:
       coherencia.respaldo_contradictorio  (respalda_clasificacion_usuario no calza con lo declarado)
 
 Los hallazgos BLOQUEANTES hacen que el backend no aplique la propuesta del modelo: la respuesta
-queda para revisión humana (ver ProcessEvidenceUseCase) y se registra una alerta de seguridad.
+queda para revisión humana (ver ProcesarEvidenciaUseCase) y se registra una alerta de seguridad.
 `sanear()` devuelve además una copia de la salida segura de guardar y mostrar (sin datos
 personales, sin código activo, sin enlaces no respaldados y con largos acotados).
 

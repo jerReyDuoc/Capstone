@@ -1,7 +1,7 @@
 """
 HU-07 — Prueba EN VIVO del test-set de alucinaciones contra el modelo configurado.
 
-La prueba automática (tests/test_hu07_verificacion_salida.py) mide la parte determinista: que
+La prueba automática (tests/ia/test_hu07_verificacion_salida.py) mide la parte determinista: que
 el verificador de salida detecte cada salida problemática del test-set y no retenga las
 correctas. Este script manda las mismas evidencias al modelo REAL (local con Ollama o Groq),
 pasando por toda la capa de IA (NER local → prompt versionado → proveedor → verificador), y
@@ -46,12 +46,12 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.application.ai.gateway import AIGateway, CapaIAError, PreciosModelo  # noqa: E402
+from app.application.ai.gateway import GatewayIA, CapaIAError, PreciosModelo  # noqa: E402
 from app.application.ai.politicas import TareaIA, crear_politicas  # noqa: E402
 from app.application.ai.verificacion_salida_evidencias import verificar_evidencia  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.ports.registro_ia_port import ContextoLlamada, RegistroIAPort  # noqa: E402
-from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer  # noqa: E402
+from app.infrastructure.security.pii.sanitizador_ner import SanitizadorNer  # noqa: E402
 
 DATASET = Path(__file__).resolve().parents[2] / "tests" / "data" / "alucinaciones_evidencias.jsonl"
 UMBRAL_ALUCINACION = 0.02
@@ -106,8 +106,8 @@ def _percentil(v: list[float], p: float) -> float | None:
 async def evaluar(args) -> int:
     proveedor = _proveedor(args.proveedor, args.modelo)
     registro = RegistroMemoria()
-    gateway = AIGateway(
-        provider=proveedor, sanitizer=NERSanitizer(), registro=registro,
+    gateway = GatewayIA(
+        provider=proveedor, sanitizer=SanitizadorNer(), registro=registro,
         politicas=crear_politicas(max_chars_evidencia=settings.MAX_CHARS_EVIDENCIA_LLM,
                                   max_chars_justificacion=settings.MAX_CHARS_JUSTIFICACION_LLM,
                                   max_tokens_salida=settings.LLM_MAX_TOKENS_SALIDA,

@@ -13,10 +13,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.evidencia import Evidencia
-from app.domain.models.formacion import AvanceFormativo, EstadoAvance
+from app.domain.models.formacion_recorrido import AvanceFormativo, EstadoAvance
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
-from app.domain.models.tutor import ConversacionTutor, MensajeTutor
+from app.domain.models.tutor_conversaciones import ConversacionTutor, MensajeTutor
 
 
 class TutorRepository:

@@ -10,7 +10,7 @@ HU-24: el árbol ya no se edita aquí. Vive en la BD (tabla regla_aplicabilidad 
 preguntas_filtro.es_compuerta) y el administrador lo cambia desde el mantenedor de la
 matriz, con versionado. Las constantes de abajo son la SEMILLA de la versión inicial (la
 migración f8c2a6d4e1b7 las copia a la BD) y el respaldo cuando la tabla está vacía (p. ej.
-la BD SQLite de las pruebas). En ejecución se usa app/infrastructure/cache/arbol_aplicabilidad.py.
+la BD SQLite de las pruebas). En ejecución se usa app/infrastructure/cache/arbol_aplicabilidad_cache.py.
 """
 from typing import Mapping
 

@@ -1,15 +1,13 @@
 """Mapa de datos: plantillas por rubro y sugerencias desde la evaluación (C4)."""
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-
-from app.application.mapa_datos import plantillas as mod_plantillas
+from app.application.mapa_datos import plantillas_mapa as mod_plantillas
 from app.application.mapa_datos import sugerencias as mod_sugerencias
 from app.application.mapa_datos.casos_uso.comun import MapaDatosError, _ahora, elemento_de_fila
 from app.core.config import settings
 from app.domain.auditoria.acciones import Accion
-from app.domain.models.mapa_datos import MapaDatos, MapaElemento, MapaFlujo
+from app.domain.errores import ConflictoIntegridadError
+from app.domain.models.mapa_datos_tablas import MapaDatos, MapaElemento, MapaFlujo
 
 
 class PlantillasYSugerenciasMixin:
@@ -42,7 +40,7 @@ class PlantillasYSugerenciasMixin:
         if len(el) + len(nuevos) > settings.MAPA_MAX_ELEMENTOS:
             raise MapaDatosError(422, "LIMITE_ELEMENTOS", f"Con esta plantilla el mapa superaría los "
                                  f"{settings.MAPA_MAX_ELEMENTOS} elementos permitidos.")
-        self.db.add_all(nuevos)
+        self.repo.agregar_varios(nuevos)
         await self.db.flush()
         por_clave.update({r.clave: r.id for r in nuevos})
         claves_flujo = {r.clave for r in fl if r.clave}
@@ -66,7 +64,7 @@ class PlantillasYSugerenciasMixin:
             await self.db.rollback()
             raise MapaDatosError(409, "PLANTILLA_SIN_CAMBIOS",
                                  "Tu mapa ya tiene todo lo que trae esta plantilla.")
-        self.db.add_all(flujos_nuevos)
+        self.repo.agregar_varios(flujos_nuevos)
         if not mapa.plantilla_inicial:
             mapa.plantilla_inicial = plantilla.codigo
         resumen = (f"Se aplicó la plantilla «{plantilla.nombre}»: {len(nuevos)} elemento"
@@ -78,18 +76,12 @@ class PlantillasYSugerenciasMixin:
 
     # ================================================================ sugerencias desde la evaluación (C4)
     async def _respuestas_evaluacion(self) -> tuple[int | None, dict[str, bool]]:
-        from app.application.use_cases.historial_empresa import evaluacion_mas_reciente
-        from app.domain.models.pregunta_filtro import PreguntaFiltro
-        from app.domain.models.respuesta_filtro import RespuestaFiltro
-
+        from app.application.empresa.casos_uso.historial_empresa import evaluacion_mas_reciente
         ev = (await evaluacion_mas_reciente(self.db, self.empresa_id)
               or await evaluacion_mas_reciente(self.db, self.empresa_id, solo_completadas=False))
         if ev is None:
             return None, {}
-        filas = (await self.db.execute(
-            select(PreguntaFiltro.codigo, RespuestaFiltro.respuesta)
-            .join(RespuestaFiltro, RespuestaFiltro.pregunta_id == PreguntaFiltro.id_pregunta)
-            .where(RespuestaFiltro.evaluacion_id == ev))).all()
+        filas = await self.repo.respuestas_filtro(ev)
         return ev, {codigo: bool(resp) for codigo, resp in filas}
 
     async def sugerencias(self) -> dict:
@@ -136,7 +128,7 @@ class PlantillasYSugerenciasMixin:
                 n.nombre = f"{n.nombre} (sugerido)"[:120]
         if len(el) + len(nuevos) > settings.MAPA_MAX_ELEMENTOS:
             raise MapaDatosError(422, "LIMITE_ELEMENTOS", f"El mapa admite hasta {settings.MAPA_MAX_ELEMENTOS} elementos.")
-        self.db.add_all(nuevos)
+        self.repo.agregar_varios(nuevos)
         await self.db.flush()
         mapa_claves.update({n.clave: n.id for n in nuevos})
         ahora = _ahora()
@@ -149,7 +141,7 @@ class PlantillasYSugerenciasMixin:
             o, d = extremos
             if not o or not d or o == d or o not in ids | {n.id for n in nuevos} or d not in ids | {n.id for n in nuevos}:
                 continue
-            self.db.add(MapaFlujo(
+            self.repo.agregar(MapaFlujo(
                 mapa_id=mapa.id, origen_id=o, destino_id=d, finalidad=f.finalidad, categorias_datos=list(f.datos),
                 categorias_titulares=list(f.titulares), nna_declarado=f.nna, frecuencia=f.frecuencia, medio=f.medio,
                 cifrado=None, garantia=None, origen="evaluacion", clave=f"{s.clave}:{i}", pendiente_revision=True,
@@ -168,10 +160,10 @@ class PlantillasYSugerenciasMixin:
             ahora = _ahora()
             mapa = MapaDatos(empresa_id=self.empresa_id, version=0, sugerencias_descartadas=[],
                              usuario_definitivo_id=self.usuario_id, fecha_creacion=ahora, fecha_actualizacion=ahora)
-            self.db.add(mapa)
+            self.repo.agregar(mapa)
             try:
-                await self.db.flush()
-            except IntegrityError:
+                await self.repo.volcar()
+            except ConflictoIntegridadError:
                 await self.db.rollback()
                 raise MapaDatosError(409, "MAPA_DESACTUALIZADO", "Actualiza la página y vuelve a intentarlo.")
         actuales = list(mapa.sugerencias_descartadas or [])

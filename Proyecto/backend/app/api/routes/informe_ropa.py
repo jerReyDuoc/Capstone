@@ -23,10 +23,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.informe_ropa import InformeRopaCasos, InformeRopaError
+from app.application.ropa.casos_uso.generar_informe_ropa import InformeRopaCasos, InformeRopaError
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
-from app.api.schemas.informe_ropa import DatosEntrada, EmitirEntrada
+from app.api.schemas.informe_ropa_esquemas import DatosEntrada, EmitirEntrada
 
 router = APIRouter(prefix="/api/registro-actividades/ropa", tags=["informe RoPA del registro (HU-37)"])
 

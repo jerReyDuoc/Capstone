@@ -97,14 +97,14 @@ class ConversacionMixin:
         ctx = ContextoAsistente(area=area, area_nombre=banco.area(area).nombre if area in banco.AREAS_POR_CODIGO
                                 else "Documento", pregunta=pregunta, catalogos=contexto.catalogos_texto(),
                                 pendientes=tuple(p.clave for p in en_prompt), tipo_documento=tipo_documento)
-        from app.application.ai.agente import SkillIA
+        from app.application.ai.agente import HabilidadIA
 
         try:
             # Corrección 13-11: tiempo TOTAL acotado (anonimización + reintentos del proveedor + LLM). Antes un
             # 429 del proveedor con sus reintentos podía tardar varios minutos: el navegador se rendía a los 90 s
             # y la respuesta quedaba "colgada".
             salida = await asyncio.wait_for(self.agente.ejecutar(
-                SkillIA.ASISTENTE_RAT,
+                HabilidadIA.ASISTENTE_RAT,
                 textos={"respuesta": respuesta, "documento": documento_texto, "mapa": mapa_txt},
                 datos={"contexto": ctx, "previos_usuario": previos},
                 contexto=ContextoLlamada(),
@@ -170,7 +170,7 @@ class ConversacionMixin:
                     fila.explicaciones = {**fila.explicaciones, "riesgo": (
                         f"La ayuda automática lo estimó en {a.riesgo_sugerido.lower()}; el nivel que ves lo calcula "
                         "la plataforma con su matriz de riesgos.")}
-                self.db.add(fila)
+                self.repo.agregar(fila)
                 info["propuestas"].append(fila)
         except AnonimizacionError:
             for fila in info["propuestas"]:
@@ -260,7 +260,7 @@ class ConversacionMixin:
             await self.db.rollback()
             raise AsistenteError(409, "PREGUNTA_YA_RESPONDIDA", "Esta pregunta ya se respondió en otra pestaña. "
                                  "Recargamos la entrevista para que sigas desde donde va.")
-        self.db.add(AsistenteMensaje(sesion_id=s.id, rol="usuario", area=area_respondida, pregunta_codigo=p.codigo,
+        self.repo.agregar(AsistenteMensaje(sesion_id=s.id, rol="usuario", area=area_respondida, pregunta_codigo=p.codigo,
                                      contenido=contenido_usuario, bloqueado=False, traza_id=info.get("traza_id"),
                                      fecha=ahora))
         s.area_actual, s.paso, s.areas_completadas = banco.siguiente(s.area_actual, s.paso,
@@ -268,7 +268,7 @@ class ConversacionMixin:
         s.fecha_actualizacion = ahora
         siguiente = banco.pregunta(s.area_actual, s.paso)
         texto_asistente = self._texto_asistente(info, siguiente, omitir)
-        self.db.add(AsistenteMensaje(sesion_id=s.id, rol="asistente", area=s.area_actual,
+        self.repo.agregar(AsistenteMensaje(sesion_id=s.id, rol="asistente", area=s.area_actual,
                                      pregunta_codigo=siguiente.codigo if siguiente else None,
                                      contenido=texto_asistente, bloqueado=False, motivo_sin_ia=info["motivo_sin_ia"],
                                      traza_id=info.get("traza_id"), prompt_version=info.get("prompt_version"),
@@ -324,11 +324,11 @@ class ConversacionMixin:
     async def _bloqueada(self, s: AsistenteSesion, p: banco.Pregunta, texto: str, info: dict, ahora: datetime) -> dict:
         """HU-18: un ataque en la respuesta no llega al NER ni al LLM; no se guarda su texto y queda auditado."""
         await self._evento(texto, info.get("motivo"), OrigenEvento.ASISTENTE.value, regla=info.get("regla"))
-        self.db.add(AsistenteMensaje(sesion_id=s.id, rol="usuario", area=s.area_actual, pregunta_codigo=p.codigo,
+        self.repo.agregar(AsistenteMensaje(sesion_id=s.id, rol="usuario", area=s.area_actual, pregunta_codigo=p.codigo,
                                      contenido=TEXTO_BLOQUEADO, bloqueado=True,
                                      motivo_bloqueo=(info.get("motivo") or "inyeccion")[:30], fecha=ahora))
         etica = info.get("motivo") == "uso_indebido"
-        self.db.add(AsistenteMensaje(sesion_id=s.id, rol="asistente", area=s.area_actual, pregunta_codigo=p.codigo,
+        self.repo.agregar(AsistenteMensaje(sesion_id=s.id, rol="asistente", area=s.area_actual, pregunta_codigo=p.codigo,
                                      contenido=(MENSAJE_ETICA if etica else MENSAJE_BLOQUEO) + "\n\n" + p.texto,
                                      bloqueado=False, fecha=ahora))
         self.bitacora.registrar(

@@ -21,8 +21,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.auditoria_externa import (
-    LEY, AuditoriaError, ConsultaAuditLog, ExportarAuditLog, GestionarAuditoresUseCase, auditor_dict,
+from app.application.auditoria.casos_uso.auditoria_externa import (
+    LEY, AuditoriaError, ConsultaBitacora, ExportarBitacora, GestionarAuditoresUseCase, auditor_dict,
 )
 from app.api.dependencias.alcance import solo_admin
 from app.domain.auth.actor import Actor, Rol
@@ -30,7 +30,7 @@ from app.api.dependencias.autenticacion import requerir_rol
 from app.core.database import get_db
 from app.domain.models.bitacora_auditoria import RESULTADOS
 from app.domain.auditoria.acciones import Categoria, acciones_conocidas, categoria
-from app.api.schemas.auditoria import CrearAuditorRequest, ActualizarAuditorRequest
+from app.api.schemas.auditoria_esquemas import CrearAuditorRequest, ActualizarAuditorRequest
 
 router = APIRouter(prefix="/api/auditoria", tags=["auditoría externa (HU-09)"])
 router_admin = APIRouter(prefix="/api/admin/auditores", tags=["auditoría externa (HU-09)"])
@@ -72,7 +72,7 @@ async def registros(
 ):
     """Historial del audit_log con filtros. Cada registro trae fecha, actor, IP, acción, resultado y hash."""
     try:
-        return await ConsultaAuditLog(db).registros(
+        return await ConsultaBitacora(db).registros(
             actor, desde=desde, hasta=hasta, categoria_=categoria, accion=accion, entidad=entidad,
             entidad_id=entidad_id, resultado=resultado, actor_rol=actor_rol, page=page, size=size)
     except AuditoriaError as e:
@@ -87,13 +87,13 @@ async def verificacion(actor: Actor = Depends(auditor_o_admin), db: AsyncSession
     cadena_de_sellos_rota, sello_alterado, firma_invalida, filas_fuera_de_lote...).
     Guarde el `ancla` (último lote y sello) fuera del sistema.
     """
-    return await ConsultaAuditLog(db).verificar(actor)
+    return await ConsultaBitacora(db).verificar(actor)
 
 
 @router.get("/lotes")
 async def lotes(page: int = Query(1, ge=1), size: int = Query(50, ge=1, le=500),
                 _: Actor = Depends(auditor_o_admin), db: AsyncSession = Depends(get_db)):
-    return await ConsultaAuditLog(db).lotes(page, size)
+    return await ConsultaBitacora(db).lotes(page, size)
 
 
 @router.get("/exportacion", response_class=Response,
@@ -111,7 +111,7 @@ async def exportacion(
     de la verificación y un script para recalcular los hashes sin depender del sistema.
     """
     try:
-        exp = await ExportarAuditLog(db).generar(actor, desde, hasta)
+        exp = await ExportarBitacora(db).generar(actor, desde, hasta)
     except AuditoriaError as e:
         raise _error(e)
     return Response(content=exp.contenido, media_type="application/zip", headers={

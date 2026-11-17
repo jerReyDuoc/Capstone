@@ -2,7 +2,7 @@
 HU-06 — Anonimización ANTES de persistir (BD, disco y logs).
 
 El gateway de IA ya anonimiza lo que sale hacia el LLM; este servicio aplica el
-mismo motor (SanitizerPort, etiquetas fijas [RUT_ANON], [NOMBRE_ANON], [CORREO_ANON],
+mismo motor (SanitizadorPort, etiquetas fijas [RUT_ANON], [NOMBRE_ANON], [CORREO_ANON],
 [TEL_ANON], [DIRECCION_ANON], [DATO_CODIFICADO_ANON]) a lo que se GUARDA:
 
   - justificación del usuario      -> antes de escribir respuestas.justificacion_usuario
@@ -25,7 +25,7 @@ import asyncio
 import os
 import re
 
-from app.domain.ports.sanitizador_port import SanitizerPort
+from app.domain.ports.sanitizador_port import SanitizadorPort
 
 _EXTENSION_SEGURA = re.compile(r"^\.[A-Za-z0-9]{1,10}$")
 MAX_NOMBRE_ARCHIVO = 255
@@ -36,9 +36,9 @@ class AnonimizacionError(RuntimeError):
 
 
 class AnonimizadorPII:
-    def __init__(self, sanitizer: SanitizerPort | None, habilitado: bool = True):
+    def __init__(self, sanitizer: SanitizadorPort | None, habilitado: bool = True):
         if habilitado and sanitizer is None:
-            raise ValueError("Se requiere un SanitizerPort cuando la anonimización está habilitada")
+            raise ValueError("Se requiere un SanitizadorPort cuando la anonimización está habilitada")
         self.sanitizer = sanitizer
         self.habilitado = habilitado
 

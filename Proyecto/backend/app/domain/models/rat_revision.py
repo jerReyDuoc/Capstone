@@ -122,7 +122,7 @@ class RatObservacion(Base):
     reaperturas: Mapped[int] = mapped_column("reaperturas", Integer, nullable=False, default=0)
 
 
-class RatRevisionConfig(Base):
+class ConfiguracionRevisionRat(Base):
     __tablename__ = "rat_revision_config"
     __table_args__ = (
         CheckConstraint("plazo_meses BETWEEN 1 AND 36", name="ck_rat_revision_config_plazo"),

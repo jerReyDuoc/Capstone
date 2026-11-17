@@ -7,5 +7,5 @@ HU-37 · Informe RoPA (registro de actividades de tratamiento en formato RoPA) d
 
 Sin dependencias de la base de datos ni de FastAPI: lo importan los casos de uso, la API y las pruebas.
 El armado del informe (traducción de cada actividad a los campos del RoPA) vive en
-app/application/ropa/informe_ropa.py, porque parte del informe del RAT (app/application/rat/informe_rat.py).
+app/application/ropa/armado_informe_ropa.py, porque parte del informe del RAT (app/application/rat/armado_informe_rat.py).
 """

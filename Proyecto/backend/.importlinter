@@ -1,0 +1,41 @@
+[importlinter]
+root_package = app
+include_external_packages = True
+
+[importlinter:contract:capas]
+name = Regla de dependencias
+type = layers
+layers =
+    app.api | app.worker | app.cli
+    app.infrastructure
+    app.application
+    app.domain
+ignore_imports =
+    # A-02 (variante B): tipos de columna cifrados (docs/arquitectura.md, seccion 3)
+    app.domain.models.* -> app.infrastructure.persistencia.tipos_cifrados
+
+[importlinter:contract:dominio-puro]
+name = El dominio no conoce frameworks
+type = forbidden
+source_modules =
+    app.domain
+forbidden_modules =
+    fastapi
+    app.core
+    reportlab
+    openpyxl
+ignore_imports =
+    # A-02 (variante B): tipos_cifrados importa app.core.config (cadena indirecta)
+    app.domain.models.* -> app.infrastructure.persistencia.tipos_cifrados
+
+[importlinter:contract:aplicacion-sin-io]
+name = Application sin frameworks ni I/O
+type = forbidden
+source_modules =
+    app.application
+forbidden_modules =
+    fastapi
+    reportlab
+    openpyxl
+    smtplib
+    pypdf

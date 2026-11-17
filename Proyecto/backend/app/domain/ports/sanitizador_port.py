@@ -56,7 +56,7 @@ class SanitizacionError(RuntimeError):
     """La sanitización falló: el texto NO debe enviarse al LLM."""
 
 
-class SanitizerPort(ABC):
+class SanitizadorPort(ABC):
     @abstractmethod
     def sanitizar(self, texto: str, max_chars: int | None = None) -> ResultadoSanitizacion:
         """

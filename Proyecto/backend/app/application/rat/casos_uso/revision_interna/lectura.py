@@ -4,15 +4,15 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from app.application.rat import informe_rat as I
+from app.application.rat import armado_informe_rat as I
 from app.application.rat.casos_uso.revision_interna.comun import (
     Contexto, RevisionError, _hoy_chile, _iso, _sin_preguntas, catalogo_criterios, observacion_vista,
 )
 from app.core.config import settings
 from app.domain.auditoria.acciones import Accion
 from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
-from app.domain.models.rat_revision import ABIERTA, EN_CURSO, RatObservacion, RatRevision, RatRevisionConfig
-from app.domain.rat import revision as R
+from app.domain.models.rat_revision import ABIERTA, EN_CURSO, RatObservacion, RatRevision, ConfiguracionRevisionRat
+from app.domain.rat import lista_verificacion as R
 
 
 class LecturaMixin:
@@ -20,7 +20,7 @@ class LecturaMixin:
 
     # ================================================================ lectura
     async def _contexto(self) -> Contexto:
-        from app.application.rat.casos_uso.registro import RegistroActividadesCasos
+        from app.application.rat.casos_uso.registro_actividades_casos import RegistroActividadesCasos
 
         inf = await self.informes.armar()
         version_mapa, elementos, flujos = await RegistroActividadesCasos(self.db, self.cliente)._mapa()
@@ -45,11 +45,11 @@ class LecturaMixin:
     async def _abiertas(self) -> int:
         return await self.repo.observaciones_abiertas(self.empresa_id)
 
-    async def _config(self) -> RatRevisionConfig | None:
+    async def _config(self) -> ConfiguracionRevisionRat | None:
         return await self.repo.config(self.empresa_id)
 
     @staticmethod
-    def _config_vista(c: RatRevisionConfig | None) -> dict:
+    def _config_vista(c: ConfiguracionRevisionRat | None) -> dict:
         return {"plazo_meses": c.plazo_meses if c else settings.REVISION_RAT_PLAZO_MESES,
                 "aviso_dias": c.aviso_dias if c else settings.REVISION_RAT_AVISO_DIAS,
                 "recordatorio_correo": c.recordatorio_correo if c else True,

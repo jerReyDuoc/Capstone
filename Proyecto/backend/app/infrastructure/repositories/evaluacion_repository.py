@@ -68,7 +68,7 @@ class EvaluacionRepository:
         if not filas:
             return None
         primera = filas[0]
-        from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+        from app.infrastructure.cache.arbol_aplicabilidad_cache import arbol_vigente
 
         return ContextoEvaluacion(
             id=primera.id,

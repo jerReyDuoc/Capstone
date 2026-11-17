@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-from app.domain.evidencias.validacion import EvidenceValidation
+from app.domain.evidencias.validacion_evidencia import ValidacionEvidencia
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import Respuesta
 from app.domain.models.catalogo_brechas import CatalogoBrechas
 from app.domain.ports.registro_ia_port import ContextoLlamada
 
 
-class EvidenceValidatorPort(ABC):
+class ValidadorEvidenciasPort(ABC):
     @abstractmethod
     async def validate(
         self,
@@ -16,7 +16,7 @@ class EvidenceValidatorPort(ABC):
         brecha: CatalogoBrechas | None = None,
         justificacion: str | None = None,
         contexto: ContextoLlamada | None = None,
-    ) -> EvidenceValidation:
+    ) -> ValidacionEvidencia:
         """
         Valida una evidencia contra el control y la clasificación declarada.
         El LLM NO tiene acceso a la BD: solo recibe el prompt y devuelve JSON.

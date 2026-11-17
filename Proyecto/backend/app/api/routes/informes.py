@@ -27,32 +27,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.fabricas import fabricas
 from app.application.informes import correo
 from app.domain.ports.correo_port import Adjunto, CorreoFallidoError, CorreoNoDisponibleError
-from app.application.informes.analisis import (
+from app.domain.evaluacion.analisis_brechas import (
     ETIQUETA_MADUREZ,
     FiltrosBrechas,
     construir_brechas,
     construir_plan,
     contar_por_severidad,
     nivel_madurez,
-    parsear_filtros,
-    plan_a_dict,
 )
+from app.application.informes.analisis_informe import parsear_filtros, plan_a_dict
 from app.application.informes.informe_evaluacion import construir_informe, ficha_a_dict
 from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
 from app.application.informes.datos_informe import DatosInforme, nombre_archivo
 from app.application.ports.generador_documentos_port import PdfNoDisponibleError
-from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.encuesta_publica.casos_uso.limites_encuesta import ventana_diaria
 from app.api.dependencias.alcance import alcance_evaluacion
 from app.domain.auth.actor import Actor
 from app.application.seguridad.huella import huella
-from app.api.dependencias.cliente import ip_cliente
+from app.api.dependencias.identificacion_cliente import ip_cliente
 from app.core.config import settings
 from app.core.database import get_db
-from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.usuario_temporal import UsuarioTemporal
+from app.application.encuesta_publica.casos_uso.recordar_email_encuestado import RecordarEmailEncuestadoUseCase
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.informes import EnviarInformeRequest
+from app.api.schemas.informes_esquemas import EnviarInformeRequest
 
 logger = logging.getLogger(__name__)
 
@@ -160,9 +158,8 @@ async def enviar_informe(
     if settings.CORREO_MODO == "desactivado":
         raise _error(503, "CORREO_NO_DISPONIBLE", "El envío por correo no está habilitado. Descarga el PDF.")
 
-    evaluacion = await db.get(Evaluacion, evaluacion_id)
-    usuario = (await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id)
-               if evaluacion and evaluacion.usuario_temporal_id else None)
+    recordar_email = RecordarEmailEncuestadoUseCase(db)
+    usuario = await recordar_email.usuario_de_evaluacion(evaluacion_id, exigir_vinculo=True)
     destino = (payload.email or "").strip().lower() or None
     if destino is None and actor is not None and actor.es_encuestado and usuario is not None:
         destino = usuario.email
@@ -214,8 +211,7 @@ async def enviar_informe(
                      "No pudimos enviar el correo. Inténtalo de nuevo en unos minutos o descarga el PDF.")
 
     if payload.recordar and actor is not None and actor.es_encuestado and usuario is not None:
-        usuario.email = destino
-        await db.commit()
+        await recordar_email.guardar_email(usuario, destino)
 
     logger.info("[informe] evaluación %s enviada a %s (%s)", evaluacion_id, correo.enmascarar(destino), modo)
     return JSONResponse(

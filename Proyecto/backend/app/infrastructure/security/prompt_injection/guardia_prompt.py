@@ -1,0 +1,64 @@
+"""
+Adaptador de GuardiaPromptPort basado en el módulo `seguridad.py`
+(repositorio ComplianceAI-Prompt-Injection).
+
+`seguridad.py` se copia tal cual desde ese repo: si lo actualizas allá
+(nuevos patrones, nuevos tests), vuelve a copiarlo aquí.
+"""
+import os
+
+from app.core.config import settings
+from app.domain.ports.guardia_prompt_port import PERFIL_JUSTIFICACION, GuardiaPromptPort, ResultadoGuardia
+from app.infrastructure.security.prompt_injection import seguridad
+
+# seguridad.py lee REQUIERE_NER desde os.environ; pydantic-settings no lo exporta solo.
+if settings.REQUIERE_NER:
+    os.environ["REQUIERE_NER"] = "1"
+
+
+class ReglasGuardiaPrompt(GuardiaPromptPort):
+    def detectar_inyeccion(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> bool:
+        return self.analizar(texto, perfil).bloquear
+
+    def analizar(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> ResultadoGuardia:
+        """HU-33: perfil "justificacion" (estricto) o "evidencia" (reglas con contexto)."""
+        if not texto:
+            return ResultadoGuardia(False)
+        d = seguridad.analizar(texto, perfil)
+        return ResultadoGuardia(d.bloquear, d.regla, d.categoria)
+
+    def anonimizar(self, texto: str) -> str:
+        """
+        HU-06: con el sanitizador activo se usa el MISMO motor que antes del LLM
+        (SanitizadorNer: también direcciones y etiquetas fijas). Si ese motor no está
+        disponible se usa seguridad.anonimizar (regex de RUT, correo, teléfono y datos
+        codificados; nombres si hay spaCy; falla si REQUIERE_NER=1).
+        """
+        if not texto:
+            return texto
+        if settings.SANITIZER_ENABLED:
+            try:
+                from app.infrastructure.security.pii.sanitizador_ner import SanitizadorNer
+                return SanitizadorNer().sanitizar(texto).texto
+            except Exception:  # noqa: BLE001  (SanitizacionError: spaCy no disponible)
+                pass
+        _compartir_modelo_ner()
+        return seguridad.anonimizar(texto)
+
+
+def _compartir_modelo_ner() -> None:
+    """
+    T-04: seguridad.py carga su propia copia de spaCy (pipeline completo) la primera
+    vez que anonimiza. Si el sanitizador está activo, se le entrega el modelo del
+    motor NER (pipeline mínimo, ya precalentado): un solo modelo por proceso.
+    Si spaCy no está, seguridad.py conserva su comportamiento (y REQUIERE_NER).
+    """
+    if not settings.SANITIZER_ENABLED or seguridad._NLP_INTENTADO:
+        return
+    try:
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
+        cargar_spacy()
+    except Exception:  # noqa: BLE001
+        pass
+
+

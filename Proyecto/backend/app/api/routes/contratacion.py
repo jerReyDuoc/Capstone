@@ -20,26 +20,25 @@ La gestión (cambiar estado, alta de empresa y migración) está en /api/admin (
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases import consentimientos_contratacion
-from app.application.use_cases.aviso_contratacion import avisar_nueva_solicitud
-from app.application.use_cases.contratacion_empresa import (
+from app.application.contratacion.casos_uso import consentimientos_contratacion
+from app.application.contratacion.casos_uso.aviso_contratacion import avisar_nueva_solicitud_sin_fallar
+from app.application.contratacion.casos_uso.contratacion_empresa import (
     ConsentimientoDado, ContratacionError, SolicitudesContratacionUseCase,
 )
-from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.encuesta_publica.casos_uso.limites_encuesta import ventana_diaria
 from app.domain.auth.actor import Actor, Rol
 from app.api.dependencias.autenticacion import requerir_rol
 from app.application.seguridad.huella import huella
-from app.api.dependencias.cliente import ip_cliente, viene_del_bff
+from app.api.dependencias.identificacion_cliente import ip_cliente, viene_del_bff
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
 from app.infrastructure.servicios_externos.captcha import ACCION_CONTRATACION, verificar_captcha
-from app.api.schemas.contratacion import CrearSolicitudRequest
+from app.api.schemas.contratacion_esquemas import CrearSolicitudRequest
 
 logger = logging.getLogger(__name__)
 
@@ -151,11 +150,7 @@ async def crear_solicitud(
         raise
 
     # Criterio 3: aviso a Therion DESPUÉS del commit; si falla, la solicitud ya está en la bandeja
-    try:
-        await avisar_nueva_solicitud(db, s)
-    except Exception:  # noqa: BLE001  (el aviso es interno: nunca debe tumbar la respuesta)
-        logger.exception("Falló el aviso de la solicitud de contratación %s", s.id)
-        await db.rollback()
+    await avisar_nueva_solicitud_sin_fallar(db, s)
     return _publica(s)
 
 
@@ -170,7 +165,7 @@ async def mi_solicitud(
         await uc.evaluacion_del_actor(actor, evaluacion_id)
     except ContratacionError as e:
         raise _error(e)
-    s = await db.scalar(select(SolicitudContratacion).where(SolicitudContratacion.evaluacion_id == evaluacion_id))
+    s = await uc.obtener_por_evaluacion(evaluacion_id)
     if s is None:
         raise _http(404, "SIN_SOLICITUD", "Aún no solicitas la contratación.")
     return _publica(s)

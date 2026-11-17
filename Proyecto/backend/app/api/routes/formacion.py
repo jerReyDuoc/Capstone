@@ -21,12 +21,12 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ports.generador_documentos_port import PdfNoDisponibleError
-from app.application.use_cases.formacion_empresa import FormacionEmpresa, FormacionError
+from app.application.empresa.casos_uso.formacion_empresa import FormacionEmpresa, FormacionError
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.formacion import VistaRequest, VerificacionRequest
+from app.api.schemas.formacion_esquemas import VistaRequest, VerificacionRequest
 
 router = APIRouter(prefix="/api/formacion", tags=["formación de la empresa (HU-26)"])
 

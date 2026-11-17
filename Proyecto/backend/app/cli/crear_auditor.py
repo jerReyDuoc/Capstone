@@ -21,11 +21,11 @@ import getpass
 from sqlalchemy import func, select
 
 from app.bootstrap import configurar
-from app.application.use_cases.auditoria_externa import AuditoriaError, GestionarAuditoresUseCase
+from app.application.auditoria.casos_uso.auditoria_externa import AuditoriaError, GestionarAuditoresUseCase
 from app.core.config import settings
 from app.core.contexto_auditoria import ORIGEN_CLI, fijar_origen_por_defecto
 from app.core.database import AsyncSessionLocal, engine
-from app.domain.models.auditoria_externa import UsuarioAuditor
+from app.domain.models.auditoria_externa_modelo import UsuarioAuditor
 
 configurar()  # raíz de composición (A-40)
 

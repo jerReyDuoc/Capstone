@@ -65,7 +65,7 @@ class DocumentosMixin:
         if doc.estado == "listo":
             pasajes, rag = documento.pasajes_relevantes(texto, settings.ASISTENTE_MAX_CHARS_DOCUMENTO_LLM)
             doc.pasajes_total, doc.pasajes_usados = rag.get("pasajes_total"), rag.get("pasajes_usados")
-            self.db.add(doc)
+            self.repo.agregar(doc)
             await self.db.flush()
             info = await self._proponer(respuesta="", documento_texto=pasajes, area="documento", pregunta=None,
                                         origen="documento", sesion_id=sesion_id, documento_id=doc.id,
@@ -77,7 +77,7 @@ class DocumentosMixin:
             if info["motivo_sin_ia"] and info["motivo_sin_ia"] != "sin_propuestas":
                 doc.estado, doc.motivo_sin_ia = "sin_ia", info["motivo_sin_ia"]
         else:
-            self.db.add(doc)
+            self.repo.agregar(doc)
             await self.db.flush()
         self.bitacora.registrar(
             accion=Accion.ASISTENTE_DOCUMENTO_ANALIZADO, entidad="asistente_documento", entidad_id=doc.id,

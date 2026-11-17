@@ -311,7 +311,7 @@ def construir_prompt(texto_usuario: str) -> str:
 #                    (aprobar, ejecutar, registrar, marcar, clasificar, eliminar...) solo
 #                    cuenta cuando va DIRIGIDO a la IA o al resultado de la evaluación.
 #
-# Tipos de regla (campo `evidencia` de _R):
+# Tipos de regla (campo `evidencia` de _ReglaTexto):
 #   _IGUAL   señal fuerte: el mismo patrón en ambos perfiles.
 #   _CTX     en evidencia cuenta solo si la oración que la contiene se dirige a la IA o al
 #            resultado ("si eres una IA", "tus reglas", "este control", "como cumplido"...).
@@ -337,7 +337,7 @@ class Deteccion:
 
 
 @dataclass(frozen=True)
-class _R:
+class _ReglaTexto:
     id: str
     patron: str
     evidencia: object = _IGUAL
@@ -408,251 +408,251 @@ _CONFORME_MULTI = (r"(?:compliant|cumprido|cumprida|conforme(?!\s+(?:a|al|con|lo
 _IA_ESTRICTA = (r"(?:ai|ia|ki|llm|chatbot|language model|ai reviewer|ai evaluator|ai auditor|evaluador automatico|"
                 r"avaliador automatico|evaluateur automatique|automated reviewer)")
 
-_REGLAS_TXT: list[_R] = [
+_REGLAS_TXT: list[_ReglaTexto] = [
     # ---- override / olvidar instrucciones
-    _R("inyeccion.ignorar_instrucciones", rf"\b{_V_IGN}\b.{{0,60}}\b{_O_IGN}\b",
+    _ReglaTexto("inyeccion.ignorar_instrucciones", rf"\b{_V_IGN}\b.{{0,60}}\b{_O_IGN}\b",
        rf"{_INI}{_V_IGN_IMP}\b.{{0,60}}\b{_O_IGN_IA}\b|\b{_V_IGN}\b.{{0,40}}\b(tus|tu|your)\s+\w+"),
-    _R("inyeccion.ignore_all", r"\bignore\b.{0,30}\b(all|previous|prior)\b"),
+    _ReglaTexto("inyeccion.ignore_all", r"\bignore\b.{0,30}\b(all|previous|prior)\b"),
     # ---- roles, modos y jailbreak
-    _R("jailbreak.modo_especial", r"\b(modo|mode)\s+(desarrollador|developer|dios|god|dan|sudo)\b"),
-    _R("jailbreak.modo_tecnico", r"\b(modo|mode)\s+(debug|depuracion|mantenimiento|admin\w*|root)\b", _CTX),
-    _R("jailbreak.sin_restricciones", r"do anything now|sin restricciones ni filtros|sin limites eticos"),
-    _R("jailbreak.sudo", r"\bsudo\b|sin censura|unrestricted", _CTX),
-    _R("jailbreak.mencion", r"\bjailbreak\w*", _CTX),
-    _R("jailbreak.actua_como", r"\b(actua|actue|act)\s+(como|as)\b|\bfinge\w*\b", _CTX),
-    _R("jailbreak.cambio_de_rol", r"\byou are now\b|\bya no eres\b|\bahora eres\b|\beres ahora\b|\bfrom now on\b"),
-    _R("jailbreak.a_partir_de_ahora", r"\ba partir de ahora\b.{0,60}\b(eres|responde|ignora|debes|puedes)\b"),
-    _R("jailbreak.imagina", r"\bimagina que (no|eres)\b|\bsi el estado fuera\b"),
-    _R("jailbreak.hipotetico", r"hipoteticamente", _CTX),
+    _ReglaTexto("jailbreak.modo_especial", r"\b(modo|mode)\s+(desarrollador|developer|dios|god|dan|sudo)\b"),
+    _ReglaTexto("jailbreak.modo_tecnico", r"\b(modo|mode)\s+(debug|depuracion|mantenimiento|admin\w*|root)\b", _CTX),
+    _ReglaTexto("jailbreak.sin_restricciones", r"do anything now|sin restricciones ni filtros|sin limites eticos"),
+    _ReglaTexto("jailbreak.sudo", r"\bsudo\b|sin censura|unrestricted", _CTX),
+    _ReglaTexto("jailbreak.mencion", r"\bjailbreak\w*", _CTX),
+    _ReglaTexto("jailbreak.actua_como", r"\b(actua|actue|act)\s+(como|as)\b|\bfinge\w*\b", _CTX),
+    _ReglaTexto("jailbreak.cambio_de_rol", r"\byou are now\b|\bya no eres\b|\bahora eres\b|\beres ahora\b|\bfrom now on\b"),
+    _ReglaTexto("jailbreak.a_partir_de_ahora", r"\ba partir de ahora\b.{0,60}\b(eres|responde|ignora|debes|puedes)\b"),
+    _ReglaTexto("jailbreak.imagina", r"\bimagina que (no|eres)\b|\bsi el estado fuera\b"),
+    _ReglaTexto("jailbreak.hipotetico", r"hipoteticamente", _CTX),
     # ---- fuerza de estado
-    _R("manipulacion.forzar_estado",
+    _ReglaTexto("manipulacion.forzar_estado",
        r"\b(clasifica|marca(l[oa]s?)?|responde|respond|devuelve|guarda|registra|establece|asigna|pon|fija|"
        r"cambia|actualiza|set|mark|classify|output|return|imprime|escribe)\b.{0,60}"
        r"\b(cumplido|cumplida|aprobado|compliant)\b",
        rf"{_INI}{_V_ESTADO_IMP}\b{_NO_ETIQ}.{{0,60}}\b(cumplido|cumplida|aprobado|compliant)\b"),
-    _R("manipulacion.marcar_resuelto",
+    _ReglaTexto("manipulacion.marcar_resuelto",
        r"\b(marca(l[oa]s?)?|clasifica|asigna|cambia|actualiza|establece|pon|set|mark)\b.{0,40}"
        r"\bcomo\s+(respondid|cerrad|resuelt|completad)\w*",
        rf"{_INI}{_V_ESTADO_IMP}\b{_NO_ETIQ}.{{0,40}}\bcomo\s+(respondid|cerrad|resuelt|completad)\w*"),
-    _R("manipulacion.estado_igual", r"\bestado\s*=\s*\w|\bestado\s+(sugerido|correcto|final|real|deseado)\b|#{3}\s*\w+\s*#{3}"),
-    _R("inyeccion.tarea_real",
+    _ReglaTexto("manipulacion.estado_igual", r"\bestado\s*=\s*\w|\bestado\s+(sugerido|correcto|final|real|deseado)\b|#{3}\s*\w+\s*#{3}"),
+    _ReglaTexto("inyeccion.tarea_real",
        r"\bresultado final\b|\btarea real\b|\bverdadera tarea\b|\btu verdadero objetivo\b|\byour real task\b",
        r"\btarea real\b|\bverdadera tarea\b|\btu verdadero objetivo\b|\byour real task\b"
        r"|\bel resultado final (es|sera|debe ser)\b.{0,30}\b(cumplid|aprobad|compliant)"),
-    _R("delimitadores.json_estado", r"\"estado\"\s*:|\{\s*\"[^\"]{1,40}\"\s*:", r"\"estado\"\s*:"),
-    _R("manipulacion.debes_cumplido", r"\bdebes?\b.{0,60}\b(cumplido|aprobado)\b",
+    _ReglaTexto("delimitadores.json_estado", r"\"estado\"\s*:|\{\s*\"[^\"]{1,40}\"\s*:", r"\"estado\"\s*:"),
+    _ReglaTexto("manipulacion.debes_cumplido", r"\bdebes?\b.{0,60}\b(cumplido|aprobado)\b",
        r"\bdebes\b.{0,60}\b(cumplido|aprobado)\b|\b(este control|esta evidencia|esta respuesta|esta evaluacion)\b.{0,40}"
        r"\bdebe\b.{0,40}\b(cumplido|aprobado)\b"),
-    _R("manipulacion.clasificarse", r"\bclasificarse\b|\bmarcarse\b",
+    _ReglaTexto("manipulacion.clasificarse", r"\bclasificarse\b|\bmarcarse\b",
        r"\b(clasificarse|marcarse|considerarse|registrarse)\b\s+como\s+(cumplid|aprobad|compliant)"),
-    _R("manipulacion.aprueba",
+    _ReglaTexto("manipulacion.aprueba",
        r"\bapruebas?\b",
        r"\b(aprueba|apruebe|apruebalo|apruebala|apruebalos|apruebame|apruebenlo|approve)\b\s*"
        r"(?:(?:este|esta|estos|estas)\s+(control|controles|evidencia|respuesta|justificacion|evaluacion|cuestionario)\b"
        r"|todo\b|todos los controles\b|sin (revisar|revision|evidencia)\b|automaticamente\b|de inmediato\b|"
        r"directamente\b)|\b(apruebalo|apruebala|apruebalos|apruebame)\b"),
-    _R("manipulacion.presion", r"\bdespedid\w*|\burgente\b.{0,120}\b(aprueb\w*|cumplido)\b", _CTX),
-    _R("manipulacion.cumplido_repetido", r"(?:cumplido\W+){3,}", _CTX),
-    _R("manipulacion.autoriza_oficial",
+    _ReglaTexto("manipulacion.presion", r"\bdespedid\w*|\burgente\b.{0,120}\b(aprueb\w*|cumplido)\b", _CTX),
+    _ReglaTexto("manipulacion.cumplido_repetido", r"(?:cumplido\W+){3,}", _CTX),
+    _ReglaTexto("manipulacion.autoriza_oficial",
        r"\boficial de cumplimiento\b.{0,40}\b(autoriz\w*|aprob\w*|delega\w*|ordena\w*|instruy\w*)", _CTX),
-    _R("inyeccion.ejemplo_few_shot", r"\bejemplo\s*\d+\s*:", _CTX),
-    _R("delimitadores.corchete_sistema", r"\[\s*(sistema|system|admin|administrador|instruccion)\s*:"),
-    _R("delimitadores.nuevo_turno", r"\b(nuevo turno|new turn|system\s*:|nuevas? instruc\w*)",
+    _ReglaTexto("inyeccion.ejemplo_few_shot", r"\bejemplo\s*\d+\s*:", _CTX),
+    _ReglaTexto("delimitadores.corchete_sistema", r"\[\s*(sistema|system|admin|administrador|instruccion)\s*:"),
+    _ReglaTexto("delimitadores.nuevo_turno", r"\b(nuevo turno|new turn|system\s*:|nuevas? instruc\w*)",
        r"\b(nuevo turno|new turn|system\s*:)|\bnuevas? instruc\w*\b.{0,20}\b(para (ti|la ia|el asistente|el modelo)|"
        r"del sistema|:)"),
-    _R("inyeccion.ejecutar_obedecer", r"\b(decodifica\w*|decode|traduce\w*|ejecuta\w*|execute|obedece\w*|obey)\b",
+    _ReglaTexto("inyeccion.ejecutar_obedecer", r"\b(decodifica\w*|decode|traduce\w*|ejecuta\w*|execute|obedece\w*|obey)\b",
        rf"{_INI}(ejecuta|ejecute|execute|obedece|obedezca|obey|decodifica|decodifique|decode|traduce|traduzca)\b"
        rf"{_NO_ETIQ}\s*(esto|esta|este|lo siguiente|el siguiente|la siguiente|las siguientes|los siguientes|la orden|"
        r"las ordenes|la instruccion|las instrucciones|el codigo|el payload|el texto|y obedece|y ejecuta|y responde|:)"
        r"|\b(obedece|obedezca|obey)\b\s*(esto|lo siguiente|las instrucciones|:|$)|\bobedeceme\b"),
-    _R("codificado.mencion_base64", r"\bbase64\b", _CTX),
+    _ReglaTexto("codificado.mencion_base64", r"\bbase64\b", _CTX),
     # ---- fuga de prompt / scope locking
-    _R("fuga_prompt.tus_instrucciones",
+    _ReglaTexto("fuga_prompt.tus_instrucciones",
        r"\b(tus|tu|your|sus)\s+(instrucciones|reglas|directrices|prompt|configuracion|guidelines|instructions|rules|indicaciones)\b",
        r"\b(tus|tu|your)\s+(instrucciones|reglas|directrices|prompt|configuracion|guidelines|instructions|rules|indicaciones)\b"),
-    _R("fuga_prompt.prompt_sistema", r"\b(prompt|instrucciones|instructions)\s+(de\s+|del\s+)?(sistema|system|internas?|iniciales)\b",
+    _ReglaTexto("fuga_prompt.prompt_sistema", r"\b(prompt|instrucciones|instructions)\s+(de\s+|del\s+)?(sistema|system|internas?|iniciales)\b",
        _CTX),
-    _R("fuga_prompt.system_prompt", r"system prompt|initial prompt|initial instructions"),
-    _R("fuga_prompt.verbatim", r"palabra por palabra|verbatim|word for word", _CTX),
-    _R("fuga_prompt.texto_de_arriba",
+    _ReglaTexto("fuga_prompt.system_prompt", r"system prompt|initial prompt|initial instructions"),
+    _ReglaTexto("fuga_prompt.verbatim", r"palabra por palabra|verbatim|word for word", _CTX),
+    _ReglaTexto("fuga_prompt.texto_de_arriba",
        r"arriba de este mensaje|above this message|everything above|todo lo anterior a este mensaje|"
        r"todo lo que (esta )?escrito arriba"),
-    _R("fuga_prompt.repite_despues", r"instrucciones (te|le) (dieron|dio)|repite despues de mi|repeat after me"),
-    _R("fuga_prompt.revela_prompt", r"\b(muestra|repite|revela|imprime)\b.{0,30}\b(prompt|configuracion interna)\b",
+    _ReglaTexto("fuga_prompt.repite_despues", r"instrucciones (te|le) (dieron|dio)|repite despues de mi|repeat after me"),
+    _ReglaTexto("fuga_prompt.revela_prompt", r"\b(muestra|repite|revela|imprime)\b.{0,30}\b(prompt|configuracion interna)\b",
        rf"{_INI}(muestra|muestrame|repite|repiteme|revela|revelame|imprime)\b.{{0,30}}\b(prompt|configuracion interna)\b"
        r"|\b(muestra|repite|revela|imprime)\w*\b.{0,30}\b(tu|tus|your)\b.{0,10}\b(prompt|configuracion)\b"),
-    _R("fuera_de_alcance.creativo",
+    _ReglaTexto("fuera_de_alcance.creativo",
        r"\b(escribe\w*|redacta\w*|genera\w*|crea\w*|hazme|dame|cuentame|compon\w*|resuelve\w*)\b.{0,40}\b(poema|cuento|receta|"
        r"chiste|cancion|horoscopo|integral|ecuacion|pronostico|script en|codigo en|programa en)\b", _CTX),
-    _R("fuera_de_alcance.codigo", r"\b(script|codigo|programa)\b.{0,15}\b(en )?(python|javascript|java|sql|bash|powershell)\b",
+    _ReglaTexto("fuera_de_alcance.codigo", r"\b(script|codigo|programa)\b.{0,15}\b(en )?(python|javascript|java|sql|bash|powershell)\b",
        _CTX),
-    _R("uso_indebido.evadir_ley", r"\b(evad\w*|elud\w*|burl\w*)\b.{0,30}\b(ley|auditoria|fiscalizacion|agencia|controles?)\b",
+    _ReglaTexto("uso_indebido.evadir_ley", r"\b(evad\w*|elud\w*|burl\w*)\b.{0,30}\b(ley|auditoria|fiscalizacion|agencia|controles?)\b",
        _CTX),
-    _R("uso_indebido.hackear", r"\bhackear\b|\bhackea\b", _CTX),
+    _ReglaTexto("uso_indebido.hackear", r"\bhackear\b|\bhackea\b", _CTX),
     # ---- agencia excesiva / ejecución
-    _R("agencia.ejecutar_comando", r"\b(ejecuta|corre|run|execute|lanza)\b.{0,40}\b(comando|command|script|shell|consulta sql|query)\b",
+    _ReglaTexto("agencia.ejecutar_comando", r"\b(ejecuta|corre|run|execute|lanza)\b.{0,40}\b(comando|command|script|shell|consulta sql|query)\b",
        rf"{_INI}(ejecuta|ejecute|corre|run|execute|lanza)\b{_NO_ETIQ}.{{0,40}}\b(comando|command|script|shell|consulta sql|query)\b"),
-    _R("agencia.correo_masivo", r"\b(envia|manda|send)\b.{0,30}\b(correo|email|mail|mensaje)\b.{0,30}\b(todos|a todos|all)\b",
+    _ReglaTexto("agencia.correo_masivo", r"\b(envia|manda|send)\b.{0,30}\b(correo|email|mail|mensaje)\b.{0,30}\b(todos|a todos|all)\b",
        rf"{_INI}(envia|enviale|manda|mandale|send)\b.{{0,30}}\b(correo|email|mail|mensaje)\b.{{0,30}}\b(todos|a todos|all)\b"),
-    _R("agencia.conectate", r"\b(conectate|connect to)\b"),
-    _R("agencia.seguir_enlace",
+    _ReglaTexto("agencia.conectate", r"\b(conectate|connect to)\b"),
+    _ReglaTexto("agencia.seguir_enlace",
        r"\b(lee|leelo|sigue|obedece|visita|abre|descarga|accede a|accede|llama|fetch|curl|wget)\b.{0,60}(https?://|www\.)",
        rf"{_INI}(lee|leelo|sigue|obedece|visita|abre|descarga|accede a|accede|llama|fetch)\b.{{0,60}}(https?://|www\.)"
        r"|\b(curl|wget)\b.{0,60}(https?://|www\.)"),
-    _R("agencia.comando_shell",
+    _ReglaTexto("agencia.comando_shell",
        r"\brm\s+-rf\b|;\s*(rm|cat|curl|wget|powershell|cmd|nc)\b|\$\([^)]*\)|\|\s*nc\b|/etc/passwd|\.\./|"
        r"c:\\windows|cmd\.exe|powershell"),
-    _R("agencia.formula_dde", r"=\s*(cmd|dde|hyperlink|importxml)\s*\||\|\s*'?\s*/c\b|/js\b|/javascript\b|/openaction"),
-    _R("consumo.repetir", r"\b(repite|repeat)\b.{0,40}\b(\d{3,}|mil|infinit\w*)\b", _CTX),
-    _R("consumo.n_veces", r"\b(envia|manda|repite|submit|responde|completa)\b.{0,40}\b\d{2,}\s+veces\b", _CTX),
+    _ReglaTexto("agencia.formula_dde", r"=\s*(cmd|dde|hyperlink|importxml)\s*\||\|\s*'?\s*/c\b|/js\b|/javascript\b|/openaction"),
+    _ReglaTexto("consumo.repetir", r"\b(repite|repeat)\b.{0,40}\b(\d{3,}|mil|infinit\w*)\b", _CTX),
+    _ReglaTexto("consumo.n_veces", r"\b(envia|manda|repite|submit|responde|completa)\b.{0,40}\b\d{2,}\s+veces\b", _CTX),
     # ---- SQL
-    _R("sql.sentencia", r"\b(update|delete|insert|drop|select|truncate|alter)\b.{0,80}\b(set|from|table|into|where)\b"),
-    _R("sql.inyeccion", r"union\s+select|\bor\s+'?1'?\s*=\s*'?1|'\s*or\s*'|;\s*(drop|delete|update|insert)\b"),
-    _R("sql.grant", r"\bgrant\s+(all|update|delete|select|insert)\b"),
+    _ReglaTexto("sql.sentencia", r"\b(update|delete|insert|drop|select|truncate|alter)\b.{0,80}\b(set|from|table|into|where)\b"),
+    _ReglaTexto("sql.inyeccion", r"union\s+select|\bor\s+'?1'?\s*=\s*'?1|'\s*or\s*'|;\s*(drop|delete|update|insert)\b"),
+    _ReglaTexto("sql.grant", r"\bgrant\s+(all|update|delete|select|insert)\b"),
     # ---- XSS / plantillas / HTML
-    _R("delimitadores.etiqueta_html", r"<\s*/?\s*[a-z][a-z0-9_\-]*|<!--|<\||\[/?inst\]|<<\s*/?sys>>"),
-    _R("xss.evento_js", r"\bon(error|load|click|mouseover|focus)\s*=|javascript\s*:|data\s*:\s*text/html"),
-    _R("xss.plantilla", r"\{\{|\{%|\$\{|\\u003c|\\x3c"),
+    _ReglaTexto("delimitadores.etiqueta_html", r"<\s*/?\s*[a-z][a-z0-9_\-]*|<!--|<\||\[/?inst\]|<<\s*/?sys>>"),
+    _ReglaTexto("xss.evento_js", r"\bon(error|load|click|mouseover|focus)\s*=|javascript\s*:|data\s*:\s*text/html"),
+    _ReglaTexto("xss.plantilla", r"\{\{|\{%|\$\{|\\u003c|\\x3c"),
     # ---- auditoría / logs
-    _R("auditoria.borrar_registros",
+    _ReglaTexto("auditoria.borrar_registros",
        r"\b(borra|elimina|oculta|esconde|delete|remove|purga|limpia|trunca)\b.{0,40}\b(log|logs|registro|"
        r"registros|auditoria|audit|historial|evidencia|conversacion|brechas?|no.?conformidades?|hallazgos?)\b",
        rf"{_INI}(borra|borrale|elimina|oculta|esconde|delete|remove|purga|limpia|trunca)\b{_NO_ETIQ}.{{0,40}}\b(log|logs|"
        r"registro|registros|auditoria|audit|historial|evidencia|conversacion|brechas?|no.?conformidades?|hallazgos?)\b"),
-    _R("auditoria.no_registrar", r"\b(no registres|no lo registres|sin registrar|sin dejar (rastro|registro|huella)|do not log)\b",
+    _ReglaTexto("auditoria.no_registrar", r"\b(no registres|no lo registres|sin registrar|sin dejar (rastro|registro|huella)|do not log)\b",
        r"\b(no registres|no lo registres|do not log)\b|\bsin dejar (rastro|registro|huella)\b"),
-    _R("auditoria.alterar_registro", r"\b(cambia|modifica|falsea|altera|edita|falsifica)\b.{0,40}\b(ip|timestamp|hash|log|auditoria|audit)\b",
+    _ReglaTexto("auditoria.alterar_registro", r"\b(cambia|modifica|falsea|altera|edita|falsifica)\b.{0,40}\b(ip|timestamp|hash|log|auditoria|audit)\b",
        rf"{_INI}(cambia|modifica|falsea|altera|edita|falsifica)\b{_NO_ETIQ}.{{0,40}}\b(ip|timestamp|hash|log|auditoria|audit)\b"
        r"|\b(falsea|falsifica)\w*\b.{0,40}\b(ip|timestamp|hash|log|auditoria|audit)\b"),
-    _R("auditoria.recalcular_hash", r"\b(recalcula|regenera|reemplaza|falsifica)\w*\b.{0,40}\bhash\b",
+    _ReglaTexto("auditoria.recalcular_hash", r"\b(recalcula|regenera|reemplaza|falsifica)\w*\b.{0,40}\bhash\b",
        rf"{_INI}(recalcula|regenera|reemplaza)\b.{{0,40}}\bhash\b|\bfalsifica\w*\b.{{0,40}}\bhash\b"),
-    _R("auditoria.desactivar_proteccion",
+    _ReglaTexto("auditoria.desactivar_proteccion",
        r"\b(desactiva|deshabilita|quita|revoca|elimina|disable)\b.{0,40}\b(append|auditoria|audit|permisos|"
        r"restricciones|supresion|umbral|cohorte|advertencia|enmascaramiento)\b",
        rf"{_INI}(desactiva|deshabilita|quita|elimina|disable)\b{_NO_ETIQ}.{{0,40}}\b(append|auditoria|audit|"
        r"restricciones|supresion|umbral|cohorte|advertencia|enmascaramiento)\b"),
-    _R("agencia.conceder_privilegios", r"\b(concede|otorga|grant|dame)\b.{0,40}\b(permisos|privilegios|acceso total|admin\w*)\b",
+    _ReglaTexto("agencia.conceder_privilegios", r"\b(concede|otorga|grant|dame)\b.{0,40}\b(permisos|privilegios|acceso total|admin\w*)\b",
        rf"{_INI}(concede|conceda|otorga|otorgame|grant|dame)\b.{{0,40}}\b(permisos|privilegios|acceso total|admin\w*)\b"),
     # ---- multi-tenant, ARCOP, k-anonimato
-    _R("uso_indebido.datos_de_otros",
+    _ReglaTexto("uso_indebido.datos_de_otros",
        r"\b(muestra|dame|revela|entrega|lista|accede|cambia|modifica|borra|elimina|exporta)\b.{0,60}"
        r"\b(de|del|a)\s+(otro|otra|otros|otras)\s+(titular\w*|usuario\w*|empresa\w*|cliente\w*|persona\w*|participante\w*)\b",
        rf"{_INI}(muestra|muestrame|dame|revela|entrega|lista|accede|cambia|modifica|borra|elimina|exporta)\b{_NO_ETIQ}.{{0,60}}"
        r"\b(de|del|a)\s+(otro|otra|otros|otras)\s+(titular\w*|usuario\w*|empresa\w*|cliente\w*|persona\w*|participante\w*)\b"),
-    _R("uso_indebido.datos_competencia",
+    _ReglaTexto("uso_indebido.datos_competencia",
        r"\b(muestra|dame|revela|entrega|lista)\b.{0,60}\b(puntaje|puntuacion|score|resultados|respuestas|madurez)\b"
        r".{0,40}\b(de|del)\s+(la\s+)?(empresa\s+)?(competidor\w*|competencia|rival\w*)\b"),
-    _R("uso_indebido.exportar_todo", r"\b(exporta|descarga|dame|entrega|lista)\b.{0,30}\btodos los\s+(datos|titulares|usuarios|registros|clientes)\b",
+    _ReglaTexto("uso_indebido.exportar_todo", r"\b(exporta|descarga|dame|entrega|lista)\b.{0,30}\btodos los\s+(datos|titulares|usuarios|registros|clientes)\b",
        rf"{_INI}(exporta|descarga|dame|entrega|lista)\b{_NO_ETIQ}.{{0,30}}\btodos los\s+(datos|titulares|usuarios|registros|clientes)\b"),
-    _R("manipulacion.plazo", r"\b(amplia|extiende|cambia|modifica|elimina|ignora)\b.{0,30}\bplazo",
+    _ReglaTexto("manipulacion.plazo", r"\b(amplia|extiende|cambia|modifica|elimina|ignora)\b.{0,30}\bplazo",
        rf"{_INI}(amplia|extiende|cambia|modifica|elimina|ignora)\b{_NO_ETIQ}.{{0,30}}\bplazo\b.{{0,40}}\b(arcop|legal|respuesta|"
        r"titular|solicitud)\w*"),
-    _R("manipulacion.no_notificar", r"\bno\s+(notifiques|avises|alertes|informes)\b|\bcambia\b.{0,30}\bsector\b",
+    _ReglaTexto("manipulacion.no_notificar", r"\bno\s+(notifiques|avises|alertes|informes)\b|\bcambia\b.{0,30}\bsector\b",
        rf"\bno\s+(notifiques|avises|alertes|informes)\b|{_INI}cambia\b.{{0,30}}\bsector\b"),
-    _R("uso_indebido.reidentificar", r"\b(deduc\w*|inferir|infiere|reconstruir|reconstruye|restar|resta)\b.{0,60}\b(puntaje|individual|datos)\b",
+    _ReglaTexto("uso_indebido.reidentificar", r"\b(deduc\w*|inferir|infiere|reconstruir|reconstruye|restar|resta)\b.{0,60}\b(puntaje|individual|datos)\b",
        rf"{_INI}(deduce|infiere|reconstruye|resta)\b.{{0,60}}\b(puntaje|individual|datos)\b"),
-    _R("uso_indebido.ranking_individual", r"\b(cuanto|cual)\b.{0,20}\b(obtuvo|saco)\b.{0,30}\b(la|el)\s+(mas|menos|menor|mayor)\b"),
+    _ReglaTexto("uso_indebido.ranking_individual", r"\b(cuanto|cual)\b.{0,20}\b(obtuvo|saco)\b.{0,30}\b(la|el)\s+(mas|menos|menor|mayor)\b"),
     # ---- cuestionario
-    _R("manipulacion.saltar_preguntas",
+    _ReglaTexto("manipulacion.saltar_preguntas",
        r"\b(salta|omite|oculta|no muestres|elimina|saltate)\b.{0,40}\b(preguntas?|dimensi\w*|cuestionario|seccion\w*)\b",
        rf"{_INI}(salta|omite|oculta|no muestres|elimina|saltate)\b{_NO_ETIQ}.{{0,40}}\b(preguntas?|dimensi\w*|cuestionario|"
        r"seccion\w*)\b"),
-    _R("manipulacion.todo_no_aplica", r"\bresponde\b.{0,30}\b(no aplica|n/a)\b.{0,40}\b(todas|siguientes)\b"),
+    _ReglaTexto("manipulacion.todo_no_aplica", r"\bresponde\b.{0,30}\b(no aplica|n/a)\b.{0,40}\b(todas|siguientes)\b"),
     # ---- puntajes y severidad
-    _R("manipulacion.denominador", r"\b(excluye|excluir)\b.{0,40}\bdenominador\b",
+    _ReglaTexto("manipulacion.denominador", r"\b(excluye|excluir)\b.{0,40}\bdenominador\b",
        rf"{_INI}excluye\b.{{0,40}}\bdenominador\b"),
-    _R("manipulacion.puntaje",
+    _ReglaTexto("manipulacion.puntaje",
        r"\b(pon|establece|fija|asigna|guarda|registra|set|calcula)\b.{0,50}\b(puntaje|puntuacion|score|sus)\b"
        r".{0,40}\b(100|maximo|perfecto|\d{2,3})\b",
        rf"{_INI}(pon|ponle|establece|fija|asigna|asignale|guarda|registra|set|calcula)\b{_NO_ETIQ}.{{0,50}}"
        r"\b(puntaje|puntuacion|score)\b.{0,40}\b(en|=|:|al?|como)\s*(100|maximo|perfecto)\b"
        r"|\b(puntaje|puntuacion|score)\s+(maximo|perfecto)\b.{0,30}\b(a|para) (este|esta|mi|nuestra)\b"),
-    _R("manipulacion.inflar",
+    _ReglaTexto("manipulacion.inflar",
        r"\b(manipul\w*|infl\w*|maquill\w*|false\w*|falsific\w*)\b.{0,40}\b(puntaje|puntuacion|score|resultados?|"
        r"madurez|metricas|hash|registro|evidencia)\b",
        rf"{_INI}(manipula|infla|maquilla|falsea|falsifica)\b.{{0,40}}\b(puntaje|puntuacion|score|resultados?|madurez|"
        r"metricas|hash|registro|evidencia)\b"),
-    _R("manipulacion.ignorar_brechas",
+    _ReglaTexto("manipulacion.ignorar_brechas",
        r"\b(ignora|omite|descarta|ignorando|omitiendo|descartando)\b.{0,30}\b(controles?|brechas?|no cumplidos?)\b",
        rf"{_INI}(ignora|omite|descarta)\b{_NO_ETIQ}.{{0,30}}\b(controles?|brechas?|no cumplidos?)\b"),
-    _R("manipulacion.bajar_severidad",
+    _ReglaTexto("manipulacion.bajar_severidad",
        r"\b(clasifica|marca|asigna|baja|reduce|disminuye|rebaja|cambia|pon)\b.{0,40}\b(severidad|criticidad|riesgo|"
        r"nivel)\b.{0,60}\b(baja|bajo|low|media|medio)\b",
        rf"{_INI}(clasifica|clasificalo|marca|marcalo|asigna|baja|bajale|reduce|disminuye|rebaja|cambia|pon|ponle)\b"
        rf"{_NO_ETIQ}.{{0,40}}\b(severidad|criticidad|riesgo|nivel)\b.{{0,40}}\b(a|en|como)\s+(baja|bajo|low|media|medio)\b"),
     # ---- aviso legal / certificaciones / borradores
-    _R("uso_indebido.sin_aviso_legal",
+    _ReglaTexto("uso_indebido.sin_aviso_legal",
        r"\b(omite|elimina|quita|borra|no incluyas|sin|reemplaza|sustituye|cambia|modifica)\b.{0,30}\b(aviso legal|"
        r"disclaimer|descargo)\b", _CTX),
-    _R("uso_indebido.certificacion_falsa",
+    _ReglaTexto("uso_indebido.certificacion_falsa",
        r"certificad[oa]\s+(oficial|por la agencia|por la ley)|certificacion\s+(juridica|vinculante|oficial)|"
        r"validez legal|garantiza\w*\s+(el\s+)?cumplimiento\s+(total|legal)|declara\w*\s+cumplimiento\s+(legal\s+)?total",
        _CTX),
-    _R("uso_indebido.confirma_lectura", r"\bconfirma\w*\b.{0,60}\b(leyo|lectura)\b.{0,40}\b(aviso|descargo|disclaimer)", _CTX),
-    _R("uso_indebido.vender_sin_consentimiento",
+    _ReglaTexto("uso_indebido.confirma_lectura", r"\bconfirma\w*\b.{0,60}\b(leyo|lectura)\b.{0,40}\b(aviso|descargo|disclaimer)", _CTX),
+    _ReglaTexto("uso_indebido.vender_sin_consentimiento",
        r"\b(diga|declare|establezca|indique)\b.{0,50}\b(vender|ceder|compartir)\b.{0,50}\bsin consentimiento"),
-    _R("uso_indebido.sin_derechos", r"\bsin\s+(incluir\s+)?(clausulas|los derechos|derechos arcop|mencionar\s+los\s+derechos)",
+    _ReglaTexto("uso_indebido.sin_derechos", r"\bsin\s+(incluir\s+)?(clausulas|los derechos|derechos arcop|mencionar\s+los\s+derechos)",
        _CTX),
-    _R("exfiltracion.enlace_oculto", r"\benlace oculto|\blink oculto|hidden link|pixel de segu\w*|tracking pixel", _CTX),
-    _R("uso_indebido.generar_certificado", r"\b(genera|emite|entrega|crea)\b.{0,30}\bcertificado\b",
+    _ReglaTexto("exfiltracion.enlace_oculto", r"\benlace oculto|\blink oculto|hidden link|pixel de segu\w*|tracking pixel", _CTX),
+    _ReglaTexto("uso_indebido.generar_certificado", r"\b(genera|emite|entrega|crea)\b.{0,30}\bcertificado\b",
        rf"{_INI}(genera|generame|emite|emiteme|entrega|entregame|crea|creame)\b{_NO_ETIQ}.{{0,30}}\bcertificado\b"),
     # ---- inyección indirecta en documentos (señales fuertes: dirigidas a la IA)
-    _R("inyeccion.nota_para_ia",
+    _ReglaTexto("inyeccion.nota_para_ia",
        r"\b(instruccion|nota|mensaje|note|instruction)\s+(para|for|to)\s+(el\s+|la\s+)?(analista|asistente|ia|ai|"
        r"modelo|llm|assistant|tutor)\b"),
-    _R("inyeccion.si_eres_ia", r"\bsi eres (una\s+)?(ia|inteligencia artificial|modelo|llm)\b|\bif you are an? (ai|llm|assistant|model)\b"),
-    _R("inyeccion.mencion_texto_oculto", r"\btexto en blanco\b|\btexto oculto\b|\bhidden text\b", _CTX),
-    _R("inyeccion.falsa_memoria", r"\brecuerda\b.{0,40}\b(acordamos|dijiste|prometiste)\b|\bclave secreta\b|\bpalabra clave\b",
+    _ReglaTexto("inyeccion.si_eres_ia", r"\bsi eres (una\s+)?(ia|inteligencia artificial|modelo|llm)\b|\bif you are an? (ai|llm|assistant|model)\b"),
+    _ReglaTexto("inyeccion.mencion_texto_oculto", r"\btexto en blanco\b|\btexto oculto\b|\bhidden text\b", _CTX),
+    _ReglaTexto("inyeccion.falsa_memoria", r"\brecuerda\b.{0,40}\b(acordamos|dijiste|prometiste)\b|\bclave secreta\b|\bpalabra clave\b",
        r"\brecuerda\b.{0,40}\b(acordamos|dijiste|prometiste)\b"),
-    _R("inyeccion.al_leer_documento",
+    _ReglaTexto("inyeccion.al_leer_documento",
        r"\bal (leer|analizar|procesar)\b.{0,40}\b(este documento|este archivo)\b.{0,80}\b(olvida|ignora|responde|marca|clasifica)\b"),
     # ---- ampliación: AT-01/03/04/05/06/08
-    _R("inyeccion.reglas_obsoletas",
+    _ReglaTexto("inyeccion.reglas_obsoletas",
        r"\b(instrucciones|reglas|politicas?)\b.{0,30}\b(anteriores|previas)\b.{0,30}\b(obsolet\w*|anulad\w*|sin efecto|derogad\w*|invalid\w*)\b",
        r"\b(instrucciones|reglas)\b.{0,30}\b(anteriores|previas)\b.{0,30}\b(obsolet\w*|anulad\w*|sin efecto|derogad\w*|invalid\w*)\b"),
-    _R("jailbreak.desde_este_momento",
+    _ReglaTexto("jailbreak.desde_este_momento",
        r"\b(a partir de este mensaje|desde este momento|desde ahora)\b.{0,60}\b(eres|responde|ignora|debes|puedes|aprueba|aprobar (todo|todas|todos))\b",
        r"\b(a partir de este mensaje|desde este momento|desde ahora)\b.{0,60}\b(eres|responde|ignora|debes ignorar|"
        r"aprueba|aprobar (todo|todas|todos))\b"),
-    _R("delimitadores.fin_mensaje_usuario",
+    _ReglaTexto("delimitadores.fin_mensaje_usuario",
        r"\b(fin|termina)\b.{0,20}\b(texto|mensaje|entrada)\b.{0,20}\busuario\b|\binicio\b.{0,20}\binstrucciones\b",
        r"\b(fin|termina)\b.{0,20}\b(texto|mensaje|entrada)\b.{0,20}\busuario\b|\binicio\b.{0,10}\b(de (las )?)?instrucciones\b"
        r"\s*[:\]>-]"),
-    _R("jailbreak.prueba_autorizada", r"\bprueba de (seguridad|penetracion)\b.{0,40}\b(autorizada|aprobada)\b", _CTX),
-    _R("jailbreak.sin_filtros", r"\bsin (aplicar|usar|activar)\s+(los\s+)?(filtros|reglas|restricciones|anonimizacion|guardrails)\b",
+    _ReglaTexto("jailbreak.prueba_autorizada", r"\bprueba de (seguridad|penetracion)\b.{0,40}\b(autorizada|aprobada)\b", _CTX),
+    _ReglaTexto("jailbreak.sin_filtros", r"\bsin (aplicar|usar|activar)\s+(los\s+)?(filtros|reglas|restricciones|anonimizacion|guardrails)\b",
        _CTX),
-    _R("jailbreak.imagina_sin_reglas",
+    _ReglaTexto("jailbreak.imagina_sin_reglas",
        r"\bimagina\b.{0,40}\b(sin reglas|sin restricciones|sin leyes|no existen (las )?(leyes|reglas)|no tienes (reglas|restricciones))\b"),
-    _R("jailbreak.asistente_sin_reglas", r"\beres un asistente sin (reglas|restricciones|limites|filtros)\b|\bmantente en (el )?(personaje|rol)\b"),
-    _R("jailbreak.juego_de_roles", r"\bjuego de roles\b|\broleplay\b", _CTX),
-    _R("delimitadores.system_override", r"\bsystem override\b|\bdeveloper message\b|\bsafety\s*=\s*off\b"),
-    _R("jailbreak.doble_respuesta", r"\bresponde primero como\b.{0,40}\by luego como\b"),
-    _R("fuga_prompt.completa_prompt",
+    _ReglaTexto("jailbreak.asistente_sin_reglas", r"\beres un asistente sin (reglas|restricciones|limites|filtros)\b|\bmantente en (el )?(personaje|rol)\b"),
+    _ReglaTexto("jailbreak.juego_de_roles", r"\bjuego de roles\b|\broleplay\b", _CTX),
+    _ReglaTexto("delimitadores.system_override", r"\bsystem override\b|\bdeveloper message\b|\bsafety\s*=\s*off\b"),
+    _ReglaTexto("jailbreak.doble_respuesta", r"\bresponde primero como\b.{0,40}\by luego como\b"),
+    _ReglaTexto("fuga_prompt.completa_prompt",
        r"\bcompleta\b.{0,30}\b(eres un asistente|you are a|tu tarea es)\b|\beres un asistente experto en la ley\b"),
-    _R("fuga_prompt.primeras_palabras", r"\brepite\b.{0,30}\bprimeras? \d+ palabras\b|\bprimeras palabras de (esta|la) conversacion\b"),
-    _R("delimitadores.etiqueta_prompt", r"\bjustificacion_usuario\b"),
-    _R("fuera_de_alcance.trivia", r"\bhaiku\b|\bsoneto\b|\b(dime|cual es)\b.{0,15}\bla capital de\b", _CTX),
-    _R("fuera_de_alcance.otros_temas",
+    _ReglaTexto("fuga_prompt.primeras_palabras", r"\brepite\b.{0,30}\bprimeras? \d+ palabras\b|\bprimeras palabras de (esta|la) conversacion\b"),
+    _ReglaTexto("delimitadores.etiqueta_prompt", r"\bjustificacion_usuario\b"),
+    _ReglaTexto("fuera_de_alcance.trivia", r"\bhaiku\b|\bsoneto\b|\b(dime|cual es)\b.{0,15}\bla capital de\b", _CTX),
+    _ReglaTexto("fuera_de_alcance.otros_temas",
        r"\b(escribe|redacta|ayudame a escribir|hazme)\b.{0,40}\b(curriculum|carta de renuncia|tesis)\b|\bcriptomoneda\w*|\bbitcoin\b|\bconsejos? medicos?\b",
        _CTX),
-    _R("inyeccion.falso_acuerdo",
+    _ReglaTexto("inyeccion.falso_acuerdo",
        r"\b(como te dije|ya te dije|como acordamos|como hablamos|segun lo acordado)\b.{0,60}\b(autorizacion|permiso|puedes|debes)\b",
        r"\b(como te dije|ya te dije)\b.{0,60}\b(autorizacion|permiso|puedes|debes)\b"),
-    _R("delimitadores.corchetes", r"\[\[\s*(fin|inicio|end|start)\b[^\]]{0,40}\]\]|\[\s*(system|sistema|admin|inst)\s*\]"),
+    _ReglaTexto("delimitadores.corchetes", r"\[\[\s*(fin|inicio|end|start)\b[^\]]{0,40}\]\]|\[\s*(system|sistema|admin|inst)\s*\]"),
     # ---- HU-07: OWASP LLM01 multilenguaje (inglés, portugués, francés, alemán, italiano) e indirectos.
     # El texto ya llega en minúsculas y sin tildes ("esqueça" -> "esqueca", "für" -> "fur").
-    _R("inyeccion.nota_para_ia_multi",
+    _ReglaTexto("inyeccion.nota_para_ia_multi",
        rf"\b(note|notice|attention|instruction|instructions|message|nota|aviso|mensagem|instrucao|instrucoes|"
        rf"hinweis|anweisung|nachricht|messaggio|istruzione|istruzioni|mensaje)\s*(to|for|para|pour|fur|an|per|a)?\s*"
        rf"(the |o |a |l'|la |le |die |den |il |el |al )?\s*{_IA_MULTI}\b"
        rf"|(?:^|[.\n¶:;!?])\s*(para|for|to|pour|fur|per)\s+(la |the |l'|die |el |il |a )?\s*{_IA_ESTRICTA}\s*[:,]"),
-    _R("inyeccion.si_eres_ia_multi",
+    _ReglaTexto("inyeccion.si_eres_ia_multi",
        rf"\b(if you are|if you're|se voce e|se vc e|si vous etes|si tu es|wenn du|falls du|wenn sie|se sei|se lei e)\s+"
        rf"(an? |uma? |une? |eine?n? |un'?|una )?\s*{_IA_MULTI}\b"),
-    _R("inyeccion.ignorar_multi",
+    _ReglaTexto("inyeccion.ignorar_multi",
        rf"\b{_V_IGN_MULTI}\b.{{0,50}}\b{_O_IGN_MULTI}\b",
        rf"{_INI}(?:please |pls |bitte |per favore |por favor |s'il vous plait )?{_V_IGN_MULTI}\b{_NO_ETIQ}.{{0,50}}\b{_O_IGN_MULTI}\b"),
-    _R("manipulacion.forzar_estado_multi",
+    _ReglaTexto("manipulacion.forzar_estado_multi",
        rf"\b(classify|mark|rate|set|output|return|answer|assign|classifique|classifica|classificalo|marque|segna|classez|"
        rf"marquez|attribuez|markiere|klassifiziere|bewerte|segnala)\b.{{0,60}}\b{_CONFORME_MULTI}\b",
        rf"{_INI}(?:please |bitte |per favore |s'il vous plait )?(classify|mark|rate|set|output|return|answer|assign|"
@@ -660,97 +660,97 @@ _REGLAS_TXT: list[_R] = [
        rf"segnala)\b{_NO_ETIQ}.{{0,60}}\b{_CONFORME_MULTI}\b"
        rf"|\b(must|should|shall|deve|devem|doit|doivent|muss|mussen|devono)\s+(classify|mark|rate|classificar|marcar|"
        rf"classer|marquer|klassifizieren|markieren|classificare|segnare|bewerten)\b.{{0,40}}\b{_CONFORME_MULTI}\b"),
-    _R("manipulacion.respuesta_correcta",
+    _ReglaTexto("manipulacion.respuesta_correcta",
        rf"\b(the )?(correct|right|expected|final) (answer|classification|result|status|rating)\b.{{0,15}}\b(is|will be|must be)\b"
        rf".{{0,10}}\b{_CONFORME_MULTI}\b|\b(la )?(respuesta|clasificacion) correcta\b.{{0,15}}\b(es|sera)\b.{{0,10}}\bcumplid"),
-    _R("jailbreak.cambio_de_rol_multi",
+    _ReglaTexto("jailbreak.cambio_de_rol_multi",
        r"\b(a partir de agora|de agora em diante|daqui em diante|a partir de maintenant|desormais|ab jetzt|von nun an|"
        r"ab sofort|d'ora in poi|da ora in poi|da adesso)\b.{0,40}\b(voce e|voce sera|vous etes|tu es|du bist|sie sind|sei|"
        r"you are|seras)\b|\b(voce agora e|agora voce e|vous etes maintenant|tu es maintenant|du bist jetzt|du bist nun|"
        r"ora sei|adesso sei)\b"),
-    _R("delimitadores.override", r"(?:^|[.\n¶:;!?])\s*override\s*[:\-]|\boverride (the|your|all) (rules|instructions|classification)\b"),
-    _R("delimitadores.campo_schema",
+    _ReglaTexto("delimitadores.override", r"(?:^|[.\n¶:;!?])\s*override\s*[:\-]|\boverride (the|your|all) (rules|instructions|classification)\b"),
+    _ReglaTexto("delimitadores.campo_schema",
        r"\b(datos_extraidos|respalda_clasificacion_usuario|divergencia_explicada|evidencia_suficiente|clasificacion_llm)\b"),
-    _R("fuga_prompt.reglas_recibidas",
+    _ReglaTexto("fuga_prompt.reglas_recibidas",
        r"\b(revela|muestra|repite|copia|imprime|escribe|reveal|print|show|repeat|output)\w*\b.{0,30}\b(reglas|instrucciones|"
        r"rules|instructions|prompt|indicaciones)\b.{0,20}\b(que recibiste|que te dieron|que tienes|you received|"
        r"you were given|you have been given)\b|\b(reveal|print|show|repeat|output)\b.{0,20}\b(your )?(initial|original|hidden)"
        r" (instructions|prompt|rules)\b"),
-    _R("fuga_contexto.etiqueta_anonimizada",
+    _ReglaTexto("fuga_contexto.etiqueta_anonimizada",
        r"\b(muestra|revela|reveal|show|imprime|print|escribe|reconstruye|reconstruct|desanonimiza|completa)\w*\b.{0,40}"
        r"\[(nombre|rut|correo|tel|direccion|dato_codificado)_anon\]"),
     # ---- AT-10/11 exfiltración por salida
-    _R("exfiltracion.imagen_markdown", r"!\[[^\]]*\]\(|\]\(\s*https?://[^)]*\?[^)]*="),
-    _R("exfiltracion.servicio_externo", r"webhook\.site|requestbin|ngrok|pastebin|burpcollaborator|interact\.sh|pipedream"),
+    _ReglaTexto("exfiltracion.imagen_markdown", r"!\[[^\]]*\]\(|\]\(\s*https?://[^)]*\?[^)]*="),
+    _ReglaTexto("exfiltracion.servicio_externo", r"webhook\.site|requestbin|ngrok|pastebin|burpcollaborator|interact\.sh|pipedream"),
     # ---- AT-13 consumo no acotado
-    _R("consumo.texto_enorme", r"\b(escribe|genera|redacta)\b.{0,30}\b(\d{3,}|mil|cien)\s+(paginas|palabras|lineas|veces|parrafos)\b",
+    _ReglaTexto("consumo.texto_enorme", r"\b(escribe|genera|redacta)\b.{0,30}\b(\d{3,}|mil|cien)\s+(paginas|palabras|lineas|veces|parrafos)\b",
        rf"{_INI}(escribe|genera|redacta)\b.{{0,30}}\b(\d{{3,}}|mil|cien)\s+(paginas|palabras|lineas|veces|parrafos)\b"),
-    _R("consumo.repetir_sin_fin",
+    _ReglaTexto("consumo.repetir_sin_fin",
        r"\brepite\b.{0,40}\b(hasta que|infinit\w*|sin parar|para siempre)\b|\brepetir\w*\b.{0,30}\b\d+\s+veces\b|\b\d{4,}\s+pasos\b",
        r"\brepite\b.{0,40}\b(infinit\w*|sin parar|para siempre)\b"),
     # ---- AT-14 agencia excesiva
-    _R("agencia.pedir_secretos",
+    _ReglaTexto("agencia.pedir_secretos",
        r"\b(lista|listar|muestra|mostrar|dame|revela|revelar|entrega|entregar)\b.{0,40}\b(contrasenas?|passwords?|tokens?|api keys?|secretos)\b",
        rf"{_INI}(lista|muestra|muestrame|dame|revela|revelame|entrega|entregame)\b{_NO_ETIQ}.{{0,40}}\b(contrasenas?|passwords?|"
        r"tokens?|api keys?|secretos)\b"),
-    _R("agencia.usar_herramienta",
+    _ReglaTexto("agencia.usar_herramienta",
        r"\busa\b.{0,10}\b(tu|la)\s+herramienta\b.{0,30}\b(base de datos|sql|archivos|correo|shell)\b|\bsin (avisar|notificar|informar)\b.{0,15}\b(a nadie|al oficial|al equipo)\b"),
-    _R("agencia.ejecutar_funcion",
+    _ReglaTexto("agencia.ejecutar_funcion",
        r"\b(llama|invoca|ejecuta)\b.{0,20}\b(la\s+)?(funcion|herramienta|tool)\b|\b(delete|drop|update|insert|grant|exec)_\w+\s*\(",
        rf"{_INI}(llama|invoca|ejecuta)\b{_NO_ETIQ}.{{0,20}}\b(la\s+)?(funcion|herramienta|tool)\b"
        r"|\b(delete|drop|update|insert|grant|exec)_\w+\s*\("),
-    _R("agencia.crear_admin",
+    _ReglaTexto("agencia.crear_admin",
        r"\b(crea|agrega|anade)\b.{0,30}\b(usuario|cuenta)\b.{0,30}\b(admin\w*|root|superusuario)\b.{0,30}\b(llamad\w*|con clave|con contrasena|sin)\b"),
-    _R("exfiltracion.enviar_base",
+    _ReglaTexto("exfiltracion.enviar_base",
        r"\b(envia|manda)\b.{0,40}\b(base de datos|backup|respaldo|tabla)\b.{0,50}(@|https?://|\.com\b|\.cl\b)",
        rf"{_INI}(envia|enviame|manda|mandame)\b.{{0,40}}\b(base de datos|backup|respaldo|tabla)\b.{{0,50}}(@|https?://|\.com\b|\.cl\b)"),
     # ---- AT-15 envenenamiento RAG
-    _R("rag.prioridad", r"\b(este documento|esta politica)\b.{0,40}\b(prioridad sobre|reemplaza|anula|invalida)\b",
+    _ReglaTexto("rag.prioridad", r"\b(este documento|esta politica)\b.{0,40}\b(prioridad sobre|reemplaza|anula|invalida)\b",
        r"\b(este documento|esta politica)\b.{0,40}\b(prioridad sobre (tus|las) (instrucciones|reglas)|anula (tus|las) "
        r"(instrucciones|reglas))\b"),
-    _R("rag.cuando_pregunten",
+    _ReglaTexto("rag.cuando_pregunten",
        r"\bcuando (alguien|el usuario|te)\b.{0,40}\b(pregunte|consulte)\b.{0,60}\b(responde|di|indica)\b"),
-    _R("rag.ranking", r"\bsiempre cita\w*\s+(este|esta)\b|\branking\s*=\s*1\b|\brelevancia\s*=\s*maxima\b"),
+    _ReglaTexto("rag.ranking", r"\bsiempre cita\w*\s+(este|esta)\b|\branking\s*=\s*1\b|\brelevancia\s*=\s*maxima\b"),
     # ---- AT-16/19 divulgación y reidentificación
-    _R("uso_indebido.datos_otras_conversaciones",
+    _ReglaTexto("uso_indebido.datos_otras_conversaciones",
        r"\b(datos|informacion|conversaciones)\b.{0,30}\b(de otros usuarios|de otras conversaciones|de conversaciones anteriores)\b",
        _CTX),
-    _R("uso_indebido.k_anonimato", r"\bhasta que\b.{0,30}\b(quede|haya)\b.{0,20}\b(solo|solamente)\b.{0,10}\b(una|1)\b", _CTX),
+    _ReglaTexto("uso_indebido.k_anonimato", r"\bhasta que\b.{0,30}\b(quede|haya)\b.{0,20}\b(solo|solamente)\b.{0,10}\b(una|1)\b", _CTX),
     # ---- AT-20/21 inyección SQL y similares
-    _R("sql.funciones",
+    _ReglaTexto("sql.funciones",
        r"waitfor\s+delay|pg_sleep|\bsleep\s*\(|\bbenchmark\s*\(|xp_cmdshell|information_schema|pg_catalog|pg_shadow|\bversion\s*\(\)|\bcurrent_user\b"),
-    _R("sql.tautologia", r"\b(and|or)\s+'?\d+'?\s*=\s*'?\d+|'\s*(--|/\*)"),
-    _R("sql.triggers", r"session_replication_role|disable\s+trigger|\btruncate\s+table\b|\balter\s+table\b"),
-    _R("inyeccion.ldap_plantilla", r"\)\s*\(\s*[&|!]|<%|#\{"),
-    _R("agencia.comando_encadenado",
+    _ReglaTexto("sql.tautologia", r"\b(and|or)\s+'?\d+'?\s*=\s*'?\d+|'\s*(--|/\*)"),
+    _ReglaTexto("sql.triggers", r"session_replication_role|disable\s+trigger|\btruncate\s+table\b|\balter\s+table\b"),
+    _ReglaTexto("inyeccion.ldap_plantilla", r"\)\s*\(\s*[&|!]|<%|#\{"),
+    _ReglaTexto("agencia.comando_encadenado",
        r"`\s*(whoami|id|ls|cat|curl|wget|rm)\b|(&&|\|\|)\s*(rm|del|curl|wget|nc|bash|sh|powershell|cmd|shutdown|chmod|whoami|cat)\b|;\s*(shutdown|chmod|chown|whoami)\b"),
     # ---- AT-30 SSRF
-    _R("ssrf.direccion_interna",
+    _ReglaTexto("ssrf.direccion_interna",
        r"\b169\.254\.169\.254\b|\blocalhost\b|\b127\.0\.0\.1\b|\b0\.0\.0\.0\b|\[::1\]|metadata\.google|\bfile://|\bgopher://|\bftp://|https?://\d{8,10}\b|https?://0x"),
     # ---- AT-33/35/36 archivos y XML
-    _R("archivos.doble_extension", r"\.\.\\|\.(pdf|docx?|txt|xlsx?)\.(exe|bat|cmd|js|vbs|scr|ps1|sh)\b|\beicar\b"),
-    _R("archivos.xml_entidad", r"<\s*!\s*(doctype|entity|\[cdata)|<\s*\?\s*xml"),
+    _ReglaTexto("archivos.doble_extension", r"\.\.\\|\.(pdf|docx?|txt|xlsx?)\.(exe|bat|cmd|js|vbs|scr|ps1|sh)\b|\beicar\b"),
+    _ReglaTexto("archivos.xml_entidad", r"<\s*!\s*(doctype|entity|\[cdata)|<\s*\?\s*xml"),
     # ---- AT-37 fórmulas CSV/Excel
-    _R("archivos.formula_csv", r"(^|\n)\s*[=+@]\s*[a-z]{2,}\s*\(|\bcmd\s*\||(^|\n)\s*=\s*\S",
+    _ReglaTexto("archivos.formula_csv", r"(^|\n)\s*[=+@]\s*[a-z]{2,}\s*\(|\bcmd\s*\||(^|\n)\s*=\s*\S",
        # En la variante "al revés" el relleno "=" de un identificador en base64 queda al inicio:
        # en una evidencia solo cuenta una fórmula real (las líneas "=..." las revisa el texto crudo).
        r"(^|¶)\s*[=+@]\s*[a-z]{2,}\s*\(|\bcmd\s*\|"),
     # ---- AT-28 lógica de negocio
-    _R("manipulacion.marcar_no_aplica", r"\b(marca|clasifica|pon|cambia)\b.{0,40}\bcomo\s+(n/a|no aplica)\b",
+    _ReglaTexto("manipulacion.marcar_no_aplica", r"\b(marca|clasifica|pon|cambia)\b.{0,40}\bcomo\s+(n/a|no aplica)\b",
        rf"{_INI}(marca|marcalo|marcala|clasifica|clasificalo|pon|ponlo|cambia)\b{_NO_ETIQ}.{{0,40}}\bcomo\s+(n/a|no aplica)\b"),
-    _R("manipulacion.subir_puntaje",
+    _ReglaTexto("manipulacion.subir_puntaje",
        r"\bpara\s+(mejorar|subir|aumentar|elevar|maquillar)\b.{0,20}\b(puntaje|score|resultado|calificacion|nota)\b", _CTX),
-    _R("manipulacion.cerrar_sin_evidencia",
+    _ReglaTexto("manipulacion.cerrar_sin_evidencia",
        r"\b(cierra|cierre|resuelve|marca)\b.{0,30}\b(brechas?|hallazgos?|no.?conformidades?)\b.{0,30}\bsin\b.{0,15}\b(evidencia|justificacion|revision)\b",
        rf"{_INI}(cierra|cierre|resuelve|marca)\b{_NO_ETIQ}.{{0,30}}\b(brechas?|hallazgos?|no.?conformidades?)\b.{{0,30}}\bsin\b"
        r".{0,15}\b(evidencia|justificacion|revision)\b"),
-    _R("manipulacion.firma_por_mi", r"\b(acepta|confirma|firma)\b.{0,30}\b(por mi|en mi nombre)\b"),
-    _R("uso_indebido.modificar_otra_empresa",
+    _ReglaTexto("manipulacion.firma_por_mi", r"\b(acepta|confirma|firma)\b.{0,30}\b(por mi|en mi nombre)\b"),
+    _ReglaTexto("uso_indebido.modificar_otra_empresa",
        r"\b(cambia|modifica|borra|elimina|actualiza|edita)\b.{0,50}\b(de|del)\s+(la\s+)?(empresa\s+vecina|otra\s+organizacion|otras\s+organizaciones|competencia|competidor\w*)\b",
        rf"{_INI}(cambia|modifica|borra|elimina|actualiza|edita)\b{_NO_ETIQ}.{{0,50}}\b(de|del)\s+(la\s+)?(empresa\s+vecina|otra\s+"
        r"organizacion|otras\s+organizaciones|competencia|competidor\w*)\b"),
     # ---- AT-40 secretos pegados en el texto
-    _R("secretos.credencial",
+    _ReglaTexto("secretos.credencial",
        r"eyj[a-z0-9_\-]{5,}\.eyj|\bbearer\s+[a-z0-9._\-]{10,}|\bsk-[a-z0-9]{20,}|\bakia[0-9a-z]{16}\b|-----begin [a-z ]*private key-----|\b(password|passwd|contrasena|clave)\s*[:=]\s*\S{6,}",
        # En un documento "clave: mínimo 14 caracteres" es una regla, no un secreto: el valor
        # debe parecer una credencial (con dígitos o símbolos).
@@ -759,32 +759,32 @@ _REGLAS_TXT: list[_R] = [
 ]
 
 # Alfabetos no latinos: se evalúan sobre NFKC sin mapear homoglifos cirílicos
-_REGLAS_ORIGINAL: list[_R] = [
-    _R("inyeccion.ignorar_chino", r"(忽略|无视|忽視).{0,10}(指示|指令|规则|規則|之前|先前)"),
-    _R("inyeccion.ignorar_ruso", r"игнорир\w*.{0,40}(инструкц|правил|все)"),
+_REGLAS_ORIGINAL: list[_ReglaTexto] = [
+    _ReglaTexto("inyeccion.ignorar_chino", r"(忽略|无视|忽視).{0,10}(指示|指令|规则|規則|之前|先前)"),
+    _ReglaTexto("inyeccion.ignorar_ruso", r"игнорир\w*.{0,40}(инструкц|правил|все)"),
 ]
 
 # Se evalúan sobre el texto crudo (conservan saltos de línea y mayúsculas)
 _CRUDO = re.IGNORECASE | re.MULTILINE
-_REGLAS_CRUDO: list[_R] = [
+_REGLAS_CRUDO: list[_ReglaTexto] = [
     # Una línea con fecha y hora es un log falso en una JUSTIFICACIÓN; en una evidencia
     # (bitácora, registro de acciones ejecutadas) es lo normal.
-    _R("delimitadores.log_falso", r"[\r\n]\s*\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", _CTX, _CRUDO),
-    _R("delimitadores.rol_chat", r"(^|\n)\s*(human|assistant|system)\s*:", _IGUAL, _CRUDO),
-    _R("delimitadores.tokens_chat", r"<\|im_(start|end)\|>|<\|(system|user|assistant)\|>", _IGUAL, _CRUDO),
-    _R("delimitadores.dialogo_falso", r"(^|\n)\s*(usuario|user|humano)\s*:[^\n]*\n\s*(asistente|assistant|ia)\s*:", _IGUAL, _CRUDO),
-    _R("oculto.ansi", r"\x1b\[", _IGUAL, _CRUDO),
-    _R("archivos.formula_csv_linea", r"(^|\n)\s*[=+@]\s*[a-z]{2,}\s*\(|(^|\n)\s*=\s*\S", _IGUAL, _CRUDO),
+    _ReglaTexto("delimitadores.log_falso", r"[\r\n]\s*\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", _CTX, _CRUDO),
+    _ReglaTexto("delimitadores.rol_chat", r"(^|\n)\s*(human|assistant|system)\s*:", _IGUAL, _CRUDO),
+    _ReglaTexto("delimitadores.tokens_chat", r"<\|im_(start|end)\|>|<\|(system|user|assistant)\|>", _IGUAL, _CRUDO),
+    _ReglaTexto("delimitadores.dialogo_falso", r"(^|\n)\s*(usuario|user|humano)\s*:[^\n]*\n\s*(asistente|assistant|ia)\s*:", _IGUAL, _CRUDO),
+    _ReglaTexto("oculto.ansi", r"\x1b\[", _IGUAL, _CRUDO),
+    _ReglaTexto("archivos.formula_csv_linea", r"(^|\n)\s*[=+@]\s*[a-z]{2,}\s*\(|(^|\n)\s*=\s*\S", _IGUAL, _CRUDO),
 ]
 
 # Se evalúan sobre el texto SIN espacios (jav ascript:, ignora  todo)
-_REGLAS_COMPACTO: list[_R] = [
-    _R("xss.compacto", r"javascript:|on(error|load|click|mouseover)=|<script", _IGUAL, 0),
-    _R("inyeccion.compacto", r"(ignora|olvida)(todo|todas|lasinstrucciones|lasreglas)", _IGUAL, 0),
+_REGLAS_COMPACTO: list[_ReglaTexto] = [
+    _ReglaTexto("xss.compacto", r"javascript:|on(error|load|click|mouseover)=|<script", _IGUAL, 0),
+    _ReglaTexto("inyeccion.compacto", r"(ignora|olvida)(todo|todas|lasinstrucciones|lasreglas)", _IGUAL, 0),
 ]
 
 
-def _compilar(reglas: list[_R]):
+def _compilar(reglas: list[_ReglaTexto]):
     """[(regla, patrón justificación, patrón evidencia | _CTX)]"""
     salida = []
     for r in reglas:

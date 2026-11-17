@@ -13,7 +13,7 @@ Las decisiones usan los endpoints que ya existían (con comentario desde HU-22):
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.bandeja_revision import (
+from app.application.evaluacion.casos_uso.bandeja_revision import (
     ESTADOS_REVISION, MOTIVOS, ORDENES, BandejaRevision, FiltrosBandeja,
 )
 from app.api.dependencias.alcance import solo_admin

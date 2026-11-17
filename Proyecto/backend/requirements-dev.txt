@@ -1,0 +1,2 @@
+-r requirements.txt
+import-linter==2.16

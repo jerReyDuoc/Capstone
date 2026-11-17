@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.schemas.api_schemas import ControlResponse
+from app.api.schemas.comunes import ControlResponse
 from app.infrastructure.repositories.catalogo_repository import CatalogoRepository
 
 

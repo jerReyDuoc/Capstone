@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.application.mapa_datos.plantillas import ElementoPlantilla
-from app.domain.mapa_datos.modelo import Elemento
+from app.application.mapa_datos.plantillas_mapa import ElementoPlantilla
+from app.domain.mapa_datos.modelo_mapa import Elemento
 
 E = ElementoPlantilla
 

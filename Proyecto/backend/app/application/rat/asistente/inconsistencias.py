@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from app.application.rat.asistente.anclaje import parsear_ref
 from app.domain.catalogos import catalogo_tratamiento as cat
-from app.domain.mapa_datos import analisis as am
-from app.domain.mapa_datos.modelo import Elemento, Flujo
-from app.domain.rat import analisis as rat_an
+from app.domain.mapa_datos import analisis_mapa as am
+from app.domain.mapa_datos.modelo_mapa import Elemento, Flujo
+from app.domain.rat import analisis_rat as rat_an
 from app.domain.rat import cobertura, riesgos
-from app.domain.rat.modelo import completar
+from app.domain.rat.modelo_actividad import completar
 
 SEVERIDAD = {"sensible_sin_base": "Alta", "transferencia_sin_garantia": "Alta",
              "actividad_sin_plazo": "Media", "flujo_sin_actividad": "Media"}

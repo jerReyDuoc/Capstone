@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.fabricas import fabricas
-from app.application.informes.analisis import (
+from app.domain.evaluacion.analisis_brechas import (
     ESTADOS_BRECHA,
     Brecha,
     construir_brechas,
@@ -303,7 +303,7 @@ def construir_contexto(
 async def cargar_contexto_tutor(db: AsyncSession, empresa_id: int, foco_ruta_id: int | None = None,
                                 max_brechas: int = 40) -> ContextoTutor:
     """Contexto de la evaluación más reciente con resultados de la empresa (y solo de ella)."""
-    from app.application.use_cases.formacion_empresa import FormacionError, evaluacion_de_la_empresa
+    from app.application.empresa.casos_uso.formacion_empresa import FormacionError, evaluacion_de_la_empresa
 
     try:
         evaluacion_id = await evaluacion_de_la_empresa(db, empresa_id, None)

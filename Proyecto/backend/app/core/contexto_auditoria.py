@@ -3,11 +3,11 @@ HU-09 · Origen (IP) de cada registro del audit_log.
 
 El criterio 2 exige la IP en TODO registro. Para no pasar la IP a mano por los ~40 lugares
 que registran acciones, un middleware ASGI
-(app/api/middleware/contexto_auditoria.py) la deja en una variable de contexto al comenzar
+(app/api/middleware/fijar_ip_auditoria.py) la deja en una variable de contexto al comenzar
 cada petición y `BitacoraRepository.registrar()` la toma de ahí.
 
   - Petición HTTP: la IP del visitante, calculada igual que en el resto de la API
-    (app/api/dependencias/cliente.py): la que reenvía el BFF de Next.js en `X-Cliente-IP` si trae el
+    (app/api/dependencias/identificacion_cliente.py): la que reenvía el BFF de Next.js en `X-Cliente-IP` si trae el
     `X-BFF-Secret` correcto, o la de la conexión. Se valida y normaliza con `ipaddress`
     (un encabezado con otra cosa nunca llega al log).
   - Fuera de una petición (worker de ARQ, scripts): "sistema:worker" o "sistema:cli".

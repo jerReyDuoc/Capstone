@@ -1,0 +1,307 @@
+"""
+HU-01 — Guardar (crear o actualizar) la respuesta a un control del cuestionario.
+
+Reglas:
+  * Una sola respuesta por (evaluación, control). Responder de nuevo ACTUALIZA la
+    existente (upsert); si la declaración no cambió, no se toca nada (el guardado
+    automático puede reenviar la misma respuesta sin perder la validación del LLM).
+  * Solo se aceptan respuestas a evaluaciones existentes, abiertas, con el filtro
+    F1–F7 completado y a controles que ese filtro deja aplicables.
+  * La justificación pasa por la capa anti prompt-injection antes de guardarse.
+  * HU-02: el usuario elige 1 de 5 estados (incluido 'requiere_revision', que luego
+    resuelve el LLM con la evidencia) y la justificación es obligatoria, con un largo
+    mínimo, en 'parcialmente_cumplido' y 'requiere_revision'.
+  * HU-06: la justificación se ANONIMIZA (etiquetas fijas) antes de guardarse. El
+    orden es: validar largo -> capa anti prompt-injection sobre el ORIGINAL ->
+    anonimizar -> persistir. Si el motor no puede anonimizar, no se guarda (503).
+"""
+import re
+from dataclasses import dataclass
+
+from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
+from app.core.config import settings
+from app.domain.models.evento_seguridad import OrigenEvento
+from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
+from app.domain.ports.guardia_prompt_port import PERFIL_JUSTIFICACION, GuardiaPromptPort
+from app.domain.ports.repositorios import (
+    EvaluacionRepositoryPort,
+    RespuestaDuplicadaError,
+    RespuestaRepositoryPort,
+)
+from app.application.auditoria.casos_uso.registrar_evento_seguridad import RegistrarEventoSeguridad
+
+
+# ---------------------------------------------------------------- errores
+class InyeccionDetectadaError(ValueError):
+    """La justificación fue bloqueada por la capa anti prompt-injection."""
+
+
+class RespuestaRechazadaError(ValueError):
+    """La respuesta no se puede guardar. `status_code` y `codigo` van a la API."""
+    status_code = 400
+    codigo = "RESPUESTA_RECHAZADA"
+
+
+class JustificacionObligatoriaError(RespuestaRechazadaError):
+    status_code = 422
+    codigo = "JUSTIFICACION_OBLIGATORIA"
+
+
+class EvaluacionNoEncontradaError(RespuestaRechazadaError):
+    status_code = 404
+    codigo = "EVALUACION_NO_ENCONTRADA"
+
+
+class EvaluacionCerradaError(RespuestaRechazadaError):
+    status_code = 409
+    codigo = "EVALUACION_CERRADA"
+
+
+class FiltroPendienteError(RespuestaRechazadaError):
+    status_code = 409
+    codigo = "FILTRO_PENDIENTE"
+
+
+class ControlNoEncontradoError(RespuestaRechazadaError):
+    status_code = 404
+    codigo = "CONTROL_NO_ENCONTRADO"
+
+
+class ControlNoAplicableError(RespuestaRechazadaError):
+    status_code = 422
+    codigo = "CONTROL_NO_APLICABLE"
+
+
+class RespuestaNoEncontradaError(RespuestaRechazadaError):
+    status_code = 404
+    codigo = "RESPUESTA_NO_ENCONTRADA"
+
+
+class AnonimizacionNoDisponibleError(RespuestaRechazadaError):
+    """HU-06: el motor de anonimización falló; por seguridad no se guarda nada."""
+    status_code = 503
+    codigo = "ANONIMIZACION_NO_DISPONIBLE"
+
+
+_ESPACIOS = re.compile(r"\s+")
+_LETRA = re.compile(r"[^\W\d_]")   # cualquier letra (incluye tildes y ñ)
+
+
+def normalizar_justificacion(texto: str | None) -> str:
+    """Quita espacios de los extremos y colapsa los repetidos (tabs, saltos de línea)."""
+    return _ESPACIOS.sub(" ", texto or "").strip()
+
+
+def validar_justificacion(estado_clasificacion: str, justificacion: str | None) -> None:
+    """
+    HU-02 C2: en 'parcialmente_cumplido' y 'requiere_revision' la justificación es
+    obligatoria: al menos JUSTIFICACION_MIN_CARACTERES caracteres (sin contar espacios
+    repetidos ni de los extremos) y con texto, no solo signos o números.
+    """
+    # Correcciones 05-11: por defecto la justificación es opcional en todos los estados
+    if not settings.JUSTIFICACION_OBLIGATORIA:
+        return
+    if not EstadoClasificacion.requiere_justificacion(estado_clasificacion):
+        return
+    minimo = settings.JUSTIFICACION_MIN_CARACTERES
+    texto = normalizar_justificacion(justificacion)
+    if len(texto) < minimo or not _LETRA.search(texto):
+        etiqueta = estado_clasificacion.replace("_", " ")
+        raise JustificacionObligatoriaError(
+            f"La justificación es obligatoria para '{etiqueta}': describe en al menos "
+            f"{minimo} caracteres por qué el control queda en ese estado "
+            f"(se recibieron {len(texto)})."
+        )
+
+
+@dataclass
+class ResultadoRespuesta:
+    respuesta: Respuesta
+    creada: bool          # True: fila nueva (201) · False: se actualizó o no cambió (200)
+    modificada: bool      # False si se reenvió exactamente la misma declaración
+
+
+# ---------------------------------------------------------------- caso de uso
+class CrearRespuestaUseCase:
+    def __init__(
+        self,
+        repo: RespuestaRepositoryPort,
+        evaluaciones: EvaluacionRepositoryPort,
+        guard: GuardiaPromptPort | None = None,
+        registrar_evento: RegistrarEventoSeguridad | None = None,
+        anonimizador: AnonimizadorPII | None = None,
+        auditar_modificacion=None,
+    ):
+        self.repo = repo
+        # HU-09: callable(respuesta, detalle) que agrega el registro al audit_log SIN commit;
+        # se llama justo antes de guardar una modificación, así va en la misma transacción.
+        self.auditar_modificacion = auditar_modificacion
+        self.evaluaciones = evaluaciones
+        self.guard = guard
+        self.registrar_evento = registrar_evento
+        # HU-06: la API siempre lo inyecta (factory.crear_anonimizador). Sin él (pruebas
+        # unitarias de otras reglas) la justificación se guarda tal cual.
+        self.anonimizador = anonimizador
+
+    async def execute(
+        self,
+        evaluacion_id: int,
+        matriz_control_id: int,
+        estado_clasificacion: str,
+        justificacion: str,
+    ) -> Respuesta:
+        """Compatibilidad: devuelve solo la respuesta guardada."""
+        resultado = await self.guardar(evaluacion_id, matriz_control_id, estado_clasificacion, justificacion)
+        return resultado.respuesta
+
+    async def guardar(
+        self,
+        evaluacion_id: int,
+        matriz_control_id: int,
+        estado_clasificacion: str,
+        justificacion: str,
+    ) -> ResultadoRespuesta:
+        """POST /api/respuestas: crea la respuesta o actualiza la del mismo control."""
+        control = await self._validar(evaluacion_id, matriz_control_id, estado_clasificacion, justificacion)
+        justificacion = await self._anonimizar(justificacion)
+
+        existente = await self.repo.get_by_evaluacion_control(evaluacion_id, matriz_control_id)
+        if existente is None:
+            nueva = Respuesta(evaluacion_id=evaluacion_id, matriz_controles_id_control=matriz_control_id)
+            self._aplicar_declaracion(nueva, estado_clasificacion, justificacion, control)
+            try:
+                return ResultadoRespuesta(await self.repo.create(nueva), creada=True, modificada=True)
+            except RespuestaDuplicadaError:
+                # Otra petición la insertó en paralelo: se actualiza esa.
+                existente = await self.repo.get_by_evaluacion_control(evaluacion_id, matriz_control_id)
+                if existente is None:  # pragma: no cover - borrada entre medio
+                    raise
+        return await self._actualizar(existente, estado_clasificacion, justificacion, control)
+
+    async def actualizar(
+        self,
+        respuesta_id: int,
+        estado_clasificacion: str,
+        justificacion: str,
+    ) -> ResultadoRespuesta:
+        """PUT /api/respuestas/{id}: modifica una respuesta existente por su id."""
+        existente = await self.repo.get(respuesta_id)
+        if existente is None:
+            raise RespuestaNoEncontradaError(f"Respuesta {respuesta_id} no encontrada")
+        control = await self._validar(
+            existente.evaluacion_id, existente.matriz_controles_id_control,
+            estado_clasificacion, justificacion,
+        )
+        justificacion = await self._anonimizar(justificacion)
+        return await self._actualizar(existente, estado_clasificacion, justificacion, control)
+
+    # ------------------------------------------------------------ internos
+    async def _validar(self, evaluacion_id, matriz_control_id, estado_clasificacion, justificacion):
+        # 1. Clasificación: uno de los 5 estados de la matriz (HU-02)
+        valores_validos = EstadoClasificacion.declarables()
+        if estado_clasificacion not in valores_validos:
+            raise ValueError(
+                f"Clasificación inválida: {estado_clasificacion}. "
+                f"Debe ser una de: {', '.join(valores_validos)}"
+            )
+
+        # 1b. HU-02: justificación obligatoria en parcialmente_cumplido / requiere_revision
+        validar_justificacion(estado_clasificacion, justificacion)
+
+        # 2. Evaluación: existe, está abierta y ya pasó por el filtro
+        contexto = await self.evaluaciones.get_contexto(evaluacion_id)
+        if contexto is None:
+            raise EvaluacionNoEncontradaError(f"Evaluación {evaluacion_id} no encontrada")
+        if contexto.cerrada:
+            raise EvaluacionCerradaError(
+                f"La evaluación {evaluacion_id} está cerrada ({contexto.estado_progreso}): "
+                "ya no admite respuestas"
+            )
+        if not contexto.filtro_completado:
+            raise FiltroPendienteError(
+                "Responde primero el filtro de aplicabilidad (F1–F7) de la evaluación"
+            )
+
+        # 3. Control: existe y el filtro lo deja aplicable
+        control = await self.repo.get_control(matriz_control_id)
+        if control is None:
+            raise ControlNoEncontradoError(f"Control {matriz_control_id} no encontrado")
+        if control.codigo_control not in contexto.codigos_aplicables:
+            raise ControlNoAplicableError(
+                f"El control {control.codigo_control} no aplica a esta evaluación según "
+                "sus respuestas del filtro; no se puede responder"
+            )
+
+        # 4. SEGURIDAD (bloqueo preventivo): la justificación es texto libre que luego
+        #    llega al prompt del LLM. Si parece una inyección, no se guarda.
+        #    HU-33: la justificación es texto corto del usuario -> revisión ESTRICTA.
+        deteccion = self.guard.analizar(justificacion or "", PERFIL_JUSTIFICACION) if self.guard else None
+        if deteccion is not None and deteccion.bloquear:
+            if self.registrar_evento:
+                await self.registrar_evento.execute(
+                    texto=justificacion,
+                    origen=OrigenEvento.JUSTIFICACION.value,
+                    evaluacion_id=evaluacion_id,
+                    matriz_control_id=matriz_control_id,
+                    regla=deteccion.regla,
+                )
+            raise InyeccionDetectadaError(
+                "La justificación contiene instrucciones o contenido no permitido "
+                "(posible prompt injection). Reescríbela describiendo solo cómo "
+                "cumple tu organización el control."
+            )
+        return control
+
+    async def _anonimizar(self, justificacion: str | None) -> str | None:
+        """HU-06: reemplaza la PII por etiquetas fijas ANTES de persistir (fail-closed)."""
+        if self.anonimizador is None:
+            return justificacion
+        try:
+            return await self.anonimizador.anonimizar(justificacion)
+        except AnonimizacionError as e:
+            raise AnonimizacionNoDisponibleError(
+                "No se pudo anonimizar la justificación (motor de anonimización no disponible). "
+                "Por seguridad no se guardó; intenta nuevamente en unos minutos."
+            ) from e
+
+    async def _actualizar(self, respuesta, estado_clasificacion, justificacion, control) -> ResultadoRespuesta:
+        # `justificacion` ya viene anonimizada: se compara contra lo guardado (también
+        # anonimizado), así el guardado automático con PII no se toma como un cambio.
+        if (
+            respuesta.estado_clasificacion == estado_clasificacion
+            and (respuesta.justificacion_usuario or "") == (justificacion or "")
+        ):
+            # Reenvío idéntico (guardado automático): no se pierde nada de lo validado.
+            return ResultadoRespuesta(respuesta, creada=False, modificada=False)
+        detalle = {
+            "evaluacion_id": respuesta.evaluacion_id,
+            "matriz_control_id": respuesta.matriz_controles_id_control,
+            "estado_anterior": respuesta.estado_clasificacion,
+            "estado_nuevo": estado_clasificacion,
+            "estado_final_anterior": respuesta.estado_clasificacion_final,
+            "fuente_anterior": respuesta.fuente_clasificacion,
+            # el texto nunca va al log (puede traer datos personales): solo si cambió
+            "justificacion_modificada": (respuesta.justificacion_usuario or "") != (justificacion or ""),
+        }
+        self._aplicar_declaracion(respuesta, estado_clasificacion, justificacion, control)
+        if self.auditar_modificacion is not None:
+            self.auditar_modificacion(respuesta, detalle)
+        return ResultadoRespuesta(await self.repo.update(respuesta), creada=False, modificada=True)
+
+    @staticmethod
+    def _aplicar_declaracion(respuesta: Respuesta, estado_clasificacion, justificacion, control) -> None:
+        """
+        Fija la declaración del usuario como estado vigente. Si cambió, la validación
+        anterior (LLM o revisión humana) correspondía a otra declaración y se descarta;
+        las evidencias ya subidas se conservan y una nueva evidencia vuelve a validar.
+        """
+        respuesta.estado_clasificacion = estado_clasificacion
+        respuesta.justificacion_usuario = justificacion
+        respuesta.estado_clasificacion_final = estado_clasificacion
+        respuesta.fuente_clasificacion = FuenteClasificacion.USUARIO.value
+        respuesta.confianza_clasificacion = None
+        respuesta.fecha_validacion = None
+        respuesta.clasificacion_revisada = None
+        respuesta.fecha_revision = None
+        # REGLA DE NEGOCIO: brecha del control solo si el estado vigente es "no_cumplido"
+        respuesta.sincronizar_brecha(control)

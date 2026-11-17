@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
-from app.infrastructure.security.cripto.autenticacion import hash_password
+from app.infrastructure.security.cripto.contrasenas_y_tokens import hash_password
 from app.core.database import AsyncSessionLocal, engine
 from app.domain.models.usuario_admin import UsuarioAdmin
 

@@ -8,10 +8,10 @@ from app.api.dependencias.consultas import reportes_evaluacion_uc
 from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
-from app.application.use_cases.generar_resumen import GenerateResumenUseCase
-from app.application.use_cases.completar_evaluacion import CompletarEvaluacionUseCase
-from app.application.use_cases.crear_respuesta import RespuestaRechazadaError
-from app.application.use_cases.reportes_evaluacion import ReporteNoDisponibleError, ReportesEvaluacionUseCase
+from app.application.evaluacion.casos_uso.generar_resumen import GenerarResumenUseCase
+from app.application.evaluacion.casos_uso.completar_evaluacion import CompletarEvaluacionUseCase
+from app.application.evaluacion.casos_uso.crear_respuesta import RespuestaRechazadaError
+from app.application.evaluacion.casos_uso.reportes_evaluacion import ReporteNoDisponibleError, ReportesEvaluacionUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/evaluaciones", tags=["reportes"])
 @router.post("/{evaluacion_id}/cerrar", dependencies=[Depends(alcance_evaluacion)])
 async def cerrar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(get_db)):
     """Genera los resúmenes por dominio y calcula el puntaje general."""
-    use_case = GenerateResumenUseCase(db)
+    use_case = GenerarResumenUseCase(db)
     try:
         return await use_case.execute(evaluacion_id)
     except ValueError as e:
@@ -52,7 +52,7 @@ async def completar_evaluacion(evaluacion_id: int, db: AsyncSession = Depends(ge
     except RespuestaRechazadaError as e:
         raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e)})
     if await uc.evaluacion_tiene_empresa(evaluacion_id):
-        from app.application.use_cases.documentos_empresa import tras_completar
+        from app.application.empresa.casos_uso.documentos_empresa import tras_completar
 
         resultado = {**resultado, "documento_id": await tras_completar(db, evaluacion_id, actor)}
     if settings.BENCHMARK_AL_COMPLETAR:
@@ -68,13 +68,9 @@ async def _recalcular_benchmark(db: AsyncSession) -> None:
     completada y confirmada por el caso de uso) y, si falla, /completar responde igual:
     el cron diario lo repara.
     """
-    from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
+    from app.application.benchmark.casos_uso.actualizar_benchmark import ActualizarBenchmarkUseCase
 
-    try:
-        await UpdateBenchmarkUseCase(db).execute()
-    except Exception:  # noqa: BLE001
-        await db.rollback()
-        logger.exception("[benchmark] no se pudo recalcular al completar; lo hará el cron diario")
+    await ActualizarBenchmarkUseCase(db).recalcular_sin_fallar()
 
 
 @router.get("/{evaluacion_id}/resumen", dependencies=[Depends(alcance_evaluacion)])

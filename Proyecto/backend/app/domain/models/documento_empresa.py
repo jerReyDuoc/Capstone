@@ -7,7 +7,7 @@ Una fila por archivo GUARDADO por el sistema para la empresa:
                 generarlo. Se archiva al completar una reevaluación de la empresa o cuando
                 el usuario lo pide desde "Mis evaluaciones".
   borrador      PDF de un borrador de cumplimiento CONSOLIDADO (HU-16). El borrador en revisión
-                vive en borrador_documento; al consolidarlo, app/application/use_cases/borradores.py
+                vive en borrador_documento; al consolidarlo, app/application/borradores/casos_uso/generar_borradores.py
                 lo guarda aquí con guardar_documento() y aparece en "Mis documentos".
   rat_pdf       HU-36: informe PDF del Registro de Actividades de Tratamiento (una emisión de
   rat_xlsx      rat_informe guarda los dos formatos con el mismo código verificable).

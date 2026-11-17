@@ -6,7 +6,9 @@ from typing import Protocol
 
 from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import Evaluacion
+from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.rubro import Rubro
+from app.domain.models.solicitud_contratacion import SolicitudContratacion
 
 
 class RubrosRepositoryPort(Protocol):
@@ -55,3 +57,17 @@ class PanelClientesRepositoryPort(Protocol):
                                   incluir_prueba: bool, page: int, size: int) -> PaginaEvaluacionesPanel: ...
 
     async def obtener_empresa(self, empresa_id: int) -> Empresa | None: ...
+
+
+class SolicitudContratacionRepositoryPort(Protocol):
+    """Consultas de las solicitudes de contratación (HU-31)."""
+
+    async def obtener_por_evaluacion(self, evaluacion_id: int) -> SolicitudContratacion | None: ...
+
+
+class EventoSeguridadRepositoryPort(Protocol):
+    """Eventos de seguridad (HU-09/HU-10). `update` hace commit y refresca (comportamiento histórico)."""
+
+    async def get(self, evento_id: int) -> EventoSeguridad | None: ...
+
+    async def update(self, evento: EventoSeguridad) -> EventoSeguridad: ...

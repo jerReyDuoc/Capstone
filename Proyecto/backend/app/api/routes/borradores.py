@@ -27,12 +27,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.borradores import BorradorError, Borradores
+from app.application.borradores.casos_uso.generar_borradores import BorradorError, Borradores
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.borradores import NuevoBorrador, EdicionBorrador, Consolidacion
+from app.api.schemas.borradores_esquemas import NuevoBorrador, EdicionBorrador, Consolidacion
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,10 @@ async def obtener_servicios_borrador(
     # no borra la métrica de la llamada al LLM.
     sesion_ia: AsyncSession = Depends(get_db, use_cache=False),
 ) -> ServiciosBorrador:
-    from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
+    from app.application.auditoria.casos_uso.registrar_evento_seguridad import RegistrarEventoSeguridad
     from app.api.dependencias.contenedor import crear_agente, crear_anonimizador
     from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.guardia_prompt import ReglasGuardiaPrompt
 
     try:
         agente = crear_agente(sesion_ia)
@@ -68,7 +68,7 @@ async def obtener_servicios_borrador(
         return ServiciosBorrador(None, None)
     return ServiciosBorrador(
         agente, anonimizador,
-        lambda db: RegistrarEventoSeguridad(EventoSeguridadRepository(db), ReglasPromptGuard()),
+        lambda db: RegistrarEventoSeguridad(EventoSeguridadRepository(db), ReglasGuardiaPrompt()),
     )
 
 

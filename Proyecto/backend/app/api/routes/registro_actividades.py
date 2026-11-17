@@ -32,11 +32,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.rat.casos_uso.registro import RatError, RegistroActividadesCasos
+from app.application.rat.casos_uso.registro_actividades_casos import RatError, RegistroActividadesCasos
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.rat import catalogo as cat
-from app.api.schemas.registro_actividades import ActividadEntrada, EditarEntrada, EstadoEntrada
+from app.api.schemas.registro_actividades_esquemas import ActividadEntrada, EditarEntrada, EstadoEntrada
 
 router = APIRouter(prefix="/api/registro-actividades", tags=["registro de actividades de tratamiento (HU-35)"])
 
@@ -126,7 +126,7 @@ async def cumplimiento(cliente: ClienteConServicio = Depends(empresa_con_servici
     recomendada), brechas que genera el registro con su ruta de remediación y lo que el registro aporta a
     la evaluación más reciente.
     """
-    from app.application.rat.casos_uso.cumplimiento import CumplimientoRegistro
+    from app.application.rat.casos_uso.cruce_cumplimiento import CumplimientoRegistro
 
     return _json(await CumplimientoRegistro(db, cliente).resumen())
 
@@ -135,6 +135,6 @@ async def cumplimiento(cliente: ClienteConServicio = Depends(empresa_con_servici
 async def usar_como_evidencia(cliente: ClienteConServicio = Depends(empresa_con_servicio),
                               db: AsyncSession = Depends(get_db)):
     """Usa el registro vigente y completo como evidencia de los controles de protección de datos (solo mejora)."""
-    from app.application.rat.casos_uso.cumplimiento import CumplimientoRegistro
+    from app.application.rat.casos_uso.cruce_cumplimiento import CumplimientoRegistro
 
     return _json(await CumplimientoRegistro(db, cliente).aplicar(origen="manual"))

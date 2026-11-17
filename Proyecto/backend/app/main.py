@@ -8,7 +8,7 @@ from arq.connections import RedisSettings
 from app.bootstrap import configurar
 from app.core.config import settings
 from app.api.routes import api_router
-from app.api.middleware.contexto_auditoria import ContextoAuditoriaMiddleware
+from app.api.middleware.fijar_ip_auditoria import ContextoAuditoriaMiddleware
 
 configurar()  # raíz de composición (A-40): a nivel de módulo, no solo en lifespan
 

@@ -1,5 +1,5 @@
 """
-Motor NER de sanitización (implementa SanitizerPort).
+Motor NER de sanitización (implementa SanitizadorPort).
 
 Motor híbrido, el mismo enfoque que usan herramientas como Microsoft Presidio:
   - Reglas (regex + validación) para datos con formato: RUT, correo, teléfono,
@@ -46,7 +46,7 @@ from app.domain.ports.sanitizador_port import (
     EntidadDetectada,
     ResultadoSanitizacion,
     SanitizacionError,
-    SanitizerPort,
+    SanitizadorPort,
     TipoEntidad,
 )
 from app.infrastructure.security.prompt_injection import seguridad as _seg
@@ -189,7 +189,7 @@ def rut_valido(texto: str) -> bool:
 
 
 @dataclass
-class _Span:
+class _Tramo:
     tipo: TipoEntidad
     inicio: int
     fin: int
@@ -250,7 +250,7 @@ def cargar_spacy():
 # ---------------------------------------------------------------------------
 # Sanitizador
 # ---------------------------------------------------------------------------
-class NERSanitizer(SanitizerPort):
+class SanitizadorNer(SanitizadorPort):
     def __init__(self, cargar_nlp: Callable[[], object] = cargar_spacy):
         # Inyectable para tests (un NLP falso); en producción carga spaCy.
         self._cargar_nlp = cargar_nlp
@@ -289,29 +289,29 @@ class NERSanitizer(SanitizerPort):
             raise SanitizacionError(f"Fallo del motor de sanitización ({type(e).__name__})") from e
 
     # ------------------------------------------------------------ detección por reglas
-    def _detectar_reglas(self, t: str, prof: int) -> list[_Span]:
-        spans: list[_Span] = []
+    def _detectar_reglas(self, t: str, prof: int) -> list[_Tramo]:
+        spans: list[_Tramo] = []
 
         if prof > 0:
             spans += self._detectar_codificados(t, prof)
 
         for m in _RE_CORREO.finditer(t):
-            spans.append(_Span(TipoEntidad.CORREO, m.start(), m.end(), "regex"))
+            spans.append(_Tramo(TipoEntidad.CORREO, m.start(), m.end(), "regex"))
 
         for m in _seg._RE_TEL.finditer(t):
-            spans.append(_Span(TipoEntidad.TELEFONO, m.start(), m.end(), "regex"))
+            spans.append(_Tramo(TipoEntidad.TELEFONO, m.start(), m.end(), "regex"))
 
         for m in _seg._RE_RUT.finditer(t):
             tipo = self._clasificar_numero(t, m)
             if tipo:
-                spans.append(_Span(tipo, m.start(), m.end(), "regex"))
+                spans.append(_Tramo(tipo, m.start(), m.end(), "regex"))
 
         for m in _seg._RE_PALABRAS.finditer(t):  # RUT dictado: "uno cinco cuatro..."
             fin = m.start() + len(m.group(0).rstrip(" ,.-\n\t"))
-            spans.append(_Span(TipoEntidad.RUT, m.start(), fin, "regex"))
+            spans.append(_Tramo(TipoEntidad.RUT, m.start(), fin, "regex"))
 
         for m in _RE_DIRECCION.finditer(t):
-            spans.append(_Span(TipoEntidad.DIRECCION, m.start(), m.end(), "regex"))
+            spans.append(_Tramo(TipoEntidad.DIRECCION, m.start(), m.end(), "regex"))
 
         return spans
 
@@ -340,7 +340,7 @@ class NERSanitizer(SanitizerPort):
             return TipoEntidad.TELEFONO
         return None
 
-    def _detectar_codificados(self, t: str, prof: int) -> list[_Span]:
+    def _detectar_codificados(self, t: str, prof: int) -> list[_Tramo]:
         """Un token Base64/Hex/Bin/B32 que al decodificarse contiene PII se oculta completo."""
         spans = []
         pares = (
@@ -354,17 +354,17 @@ class NERSanitizer(SanitizerPort):
                 decodificado = dec(m.group(0))
                 if decodificado and _seg._imprimible(decodificado):
                     if self._detectar_reglas(_seg.normalizar(decodificado), prof - 1):
-                        spans.append(_Span(TipoEntidad.CODIFICADO, m.start(), m.end(), "decodificado"))
+                        spans.append(_Tramo(TipoEntidad.CODIFICADO, m.start(), m.end(), "decodificado"))
         return spans
 
     # ------------------------------------------------------------ detección NER
-    def _detectar_ner(self, nlp, t: str) -> list[_Span]:
+    def _detectar_ner(self, nlp, t: str) -> list[_Tramo]:
         if not t.strip():
             return []
         if len(t) >= getattr(nlp, "max_length", 10**9):
             nlp.max_length = len(t) + 1
 
-        spans: list[_Span] = []
+        spans: list[_Tramo] = []
         for e in nlp(t).ents:
             if e.label_ == "PER":
                 s = self._persona(t, e.start_char, e.end_char)
@@ -440,13 +440,13 @@ class NERSanitizer(SanitizerPort):
             b -= 1
         return a, b
 
-    def _persona(self, t: str, ini: int, fin: int) -> _Span | None:
+    def _persona(self, t: str, ini: int, fin: int) -> _Tramo | None:
         rango = self._recortar_cargos(t, ini, fin)
         if not rango or not _seg._entidad_valida(t[rango[0]:rango[1]]):
             return None
-        return _Span(TipoEntidad.NOMBRE, rango[0], rango[1], "ner")
+        return _Tramo(TipoEntidad.NOMBRE, rango[0], rango[1], "ner")
 
-    def _persona_con_cargo(self, t: str, ini: int, fin: int) -> _Span | None:
+    def _persona_con_cargo(self, t: str, ini: int, fin: int) -> _Tramo | None:
         """spaCy marca 'Gerente General Pedro Soto Rojas' como ORG: si el span EMPIEZA con
         un cargo y lo que queda son >= 2 palabras Capitalizadas que no son de organización,
         es una persona. Un ORG/MISC sin cargo al inicio se deja como está."""
@@ -463,24 +463,24 @@ class NERSanitizer(SanitizerPort):
         return None
 
     @staticmethod
-    def _direccion(t: str, ini: int, fin: int) -> _Span | None:
+    def _direccion(t: str, ini: int, fin: int) -> _Tramo | None:
         texto = t[ini:fin]
         palabras = texto.split()
         if not palabras or any(_plano(p) in _NORMATIVOS for p in palabras):
             return None  # "la Ley" + 21.719, "Artículo" + 14
         num = _RE_NUMERO_TRAS_LOC.match(t[fin:])
         if num:  # "Los Leones" + " 1234" -> dirección
-            return _Span(TipoEntidad.DIRECCION, ini, fin + num.end(), "ner")
+            return _Tramo(TipoEntidad.DIRECCION, ini, fin + num.end(), "ner")
         if _RE_LOC_TERMINA_EN_NUMERO.search(texto) and len(palabras) >= 2:
             # spaCy ya incluyó el número: "Los Leones 456"; se extiende al complemento ("depto 5")
-            return _Span(TipoEntidad.DIRECCION, ini, fin + _RE_COMPLEMENTO_TRAS.match(t[fin:]).end(), "ner")
+            return _Tramo(TipoEntidad.DIRECCION, ini, fin + _RE_COMPLEMENTO_TRAS.match(t[fin:]).end(), "ner")
         return None
 
     # ------------------------------------------------------------ fusión y reemplazo
     @staticmethod
-    def _fusionar(spans: list[_Span]) -> list[_Span]:
+    def _fusionar(spans: list[_Tramo]) -> list[_Tramo]:
         """Une spans solapados (unión de rangos: nunca queda un trozo de PII afuera)."""
-        fusion: list[_Span] = []
+        fusion: list[_Tramo] = []
         for s in sorted(spans, key=lambda s: (s.inicio, -(s.fin - s.inicio))):
             if s.fin <= s.inicio:
                 continue
@@ -492,11 +492,11 @@ class NERSanitizer(SanitizerPort):
                 if s.fuente not in ult.fuente.split("+"):
                     ult.fuente = f"{ult.fuente}+{s.fuente}"
             else:
-                fusion.append(_Span(s.tipo, s.inicio, s.fin, s.fuente))
+                fusion.append(_Tramo(s.tipo, s.inicio, s.fin, s.fuente))
         return fusion
 
     @staticmethod
-    def _reemplazar(t: str, spans: list[_Span], corte: int):
+    def _reemplazar(t: str, spans: list[_Tramo], corte: int):
         partes, entidades, pos = [], [], 0
         for s in spans:
             if s.inicio >= corte:

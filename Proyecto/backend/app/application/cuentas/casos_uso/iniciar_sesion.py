@@ -1,0 +1,275 @@
+"""
+Emisión de tokens de acceso (ver app/infrastructure/security/cripto/contrasenas_y_tokens.py).
+
+  - Admin:   email + contraseña contra usuarios_admin (hash PBKDF2).
+  - Titular: usuario_temporal_id + email de la invitación; la invitación no debe
+             estar expirada ni el usuario anonimizado.
+  - Encuestado anónimo (encuesta pública): evaluacion_id + clave de acceso de la
+             evaluación (ver clave_acceso_encuestado.py).
+  - Cliente (HU-27): email + contraseña del usuario definitivo, que la definió con su
+             enlace de activación. Exige cuenta activa y contrato de la empresa vigente.
+
+Los errores son deliberadamente genéricos ("credenciales inválidas") para no
+revelar si un email o id existe.
+
+HU-28 (admin y cliente, los dos logins con contraseña):
+  - Abren una sesión revocable (sesiones.py): el token lleva su sid.
+  - Intentos FALLIDOS limitados por cuenta y por IP (ProteccionInicioSesion). La cuenta se
+    identifica por la huella del correo escrito, exista o no: bloquear solo los correos
+    que existen revelaría cuáles existen. Entrar bien reinicia el contador de la cuenta.
+  - Cada intento queda en la bitácora: exitoso, fallido (con su motivo) o bloqueado.
+    Nunca el correo escrito ni la contraseña; solo el id de la cuenta si existe.
+"""
+import asyncio
+import logging
+from datetime import date, datetime, timezone
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.auth.actor import Rol
+from app.application.seguridad.huella import huella
+from app.core.config import settings
+from app.application.cuentas.casos_uso.clave_acceso_encuestado import verificar_clave
+from app.application.cuentas.casos_uso.sesiones import abrir_sesion
+from app.application.fabricas import fabricas
+from app.domain.models.bitacora_auditoria import RESULTADO_RECHAZADO
+from app.domain.ports.limitador_port import Limitador
+from app.domain.auditoria.acciones import ROL_ANONIMO, Accion
+
+logger = logging.getLogger("seguridad")
+
+
+class CredencialesInvalidasError(Exception):
+    pass
+
+
+class ContratoNoVigenteError(Exception):
+    """Ya no se lanza desde HU-30 (el cliente entra sin contrato vigente); se conserva por compatibilidad."""
+
+
+class DemasiadosIntentosError(Exception):
+    """HU-28: la cuenta o la IP superaron los intentos fallidos permitidos."""
+
+    def __init__(self, reintentar_en_s: int):
+        super().__init__(
+            "Demasiados intentos fallidos. Por seguridad, espera unos minutos antes de volver a intentarlo."
+        )
+        self.reintentar_en_s = max(1, int(reintentar_en_s))
+
+
+class ProteccionInicioSesion:
+    """
+    HU-28 criterio 3: límite de intentos FALLIDOS de inicio de sesión.
+
+    Ventana fija de LOGIN_VENTANA_FALLOS_MIN: con LOGIN_MAX_FALLOS_CUENTA fallos sobre el
+    mismo correo, o LOGIN_MAX_FALLOS_IP desde la misma IP, se rechaza (429) hasta que la
+    ventana termine, aunque la contraseña sea correcta. Las claves llevan huellas HMAC:
+    ni el correo ni la IP quedan en claro en Redis.
+
+    Si Redis no responde, el limitador lanza LimitadorNoDisponibleError y la ruta responde
+    503 (falla "cerrado", como los demás límites del sistema).
+    """
+
+    def __init__(self, limitador: Limitador | None, tipo: str, email: str, ip: str | None):
+        self.limitador = limitador
+        self.ventana_s = settings.LOGIN_VENTANA_FALLOS_MIN * 60
+        self.clave_cuenta = f"login:{tipo}:em:{huella(email)}"
+        self.reglas = [(self.clave_cuenta, settings.LOGIN_MAX_FALLOS_CUENTA)]
+        if ip:
+            self.reglas.append((f"login:{tipo}:ip:{huella(ip)}", settings.LOGIN_MAX_FALLOS_IP))
+
+    async def verificar(self) -> None:
+        if self.limitador is None:
+            return
+        esperas = [await self.limitador.restante_s(clave) for clave, maximo in self.reglas
+                   if await self.limitador.usados(clave) >= maximo]
+        if esperas:
+            raise DemasiadosIntentosError(max(esperas) or self.ventana_s)
+
+    async def registrar_fallo(self) -> bool:
+        """Cuenta el fallo. True si con él la cuenta o la IP quedaron bloqueadas."""
+        if self.limitador is None:
+            return False
+        bloqueada = False
+        for clave, maximo in self.reglas:
+            consumo = await self.limitador.consumir(clave, maximo, self.ventana_s)
+            bloqueada = bloqueada or consumo.usados >= maximo
+        return bloqueada
+
+    async def registrar_exito(self) -> None:
+        if self.limitador is not None:
+            await self.limitador.reiniciar(self.clave_cuenta)
+
+
+def _ahora() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _normalizar_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _respuesta(usuario_id: int, rol: Rol, token: str | None = None, **extra) -> dict:
+    return {
+        "access_token": token or fabricas().credenciales.emitir_token(usuario_id, rol.value),
+        "token_type": "bearer",
+        "rol": rol.value,
+        "usuario_id": usuario_id,
+        "expira_en_min": settings.AUTH_TOKEN_TTL_MIN,
+        **extra,
+    }
+
+
+class IniciarSesionUseCase:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    # ------------------------------------------------------------ HU-28: comunes
+    def _auditar_intento(self, tipo: str, entidad: str, entidad_id: int | None, motivo: str,
+                         accion: str = Accion.LOGIN_FALLIDO, **extra) -> None:
+        fabricas().bitacora(self.db).registrar(
+            accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ROL_ANONIMO,
+            resultado=RESULTADO_RECHAZADO, detalle={"tipo": tipo, "motivo": motivo, **extra},
+        )
+
+    async def _bloqueo_previo(self, proteccion: ProteccionInicioSesion, tipo: str, entidad: str) -> None:
+        try:
+            await proteccion.verificar()
+        except DemasiadosIntentosError:
+            self._auditar_intento(tipo, entidad, None, "demasiados_intentos", accion=Accion.LOGIN_BLOQUEADO)
+            await self.db.commit()
+            logger.warning("Inicio de sesión de %s bloqueado por intentos fallidos", tipo)
+            raise
+
+    async def _fallo(self, proteccion: ProteccionInicioSesion, tipo: str, entidad: str, entidad_id: int | None) -> None:
+        bloqueada = await proteccion.registrar_fallo()
+        self._auditar_intento(tipo, entidad, entidad_id, "credenciales", bloqueo_activado=bloqueada)
+        await self.db.commit()
+        logger.warning("Login de %s fallido", tipo)
+        raise CredencialesInvalidasError("Credenciales inválidas.")
+
+    async def admin(self, email: str, password: str, limitador: Limitador | None = None,
+                    ip: str | None = None) -> dict:
+        email = _normalizar_email(email)
+        proteccion = ProteccionInicioSesion(limitador, "admin", email, ip)
+        await self._bloqueo_previo(proteccion, "admin", "usuarios_admin")
+        admin = await fabricas().cuentas(self.db).admin_por_email(email)
+        if admin is None:
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
+            ok = False
+        else:
+            # PBKDF2 de 600.000 iteraciones: fuera del event loop
+            ok = await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", admin.password_hash) and admin.activo
+        if not ok:
+            await self._fallo(proteccion, "admin", "usuarios_admin", admin.id if admin else None)
+        await proteccion.registrar_exito()
+        ahora = _ahora()
+        token, sesion = await abrir_sesion(self.db, Rol.ADMIN_THERION.value, admin.id, ahora)
+        admin.ultimo_acceso = ahora
+        fabricas().bitacora(self.db).registrar(
+            accion=Accion.ADMIN_LOGIN, entidad="usuarios_admin", entidad_id=admin.id,
+            actor_rol=Rol.ADMIN_THERION.value, actor_id=admin.id, detalle={"sesion_id": sesion.id}, fecha=ahora,
+        )
+        await self.db.commit()
+        return _respuesta(admin.id, Rol.ADMIN_THERION, token)
+
+    async def auditor(self, email: str, password: str, limitador: Limitador | None = None,
+                      ip: str | None = None) -> dict:
+        """
+        HU-09: login del Auditor Externo (rol auditor_externo, solo lectura del audit_log).
+        Mismas protecciones que el admin (HU-28): intentos limitados, sesión revocable y cada
+        intento en el log. Una cuenta vencida o desactivada responde igual que una
+        contraseña incorrecta (no revela que la cuenta existe).
+        """
+        email = _normalizar_email(email)
+        proteccion = ProteccionInicioSesion(limitador, "auditor", email, ip)
+        await self._bloqueo_previo(proteccion, "auditor", "usuario_auditor")
+        auditor = await fabricas().cuentas(self.db).auditor_por_email(email)
+        ahora = _ahora()
+        if auditor is None:
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
+            ok = False
+        else:
+            ok = (await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", auditor.password_hash)
+                  and auditor.vigente(ahora))
+        if not ok:
+            await self._fallo(proteccion, "auditor", "usuario_auditor", auditor.id if auditor else None)
+        await proteccion.registrar_exito()
+        token, sesion = await abrir_sesion(self.db, Rol.AUDITOR_EXTERNO.value, auditor.id, ahora)
+        # La sesión no dura más que la cuenta
+        if sesion.fecha_expiracion > auditor.fecha_expiracion:
+            sesion.fecha_expiracion = auditor.fecha_expiracion
+        auditor.ultimo_acceso = ahora
+        fabricas().bitacora(self.db).registrar(
+            accion=Accion.AUDITOR_LOGIN, entidad="usuario_auditor", entidad_id=auditor.id,
+            actor_rol=Rol.AUDITOR_EXTERNO.value, actor_id=auditor.id, detalle={"sesion_id": sesion.id}, fecha=ahora,
+        )
+        await self.db.commit()
+        return _respuesta(auditor.id, Rol.AUDITOR_EXTERNO, token,
+                          cuenta_vence=auditor.fecha_expiracion.isoformat(timespec="seconds"))
+
+    async def titular(self, usuario_temporal_id: int, email: str) -> dict:
+        usuario = await fabricas().cuentas(self.db).usuario_temporal(usuario_temporal_id)
+        valido = (
+            usuario is not None
+            and usuario.fecha_anonimizacion is None
+            and usuario.email is not None
+            and usuario.email.strip().lower() == _normalizar_email(email)
+            and (usuario.fecha_expiracion is None or usuario.fecha_expiracion >= date.today())
+        )
+        if valido:
+            # HU-19: el usuario anónimo de la encuesta pública entra solo con su clave
+            # (POST /api/auth/encuestado); su email opcional no lo convierte en "referente".
+            valido = not await fabricas().cuentas(self.db).tiene_evaluacion_publica(usuario.id)
+        if not valido:
+            raise CredencialesInvalidasError(
+                "Credenciales inválidas o invitación expirada."
+            )
+        return _respuesta(usuario.id, Rol.REFERENTE)
+
+    async def encuestado(self, evaluacion_id: int, clave: str) -> dict:
+        evaluacion = await fabricas().cuentas(self.db).evaluacion(evaluacion_id)
+        almacenado = evaluacion.clave_acceso_hash if evaluacion else None
+        if almacenado is None:
+            fabricas().credenciales.verificar_password_senuelo(clave or "")  # mismo tiempo de respuesta
+            ok = False
+        else:
+            ok = verificar_clave(clave, almacenado)
+        if not ok:
+            logger.warning("Acceso de encuestado fallido (evaluacion=%s)", evaluacion_id)
+            raise CredencialesInvalidasError("Credenciales inválidas.")
+        return _respuesta(evaluacion.id, Rol.ENCUESTADO)
+
+    async def cliente(self, email: str, password: str, limitador: Limitador | None = None,
+                      ip: str | None = None) -> dict:
+        """HU-27/HU-28: login del usuario definitivo (rol cliente)."""
+        email = _normalizar_email(email)
+        proteccion = ProteccionInicioSesion(limitador, "cliente", email, ip)
+        await self._bloqueo_previo(proteccion, "cliente", "usuario_definitivo")
+        usuario = await fabricas().cuentas(self.db).usuario_definitivo_por_email(email)
+        if usuario is None or not usuario.password_hash:
+            # Mismo tiempo de respuesta exista o no (y aunque aún no active su cuenta)
+            await asyncio.to_thread(fabricas().credenciales.verificar_password_senuelo, password or "")
+            ok = False
+        else:
+            ok = await asyncio.to_thread(fabricas().credenciales.verificar_password, password or "", usuario.password_hash) and usuario.activo
+        if not ok:
+            await self._fallo(proteccion, "cliente", "usuario_definitivo", usuario.id if usuario else None)
+        await proteccion.registrar_exito()
+        # HU-30: sin contrato vigente el cliente SÍ entra (conserva lo gratuito, sus documentos
+        # en el plazo de gracia y sus derechos ARCOP); el servicio pagado responde 403
+        # CONTRATO_NO_VIGENTE. La respuesta trae la situación para que el frontend la muestre.
+        empresa = await fabricas().cuentas(self.db).empresa(usuario.empresa_id)
+        vigencia = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS) if empresa else None
+        ahora = _ahora()
+        token, sesion = await abrir_sesion(self.db, Rol.CLIENTE.value, usuario.id, ahora)
+        usuario.ultimo_acceso = ahora
+        fabricas().bitacora(self.db).registrar(
+            accion=Accion.CLIENTE_LOGIN, entidad="usuario_definitivo", entidad_id=usuario.id,
+            actor_rol=Rol.CLIENTE.value, actor_id=usuario.id,
+            detalle={"empresa_id": usuario.empresa_id, "sesion_id": sesion.id,
+                     "situacion_contrato": vigencia.situacion.value if vigencia else None}, fecha=ahora,
+        )
+        await self.db.commit()
+        return _respuesta(usuario.id, Rol.CLIENTE, token, empresa_id=usuario.empresa_id,
+                          contrato=vigencia.como_dict() if vigencia else None)

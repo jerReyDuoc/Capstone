@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from app.application.informes.analisis import (
+from app.domain.evaluacion.analisis_brechas import (
     SEVERIDADES,
     FiltrosBrechas,
     construir_brechas,

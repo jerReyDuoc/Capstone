@@ -1,0 +1,161 @@
+from datetime import date
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.models.dominio import Dominio
+from app.domain.models.respuesta import EstadoClasificacion
+from app.domain.models.resumen import Resumen
+from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
+from app.application.fabricas import fabricas
+
+
+# Puntajes por clasificación
+PUNTAJE_CUMPLIDO = 1.0
+PUNTAJE_PARCIAL = 0.5
+PUNTAJE_NO_CUMPLIDO = 0.0
+# Bloqueada por seguridad (posible prompt injection): cuenta como 0 y NO se excluye
+# del denominador, para que inyectar texto nunca pueda subir el puntaje.
+PUNTAJE_REQUIERE_REVISION = 0.0
+
+
+def nivel_madurez(puntaje: float) -> str:
+    """Traduce un puntaje 0-100 a un nivel cualitativo."""
+    if puntaje <= 25:
+        return "inicial"
+    if puntaje <= 50:
+        return "en_desarrollo"
+    if puntaje <= 75:
+        return "gestionado"
+    return "optimizado"
+
+
+class GenerarResumenUseCase:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self.repo = fabricas().cierre_evaluacion(session)
+
+    async def execute(self, evaluacion_id: int) -> dict:
+        # 1. Validar evaluación
+        evaluacion = await self.repo.obtener_evaluacion(evaluacion_id)
+        if not evaluacion:
+            raise ValueError(f"Evaluación {evaluacion_id} no encontrada")
+
+        # 2. Obtener respuestas del filtro y calcular controles aplicables
+        resp_filtro_repo = fabricas().respuestas_filtro(self.session)
+        respuestas_filtro = await resp_filtro_repo.list_by_evaluacion(evaluacion_id)
+        respuestas_filtro_dict = {
+            r.pregunta.codigo: r.respuesta
+            for r in respuestas_filtro
+            if r.pregunta is not None
+        }
+        # HU-24: el árbol de la versión de la matriz con que se respondió (la fija POST /completar
+        # antes de llamar aquí); si no tiene, el de la vigente. Así el recálculo por remediación
+        # (HU-17) de una evaluación cerrada no cambia de reglas aunque el admin publique otra.
+        version_id = getattr(evaluacion, "matriz_version_id", None)
+        arbol = None
+        dominio_de: dict[int, int | None] = {}
+        if version_id:
+            cache = fabricas().cache_matriz
+            arbol = await cache.arbol_de_version(self.session, version_id)
+            contenido = await cache.contenido_de_version(self.session, version_id) or {}
+            dominio_de = {int(c["id"]): c.get("dominio_id") for c in contenido.get("controles", [])}
+        if arbol is None:
+            arbol = await fabricas().cache_matriz.arbol_vigente(self.session)
+        codigos_aplicables = set(get_controles_aplicables(respuestas_filtro_dict, arbol))
+
+        # 3. Obtener todas las respuestas de la evaluación con sus controles
+        filas_respuesta = await self.repo.respuestas_con_control(evaluacion_id)
+        # HU-01: una respuesta por control. La BD ya lo garantiza (restricción única);
+        # por defensa, si llegaran duplicados solo cuenta la más reciente.
+        ultima_por_control = {}
+        for respuesta, control in filas_respuesta:
+            ultima_por_control[control.codigo_control] = (respuesta, control)
+        pares = list(ultima_por_control.values())
+
+        # 4. Filtrar a los que aplican y no son "no_aplica"
+        por_dominio: dict[int, list[dict]] = {}
+
+        for respuesta, control in pares:
+            if control.codigo_control not in codigos_aplicables:
+                continue
+
+            if respuesta.estado_clasificacion_final == EstadoClasificacion.NO_APLICA.value:
+                continue
+
+            # HU-24: la dimensión del control en ESA versión (el admin pudo moverlo después)
+            dominio_id = dominio_de.get(control.id_control, control.dominio_id) if dominio_de else control.dominio_id
+            if dominio_id is None:
+                continue
+
+            clasif = respuesta.estado_clasificacion_final or respuesta.estado_clasificacion
+            if clasif == EstadoClasificacion.CUMPLIDO.value:
+                puntaje = PUNTAJE_CUMPLIDO
+            elif clasif == EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value:
+                puntaje = PUNTAJE_PARCIAL
+            elif clasif == EstadoClasificacion.NO_CUMPLIDO.value:
+                puntaje = PUNTAJE_NO_CUMPLIDO
+            elif clasif == EstadoClasificacion.REQUIERE_REVISION.value:
+                puntaje = PUNTAJE_REQUIERE_REVISION
+            else:
+                continue
+
+            por_dominio.setdefault(dominio_id, []).append({
+                "clasificacion": clasif,
+                "puntaje": puntaje,
+            })
+
+        # 5. Reemplazar resúmenes previos
+        await self.repo.eliminar_resumenes(evaluacion_id)
+
+        # 6. Crear nuevos resúmenes por dominio
+        resumenes_creados = []
+        total_general_controles = 0
+        total_general_puntaje = 0.0
+
+        for dominio_id, items in por_dominio.items():
+            total_evaluados = len(items)
+            if total_evaluados == 0:
+                continue
+
+            suma = sum(i["puntaje"] for i in items)
+            puntaje_dominio = round((suma / total_evaluados) * 100, 2)
+            cumplidos = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.CUMPLIDO.value)
+            parciales = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value)
+            no_cumplidos = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.NO_CUMPLIDO.value)
+            en_revision = sum(1 for i in items if i["clasificacion"] == EstadoClasificacion.REQUIERE_REVISION.value)
+
+            resumen = Resumen(
+                evaluacion_id=evaluacion_id,
+                dominio_id=dominio_id,
+                puntaje_obtenido=puntaje_dominio,
+                nivel_madurez=nivel_madurez(puntaje_dominio),
+                total_controles_evaluados=total_evaluados,
+            )
+            self.repo.agregar_resumen(resumen)
+            resumenes_creados.append({
+                "dominio_id": dominio_id,
+                "puntaje": puntaje_dominio,
+                "nivel": nivel_madurez(puntaje_dominio),
+                "total_evaluados": total_evaluados,
+                "cumplidos": cumplidos,
+                "parciales": parciales,
+                "no_cumplidos": no_cumplidos,
+                "en_revision": en_revision,
+            })
+
+            total_general_controles += total_evaluados
+            total_general_puntaje += suma
+
+        # 7. Calcular puntaje general
+        puntaje_general = 0.0
+        if total_general_controles > 0:
+            puntaje_general = round((total_general_puntaje / total_general_controles) * 100, 2)
+
+        await self.session.commit()
+
+        return {
+            "evaluacion_id": evaluacion_id,
+            "puntaje_general": puntaje_general,
+            "nivel_madurez_general": nivel_madurez(puntaje_general),
+            "total_controles_evaluados": total_general_controles,
+            "dominios": resumenes_creados,
+        }

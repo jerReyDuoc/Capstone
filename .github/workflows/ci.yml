@@ -4,7 +4,7 @@
 # CI > Run workflow). GitHub corre todo en sus servidores: nadie tiene que ejecutar
 # nada en su computador.
 #
-#   backend    pytest con cobertura >= 70 % (.coveragerc) + SonarQube opcional
+#   backend    import-linter + pytest con cobertura >= 70 % (.coveragerc) + SonarQube opcional
 #   frontend   tipos de TypeScript (tsc) + pruebas vitest
 #   imagenes   construye las imágenes api y web (sin publicarlas) y comprueba que no
 #              llevan secretos adentro (.github/scripts/verificar_imagen.sh)
@@ -88,16 +88,20 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: Proyecto/backend/requirements.txt
+          cache-dependency-path: Proyecto/backend/requirements-dev.txt
 
       - name: Instalar dependencias (incluye spaCy + es_core_news_md)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           python -c "import spacy; spacy.load('es_core_news_md')"
 
+      # Contratos de arquitectura (.importlinter): capas, dominio puro, application sin I/O
+      - name: Revisar la regla de dependencias (import-linter)
+        run: lint-imports
+
       # Sin PostgreSQL, Redis ni Groq: la suite usa SQLite en memoria y dobles de prueba
-      # (tests/conftest.py). test_live_capa_ia.py se omite solo (no hay LIVE_BASE_URL).
+      # (tests/conftest.py). ia/test_live_capa_ia.py se omite solo (no hay LIVE_BASE_URL).
       - name: Ejecutar la suite con cobertura
         env:
           APP_ENV: test

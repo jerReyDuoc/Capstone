@@ -33,11 +33,11 @@ from enum import Enum
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.mantenedor_matriz import MantenedorMatrizUseCase, MatrizError
+from app.application.administracion.casos_uso.mantenedor_matriz import MantenedorMatrizUseCase, MatrizError
 from app.api.dependencias.alcance import solo_admin
 from app.domain.auth.actor import Actor
 from app.core.database import get_db
-from app.api.schemas.admin_matriz import (
+from app.api.schemas.admin_matriz_esquemas import (
     CrearBorradorRequest,
     RevisionRequest,
     DatosRequest,

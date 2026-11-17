@@ -15,7 +15,7 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel)
 
 
-class TipoErrorLLM(str, Enum):
+class TipoErrorLlm(str, Enum):
     TIMEOUT = "timeout"
     RATE_LIMIT = "rate_limit"
     AUTENTICACION = "autenticacion"
@@ -26,7 +26,7 @@ class TipoErrorLLM(str, Enum):
 
 
 @dataclass
-class LLMRequest(Generic[T]):
+class SolicitudLlm(Generic[T]):
     system: str
     user: str
     schema: type[T]
@@ -37,7 +37,7 @@ class LLMRequest(Generic[T]):
 
 
 @dataclass
-class LLMResponse(Generic[T]):
+class RespuestaLlm(Generic[T]):
     data: T
     proveedor: str
     modelo: str
@@ -46,18 +46,18 @@ class LLMResponse(Generic[T]):
     latencia_ms: float = 0.0
 
 
-class LLMProviderError(Exception):
-    def __init__(self, tipo: TipoErrorLLM, mensaje: str, latencia_ms: float = 0.0):
+class ProveedorLlmError(Exception):
+    def __init__(self, tipo: TipoErrorLlm, mensaje: str, latencia_ms: float = 0.0):
         super().__init__(mensaje)
         self.tipo = tipo
         self.latencia_ms = latencia_ms
 
 
-class LLMProviderPort(ABC):
+class ProveedorLlmPort(ABC):
     nombre: str = "desconocido"
     modelo_por_defecto: str = ""
 
     @abstractmethod
-    async def generar(self, request: LLMRequest[T]) -> LLMResponse[T]:
-        """Lanza LLMProviderError (con su tipo) ante cualquier fallo."""
+    async def generar(self, request: SolicitudLlm[T]) -> RespuestaLlm[T]:
+        """Lanza ProveedorLlmError (con su tipo) ante cualquier fallo."""
         ...

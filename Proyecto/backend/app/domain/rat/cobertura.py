@@ -10,8 +10,8 @@ cubren nada (ya no se realizan).
 """
 from __future__ import annotations
 
-from app.domain.mapa_datos.modelo import Flujo
-from app.domain.rat.modelo import completar
+from app.domain.mapa_datos.modelo_mapa import Flujo
+from app.domain.rat.modelo_actividad import completar
 
 ARCHIVADA = "archivada"
 

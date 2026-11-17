@@ -25,10 +25,10 @@ from types import SimpleNamespace
 from app.application.rat.asistente.contexto_asistente import clave_segura
 from app.application.ai.schemas.asistente_rat import AsistenteRatRespuesta, PropuestaIA
 from app.domain.catalogos import catalogo_tratamiento as cat
-from app.domain.mapa_datos import modelo as modelo_mapa
-from app.domain.mapa_datos.modelo import ErrorValidacion
+from app.domain.mapa_datos import modelo_mapa
+from app.domain.mapa_datos.modelo_mapa import ErrorValidacion
 from app.domain.rat import catalogo as cat_rat
-from app.domain.rat import modelo as modelo_rat
+from app.domain.rat import modelo_actividad as modelo_rat
 
 MAX_PROPUESTAS = 6
 MAX_EXPLICACIONES = 12

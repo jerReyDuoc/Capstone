@@ -52,8 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from sqlalchemy import delete, func, select  # noqa: E402
 
 from app.bootstrap import configurar  # noqa: E402
-
-configurar()  # raíz de composición (A-40)
+from app.core.contexto_auditoria import ORIGEN_CLI, fijar_origen_por_defecto  # noqa: E402
 
 ID_BASE = 990_000          # primer ID de ejemplo = ID_BASE + 1
 ID_TOPE = ID_BASE + 9_999  # rango reservado para la semilla
@@ -98,7 +97,7 @@ def _ahora() -> datetime:
 # ---------------------------------------------------------------- administrador
 async def sembrar_admin(session, email: str | None, password: str | None,
                         actualizar_clave: bool = False, iteraciones: int | None = None) -> str:
-    from app.infrastructure.security.cripto.autenticacion import hash_password
+    from app.infrastructure.security.cripto.contrasenas_y_tokens import hash_password
     from app.domain.models.usuario_admin import UsuarioAdmin
 
     if not email:
@@ -160,7 +159,7 @@ async def _verificar_catalogos(session) -> None:
 async def _crear_evaluacion(session, ev_id: int, rubro_id: int) -> None:
     from app.domain.matriz.arbol_aplicabilidad import get_controles_aplicables
     from app.application.informes.carga import version_matriz_vigente
-    from app.application.use_cases.generar_resumen import GenerateResumenUseCase
+    from app.application.evaluacion.casos_uso.generar_resumen import GenerarResumenUseCase
     from app.core.config import settings
     from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
     from app.domain.models.matriz_control import MatrizControl
@@ -169,7 +168,7 @@ async def _crear_evaluacion(session, ev_id: int, rubro_id: int) -> None:
     from app.domain.models.respuesta import EstadoClasificacion, FuenteClasificacion, Respuesta
     from app.domain.models.respuesta_filtro import RespuestaFiltro
     from app.domain.models.usuario_temporal import UsuarioTemporal
-    from app.infrastructure.cache.arbol_aplicabilidad import arbol_vigente
+    from app.infrastructure.cache.arbol_aplicabilidad_cache import arbol_vigente
 
     rng = random.Random(ev_id)  # determinista: misma semilla, mismos datos
     hoy = date.today()
@@ -226,17 +225,16 @@ async def _crear_evaluacion(session, ev_id: int, rubro_id: int) -> None:
         session.add(r)
 
     # Cierre igual que POST /completar: estado, fecha y versión de la matriz
-    evaluacion.estado_progreso = "completada"
-    evaluacion.fecha_completado = _ahora()
     vigente = (await session.execute(
         select(MatrizVersion.id, MatrizVersion.version_texto).where(MatrizVersion.estado == ESTADO_PUBLICADA)
     )).first()
     if vigente is not None:
-        evaluacion.matriz_version_id, evaluacion.version_matriz = vigente
+        matriz_version_id, version_matriz = vigente
     else:
-        evaluacion.version_matriz = await version_matriz_vigente(session)
+        matriz_version_id, version_matriz = None, await version_matriz_vigente(session)
+    evaluacion.cerrar(_ahora(), matriz_version_id, version_matriz)
     await session.flush()
-    await GenerateResumenUseCase(session).execute(ev_id)  # hace el commit
+    await GenerarResumenUseCase(session).execute(ev_id)  # hace el commit
 
 
 async def sembrar_evaluaciones(session, rubros: int, por_rubro: int, resultado: ResultadoSemilla) -> None:
@@ -292,7 +290,7 @@ async def eliminar_evaluaciones(session) -> int:
 async def ejecutar(session_factory, *, admin_email: str | None, admin_password: str | None,
                    rubros: int = 2, por_rubro: int = 10, actualizar_clave: bool = False,
                    eliminar: bool = False, iteraciones_hash: int | None = None) -> ResultadoSemilla:
-    from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
+    from app.application.benchmark.casos_uso.actualizar_benchmark import ActualizarBenchmarkUseCase
 
     resultado = ResultadoSemilla()
     async with session_factory() as session:
@@ -303,7 +301,7 @@ async def ejecutar(session_factory, *, admin_email: str | None, admin_password: 
                                                   actualizar_clave, iteraciones_hash)
             await sembrar_evaluaciones(session, rubros, por_rubro, resultado)
     async with session_factory() as session:
-        resultado.benchmark = await UpdateBenchmarkUseCase(session).execute()
+        resultado.benchmark = await ActualizarBenchmarkUseCase(session).execute()
     return resultado
 
 
@@ -341,5 +339,12 @@ def _argumentos(argv=None):
     return p.parse_args(argv)
 
 
+def main(argv=None) -> int:
+    args = _argumentos(argv)
+    configurar()  # raíz de composición (A-40)
+    fijar_origen_por_defecto(ORIGEN_CLI)
+    return asyncio.run(_main(args))
+
+
 if __name__ == "__main__":
-    sys.exit(asyncio.run(_main(_argumentos())))
+    sys.exit(main())

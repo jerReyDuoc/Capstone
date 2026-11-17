@@ -1,7 +1,7 @@
 """
 Dependencias FastAPI de autenticación y roles (punto ÚNICO de identidad de la API).
 
-Cómo se obtiene el token (app/api/routes/auth.py):
+Cómo se obtiene el token (app/api/routes/acceso.py):
   - Invitado:   POST /api/auth/titular     {usuario_temporal_id, email}
   - Encuestado: POST /api/auth/encuestado  {evaluacion_id, clave}
   - Admin:      POST /api/auth/login       {email, password}
@@ -14,7 +14,7 @@ contrato vigente), así desactivar a alguien corta su acceso
 sin esperar a que expire el token.
 
 Roles y Actor: app/domain/auth/actor.py. Firma y verificación del token:
-app/infrastructure/security/cripto/autenticacion.py.
+app/infrastructure/security/cripto/contrasenas_y_tokens.py.
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.auth.actor import Actor, Rol
-from app.infrastructure.security.cripto.autenticacion import TokenInvalidoError, verificar_token
+from app.infrastructure.security.cripto.contrasenas_y_tokens import TokenInvalidoError, verificar_token
 
 _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 
@@ -45,7 +45,7 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
     # imports locales: evitan ciclos (los modelos importan app.core.database)
     if actor.sid is not None:
         # HU-28: sesión cerrada (logout, cambio de contraseña) o vencida -> token sin efecto
-        from app.application.use_cases.sesiones import sesion_vigente
+        from app.application.cuentas.casos_uso.sesiones import sesion_vigente
         if not await sesion_vigente(db, actor):
             return False
     if actor.es_admin:
@@ -66,7 +66,7 @@ async def _sigue_habilitado(actor: Actor, db: AsyncSession) -> bool:
     if actor.es_auditor:
         # HU-09: cuenta activa y no vencida (desactivarla o que venza corta el acceso al instante)
         from datetime import datetime, timezone
-        from app.domain.models.auditoria_externa import UsuarioAuditor
+        from app.domain.models.auditoria_externa_modelo import UsuarioAuditor
         auditor = await db.get(UsuarioAuditor, actor.id)
         return bool(auditor and auditor.vigente(datetime.now(timezone.utc).replace(tzinfo=None)))
     from app.domain.models.usuario_temporal import UsuarioTemporal

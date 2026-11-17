@@ -1,5 +1,5 @@
 """
-AIGateway: capa de Políticas e IA entre la lógica de negocio y el proveedor LLM.
+GatewayIA: capa de Políticas e IA entre la lógica de negocio y el proveedor LLM.
 
 Pipeline de `ejecutar(tarea, textos, datos, contexto)`:
   1. Router        -> PoliticaTarea de la tarea (prompt, schema, límites).
@@ -9,7 +9,7 @@ Pipeline de `ejecutar(tarea, textos, datos, contexto)`:
                       sin los valores originales) se guarda en BD y no va al LLM.
                       Si no se puede guardar => se aborta.
   4. Prompt        -> plantilla versionada, construida SOLO con texto sanitizado.
-  5. Proveedor     -> LLMProviderPort (Groq hoy; intercambiable por config).
+  5. Proveedor     -> ProveedorLlmPort (Groq hoy; intercambiable por config).
   6. Validación    -> schema Pydantic (en el proveedor) + reglas post-salida (HU-07: en
                       evidencias, verificación sintáctica, de alucinaciones y de fuga de contexto).
   7. Métricas      -> una fila en llamadas_llm por ejecución, con éxito o error.
@@ -23,7 +23,7 @@ Reglas de negocio implementadas aquí:
   R2 El mapa de entidades se guarda en BD y no se envía al proveedor.
   R3 Si la sanitización falla se aborta y se registra el error.
   R4 Si el LLM falla se registra la métrica con exito=False y el tipo de error.
-  R5 Etiquetas fijas por tipo (responsabilidad del SanitizerPort).
+  R5 Etiquetas fijas por tipo (responsabilidad del SanitizadorPort).
   R6 SANITIZER_ENABLED=false desactiva la sanitización (solo debug; la config
      impide arrancar así en producción).
 """
@@ -40,14 +40,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.application.ai.politicas import TEXTOS_ENVIADOS, PoliticaTarea, TareaIA
-from app.domain.ports.proveedor_llm_port import LLMProviderError, LLMProviderPort, LLMRequest
+from app.domain.ports.proveedor_llm_port import ProveedorLlmError, ProveedorLlmPort, SolicitudLlm
 from app.domain.ports.registro_ia_port import (
     ContextoLlamada,
     RegistroIAPort,
     RegistroLlamada,
     RegistroSanitizacion,
 )
-from app.domain.ports.sanitizador_port import SanitizacionError, SanitizerPort
+from app.domain.ports.sanitizador_port import SanitizacionError, SanitizadorPort
 
 logger = logging.getLogger("capa_ia")
 
@@ -72,8 +72,8 @@ class AuditoriaNoDisponibleError(CapaIAError):
     tipo_error = "auditoria"
 
 
-class LLMNoDisponibleError(CapaIAError):
-    pass  # tipo_error = el TipoErrorLLM del proveedor
+class LlmNoDisponibleError(CapaIAError):
+    pass  # tipo_error = el TipoErrorLlm del proveedor
 
 
 @dataclass
@@ -104,11 +104,11 @@ class PreciosModelo:
 
 
 # ---------------------------------------------------------------- gateway
-class AIGateway:
+class GatewayIA:
     def __init__(
         self,
-        provider: LLMProviderPort,
-        sanitizer: SanitizerPort,
+        provider: ProveedorLlmPort,
+        sanitizer: SanitizadorPort,
         registro: RegistroIAPort,
         politicas: dict[TareaIA, PoliticaTarea],
         sanitizer_enabled: bool = True,
@@ -161,7 +161,7 @@ class AIGateway:
         # 5-6. Proveedor + validación de salida ------------------------------
         inicio = time.perf_counter()
         try:
-            respuesta = await self.provider.generar(LLMRequest(
+            respuesta = await self.provider.generar(SolicitudLlm(
                 system=prompt.system,
                 user=prompt.user,
                 schema=politica.schema,
@@ -170,7 +170,7 @@ class AIGateway:
                 max_tokens_salida=politica.max_tokens_salida,
                 timeout_s=politica.timeout_s,
             ))
-        except LLMProviderError as e:
+        except ProveedorLlmError as e:
             await self._metrica(
                 base, exito=False, tipo_error=e.tipo.value, detalle_error=str(e)[:300],
                 latencia_ms=e.latencia_ms or _ms(inicio), sanitizado=self.sanitizer_enabled,
@@ -179,7 +179,7 @@ class AIGateway:
             # El detalle viene del adaptador y nunca contiene texto del usuario.
             logger.error("LLM falló (tarea=%s, tipo=%s, traza=%s): %s",
                          tarea.value, e.tipo.value, traza_id, str(e)[:300])
-            raise LLMNoDisponibleError(
+            raise LlmNoDisponibleError(
                 f"El servicio de IA no respondió correctamente ({e.tipo.value}).", e.tipo.value
             ) from e
         except Exception as e:  # error no previsto del adaptador: también es R4
@@ -188,7 +188,7 @@ class AIGateway:
                 latencia_ms=_ms(inicio), sanitizado=self.sanitizer_enabled, entidades=n_entidades,
             )
             logger.exception("Error inesperado del proveedor LLM (traza=%s)", traza_id)
-            raise LLMNoDisponibleError("Error inesperado del servicio de IA.", "desconocido") from e
+            raise LlmNoDisponibleError("Error inesperado del servicio de IA.", "desconocido") from e
 
         # Reglas post-salida: reciben los datos confiables (p. ej. el tutor comprueba que
         # solo cite brechas del contexto entregado) y, desde HU-07, los textos tal como salieron

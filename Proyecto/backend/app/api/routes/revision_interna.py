@@ -36,7 +36,7 @@ from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.revision_interna import (
+from app.api.schemas.revision_interna_esquemas import (
     VerificacionEntrada,
     ObservacionEntrada,
     CierreEntrada,

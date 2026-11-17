@@ -33,11 +33,11 @@ from pydantic import BaseModel
 from app.application.ai.prompts import asistente_rat as prompt_asistente
 from app.application.ai.prompts import borrador as prompt_borrador
 from app.application.ai.prompts import tutor, validar_evidencia
-from app.application.ai.prompts.base import PromptRenderizado
+from app.application.ai.prompts.renderizado_prompt import PromptRenderizado
 from app.application.ai.verificacion_salida_evidencias import verificar_evidencia
 from app.application.ai.schemas.asistente_rat import AsistenteRatRespuesta
 from app.application.ai.schemas.borrador import BorradorIA
-from app.domain.evidencias.validacion import EvidenceValidation
+from app.domain.evidencias.validacion_evidencia import ValidacionEvidencia
 from app.application.ai.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 
 
@@ -90,12 +90,12 @@ def _prompt_validar_evidencia(textos: dict[str, str], datos: dict[str, Any]) -> 
     )
 
 
-def _validar_salida_evidencia(r: EvidenceValidation, datos: dict[str, Any] | None = None) -> list[str]:
+def _validar_salida_evidencia(r: ValidacionEvidencia, datos: dict[str, Any] | None = None) -> list[str]:
     """
     Reglas post-LLM que el schema no puede expresar. Generan advertencias auditables (quedan en
     llamadas_llm.advertencias). HU-07: verificación sintáctica, de alucinaciones (afirmaciones
     sin respaldo en lo que recibió el modelo) y de fuga de contexto. Aquí solo se REGISTRAN;
-    la decisión (revisión humana y alerta) la toma ProcessEvidenceUseCase con el mismo verificador.
+    la decisión (revisión humana y alerta) la toma ProcesarEvidenciaUseCase con el mismo verificador.
     """
     datos = datos or {}
     textos = datos.get(TEXTOS_ENVIADOS) or {}
@@ -229,7 +229,7 @@ def crear_politicas(
     return {
         TareaIA.VALIDAR_EVIDENCIA: PoliticaTarea(
             tarea=TareaIA.VALIDAR_EVIDENCIA,
-            schema=EvidenceValidation,
+            schema=ValidacionEvidencia,
             prompt_version=validar_evidencia.PROMPT_VERSION,
             construir_prompt=_prompt_validar_evidencia,
             campos_no_confiables={

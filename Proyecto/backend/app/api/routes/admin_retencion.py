@@ -20,8 +20,9 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.aplicar_retencion import ORIGEN_MANUAL, AplicarRetencionUseCase
-from app.application.use_cases.configurar_retencion import (
+from app.application.fabricas import fabricas
+from app.application.retencion.casos_uso.aplicar_retencion import ORIGEN_MANUAL, AplicarRetencionUseCase
+from app.application.retencion.casos_uso.configurar_retencion import (
     PlazoTitular,
     RetencionError,
     actualizar_plazo,
@@ -36,8 +37,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.domain.auditoria.acciones import Accion
 from app.infrastructure.repositories.retencion_repository import RetencionRepository
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.api.schemas.admin_retencion import CambioRetencion, PedidoEjecucion
+from app.api.schemas.admin_retencion_esquemas import CambioRetencion, PedidoEjecucion
 
 router = APIRouter(prefix="/api/admin/retencion", tags=["admin · retención (HU-25)"])
 
@@ -75,7 +75,7 @@ def _fila(f) -> dict:
 async def _estado(db: AsyncSession) -> dict:
     p = await plazo_titular_vigente(db)
     sin_vencimiento = await usuarios_sin_vencimiento(RetencionRepository(db))
-    bitacora = BitacoraRepository(db)
+    bitacora = fabricas().bitacora(db)
     ultimas, _ = await bitacora.listar(accion=Accion.RETENCION_EJECUCION, page=1, size=1)
     cambios, _ = await bitacora.listar(accion=Accion.RETENCION_CONFIGURACION, page=1, size=5)
     return {
@@ -160,5 +160,5 @@ async def ejecuciones(
     _: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    filas, total = await BitacoraRepository(db).listar(accion=Accion.RETENCION_EJECUCION, page=page, size=size)
+    filas, total = await fabricas().bitacora(db).listar(accion=Accion.RETENCION_EJECUCION, page=page, size=size)
     return {"items": [_fila(f) for f in filas], "total": total, "page": page, "size": size}

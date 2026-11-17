@@ -13,7 +13,7 @@ ilegible al NER y al LLM (hallazgo de la revisión del backlog, T-SM-54). Ahora:
                         aparecen en el texto, para mostrarlos y no gastar cuota del LLM en
                         archivos que no tienen nada que ver.
 
-Sin dependencias de FastAPI ni de la BD (se prueba sola en tests/test_hu17_remediacion.py).
+Sin dependencias de FastAPI ni de la BD (se prueba sola en tests/integracion/test_hu17_remediacion.py).
 """
 from __future__ import annotations
 

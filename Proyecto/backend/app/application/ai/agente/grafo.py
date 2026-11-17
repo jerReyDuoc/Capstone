@@ -19,14 +19,14 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from app.application.ai.agente import salida_tutor as validacion
-from app.application.ai.gateway import AIGateway, ResultadoIA
+from app.application.ai.gateway import GatewayIA, ResultadoIA
 from app.application.ai.politicas import TareaIA
 from app.domain.ports.filtro_agente_port import CategoriaAtaque, FiltroAgentePort, ResultadoFiltro
-from app.domain.ports.guardia_prompt_port import PromptGuardPort
+from app.domain.ports.guardia_prompt_port import GuardiaPromptPort
 from app.domain.ports.registro_ia_port import ContextoLlamada
 
 
-class SkillIA(str, Enum):
+class HabilidadIA(str, Enum):
     VALIDAR_EVIDENCIA = "validar_evidencia"
     TUTOR = "tutor"
     BORRADOR = "borrador"  # HU-16: adaptar un borrador de cumplimiento
@@ -42,10 +42,10 @@ NEUTRALIZAR_DOCUMENTO = "neutralizar_documento"
 
 
 @dataclass(frozen=True)
-class SpecSkill:
+class EspecHabilidad:
     tarea: TareaIA
     # Qué hace la guardia con cada campo no confiable. En evidencias no actúa: lo hace
-    # ProcessEvidenceUseCase (con MODO_SEGURIDAD_EVIDENCIA bloquear/marcar). En el tutor, el
+    # ProcesarEvidenciaUseCase (con MODO_SEGURIDAD_EVIDENCIA bloquear/marcar). En el tutor, el
     # mensaje se bloquea y los antecedentes guardados de la empresa se neutralizan (HU-18):
     # una justificación con inyección no debe impedir que el usuario use el tutor.
     campos: dict[str, str] = field(default_factory=dict)
@@ -57,15 +57,15 @@ class SpecSkill:
         return bool(self.campos)
 
 
-SKILLS: dict[SkillIA, SpecSkill] = {
-    SkillIA.VALIDAR_EVIDENCIA: SpecSkill(TareaIA.VALIDAR_EVIDENCIA),
-    SkillIA.TUTOR: SpecSkill(TareaIA.TUTOR, {"mensaje": BLOQUEAR, "antecedentes": NEUTRALIZAR}, canario=True),
+SKILLS: dict[HabilidadIA, EspecHabilidad] = {
+    HabilidadIA.VALIDAR_EVIDENCIA: EspecHabilidad(TareaIA.VALIDAR_EVIDENCIA),
+    HabilidadIA.TUTOR: EspecHabilidad(TareaIA.TUTOR, {"mensaje": BLOQUEAR, "antecedentes": NEUTRALIZAR}, canario=True),
     # HU-16: las instrucciones de la empresa se bloquean si traen un ataque (no se llama al NER
     # ni al LLM y el borrador se arma solo con la plantilla). Mismos estándares que el tutor (HU-18).
-    SkillIA.BORRADOR: SpecSkill(TareaIA.REDACTAR_BORRADOR, {"instrucciones": BLOQUEAR}, canario=True),
+    HabilidadIA.BORRADOR: EspecHabilidad(TareaIA.REDACTAR_BORRADOR, {"instrucciones": BLOQUEAR}, canario=True),
     # HU-39: la respuesta a la entrevista se bloquea si trae un ataque (sin NER ni LLM); el documento y
     # los nombres del mapa (texto guardado por la empresa) se neutralizan línea por línea.
-    SkillIA.ASISTENTE_RAT: SpecSkill(
+    HabilidadIA.ASISTENTE_RAT: EspecHabilidad(
         TareaIA.ASISTENTE_RAT,
         {"respuesta": BLOQUEAR, "documento": NEUTRALIZAR_DOCUMENTO, "mapa": NEUTRALIZAR},
         canario=True,
@@ -92,7 +92,7 @@ class EstadoAgente(TypedDict, total=False):
 
 @dataclass
 class SalidaAgente:
-    skill: SkillIA
+    skill: HabilidadIA
     resultado: ResultadoIA | None = None
     bloqueado: bool = False
     motivo: str | None = None              # HU-18: categoría del ataque (inyeccion, jailbreak...)
@@ -103,10 +103,10 @@ class SalidaAgente:
     salida_bloqueada: str | None = None    # la respuesta del LLM se reemplazó (fuga_canario, fuga_prompt)
 
 
-class _FiltroSoloGuard(FiltroAgentePort):
-    """Compatibilidad: sin filtro del agente, la guardia usa solo PromptGuardPort."""
+class _FiltroSoloGuardia(FiltroAgentePort):
+    """Compatibilidad: sin filtro del agente, la guardia usa solo GuardiaPromptPort."""
 
-    def __init__(self, guard: PromptGuardPort):
+    def __init__(self, guard: GuardiaPromptPort):
         self.guard = guard
 
     def evaluar(self, texto, previos=None) -> ResultadoFiltro:
@@ -122,7 +122,7 @@ def _deps(config: RunnableConfig) -> dict:
 
 async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
     """Revisa los textos no confiables ANTES del NER y del LLM (HU-18: por categoría de ataque)."""
-    spec = SKILLS[SkillIA(estado["skill"])]
+    spec = SKILLS[HabilidadIA(estado["skill"])]
     filtro: FiltroAgentePort | None = _deps(config).get("filtro")
     if not spec.guardia or filtro is None:
         return {"bloqueado": False}
@@ -138,7 +138,7 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
             if r.bloquear:
                 return {"bloqueado": True, "motivo": r.categoria.value, "regla": r.regla, "campo_bloqueado": campo}
         else:  # NEUTRALIZAR / NEUTRALIZAR_DOCUMENTO: línea por línea ("[REF] antecedente")
-            guard: PromptGuardPort | None = _deps(config).get("guard")
+            guard: GuardiaPromptPort | None = _deps(config).get("guard")
             lineas = []
             for linea in texto.splitlines():
                 if politica == NEUTRALIZAR_DOCUMENTO and guard is not None:
@@ -176,12 +176,12 @@ def _router(estado: EstadoAgente) -> str:
     """Router determinista: la skill la decide la lógica de negocio, no el modelo."""
     if estado.get("bloqueado"):
         return END
-    return SkillIA(estado["skill"]).value
+    return HabilidadIA(estado["skill"]).value
 
 
 async def _ejecutar_tarea(estado: EstadoAgente, config: RunnableConfig) -> dict:
-    gateway: AIGateway = _deps(config)["gateway"]
-    spec = SKILLS[SkillIA(estado["skill"])]
+    gateway: GatewayIA = _deps(config)["gateway"]
+    spec = SKILLS[HabilidadIA(estado["skill"])]
     resultado = await gateway.ejecutar(
         spec.tarea, textos=estado["textos"], datos=estado.get("datos") or {}, contexto=estado.get("contexto"),
     )
@@ -313,29 +313,29 @@ async def nodo_validar_borrador(estado: EstadoAgente, config: RunnableConfig) ->
 def construir_grafo():
     g = StateGraph(EstadoAgente)
     g.add_node("guardia", nodo_guardia)
-    g.add_node(SkillIA.VALIDAR_EVIDENCIA.value, nodo_validar_evidencia)
-    g.add_node(SkillIA.TUTOR.value, nodo_tutor)
-    g.add_node(SkillIA.BORRADOR.value, nodo_borrador)
+    g.add_node(HabilidadIA.VALIDAR_EVIDENCIA.value, nodo_validar_evidencia)
+    g.add_node(HabilidadIA.TUTOR.value, nodo_tutor)
+    g.add_node(HabilidadIA.BORRADOR.value, nodo_borrador)
     g.add_node("validar_borrador", nodo_validar_borrador)
-    g.add_node(SkillIA.ASISTENTE_RAT.value, nodo_asistente)
+    g.add_node(HabilidadIA.ASISTENTE_RAT.value, nodo_asistente)
     g.add_node("validar_asistente", nodo_validar_asistente)
     g.add_node("validar_salida", nodo_validar_salida)
     g.add_node("anclar_contexto", nodo_anclar_contexto)
     g.add_edge(START, "guardia")
     g.add_conditional_edges("guardia", _router, {
         END: END,
-        SkillIA.VALIDAR_EVIDENCIA.value: SkillIA.VALIDAR_EVIDENCIA.value,
-        SkillIA.TUTOR.value: SkillIA.TUTOR.value,
-        SkillIA.BORRADOR.value: SkillIA.BORRADOR.value,
-        SkillIA.ASISTENTE_RAT.value: SkillIA.ASISTENTE_RAT.value,
+        HabilidadIA.VALIDAR_EVIDENCIA.value: HabilidadIA.VALIDAR_EVIDENCIA.value,
+        HabilidadIA.TUTOR.value: HabilidadIA.TUTOR.value,
+        HabilidadIA.BORRADOR.value: HabilidadIA.BORRADOR.value,
+        HabilidadIA.ASISTENTE_RAT.value: HabilidadIA.ASISTENTE_RAT.value,
     })
-    g.add_edge(SkillIA.VALIDAR_EVIDENCIA.value, END)
-    g.add_edge(SkillIA.TUTOR.value, "validar_salida")
+    g.add_edge(HabilidadIA.VALIDAR_EVIDENCIA.value, END)
+    g.add_edge(HabilidadIA.TUTOR.value, "validar_salida")
     g.add_edge("validar_salida", "anclar_contexto")
     g.add_edge("anclar_contexto", END)
-    g.add_edge(SkillIA.BORRADOR.value, "validar_borrador")
+    g.add_edge(HabilidadIA.BORRADOR.value, "validar_borrador")
     g.add_edge("validar_borrador", END)
-    g.add_edge(SkillIA.ASISTENTE_RAT.value, "validar_asistente")
+    g.add_edge(HabilidadIA.ASISTENTE_RAT.value, "validar_asistente")
     g.add_edge("validar_asistente", END)
     return g.compile()
 
@@ -358,22 +358,22 @@ class AgenteIA:
     (CapaIAError: sanitización abortada, auditoría, LLM no disponible) salen tal cual.
     """
 
-    def __init__(self, gateway: AIGateway, guard: PromptGuardPort | None = None,
+    def __init__(self, gateway: GatewayIA, guard: GuardiaPromptPort | None = None,
                  filtro: FiltroAgentePort | None = None):
         self.gateway = gateway
         self.guard = guard
         # HU-18: el filtro del agente (infrastructure/security/prompt_injection/filtro_agente.py). Sin él, la
-        # guardia usa solo PromptGuardPort (comportamiento de HU-15).
-        self.filtro = filtro or (_FiltroSoloGuard(guard) if guard is not None else None)
+        # guardia usa solo GuardiaPromptPort (comportamiento de HU-15).
+        self.filtro = filtro or (_FiltroSoloGuardia(guard) if guard is not None else None)
 
     async def ejecutar(
         self,
-        skill: SkillIA,
+        skill: HabilidadIA,
         textos: dict[str, str | None],
         datos: dict[str, Any] | None = None,
         contexto: ContextoLlamada | None = None,
     ) -> SalidaAgente:
-        skill = SkillIA(skill)
+        skill = HabilidadIA(skill)
         estado: EstadoAgente = {
             "skill": skill.value, "textos": dict(textos), "datos": dict(datos or {}),
             "contexto": contexto or ContextoLlamada(), "bloqueado": False, "resultado": None,

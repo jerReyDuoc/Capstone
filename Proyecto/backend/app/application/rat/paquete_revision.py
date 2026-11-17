@@ -2,7 +2,7 @@
 HU-40 criterio 4 · Paquete de evidencia de una revisión interna (ZIP verificable con hash).
 
 Sigue el mismo esquema que la exportación del log inmutable para el Auditor Externo (HU-09,
-app/application/use_cases/auditoria_externa.py): archivos de lectura y de verificación, un manifiesto con
+app/application/auditoria/casos_uso/auditoria_externa.py): archivos de lectura y de verificación, un manifiesto con
 el SHA-256 de cada archivo y un script que lo comprueba todo con la librería estándar de Python, sin
 depender de la plataforma.
 

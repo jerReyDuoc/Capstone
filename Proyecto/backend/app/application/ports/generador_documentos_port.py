@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.application.formacion.constancia import DatosConstancia
+from app.application.formacion.datos_constancia import DatosConstancia
 from app.application.informes.datos_informe import DatosInforme
 from app.application.mapa_datos.informe_mapa import DatosInformeMapa
 from app.application.rat.constancia_revision import DatosConstancia as DatosConstanciaRevision
-from app.application.rat.informe_rat import InformeRat
-from app.application.ropa.informe_ropa import InformeRopa
+from app.application.rat.armado_informe_rat import InformeRat
+from app.application.ropa.armado_informe_ropa import InformeRopa
 
 MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

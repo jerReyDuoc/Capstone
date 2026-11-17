@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.domain.mapa_datos.modelo import Elemento, Flujo
-from app.domain.models.mapa_datos import MapaElemento, MapaFlujo
+from app.domain.mapa_datos.modelo_mapa import Elemento, Flujo
+from app.domain.models.mapa_datos_tablas import MapaElemento, MapaFlujo
 
 
 MAX_CAMBIOS_GUARDADOS = 500        # diferencias que se guardan por versión (el resto se cuenta)

@@ -35,12 +35,12 @@ el enlace solo va al correo del usuario definitivo.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.activacion_cuenta import ResultadoCorreo
-from app.application.use_cases.contratacion_empresa import (
+from app.application.cuentas.casos_uso.activacion_cuenta import ResultadoCorreo
+from app.application.contratacion.casos_uso.contratacion_empresa import (
     ContratacionError, DatosEmpresa, DatosUsuario, EmpresasClienteUseCase, SolicitudesContratacionUseCase,
 )
-from app.application.use_cases.migrar_evaluacion import EvaluacionMigrada, MigracionError
-from app.application.use_cases.gestionar_contrato import ContratoError, GestionarContratoUseCase, contrato_dict
+from app.application.evaluacion.casos_uso.migrar_evaluacion import EvaluacionMigrada, MigracionError
+from app.application.contratacion.casos_uso.gestionar_contrato import ContratoError, GestionarContratoUseCase, contrato_dict
 from app.api.dependencias.alcance import solo_admin
 from app.domain.auth.actor import Actor
 from app.core.config import settings
@@ -49,9 +49,9 @@ from app.domain.models.empresa import Empresa
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 from app.domain.auditoria.acciones import categoria
-from app.application.use_cases.panel_clientes import PanelClientesError, PanelClientesUseCase
+from app.application.administracion.casos_uso.panel_clientes import PanelClientesError, PanelClientesUseCase
 from app.infrastructure.repositories.panel_clientes_repository import PanelClientesRepository
-from app.api.schemas.admin_clientes import (
+from app.api.schemas.admin_clientes_esquemas import (
     CambiarEstadoRequest,
     AltaEmpresaRequest,
     AsociarRequest,
@@ -287,7 +287,7 @@ async def terminar_contrato(empresa_id: int, payload: MotivoContratoRequest,
 async def formacion_empresa(empresa_id: int, evaluacion_id: int | None = Query(None, ge=1),
                             _: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
     """HU-26: avance formativo de la empresa (lo mismo que ve el cliente en su panel)."""
-    from app.application.use_cases.formacion_empresa import FormacionError
+    from app.application.empresa.casos_uso.formacion_empresa import FormacionError
 
     try:
         return await PanelClientesUseCase(db, PanelClientesRepository(db)).formacion_empresa(

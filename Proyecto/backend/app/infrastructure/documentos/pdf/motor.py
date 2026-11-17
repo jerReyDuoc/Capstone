@@ -2,7 +2,7 @@
 Motor común de los informes PDF (HU-21, extendido por HU-36).
 
 Las piezas que comparten los informes que la empresa presenta a terceros, con la misma paleta,
-tipografía y pie que el informe de evaluación (app/infrastructure/documentos/pdf/informe_evaluacion.py):
+tipografía y pie que el informe de evaluación (app/infrastructure/documentos/pdf/informe_evaluacion_pdf.py):
 
   Estilos            estilos de párrafo (base, chico, gris, títulos, cabecera de tabla, cifras).
   lienzo()           Canvas que dibuja al final, cuando ya se sabe el total de páginas, la línea

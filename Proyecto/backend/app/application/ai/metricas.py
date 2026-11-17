@@ -175,13 +175,13 @@ def precision_clasificacion(pares: Iterable[tuple[str, str]], clases=CLASES) -> 
 
 # ---------------------------------------------------------------- precisión del NER
 @dataclass(frozen=True)
-class EntidadGold:
+class EntidadReferencia:
     tipo: str
     inicio: int
     fin: int
 
 
-def evaluar_ner(casos: Iterable[tuple[list[EntidadGold], list[EntidadGold]]]) -> dict:
+def evaluar_ner(casos: Iterable[tuple[list[EntidadReferencia], list[EntidadReferencia]]]) -> dict:
     """
     `casos` = [(gold, predichas)] por texto, con offsets sobre el mismo texto.
     Un acierto exige mismo tipo y solapamiento de rango. La cobertura ignora el tipo.

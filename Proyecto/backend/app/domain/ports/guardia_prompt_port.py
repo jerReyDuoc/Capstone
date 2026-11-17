@@ -10,14 +10,14 @@ PERFIL_EVIDENCIA = "evidencia"
 
 
 @dataclass(frozen=True)
-class ResultadoGuard:
+class ResultadoGuardia:
     """Resultado de la revisión. `regla` identifica la regla que disparó, sin texto del usuario."""
     bloquear: bool
     regla: str | None = None
     categoria: str | None = None
 
 
-class PromptGuardPort(ABC):
+class GuardiaPromptPort(ABC):
     """
     Capa de seguridad que se interpone entre el texto del usuario y el LLM
     (Prompt Injection + anonimización de datos personales, Ley 21.719).
@@ -31,13 +31,13 @@ class PromptGuardPort(ABC):
         """True si el texto parece un intento de prompt injection / jailbreak / XSS (revisión estricta)."""
         ...
 
-    def analizar(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> ResultadoGuard:
+    def analizar(self, texto: str, perfil: str = PERFIL_JUSTIFICACION) -> ResultadoGuardia:
         """
         HU-33: revisa el texto con el perfil indicado y dice qué regla disparó.
         Por defecto (implementaciones antiguas o dobles de prueba) aplica la revisión
         estricta de `detectar_inyeccion` y no informa la regla.
         """
-        return ResultadoGuard(bool(self.detectar_inyeccion(texto or "")))
+        return ResultadoGuardia(bool(self.detectar_inyeccion(texto or "")))
 
     @abstractmethod
     def anonimizar(self, texto: str) -> str:

@@ -2,7 +2,7 @@
 HU-18 · Puerto del filtro de entrada del agente de IA.
 
 El agente pasa por aquí TODO texto no confiable antes del NER y del LLM. A diferencia de
-PromptGuardPort (que solo responde "¿es inyección?"), este puerto dice QUÉ tipo de ataque
+GuardiaPromptPort (que solo responde "¿es inyección?"), este puerto dice QUÉ tipo de ataque
 es, para auditarlo y medirlo por categoría.
 """
 from abc import ABC, abstractmethod

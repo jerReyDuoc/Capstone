@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.asistente import AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion
-from app.domain.models.rat import RatActividad
+from app.domain.models.rat_modelo import RatActividad
 
 
 class AsistenteRatRepository:
@@ -77,3 +77,6 @@ class AsistenteRatRepository:
         return list((await self.session.execute(
             select(RatActividad).where(RatActividad.empresa_id == empresa_id).order_by(RatActividad.nombre)
         )).scalars().all())
+
+    def agregar(self, entidad: Any) -> None:
+        self.session.add(entidad)

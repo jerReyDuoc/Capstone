@@ -2,7 +2,7 @@
 Solicitudes de derechos ARCOP del titular de datos personales
 (Acceso, Rectificación, Supresión, Oposición, Portabilidad, Bloqueo).
 
-Roles (app/domain/auth/actor.py) y cómo obtener el token (app/api/routes/auth.py):
+Roles (app/domain/auth/actor.py) y cómo obtener el token (app/api/routes/acceso.py):
   referente      -> titular invitado (POST /api/auth/titular)
   encuestado     -> titular anónimo de la encuesta pública (POST /api/auth/encuestado)
   cliente        -> usuario de una empresa cliente (POST /api/auth/cliente). HU-30: con o sin
@@ -21,7 +21,7 @@ from app.domain.auth.actor import Actor, Rol
 from app.api.dependencias.autenticacion import requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.schemas.arcop_schemas import (
+from app.api.schemas.arcop_esquemas import (
     AportarInformacionARCOPRequest,
     CambiarEstadoARCOPRequest,
     CancelarSolicitudARCOPRequest,
@@ -33,14 +33,14 @@ from app.api.schemas.arcop_schemas import (
     SolicitudARCOPDetalleResponse,
     SolicitudARCOPResumenResponse,
 )
-from app.application.use_cases.gestionar_solicitud_arcop import (
+from app.application.arcop.casos_uso.gestionar_solicitud_arcop import (
     GestionarSolicitudARCOPUseCase,
     OperacionNoPermitidaError,
     SolicitudNoEncontradaError,
     TransicionInvalidaError,
     plazo_vencido,
 )
-from app.application.use_cases.exportar_datos_arcop import (
+from app.application.arcop.casos_uso.exportar_datos_arcop import (
     ExportacionNoDisponibleError,
     ExportarDatosARCOP,
 )
@@ -52,7 +52,7 @@ from app.domain.models.solicitud_arcop import (
 )
 from app.infrastructure.repositories.anonimizacion_repository import AnonimizacionRepository
 from app.infrastructure.repositories.solicitud_arcop_repository import SolicitudARCOPRepository
-from app.infrastructure.storage.local_storage import LocalFileStorage
+from app.infrastructure.storage.almacenamiento_local import AlmacenamientoLocal
 
 router = APIRouter(prefix="/api/arcop", tags=["arcop"])
 
@@ -67,7 +67,7 @@ def _use_case(db: AsyncSession) -> GestionarSolicitudARCOPUseCase:
     return GestionarSolicitudARCOPUseCase(
         SolicitudARCOPRepository(db),
         anonimizacion_repo=AnonimizacionRepository(db),
-        storage=LocalFileStorage(),
+        storage=AlmacenamientoLocal(),
         plazo_respuesta_dias=settings.ARCOP_PLAZO_RESPUESTA_DIAS,
         plazo_informacion_dias=settings.ARCOP_PLAZO_INFORMACION_DIAS,
         plazo_prorroga_dias=settings.ARCOP_PLAZO_PRORROGA_DIAS,

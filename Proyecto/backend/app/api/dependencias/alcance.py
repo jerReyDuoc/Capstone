@@ -23,7 +23,7 @@ no la evaluación, por la misma razón.
 Lo que es solo de Therion Labs (métricas de IA, eventos de seguridad, revisión humana,
 marcar evaluaciones de prueba) usa `solo_admin`: 401 sin token y 403 con otro rol.
 Catálogos, controles, la landing (encuesta pública) y el aviso legal siguen públicos.
-La matriz completa de cada endpoint está en tests/test_hu20_autorizacion.py.
+La matriz completa de cada endpoint está en tests/integracion/test_hu20_autorizacion.py.
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer

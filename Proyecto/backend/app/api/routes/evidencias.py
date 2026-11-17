@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencias.alcance import alcance_evidencia, alcance_respuesta
-from app.api.dependencias.cliente import ip_cliente
+from app.api.dependencias.identificacion_cliente import ip_cliente
 from app.core.database import get_db
-from app.application.use_cases.limites_encuesta import LimiteEncuestaError, LimitesEncuesta
+from app.application.encuesta_publica.casos_uso.limites_encuesta import LimiteEncuestaError, LimitesEncuesta
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.application.use_cases.subir_evidencia import UploadEvidenceUseCase
-from app.api.schemas.api_schemas import EvidenciaUploadResponse, EvidenciaDetalleResponse
-from app.application.use_cases.crear_respuesta import RespuestaRechazadaError
+from app.application.evidencias.casos_uso.subir_evidencia import SubirEvidenciaUseCase
+from app.api.schemas.comunes import EvidenciaUploadResponse, EvidenciaDetalleResponse
+from app.application.evaluacion.casos_uso.crear_respuesta import RespuestaRechazadaError
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
@@ -67,7 +67,7 @@ async def upload_evidencia(
             "mensaje": "El servidor no tiene configurado el cifrado de evidencias (ENTITY_MAP_KEY).",
         })
 
-    use_case = UploadEvidenceUseCase(
+    use_case = SubirEvidenciaUseCase(
         evidencia_repo, respuesta_repo, storage, EvaluacionRepository(db),
         anonimizador=crear_anonimizador(),  # HU-06: nombre de archivo sin PII
     )
@@ -89,7 +89,7 @@ async def upload_evidencia(
         raise
 
     # Encolar tarea en ARQ
-    await request.app.state.arq.enqueue_job("process_evidence_task", evidencia.id_evidencia)
+    await request.app.state.arq.enqueue_job("procesar_evidencia_task", evidencia.id_evidencia)
 
     return EvidenciaUploadResponse(
         id_evidencia=evidencia.id_evidencia,

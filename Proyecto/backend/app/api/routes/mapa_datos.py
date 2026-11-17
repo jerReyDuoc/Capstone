@@ -39,17 +39,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.fabricas import fabricas
 from app.application.informes import correo
 from app.domain.ports.correo_port import Adjunto, CorreoFallidoError, CorreoNoDisponibleError
-from app.application.use_cases.limites_encuesta import ventana_diaria
+from app.application.encuesta_publica.casos_uso.limites_encuesta import ventana_diaria
 from app.application.mapa_datos.casos_uso import MapaDatosCasos, MapaDatosError
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.catalogos import catalogo_tratamiento as cat
-from app.domain.mapa_datos import analisis
+from app.domain.mapa_datos import analisis_mapa as analisis
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
 from app.domain.auditoria.acciones import Accion
-from app.api.schemas.mapa_datos import (
+from app.api.schemas.mapa_datos_esquemas import (
     ElementoEntrada,
     FlujoEntrada,
     VersionEntrada,
@@ -241,8 +241,7 @@ async def descargar_informe(
     filtros = analisis.parsear_filtros(sensibles, nna, internacional, tercero, pais, tipo)
     datos = await _ejecutar(casos.datos_informe(filtros))
     contenido = _pdf(datos)
-    casos.registrar_informe(Accion.MAPA_INFORME_DESCARGADO, datos.version, filtros)
-    await db.commit()
+    await casos.registrar_informe(Accion.MAPA_INFORME_DESCARGADO, datos.version, filtros)
     return Response(content=contenido, media_type="application/pdf", headers={
         **_SIN_CACHE, "Content-Disposition": f'attachment; filename="{nombre_archivo(datos.version, datos.generado)}"',
         "X-Content-Type-Options": "nosniff",
@@ -294,8 +293,7 @@ async def enviar_informe(payload: EnviarInformeEntrada, cliente: ClienteConServi
         logger.warning("[mapa_datos] envío fallido empresa %s: %s", casos.empresa_id, e)
         raise error(502 if isinstance(e, CorreoFallidoError) else 503, "CORREO_FALLIDO",
                     "No pudimos enviar el correo. Inténtalo de nuevo en unos minutos o descarga el PDF.")
-    casos.registrar_informe(Accion.MAPA_INFORME_ENVIADO, datos.version, filtros, modo=modo,
-                            destino_propio=destino == casos.email_usuario)
-    await db.commit()
+    await casos.registrar_informe(Accion.MAPA_INFORME_ENVIADO, datos.version, filtros, modo=modo,
+                                  destino_propio=destino == casos.email_usuario)
     logger.info("[mapa_datos] informe v%s enviado a %s (%s)", datos.version, correo.enmascarar(destino), modo)
     return _json({"enviado": True, "destino": correo.enmascarar(destino), "modo": modo})

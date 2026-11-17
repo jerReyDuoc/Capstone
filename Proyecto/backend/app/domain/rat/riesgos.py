@@ -138,11 +138,11 @@ def evaluar(actividad_id: int, nombre: str, contenido: dict, mapa: dict, faltant
             sistemas_ia: list[dict] | None = None) -> RiesgoActividad:
     """
     `contenido`: lo que escribió la empresa (rat.modelo.completar). `mapa`: lo que la actividad toma del
-    mapa (las listas de rat.analisis.derivados o de la instantánea de una versión vigente).
+    mapa (las listas de rat.analisis_rat.derivados o de la instantánea de una versión vigente).
     `faltantes`: campos obligatorios vacíos (0 en una versión vigente).
     `sistemas_ia` (HU-38): sistemas con IA que usa la actividad; si no se indica se toman de
-    `mapa["sistemas_ia"]` (rat.analisis.derivados). Una instantánea no los guarda: el caso de uso los
-    calcula con el mapa actual (rat.analisis.sistemas_ia_en).
+    `mapa["sistemas_ia"]` (rat.analisis_rat.derivados). Una instantánea no los guarda: el caso de uso los
+    calcula con el mapa actual (rat.analisis_rat.sistemas_ia_en).
     """
     factores: list[Factor] = []
     tipos = mapa.get("tipos_datos") or []

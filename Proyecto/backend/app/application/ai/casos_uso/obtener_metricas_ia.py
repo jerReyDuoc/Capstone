@@ -1,0 +1,97 @@
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.application.ai.metricas import (
+    FilaLlamada, precision_clasificacion, resumen_operacion, resumen_tutor, resumen_verificacion,
+)
+from app.application.fabricas import fabricas
+from app.domain.models.evento_seguridad import OrigenEvento
+
+
+class ObtenerMetricasIAUseCase:
+    def __init__(self, session: AsyncSession, umbral_confianza: float):
+        self.session = session
+        self.umbral = umbral_confianza
+        self.repo = fabricas().metricas_ia(session)
+
+    async def execute(
+        self,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        tarea: str | None = None,
+        modelo: str | None = None,
+    ) -> dict:
+        llamadas = await self.repo.llamadas(desde, hasta, tarea, modelo)
+
+        filas = [FilaLlamada(
+            exito=l.exito, tipo_error=l.tipo_error, latencia_ms=l.latencia_ms,
+            tokens_entrada=l.tokens_entrada, tokens_salida=l.tokens_salida,
+            costo_estimado_usd=l.costo_estimado_usd, confianza=l.confianza,
+            advertencias=l.advertencias, sanitizado=l.sanitizado,
+        ) for l in llamadas]
+        operacion = resumen_operacion(filas, self.umbral)
+
+        # Precisión: última clasificación exitosa del LLM por respuesta vs. revisión humana
+        ids = {l.respuesta_id for l in llamadas if l.exito and l.respuesta_id and l.clasificacion}
+        pares = []
+        if ids:
+            revisadas = await self.repo.clasificaciones_revisadas(ids)
+            ultima: dict[int, str] = {}
+            for l in llamadas:  # ordenadas por fecha: la última gana
+                if l.exito and l.respuesta_id in revisadas and l.clasificacion:
+                    ultima[l.respuesta_id] = l.clasificacion
+            pares = [(pred, revisadas[rid]) for rid, pred in ultima.items()]
+
+        # Sanitización
+        sans = await self.repo.sanitizaciones(desde, hasta)
+        por_tipo: dict[str, int] = {}
+        for s in sans:
+            for t, n in (s.conteo_por_tipo or {}).items():
+                por_tipo[t] = por_tipo.get(t, 0) + n
+        fallos = operacion["errores_por_tipo"].get("sanitizacion", {}).get("cantidad", 0)
+
+        # HU-15: tutor (los bloqueos por inyección no llegan al LLM: salen de eventos_seguridad)
+        tutor = None
+        if tarea in (None, "tutor"):
+            # HU-18: eventos del tutor por categoría (los bloqueos del filtro nunca llegan al LLM)
+            por_categoria: dict[str, int] = {}
+            antecedentes = 0
+            for tipo_ev, origen, n in await self.repo.eventos_tutor(desde, hasta):
+                if origen == OrigenEvento.TUTOR_ANTECEDENTE.value:
+                    antecedentes += n
+                else:
+                    por_categoria[tipo_ev] = por_categoria.get(tipo_ev, 0) + n
+            no_mensajes = {"abuso_reiterado", "fuga_prompt_salida"}
+            bloqueados = sum(n for t, n in por_categoria.items() if t not in no_mensajes)
+            pares_tutor = [(f, l.clasificacion) for f, l in zip(filas, llamadas) if l.tarea == "tutor"]
+            tutor = resumen_tutor([f for f, _ in pares_tutor], [t for _, t in pares_tutor], bloqueados)
+            tutor["eventos_por_categoria"] = dict(sorted(por_categoria.items()))
+            tutor["antecedentes_neutralizados"] = antecedentes
+            tutor["salidas_bloqueadas"] = por_categoria.get("fuga_prompt_salida", 0)
+            tutor["advertencias_abuso"] = por_categoria.get("abuso_reiterado", 0)
+
+        # HU-07: verificación de la salida del modelo en la validación de evidencias
+        verificacion = None
+        if tarea in (None, "validar_evidencia"):
+            verificacion = resumen_verificacion([f for f, l in zip(filas, llamadas) if l.tarea == "validar_evidencia"])
+            alertas = await self.repo.alertas_salida_llm(desde, hasta)
+            verificacion["alertas_por_categoria"] = dict(sorted(alertas.items()))
+            verificacion["alertas_registradas"] = sum(alertas.values())
+
+        return {
+            "periodo": {"desde": desde, "hasta": hasta},
+            "verificacion_salida": verificacion,
+            "operacion_modelo": operacion,
+            "precision_modelo": precision_clasificacion(pares),
+            "tutor": tutor,
+            "sanitizacion": {
+                "textos_sanitizados": len(sans),
+                "fallos_sanitizacion": fallos,
+                "entidades_por_tipo": por_tipo,
+                "textos_truncados": sum(1 for s in sans if s.truncado),
+                "duracion_ms_promedio": (
+                    round(sum(s.duracion_ms for s in sans) / len(sans), 2) if sans else None
+                ),
+            },
+        }

@@ -115,7 +115,7 @@ def _vigente() -> _Catalogo | None:
 
 async def obtener(session: AsyncSession) -> _Catalogo:
     global _catalogo
-    from app.infrastructure.cache.arbol_aplicabilidad import version_vigente_id
+    from app.infrastructure.cache.arbol_aplicabilidad_cache import version_vigente_id
 
     version_id = await version_vigente_id(session)
     c = _vigente()

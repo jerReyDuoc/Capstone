@@ -6,8 +6,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.models.mapa_datos import MapaDatos, MapaElemento, MapaFlujo
-from app.domain.models.rat import RatActividad, RatActividadVersion
+from app.domain.models.mapa_datos_tablas import MapaDatos, MapaElemento, MapaFlujo
+from app.domain.models.rat_modelo import RatActividad, RatActividadVersion
 from app.domain.rat import catalogo as cat
 
 
@@ -71,3 +71,6 @@ class RegistroActividadesRepository:
         return (await self.session.execute(
             select(RatActividadVersion).where(RatActividadVersion.actividad_id == actividad_id,
                                               RatActividadVersion.numero == numero))).scalar_one_or_none()
+
+    def agregar(self, entidad: Any) -> None:
+        self.session.add(entidad)
