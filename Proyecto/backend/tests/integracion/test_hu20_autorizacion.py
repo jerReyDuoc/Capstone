@@ -635,6 +635,10 @@ RUTAS_CON_TOKEN_PROPIO = [
      {"json": {}}),
     ("POST", "/api/asistente/propuestas/{propuesta_id}/descartar", "/api/asistente/propuestas/1/descartar",
      {"json": {}}),
+    # Asistente de registro como guía dentro del mapa de datos y del registro (flujo completo en
+    # tests/ia/test_guia_registro.py)
+    ("GET", "/api/asistente/guia", "/api/asistente/guia", {}),
+    ("POST", "/api/asistente/guia", "/api/asistente/guia", {"json": {"texto": "¿Qué es un flujo?"}}),
 ]
 
 
