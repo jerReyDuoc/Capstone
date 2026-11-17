@@ -10,6 +10,10 @@ HU-39 · Asistente de IA para el mapa de datos, el RAT y los informes (rol clien
   POST   /api/asistente/propuestas/{id}/aceptar       acepta (tal cual o editada) {payload?, version_mapa?}
   POST   /api/asistente/propuestas/{id}/descartar     descarta {motivo}
 
+  Guía dentro del mapa de datos y del registro de actividades (respuestas cortas, sin propuestas):
+  GET    /api/asistente/guia                          revisión del registro, conteos y cuota
+  POST   /api/asistente/guia                          responde una duda {texto, vista, historial}
+
 Todas exigen usuario definitivo y contrato VIGENTE (empresa_con_servicio, HU-30): 401 sin sesión,
 403 para otros roles o sin servicio. Lo de otra empresa responde 404.
 """
@@ -27,7 +31,9 @@ from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.api.schemas.asistente_registro_rat_esquemas import NuevaSesion, CambioArea, Respuesta, Aceptacion, Descarte
+from app.api.schemas.asistente_registro_rat_esquemas import (
+    Aceptacion, CambioArea, Descarte, NuevaSesion, PreguntaGuia, Respuesta,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +100,22 @@ async def _ejecutar(corutina, status: int = 200):
 async def estado(cliente: ClienteConServicio = Depends(empresa_con_servicio), db: AsyncSession = Depends(get_db),
                  limitador: Limitador = Depends(obtener_limitador)):
     return await _ejecutar(_caso(db, cliente, None, limitador).estado())
+
+
+@router.get("/guia")
+async def resumen_guia(cliente: ClienteConServicio = Depends(empresa_con_servicio), db: AsyncSession = Depends(get_db),
+                       limitador: Limitador = Depends(obtener_limitador),
+                       servicios: ServiciosAsistente = Depends(obtener_servicios_asistente)):
+    return await _ejecutar(_caso(db, cliente, servicios, limitador).resumen_guia())
+
+
+@router.post("/guia")
+async def guiar(payload: PreguntaGuia, cliente: ClienteConServicio = Depends(empresa_con_servicio),
+                db: AsyncSession = Depends(get_db), limitador: Limitador = Depends(obtener_limitador),
+                servicios: ServiciosAsistente = Depends(obtener_servicios_asistente)):
+    """Una respuesta corta de guía. No crea ni modifica nada del mapa ni del registro."""
+    historial = [t.model_dump() for t in payload.historial]
+    return await _ejecutar(_caso(db, cliente, servicios, limitador).guiar(payload.texto, payload.vista, historial))
 
 
 @router.post("/sesiones", status_code=201)

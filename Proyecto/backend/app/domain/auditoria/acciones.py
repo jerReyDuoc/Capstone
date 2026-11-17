@@ -160,6 +160,8 @@ class Accion:
     ASISTENTE_PROPUESTA_ACEPTADA = "asistente.propuesta_aceptada"
     ASISTENTE_PROPUESTA_EDITADA = "asistente.propuesta_editada"      # aceptada con cambios del usuario
     ASISTENTE_PROPUESTA_DESCARTADA = "asistente.propuesta_descartada"
+    ASISTENTE_GUIA_CONSULTA = "asistente.guia_consulta"              # detalle: vista, motivo_sin_ia, huella
+    ASISTENTE_GUIA_BLOQUEADA = "asistente.guia_bloqueada"            # filtro de entrada o salida (HU-18)
     # HU-41: registro de tratamiento de la propia plataforma (RAT y RoPA de ComplianceAI). El detalle lleva
     # el tipo, la versión, si es oficial, conteos y prefijos de huellas; nunca los datos de contacto del RoPA.
     PLATAFORMA_INFORME_GENERADO = "plataforma.informe_generado"
@@ -309,6 +311,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.BORRADOR_INSTRUCCIONES_BLOQUEADAS: Categoria.SEGURIDAD,
     Accion.ASISTENTE_RESPUESTA_BLOQUEADA: Categoria.SEGURIDAD,   # HU-39
     Accion.ASISTENTE_SALIDA_BLOQUEADA: Categoria.SEGURIDAD,
+    Accion.ASISTENTE_GUIA_BLOQUEADA: Categoria.SEGURIDAD,
     # actividad del propio log
     Accion.AUDITORIA_CONSULTA: Categoria.AUDITORIA,
     Accion.AUDITORIA_VERIFICACION: Categoria.AUDITORIA,

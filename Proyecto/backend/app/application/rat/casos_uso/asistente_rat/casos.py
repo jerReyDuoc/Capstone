@@ -7,12 +7,13 @@ from app.application.ai.anonimizador import AnonimizadorPII
 from app.application.rat.casos_uso.asistente_rat.conversacion import ConversacionMixin
 from app.application.rat.casos_uso.asistente_rat.decisiones import DecisionesMixin
 from app.application.rat.casos_uso.asistente_rat.documentos import DocumentosMixin
+from app.application.rat.casos_uso.asistente_rat.guia import GuiaMixin
 from app.application.rat.casos_uso.asistente_rat.sesion_asistente import SesionMixin
 from app.application.fabricas import fabricas
 from app.domain.ports.limitador_port import Limitador
 
 
-class AsistenteRat(SesionMixin, ConversacionMixin, DocumentosMixin, DecisionesMixin):
+class AsistenteRat(SesionMixin, ConversacionMixin, DocumentosMixin, DecisionesMixin, GuiaMixin):
     """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
     def __init__(self, db: AsyncSession, cliente, agente=None, anonimizador: AnonimizadorPII | None = None,

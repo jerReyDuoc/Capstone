@@ -186,14 +186,10 @@ const REGLAS: Regla[] = [
   { metodo: "GET", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}\/paquete$/, binario: true, tipos: TIPOS_PAQUETE_REVISION, timeoutMs: 90_000 },
   { metodo: "POST", patron: /^registro-actividades\/revision\/revisiones\/\d{1,9}\/enviar$/, timeoutMs: 90_000 },
   { metodo: "POST", patron: /^registro-actividades\/revision\/paquetes\/verificacion$/, archivo: true, timeoutMs: 60_000 },
-  // Asistente de registro: entrevista guiada, documentos y propuestas que el usuario acepta o descarta.
-  // Responder y analizar un documento llaman al servicio de IA: más tiempo.
-  { metodo: "GET", patron: /^asistente$/ },
-  { metodo: "POST", patron: /^asistente\/sesiones$/ },
-  { metodo: "POST", patron: /^asistente\/sesiones\/\d{1,9}\/(area|cerrar)$/ },
-  { metodo: "POST", patron: /^asistente\/sesiones\/\d{1,9}\/respuestas$/, timeoutMs: 90_000 },
-  { metodo: "POST", patron: /^asistente\/documentos$/, archivo: true, timeoutMs: 120_000 },
-  { metodo: "POST", patron: /^asistente\/propuestas\/\d{1,9}\/(aceptar|descartar)$/, timeoutMs: 30_000 },
+  // Asistente de registro: guía dentro del mapa de datos y del registro de actividades (respuestas cortas,
+  // sin propuestas). Preguntar llama al servicio de IA: más tiempo.
+  { metodo: "GET", patron: /^asistente\/guia$/ },
+  { metodo: "POST", patron: /^asistente\/guia$/, timeoutMs: 90_000 },
 ];
 
 const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;

@@ -10,6 +10,7 @@
  *
  * Los sistemas, bases de datos, terceros y flujos se eligen del mapa de datos: lo que cambie en el
  * mapa se refleja aquí y devuelve a revisión las actividades que lo usan.
+ * El asistente de registro (botón flotante) orienta con respuestas cortas y revisa el registro en simple.
  * Es parte del servicio contratado: sin contrato vigente, la página lo explica.
  */
 import Link from "next/link";
@@ -17,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useEspacioEmpresa } from "@/components/empresa/EspacioEmpresaContexto";
+import { GuiaRegistro } from "@/components/empresa/guia/GuiaRegistro";
 import { Dialogo } from "@/components/empresa/mapa/Dialogos";
 import ms from "@/components/empresa/mapa/mapa.module.css";
 import { ErrorBff } from "@/lib/encuesta/cliente";
@@ -206,6 +208,16 @@ export function RegistroActividades() {
     </div>
   ) : null;
 
+  // Asistente de registro: guía corta y revisión simple, sin salir de esta vista
+  const guia = (
+    <GuiaRegistro vista="registro" acciones={{
+      abrirActividad: (id) => {
+        setPasoInicial(undefined);
+        setAbierta(id);
+      },
+    }} />
+  );
+
   /* ---------------------------------------------------- detalle */
   if (abierta !== null) {
     return (
@@ -234,6 +246,7 @@ export function RegistroActividades() {
           }}
         />
         {avisoFlotante}
+        {guia}
       </div>
     );
   }
@@ -394,6 +407,7 @@ export function RegistroActividades() {
         />
       ) : null}
       {avisoFlotante}
+      {guia}
     </div>
   );
 }

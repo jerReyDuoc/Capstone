@@ -1,0 +1,88 @@
+/* =====================================================================
+   Asistente de registro (panel dentro del mapa de datos y del registro de actividades).
+   El panel, la conversación y el composer usan los estilos del tutor IA (formacion/tutor.module.css);
+   aquí solo va lo propio: el botón flotante, las pestañas y la revisión del registro.
+   Solo tokens de app/globals.css.
+   ===================================================================== */
+
+/* ---------- Botón flotante ---------- */
+.lanzador {
+  position: fixed; right: var(--sp-6); bottom: var(--sp-6); z-index: 40;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 6px var(--accent-glow);
+}
+@media (max-width: 640px) { .lanzador { right: var(--sp-4); bottom: var(--sp-4); } }
+@media print { .lanzador { display: none; } }
+
+/* ---------- Pestañas ---------- */
+.pestanas {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1);
+  margin: var(--sp-3) var(--sp-5) 0; padding: 3px;
+  border: 1px solid var(--line-control); border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+.pestanas button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 36px; padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--radius-pill); background: transparent;
+  font: inherit; font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; white-space: nowrap;
+}
+.pestanas button svg { width: 16px; height: 16px; }
+.pestanas button:hover { color: var(--text); }
+.pestanas button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.contador {
+  min-width: 20px; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--medio); color: var(--on-accent); font-size: var(--fs-xs); font-weight: 700; line-height: 20px;
+}
+
+/* ---------- Revisar mi registro ---------- */
+.revision {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; align-content: start; gap: var(--sp-4);
+  padding: var(--sp-5);
+}
+.resumen { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+
+.paso {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3);
+  padding: var(--sp-4); border: 1px solid var(--accent-strong); border-radius: var(--radius-md);
+  background: var(--accent-soft);
+}
+.paso > svg { width: 22px; height: 22px; color: var(--accent); }
+.paso > div { display: grid; gap: var(--sp-1); justify-items: start; }
+.paso p { margin: 0; }
+.pasoListo { border-color: var(--line-strong); background: var(--surface-2); }
+.pasoEtiqueta { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.pasoTitulo { font-weight: 600; }
+.pasoTexto { font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: var(--sp-2) !important; }
+
+.grupos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.grupo {
+  display: grid; gap: var(--sp-2);
+  padding: var(--sp-4); border: 1px solid var(--line-strong); border-left: 3px solid var(--medio);
+  border-radius: var(--radius-md); background: var(--surface-2);
+}
+.grupo[data-severidad="Crítica"] { border-left-color: var(--critico); }
+.grupo[data-severidad="Alta"] { border-left-color: var(--naranja); }
+.grupo p { margin: 0; }
+.grupoTitulo { display: flex; justify-content: space-between; gap: var(--sp-2); font-weight: 600; }
+.grupoCantidad {
+  flex: none; min-width: 24px; padding: 0 8px; border-radius: var(--radius-pill);
+  background: var(--surface-3); font-size: var(--fs-xs); line-height: 22px; text-align: center;
+}
+.queHacer { font-size: var(--fs-sm); color: var(--text-muted); }
+.detalle summary { cursor: pointer; font-size: var(--fs-xs); color: var(--accent); }
+.detalle ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.detalle li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-2); align-items: start;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.enlace {
+  border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline;
+}
+.grupoAcciones { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+@media (max-width: 640px) {
+  .pestanas { margin-inline: var(--sp-4); }
+  .revision { padding-inline: var(--sp-4); }
+}

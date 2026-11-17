@@ -31,6 +31,7 @@ class HabilidadIA(str, Enum):
     TUTOR = "tutor"
     BORRADOR = "borrador"  # HU-16: adaptar un borrador de cumplimiento
     ASISTENTE_RAT = "asistente_rat"  # HU-39: proponer mapa de datos y RAT
+    GUIA_REGISTRO = "guia_registro"  # guía corta dentro del mapa de datos y del registro (sin propuestas)
 
 
 BLOQUEAR = "bloquear"        # un ataque en el campo corta la ejecución (sin NER ni LLM)
@@ -68,6 +69,13 @@ SKILLS: dict[HabilidadIA, EspecHabilidad] = {
     HabilidadIA.ASISTENTE_RAT: EspecHabilidad(
         TareaIA.ASISTENTE_RAT,
         {"respuesta": BLOQUEAR, "documento": NEUTRALIZAR_DOCUMENTO, "mapa": NEUTRALIZAR},
+        canario=True,
+    ),
+    # La pregunta se bloquea si trae un ataque (sin NER ni LLM); la conversación anterior (la manda el
+    # navegador) y los nombres del registro se neutralizan línea por línea.
+    HabilidadIA.GUIA_REGISTRO: EspecHabilidad(
+        TareaIA.GUIA_REGISTRO,
+        {"mensaje": BLOQUEAR, "historial": NEUTRALIZAR, "registro": NEUTRALIZAR},
         canario=True,
     ),
 }
@@ -223,6 +231,21 @@ async def nodo_validar_asistente(estado: EstadoAgente, config: RunnableConfig) -
     return {"resultado": _resultado(resultado, limpio), "salida_bloqueada": bloqueada}
 
 
+async def nodo_guia(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    return await _ejecutar_tarea(estado, config)
+
+
+async def nodo_validar_guia(estado: EstadoAgente, config: RunnableConfig) -> dict:
+    """Misma revisión de salida que el tutor (HU-18) y, siempre, una respuesta corta."""
+    from app.application.ai.prompts.guia_registro import SYSTEM
+    from app.application.rat.asistente import salida_guia
+
+    resultado: ResultadoIA = estado["resultado"]
+    canario = (estado.get("datos") or {}).get("canario")
+    limpio, bloqueada = salida_guia.aplicar(resultado.data, salida_guia.problemas(resultado.data, canario, SYSTEM))
+    return {"resultado": _resultado(resultado, limpio), "salida_bloqueada": bloqueada}
+
+
 def _resultado(base: ResultadoIA, data) -> ResultadoIA:
     return ResultadoIA(
         data=data, traza_id=base.traza_id, prompt_version=base.prompt_version, modelo=base.modelo,
@@ -319,6 +342,8 @@ def construir_grafo():
     g.add_node("validar_borrador", nodo_validar_borrador)
     g.add_node(HabilidadIA.ASISTENTE_RAT.value, nodo_asistente)
     g.add_node("validar_asistente", nodo_validar_asistente)
+    g.add_node(HabilidadIA.GUIA_REGISTRO.value, nodo_guia)
+    g.add_node("validar_guia", nodo_validar_guia)
     g.add_node("validar_salida", nodo_validar_salida)
     g.add_node("anclar_contexto", nodo_anclar_contexto)
     g.add_edge(START, "guardia")
@@ -328,6 +353,7 @@ def construir_grafo():
         HabilidadIA.TUTOR.value: HabilidadIA.TUTOR.value,
         HabilidadIA.BORRADOR.value: HabilidadIA.BORRADOR.value,
         HabilidadIA.ASISTENTE_RAT.value: HabilidadIA.ASISTENTE_RAT.value,
+        HabilidadIA.GUIA_REGISTRO.value: HabilidadIA.GUIA_REGISTRO.value,
     })
     g.add_edge(HabilidadIA.VALIDAR_EVIDENCIA.value, END)
     g.add_edge(HabilidadIA.TUTOR.value, "validar_salida")
@@ -337,6 +363,8 @@ def construir_grafo():
     g.add_edge("validar_borrador", END)
     g.add_edge(HabilidadIA.ASISTENTE_RAT.value, "validar_asistente")
     g.add_edge("validar_asistente", END)
+    g.add_edge(HabilidadIA.GUIA_REGISTRO.value, "validar_guia")
+    g.add_edge("validar_guia", END)
     return g.compile()
 
 

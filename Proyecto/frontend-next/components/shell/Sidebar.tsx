@@ -59,8 +59,7 @@ const BORRADORES: Item = { ruta: "/empresa/borradores", etiqueta: "Borradores", 
 // Mapa de datos personales del cliente (servicio contratado): va en "Privacidad", antes de sus derechos.
 const MAPA_DATOS: Item = { ruta: "/empresa/mapa-datos", etiqueta: "Mapa de datos", icono: "mapa" };
 
-// Asistente que guía a armar el mapa y el registro con propuestas que el usuario confirma (servicio contratado).
-const ASISTENTE: Item = { ruta: "/empresa/asistente", etiqueta: "Asistente de registro", icono: "chispa" };
+// El asistente de registro no tiene entrada propia: vive dentro del mapa de datos y del registro de actividades.
 
 // Registro de actividades de tratamiento (servicio contratado): se arma sobre el mapa de datos.
 const REGISTRO_ACTIVIDADES: Item = { ruta: "/empresa/registro-actividades", etiqueta: "Registro de actividades", icono: "lista" };
@@ -149,7 +148,6 @@ export function Sidebar() {
         <nav className="nav" aria-labelledby="nav-privacidad">
           <p className="nav-heading" id="nav-privacidad">Privacidad</p>
           <ul className="nav-list">
-            {modo === "cliente" ? enlace(ASISTENTE) : null}
             {modo === "cliente" ? enlace(MAPA_DATOS) : null}
             {modo === "cliente" ? enlace(REGISTRO_ACTIVIDADES) : null}
             {enlace(MIS_DERECHOS[modo])}

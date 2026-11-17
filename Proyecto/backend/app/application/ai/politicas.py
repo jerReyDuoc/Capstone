@@ -20,6 +20,8 @@ Tareas registradas:
                      de LLM, Aviso de privacidad, PIA) al rubro y a las brechas de la empresa.
   ASISTENTE_RAT      HU-39: interpreta la entrevista guiada o un documento de la empresa y propone
                      elementos y flujos del mapa y actividades del RAT (el usuario las confirma).
+  GUIA_REGISTRO      el asistente de registro como guía dentro del mapa de datos y del registro de
+                     actividades: respuestas cortas, sin armar ni proponer registros.
 """
 from __future__ import annotations
 
@@ -32,11 +34,13 @@ from pydantic import BaseModel
 
 from app.application.ai.prompts import asistente_rat as prompt_asistente
 from app.application.ai.prompts import borrador as prompt_borrador
+from app.application.ai.prompts import guia_registro as prompt_guia
 from app.application.ai.prompts import tutor, validar_evidencia
 from app.application.ai.prompts.renderizado_prompt import PromptRenderizado
 from app.application.ai.verificacion_salida_evidencias import verificar_evidencia
 from app.application.ai.schemas.asistente_rat import AsistenteRatRespuesta
 from app.application.ai.schemas.borrador import BorradorIA
+from app.application.ai.schemas.guia_registro import GuiaRegistroRespuesta
 from app.domain.evidencias.validacion_evidencia import ValidacionEvidencia
 from app.application.ai.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 
@@ -51,6 +55,7 @@ class TareaIA(str, Enum):
     TUTOR = "tutor"  # HU-15
     REDACTAR_BORRADOR = "redactar_borrador"  # HU-16
     ASISTENTE_RAT = "asistente_rat"  # HU-39
+    GUIA_REGISTRO = "guia_registro"  # asistente de registro como guía en el mapa y el registro
 
 
 def _sin_advertencias(_r: BaseModel, _datos: dict[str, Any] | None = None) -> list[str]:
@@ -200,6 +205,27 @@ def _etiqueta_asistente(r: AsistenteRatRespuesta) -> str:
     return "fuera_de_alcance" if r.fuera_de_alcance else f"propuestas:{len(r.propuestas)}"
 
 
+# ---------------------------------------------------------------- GUIA_REGISTRO
+def _prompt_guia(textos: dict[str, str], datos: dict[str, Any]) -> PromptRenderizado:
+    return prompt_guia.construir(
+        mensaje=textos.get("mensaje") or "",
+        historial=textos.get("historial") or "",
+        registro=textos.get("registro") or "",
+        contexto=datos["contexto"],
+        canario=datos.get("canario"),
+    )
+
+
+def _validar_salida_guia(r: GuiaRegistroRespuesta, datos: dict[str, Any] | None = None) -> list[str]:
+    """Solo REGISTRA en la métrica; el nodo "validar_guia" del agente aplica las reglas."""
+    from app.application.rat.asistente.salida_guia import problemas
+    return problemas(r, (datos or {}).get("canario"), prompt_guia.SYSTEM)
+
+
+def _etiqueta_guia(r: GuiaRegistroRespuesta) -> str:
+    return "fuera_de_alcance" if r.fuera_de_alcance else "respuesta"
+
+
 def crear_politicas(
     *,
     max_chars_evidencia: int,
@@ -290,5 +316,23 @@ def crear_politicas(
             modelo=modelo_asistente or modelo,
             validar_salida=_validar_salida_asistente,
             etiqueta_metrica=_etiqueta_asistente,
+        ),
+        TareaIA.GUIA_REGISTRO: PoliticaTarea(
+            tarea=TareaIA.GUIA_REGISTRO,
+            schema=GuiaRegistroRespuesta,
+            prompt_version=prompt_guia.PROMPT_VERSION,
+            construir_prompt=_prompt_guia,
+            # Todo lo que escribió la empresa: su pregunta, la conversación anterior (la guarda el navegador)
+            # y los nombres de su registro. Pasan por el filtro del agente y por el NER del gateway.
+            campos_no_confiables={"mensaje": max_chars_respuesta_asistente,
+                                  "historial": 3000,
+                                  "registro": 3000},
+            # Respuestas cortas: pocos tokens de salida y más rápidas
+            max_tokens_salida=600,
+            timeout_s=timeout_asistente_s or timeout_s,
+            temperatura=0.2,
+            modelo=modelo_asistente or modelo,
+            validar_salida=_validar_salida_guia,
+            etiqueta_metrica=_etiqueta_guia,
         ),
     }

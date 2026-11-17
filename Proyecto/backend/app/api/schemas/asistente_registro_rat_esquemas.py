@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -24,3 +26,15 @@ class Aceptacion(BaseModel):
 
 class Descarte(BaseModel):
     motivo: str | None = Field(default=None, max_length=20)
+
+
+class TurnoGuia(BaseModel):
+    rol: Literal["usuario", "guia"]
+    texto: str = Field(max_length=4000)
+
+
+class PreguntaGuia(BaseModel):
+    texto: str = Field(max_length=8000)
+    vista: Literal["mapa", "registro"] = "mapa"
+    # La conversación anterior la guarda el navegador; llega como texto NO confiable
+    historial: list[TurnoGuia] = Field(default_factory=list, max_length=20)

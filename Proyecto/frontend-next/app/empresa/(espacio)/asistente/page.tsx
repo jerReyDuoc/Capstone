@@ -1,9 +1,9 @@
-/** /empresa/asistente — Asistente que guía para armar el mapa de datos, el registro de actividades y sus informes. */
-import type { Metadata } from "next";
-import { AsistenteRegistro } from "@/components/empresa/asistente/AsistenteRegistro";
-
-export const metadata: Metadata = { title: "Asistente de registro", robots: { index: false, follow: false } };
+/**
+ * /empresa/asistente — Ya no es una página propia: el asistente de registro vive dentro del mapa de datos y del
+ * registro de actividades. Los enlaces antiguos llevan al mapa con el asistente abierto.
+ */
+import { redirect } from "next/navigation";
 
 export default function PaginaAsistente() {
-  return <AsistenteRegistro />;
+  redirect("/empresa/mapa-datos?asistente=1");
 }

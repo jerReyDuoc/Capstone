@@ -12,6 +12,7 @@
  *   Riesgos       hallazgos priorizados y lo que falta completar.
  *   Sugerencias   propuestas según la evaluación y plantillas por rubro.
  *   Historial     versiones del mapa (cada cambio crea una) y la restauración.
+ *   Asistente     botón flotante con la guía de registro y la revisión simple (components/empresa/guia/).
  * Exporta a PDF (lo genera el servidor), a PNG y a CSV, y envía el informe por correo.
  *
  * Es parte del servicio contratado: sin contrato vigente, la página lo explica. Cada cambio
@@ -34,6 +35,7 @@ import {
   type PlantillaMapa, type SugerenciasApi, type TipoElemento, type VistaMapa,
 } from "@/lib/mapaDatos";
 import { useEspacioEmpresa } from "@/components/empresa/EspacioEmpresaContexto";
+import { GuiaRegistro } from "@/components/empresa/guia/GuiaRegistro";
 import { DialogoConfirmar, DialogoCorreo } from "./Dialogos";
 import { FormElemento } from "./FormElemento";
 import { FormFlujo } from "./FormFlujo";
@@ -791,6 +793,8 @@ export function MapaDatos() {
           </button>
         </div>
       ) : null}
+
+      <GuiaRegistro vista="mapa" acciones={{ abrirFlujo: (id) => abrirEdicion("flujo", id) }} />
     </div>
   );
 }
