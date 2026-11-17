@@ -25,7 +25,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.borradores import BorradorError, Borradores
@@ -33,6 +32,7 @@ from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.borradores import NuevoBorrador, EdicionBorrador, Consolidacion
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ async def obtener_servicios_borrador(
     from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
     from app.api.dependencias.contenedor import crear_agente, crear_anonimizador
     from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
     try:
         agente = crear_agente(sesion_ia)
@@ -102,18 +102,6 @@ async def listar(cliente: ClienteConServicio = Depends(empresa_con_servicio), db
     return _json(await _casos(db, cliente).listar())
 
 
-class NuevoBorrador(BaseModel):
-    tipo: str = Field(..., max_length=30, description="politica_llm | aviso_privacidad | pia")
-    # El largo real lo controla BORRADORES_MAX_CHARS_INSTRUCCIONES en el caso de uso; esto es un tope duro.
-    instrucciones: str | None = Field(None, max_length=20000,
-                                      description="Preferencias de redacción para el Agente IA (opcional)")
-    usar_ia: bool = Field(True, description="false = solo la plantilla y la evaluación, sin llamar al LLM")
-    evaluacion_id: int | None = Field(None, ge=1, description="Vacío = la evaluación más reciente de la empresa")
-    # HU-38: actividades del registro que evalúa la PIA (vacío = las que tienen la evaluación recomendada)
-    actividades: list[int] | None = Field(None, max_length=10,
-                                          description="Ids de actividades del registro para la PIA (opcional)")
-
-
 @router.post("", status_code=201)
 async def generar(
     payload: NuevoBorrador,
@@ -140,12 +128,6 @@ async def obtener(borrador_id: int, cliente: ClienteConServicio = Depends(empres
         raise _http(e)
 
 
-class EdicionBorrador(BaseModel):
-    # Tope duro; el real es BORRADORES_MAX_CHARS_CONTENIDO
-    contenido: str = Field(..., max_length=100000)
-    version: int = Field(..., ge=1, description="La versión que se editó (control de edición concurrente)")
-
-
 @router.patch("/{borrador_id}")
 async def editar(borrador_id: int, payload: EdicionBorrador,
                  cliente: ClienteConServicio = Depends(empresa_con_servicio), db: AsyncSession = Depends(get_db)):
@@ -169,11 +151,6 @@ async def descargar(borrador_id: int, formato: str = Query("pdf", max_length=5),
     return Response(content=contenido, media_type=mime, headers={
         **_SIN_CACHE, "Content-Disposition": f'attachment; filename="{nombre}"', "X-Content-Type-Options": "nosniff",
     })
-
-
-class Consolidacion(BaseModel):
-    version: int = Field(..., ge=1)
-    confirmar_pendientes: bool = Field(False, description="Consolidar aunque queden campos [COMPLETAR: ...]")
 
 
 @router.post("/{borrador_id}/consolidacion")

@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     # true  -> el motor NER anonimiza todo antes del LLM (obligatorio en producción)
     # false -> SOLO DEBUG: el texto va en claro al LLM. Prohibido si APP_ENV=production.
     SANITIZER_ENABLED: bool = True
-    # Clave maestra Fernet de los datos personales (ver app/infrastructure/security/cifrado.py).
+    # Clave maestra Fernet de los datos personales (ver app/infrastructure/security/cripto/cifrado.py).
     # De ella se derivan: las huellas HMAC del mapa de entidades, el cifrado de los
     # archivos de evidencia hasta que se anonimizan y el de los textos ARCOP (HU-06).
     # Generar con:
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # true reactiva el mapa cifrado (reversible) y debe documentarse como excepción.
     GUARDAR_MAPA_ENTIDADES_CIFRADO: bool = False
     # ------------------------------------------------ Autenticación de la API
-    # Secreto HMAC para firmar/verificar los tokens bearer (app/infrastructure/security/autenticacion.py).
+    # Secreto HMAC para firmar/verificar los tokens bearer (app/infrastructure/security/cripto/autenticacion.py).
     AUTH_SECRET: str | None = None
     AUTH_TOKEN_TTL_MIN: int = 480
     # ------------------------------------------------ Plazos de solicitudes ARCOP

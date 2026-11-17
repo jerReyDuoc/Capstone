@@ -6,7 +6,7 @@ abierta (sirve de vista previa y se puede llamar muchas veces). /completar es el
 cierre DEFINITIVO: verifica que el cuestionario esté terminado, genera el resumen
 y marca estado_progreso = 'completada' en la misma transacción. Desde ahí la
 evaluación no admite respuestas, cambios de filtro ni evidencias, y entra al
-benchmark (update_benchmark.py solo cuenta las 'completada').
+benchmark (actualizar_benchmark.py solo cuenta las 'completada').
 
 Condiciones para completar:
   1. La evaluación existe y no está cerrada.
@@ -23,13 +23,13 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.create_respuesta import (
+from app.application.use_cases.crear_respuesta import (
     EvaluacionCerradaError,
     EvaluacionNoEncontradaError,
     FiltroPendienteError,
     RespuestaRechazadaError,
 )
-from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.application.use_cases.generar_resumen import GenerateResumenUseCase
 from app.core.config import settings
 from app.application.fabricas import fabricas
 from app.application.use_cases.progreso_cuestionario import calcular_progreso

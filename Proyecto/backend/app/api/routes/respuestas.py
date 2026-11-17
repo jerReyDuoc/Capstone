@@ -2,47 +2,36 @@ import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencias.alcance import actor_opcional, alcance_respuesta, solo_admin, verificar_alcance
 from app.domain.auth.actor import Actor
 from app.core.database import get_db
-from app.application.use_cases.create_respuesta import (
+from app.application.use_cases.crear_respuesta import (
     CreateRespuestaUseCase,
     InyeccionDetectadaError,
     RespuestaRechazadaError,
     ResultadoRespuesta,
 )
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
-from app.application.schemas.api_schemas import RespuestaDetalleResponse, EvidenciaDetalleResponse
+from app.api.schemas.api_schemas import RespuestaDetalleResponse, EvidenciaDetalleResponse
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 from app.api.dependencias.contenedor import crear_anonimizador
 from app.domain.models.respuesta import DecisionRevision, EstadoClasificacion, FuenteClasificacion
 from app.domain.models.evaluacion import Evaluacion
 from app.application.ai.anonimizador import AnonimizacionError
-from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.application.use_cases.generar_resumen import GenerateResumenUseCase
 from app.application.seguridad.huella import huella
 from app.domain.auditoria.acciones import Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.api.schemas.respuestas import CreateRespuestaRequest, UpdateRespuestaRequest, RevisionRequest
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/respuestas", tags=["respuestas"])
-
-class CreateRespuestaRequest(BaseModel):
-    evaluacion_id: int
-    matriz_control_id: int
-    estado_clasificacion: str
-    justificacion: str
-
-
-class UpdateRespuestaRequest(BaseModel):
-    estado_clasificacion: str
-    justificacion: str
 
 
 def _use_case(db: AsyncSession, actor: Actor | None = None) -> CreateRespuestaUseCase:
@@ -168,11 +157,6 @@ async def get_respuesta(respuesta_id: int, db: AsyncSession = Depends(get_db)):
         fecha_validacion=respuesta.fecha_validacion,
         evidencias=evidencias,
     )
-
-class RevisionRequest(BaseModel):
-    clasificacion_revisada: str
-    # HU-22 criterio 2: confirmar o corregir SIEMPRE lleva un comentario del oficial
-    comentario: str | None = None
 
 
 # HU-22: largo del comentario de revisión (se valida a mano para responder {codigo, mensaje})

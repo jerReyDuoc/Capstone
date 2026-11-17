@@ -22,10 +22,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.fabricas import fabricas
 from app.application.informes import correo
+from app.domain.ports.correo_port import Adjunto, CorreoFallidoError, CorreoNoDisponibleError
 from app.application.informes.analisis import (
     ETIQUETA_MADUREZ,
     FiltrosBrechas,
@@ -36,9 +37,10 @@ from app.application.informes.analisis import (
     parsear_filtros,
     plan_a_dict,
 )
-from app.application.informes.informe import construir_informe, ficha_a_dict
+from app.application.informes.informe_evaluacion import construir_informe, ficha_a_dict
 from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
-from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf, nombre_archivo
+from app.application.informes.datos_informe import DatosInforme, nombre_archivo
+from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.use_cases.limites_encuesta import ventana_diaria
 from app.api.dependencias.alcance import alcance_evaluacion
 from app.domain.auth.actor import Actor
@@ -50,6 +52,7 @@ from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.informes import EnviarInformeRequest
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +79,7 @@ def _informe(datos: DatosEvaluacion, filtros: FiltrosBrechas) -> DatosInforme:
 
 def _pdf(informe: DatosInforme) -> bytes:
     try:
-        return generar_pdf(informe)
+        return fabricas().documentos.pdf_informe(informe)
     except PdfNoDisponibleError as e:
         raise _error(503, "PDF_NO_DISPONIBLE", str(e))
 
@@ -144,18 +147,6 @@ async def descargar_informe(
     )
 
 
-# ---------------------------------------------------------------------------- correo
-class EnviarInformeRequest(BaseModel):
-    # Encuestado: vacío = el correo que registró. Equipo interno: obligatorio.
-    email: str | None = Field(None, max_length=100)
-    # true = además guardarlo como su correo (HU-19: retomar / recibir informes)
-    recordar: bool = False
-    severidad: str | None = Field(None, max_length=80)
-    dominio: str | None = Field(None, max_length=80)
-    estado: str | None = Field(None, max_length=30)
-    q: str | None = Field(None, max_length=80)
-
-
 @router.post("/{evaluacion_id}/informe/enviar")
 async def enviar_informe(
     evaluacion_id: int,
@@ -209,17 +200,17 @@ async def enviar_informe(
             evaluacion_id, datos.puntaje_general, ETIQUETA_MADUREZ[nivel_madurez(datos.puntaje_general)],
             informe.brechas_total, conteo["Crítica"], informe.plan.modulos, informe.plan.horas,
         )
-        modo = await correo.enviar(
+        modo = await fabricas().correo.enviar(
             destino, f"Tu informe de diagnóstico · Evaluación #{evaluacion_id}", texto, html,
-            [correo.Adjunto(nombre_archivo(evaluacion_id, informe.generado), pdf)],
+            [Adjunto(nombre_archivo(evaluacion_id, informe.generado), pdf)],
         )
-    except (correo.CorreoFallidoError, correo.CorreoNoDisponibleError, HTTPException) as e:
+    except (CorreoFallidoError, CorreoNoDisponibleError, HTTPException) as e:
         for c in consumidas:
             await limitador.devolver(c)
         if isinstance(e, HTTPException):
             raise
         logger.warning("[informe] envío fallido evaluación %s: %s", evaluacion_id, e)
-        raise _error(502 if isinstance(e, correo.CorreoFallidoError) else 503, "CORREO_FALLIDO",
+        raise _error(502 if isinstance(e, CorreoFallidoError) else 503, "CORREO_FALLIDO",
                      "No pudimos enviar el correo. Inténtalo de nuevo en unos minutos o descarga el PDF.")
 
     if payload.recordar and actor is not None and actor.es_encuestado and usuario is not None:

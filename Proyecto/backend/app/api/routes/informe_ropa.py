@@ -21,12 +21,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.informe_ropa import InformeRopaCasos, InformeRopaError
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
+from app.api.schemas.informe_ropa import DatosEntrada, EmitirEntrada
 
 router = APIRouter(prefix="/api/registro-actividades/ropa", tags=["informe RoPA del registro (HU-37)"])
 
@@ -42,33 +42,6 @@ async def _ejecutar(coro):
         return await coro
     except InformeRopaError as e:
         raise HTTPException(status_code=e.status, detail={"codigo": e.codigo, "mensaje": e.mensaje, **e.extra})
-
-
-class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class MandanteEntrada(_Base):
-    clave: str = Field(..., min_length=1, max_length=150, description="Clave de la organización (la entrega el GET)")
-    direccion: str | None = Field(None, max_length=200)
-    correo: str | None = Field(None, max_length=100)
-    dpo: str | None = Field(None, max_length=150, description="Correo o cargo del delegado de protección de datos")
-
-
-class DatosEntrada(_Base):
-    direccion: str | None = Field(None, max_length=200)
-    correo: str | None = Field(None, max_length=100)
-    telefono: str | None = Field(None, max_length=25)
-    tiene_dpo: bool | None = None
-    dpo_cargo: str | None = Field(None, max_length=120)
-    dpo_correo: str | None = Field(None, max_length=100)
-    mandantes: list[MandanteEntrada] | None = Field(None, max_length=100)
-
-
-class EmitirEntrada(_Base):
-    partes: list[str] = Field(default_factory=list, max_length=2,
-                              description="responsable, encargado o ambas (vacío = todas las que tienen actividades)")
-    forzar: bool = Field(False, description="Emitir aunque nada haya cambiado desde la última emisión")
 
 
 def _partes_validas(partes: list[str] | None) -> list[str]:

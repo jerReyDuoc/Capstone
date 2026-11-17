@@ -146,7 +146,7 @@ if [ "$CON_SEED" = true ]; then
       --trigger-type Manual --replica-timeout 1800 --replica-retry-limit 0 --parallelism 1 \
       --replica-completion-count 1 \
       --image "$IMAGEN" --cpu 1 --memory 2Gi \
-      --command "python" --args "scripts/sembrar_staging.py" \
+      --command "python" --args "scripts/operacion/sembrar_staging.py" \
       "${REG_ARGS[@]}" \
       --secrets "${SECRETOS[@]}" \
       --env-vars "${VARS[@]}" -o none

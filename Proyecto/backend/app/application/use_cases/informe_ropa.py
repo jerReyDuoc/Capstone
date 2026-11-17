@@ -6,7 +6,7 @@ clientes, matrices o socios que piden ese formato sin rehacer el trabajo.
 
   C1  Se genera desde el RAT vigente sin ingresar los datos de nuevo: lee las actividades igual que el
       informe del registro (InformeRatCasos._fuentes) y traduce cada campo a los del RoPA
-      (app/application/ropa/informe.py). Solo entran las actividades con versión vigente.
+      (app/application/ropa/informe_ropa.py). Solo entran las actividades con versión vigente.
   C2  Dos partes según el rol marcado en cada actividad: como responsable y como encargado (agrupado por
       la organización por cuenta de la cual se actúa). Se puede generar solo una.
   C3  En español. Los datos que el RoPA pide y el registro no tiene (contacto de la empresa, delegado de
@@ -28,11 +28,12 @@ from datetime import datetime, time as dtime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.informes.motor_pdf import ZONA, PdfNoDisponibleError
-from app.application.rat import informe as I
-from app.application.ropa import informe as R
+from app.application.informes.formato import ZONA
+from app.application.ports.generador_documentos_port import MIME_XLSX, PdfNoDisponibleError, XlsxNoDisponibleError
+from app.application.rat import informe_rat as I
+from app.application.ropa import informe_ropa as R
 from app.application.use_cases.documentos_empresa import guardar_documento
-from app.application.use_cases.informe_rat import InformeRatCasos
+from app.application.rat.casos_uso.generar_informe import InformeRatCasos
 from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.mapa_datos.modelo import ErrorValidacion
@@ -242,12 +243,9 @@ class InformeRopaCasos:
         fila.codigo = R.codigo(fila.id, generado.astimezone(ZONA).year)
         inf = inf.con_emision(fila.codigo, version)
 
-        from app.application.ropa.pdf_ropa import generar_pdf_ropa
-        from app.application.ropa.xlsx_ropa import MIME_XLSX, XlsxNoDisponibleError, generar_xlsx_ropa
-
         try:
-            pdf, xlsx = await asyncio.gather(asyncio.to_thread(generar_pdf_ropa, inf),
-                                             asyncio.to_thread(generar_xlsx_ropa, inf))
+            pdf, xlsx = await asyncio.gather(asyncio.to_thread(fabricas().documentos.pdf_ropa, inf),
+                                             asyncio.to_thread(fabricas().documentos.xlsx_ropa, inf))
         except (PdfNoDisponibleError, XlsxNoDisponibleError) as e:
             await self.db.rollback()
             raise InformeRopaError(503, "INFORME_NO_DISPONIBLE", str(e))

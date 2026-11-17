@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from app.domain.ports.sanitizer_port import EntidadDetectada
+from app.domain.ports.sanitizador_port import EntidadDetectada
 
 
 @dataclass

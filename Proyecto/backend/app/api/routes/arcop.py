@@ -21,7 +21,7 @@ from app.domain.auth.actor import Actor, Rol
 from app.api.dependencias.autenticacion import requerir_rol
 from app.core.config import settings
 from app.core.database import get_db
-from app.application.schemas.arcop_schemas import (
+from app.api.schemas.arcop_schemas import (
     AportarInformacionARCOPRequest,
     CambiarEstadoARCOPRequest,
     CancelarSolicitudARCOPRequest,

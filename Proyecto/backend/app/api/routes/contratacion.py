@@ -20,7 +20,6 @@ La gestión (cambiar estado, alta de empresa y migración) está en /api/admin (
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,7 +38,8 @@ from app.core.database import get_db
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.infrastructure.security.captcha import ACCION_CONTRATACION, verificar_captcha
+from app.infrastructure.servicios_externos.captcha import ACCION_CONTRATACION, verificar_captcha
+from app.api.schemas.contratacion import CrearSolicitudRequest
 
 logger = logging.getLogger(__name__)
 
@@ -61,23 +61,6 @@ def _http(status: int, codigo: str, mensaje: str, reintentar_en_s: int | None = 
 
 def _error(e: ContratacionError) -> HTTPException:
     return _http(e.status_code, e.codigo, str(e), **e.extra)
-
-
-class ConsentimientoRequest(BaseModel):
-    version: str = Field(..., max_length=20)
-    aceptado: bool
-
-
-class CrearSolicitudRequest(BaseModel):
-    evaluacion_id: int = Field(..., ge=1)
-    nombre: str = Field(..., max_length=200)
-    cargo: str = Field(..., max_length=200)
-    empresa: str = Field(..., max_length=200)
-    email: str = Field(..., max_length=200)
-    telefono: str | None = Field(None, max_length=40)
-    consentimiento_contacto: ConsentimientoRequest
-    consentimiento_migracion: ConsentimientoRequest
-    captcha_token: str = Field("", max_length=2048)
 
 
 def _publica(s: SolicitudContratacion) -> dict:

@@ -44,7 +44,7 @@ HOY = date(2026, 10, 21)
 
 
 def _script_auditoria():
-    spec = importlib.util.spec_from_file_location("auditoria_t06", RAIZ / "scripts" / "auditoria_minimizacion.py")
+    spec = importlib.util.spec_from_file_location("auditoria_t06", RAIZ / "scripts" / "evaluacion" / "auditoria_minimizacion.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -182,7 +182,7 @@ def test_h1_supresion_del_encuestado_no_toca_al_invitado():
 # ------------------------------------------------------------------ 6. H2
 def test_h2_datos_extraidos_por_el_llm_no_se_persisten():
     from app.domain.evidencias.validacion import EvidenceValidation
-    from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+    from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
     from test_hu06_anonimizacion import _anon, _storage
     from test_seguridad_integracion import FakeEvidenciaRepo, FakeRespuestaRepo, _control, _respuesta
 
@@ -342,8 +342,8 @@ def test_r3_extracto_de_eventos_revisados_y_antiguos():
 # ------------------------------------------------------------------ H1 por la API (camino real)
 def test_h1_por_la_api_encuestado_deja_email_pide_supresion_y_el_email_se_borra(monkeypatch):
     """Landing -> email opcional -> solicitud de supresión -> el admin la resuelve -> sin email en BD."""
-    from _api_harness import MODO, cliente_api
-    import app.infrastructure.security.autenticacion as auth
+    from apoyo.api_harness import MODO, cliente_api
+    import app.infrastructure.security.cripto.autenticacion as auth
     from app.core.config import settings
     from app.core.database import get_db
     from app.infrastructure.cache.limitador import LimitadorMemoria, obtener_limitador

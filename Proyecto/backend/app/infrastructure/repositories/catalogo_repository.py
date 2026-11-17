@@ -6,6 +6,7 @@ from app.domain.models.dominio import Dominio
 from app.domain.models.rubro import Rubro
 from app.domain.models.ruta_formativa import RutaFormativa
 from app.domain.models.catalogo_brechas import CatalogoBrechas
+from app.domain.models.matriz_control import MatrizControl
 
 
 class CatalogoRepository:
@@ -43,3 +44,17 @@ class CatalogoRepository:
             .order_by(CatalogoBrechas.id_brecha)
         )
         return list(result.scalars().all())
+
+    async def list_controles(self, dominio_id: int | None = None, criticidad: str | None = None) -> list[MatrizControl]:
+        # HU-24: los retirados en una versión de la matriz no se listan (se conservan en la BD)
+        query = select(MatrizControl).where(MatrizControl.activo.is_(True)).order_by(MatrizControl.id_control)
+        if dominio_id is not None:
+            query = query.where(MatrizControl.dominio_id == dominio_id)
+        if criticidad is not None:
+            query = query.where(MatrizControl.criticidad == criticidad)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_control(self, control_id: int) -> MatrizControl | None:
+        result = await self.session.execute(select(MatrizControl).where(MatrizControl.id_control == control_id))
+        return result.scalar_one_or_none()

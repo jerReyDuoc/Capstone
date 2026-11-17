@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from app.domain.models.evento_seguridad import EventoSeguridad
-from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.guardia_prompt_port import PromptGuardPort
 
 logger = logging.getLogger("seguridad")
 

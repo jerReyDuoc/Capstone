@@ -1,5 +1,5 @@
 """
-Emisión de tokens de acceso (ver app/infrastructure/security/autenticacion.py).
+Emisión de tokens de acceso (ver app/infrastructure/security/cripto/autenticacion.py).
 
   - Admin:   email + contraseña contra usuarios_admin (hash PBKDF2).
   - Titular: usuario_temporal_id + email de la invitación; la invitación no debe

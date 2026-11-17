@@ -5,7 +5,7 @@ Emisión de tokens de acceso de prueba (solo desarrollo), sin pasar por el login
 import argparse
 
 from app.domain.auth.actor import Rol
-from app.infrastructure.security.autenticacion import emitir_token
+from app.infrastructure.security.cripto.autenticacion import emitir_token
 
 
 def main() -> None:

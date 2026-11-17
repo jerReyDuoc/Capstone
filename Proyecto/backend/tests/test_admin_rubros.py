@@ -9,7 +9,7 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import EVAL_ID, MODO, cliente_api, encabezados_qa  # noqa: E402
+from apoyo.api_harness import EVAL_ID, MODO, cliente_api, encabezados_qa  # noqa: E402
 
 api = pytest.mark.skipif(MODO == "live", reason="cambia el catálogo; solo en proceso")
 if MODO == "en_proceso":
@@ -55,7 +55,7 @@ def test_agregar_listar_renombrar_y_auditar():
 @api
 def test_rutas_de_rubros_solo_admin():
     from app.domain.auth.actor import Rol
-    from app.infrastructure.security.autenticacion import emitir_token
+    from app.infrastructure.security.cripto.autenticacion import emitir_token
 
     async def esc(c):
         rutas = [("GET", B, {}), ("POST", B, {"json": {"nombre": "Salud"}}),

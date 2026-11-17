@@ -10,7 +10,7 @@ Dos grupos de pruebas:
      corpus etiquetado. Son las que respaldan el criterio de aceptación de T-04.
 
 Ejecutar solo estas:  pytest tests/test_rendimiento_ner.py -v -s
-Benchmark detallado:  python scripts/benchmark_ner.py --paginas 100 --evidencia 8000 --perfil
+Benchmark detallado:  python scripts/evaluacion/benchmark_ner.py --paginas 100 --evidencia 8000 --perfil
 """
 import asyncio
 import json
@@ -20,14 +20,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from _capa_ia_fakes import StubNLP, crear_gateway, sanitizer_stub
-from _corpus_ner import CHARS_POR_PAGINA, pagina_etiquetada, paginas
+from apoyo.capa_ia_fakes import StubNLP, crear_gateway, sanitizer_stub
+from apoyo.corpus_ner import CHARS_POR_PAGINA, pagina_etiquetada, paginas
 from app.application.ai.metricas import EntidadGold, evaluar_ner
 from app.application.ai.politicas import TareaIA
 from app.domain.ports.registro_ia_port import ContextoLlamada
-from app.domain.ports.sanitizer_port import ResultadoSanitizacion, SanitizerPort
-from app.infrastructure.security import seguridad
-from app.infrastructure.security.ner_sanitizer import NERSanitizer
+from app.domain.ports.sanitizador_port import ResultadoSanitizacion, SanitizerPort
+from app.infrastructure.security.prompt_injection import seguridad
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
 
 LIMITE_POR_PAGINA_S = 2.0
 
@@ -154,7 +154,7 @@ def test_correo_con_tildes_se_anonimiza_completo():
 @pytest.fixture(scope="module")
 def nlp_real():
     pytest.importorskip("spacy")
-    from app.infrastructure.security.ner_sanitizer import cargar_spacy
+    from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
     try:
         return cargar_spacy()
     except OSError:

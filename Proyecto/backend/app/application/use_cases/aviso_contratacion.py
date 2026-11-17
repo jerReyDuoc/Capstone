@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
+from app.domain.ports.correo_port import CorreoFallidoError, CorreoNoDisponibleError
 from app.application.fabricas import fabricas
 from app.core.config import settings
 # HU-09: el audit_log admite ok / rechazado / error / omitido (CHECK en PostgreSQL); un aviso
@@ -84,11 +85,11 @@ async def avisar_nueva_solicitud(db: AsyncSession, solicitud: SolicitudContratac
             settings.CONTRATACION_BANDEJA_URL,
         )
         try:
-            modo = await correo.enviar(destino, asunto, texto, cuerpo_html, [])
+            modo = await fabricas().correo.enviar(destino, asunto, texto, cuerpo_html, [])
             resultado = ResultadoAviso(enviado=True, modo=modo)
-        except correo.CorreoNoDisponibleError:
+        except CorreoNoDisponibleError:
             resultado = ResultadoAviso(enviado=False, motivo="CORREO_NO_DISPONIBLE")
-        except (correo.CorreoFallidoError, ValueError) as e:
+        except (CorreoFallidoError, ValueError) as e:
             logger.warning("No se pudo enviar el aviso de contratación (%s)", type(e).__name__)
             resultado = ResultadoAviso(enviado=False, motivo="CORREO_FALLIDO")
 

@@ -32,7 +32,7 @@ un registro por titular (R1) y por solicitud ARCOP (R2), y uno por corrida con l
 y los ids afectados en R3 y R4.
 
 Lo ejecuta el worker una vez al día (app/worker/tasks.py) y se puede correr a mano en
-modo simulación con scripts/retencion_datos.py.
+modo simulación con scripts/operacion/retencion_datos.py.
 
 HU-25 (retención de usuarios temporales vencidos):
   - Criterio 1: el plazo de R1 lo fija el Oficial de Privacidad en /admin/retencion
@@ -86,7 +86,7 @@ ACTOR_SISTEMA = "sistema"
 # HU-25: quién disparó la ejecución
 ORIGEN_CRON = "cron"
 ORIGEN_MANUAL = "manual"     # el Oficial de Privacidad desde /admin/retencion
-ORIGEN_CLI = "cli"           # scripts/retencion_datos.py
+ORIGEN_CLI = "cli"           # scripts/operacion/retencion_datos.py
 ORIGENES = (ORIGEN_CRON, ORIGEN_MANUAL, ORIGEN_CLI)
 FUENTE_PARAMETRO = "parametro"  # plazos pasados al constructor (pruebas)
 

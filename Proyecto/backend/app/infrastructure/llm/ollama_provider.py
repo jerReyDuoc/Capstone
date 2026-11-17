@@ -23,7 +23,7 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from app.domain.ports.llm_provider_port import (
+from app.domain.ports.proveedor_llm_port import (
     LLMProviderError,
     LLMProviderPort,
     LLMRequest,

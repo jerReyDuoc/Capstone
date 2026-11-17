@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from html import escape
 
-from app.application.informes import motor_pdf as M
-from app.application.rat import informe as I
+from app.application.informes import formato as M
+from app.application.rat import informe_rat as I
 
 
 def asunto(inf: I.InformeRat) -> str:

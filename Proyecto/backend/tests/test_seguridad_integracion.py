@@ -14,15 +14,15 @@ from types import SimpleNamespace
 import pytest
 
 import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchemy)
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
-from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+from app.application.use_cases.crear_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
+from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.domain.evidencias.validacion import EvidenceValidation
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.core.config import settings
 from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 from app.application.ai.prompts.base import escapar_para_prompt
 
 RUT = "15.444.333-2"
@@ -208,7 +208,7 @@ def test_evidencia_con_inyeccion_no_llega_al_llm():
 def test_pii_se_anonimiza_antes_del_llm():
     # La anonimización ocurre en la capa de IA: se prueba con el gateway real y un
     # proveedor falso que guarda exactamente lo que habría salido hacia el LLM.
-    from _capa_ia_fakes import crear_validador
+    from apoyo.capa_ia_fakes import crear_validador
     contenido = f"Política aprobada. Responsable: RUT {RUT}, contacto {CORREO}."
     respuesta = _respuesta(f"La firmó el encargado, correo {CORREO}.")
     validator, gw = crear_validador()

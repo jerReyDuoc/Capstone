@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from _capa_ia_fakes import FakeProvider, FakeRegistro, crear_gateway
+from apoyo.capa_ia_fakes import FakeProvider, FakeRegistro, crear_gateway
 from app.application.ai.gateway import (
     AuditoriaNoDisponibleError,
     LLMNoDisponibleError,
@@ -25,9 +25,9 @@ from app.application.ai.gateway import (
 )
 from app.application.ai.politicas import TareaIA
 from app.application.ai.prompts import validar_evidencia
-from app.domain.ports.llm_provider_port import LLMProviderError, TipoErrorLLM
+from app.domain.ports.proveedor_llm_port import LLMProviderError, TipoErrorLLM
 from app.domain.ports.registro_ia_port import ContextoLlamada
-from app.infrastructure.security.ner_sanitizer import NERSanitizer
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
 
 PII = {
     "rut": "12.345.678-5",
@@ -222,8 +222,8 @@ def _proceso(validator, contenido=EVIDENCIA):
         FakeEvidenciaRepo, FakeRespuestaRepo, FakeStorage, _control as ctrl,
         _evidencia, _respuesta as resp,
     )
-    from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
     evidencia, respuesta = _evidencia(), resp(JUSTIFICACION)
     uc = ProcessEvidenceUseCase(
@@ -236,7 +236,7 @@ def _proceso(validator, contenido=EVIDENCIA):
 
 def test_caso_de_uso_sanitizacion_fallida_deja_evidencia_en_error():
     pytest.importorskip("sqlalchemy")
-    from _capa_ia_fakes import crear_validador
+    from apoyo.capa_ia_fakes import crear_validador
     validator, gw = crear_validador(sanitizer=NERSanitizer(lambda: None))
     evidencia, respuesta = _proceso(validator)
     assert gw.provider.requests == []
@@ -247,7 +247,7 @@ def test_caso_de_uso_sanitizacion_fallida_deja_evidencia_en_error():
 
 def test_caso_de_uso_error_llm_deja_evidencia_en_error_con_tipo():
     pytest.importorskip("sqlalchemy")
-    from _capa_ia_fakes import crear_validador
+    from apoyo.capa_ia_fakes import crear_validador
     validator, gw = crear_validador(
         provider=FakeProvider(error=LLMProviderError(TipoErrorLLM.RATE_LIMIT, "429")))
     evidencia, _ = _proceso(validator)
@@ -257,7 +257,7 @@ def test_caso_de_uso_error_llm_deja_evidencia_en_error_con_tipo():
 
 def test_caso_de_uso_exito_pasa_contexto_a_las_metricas():
     pytest.importorskip("sqlalchemy")
-    from _capa_ia_fakes import crear_validador
+    from apoyo.capa_ia_fakes import crear_validador
     validator, gw = crear_validador()
     evidencia, respuesta = _proceso(validator)
     assert evidencia.estado_validacion == "validated"

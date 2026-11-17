@@ -33,12 +33,14 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.fabricas import fabricas
 from app.application.informes import correo
+from app.domain.ports.correo_port import Adjunto, CorreoFallidoError, CorreoNoDisponibleError
 from app.application.use_cases.limites_encuesta import ventana_diaria
-from app.application.use_cases.mapa_datos import MapaDatosCasos, MapaDatosError
+from app.application.mapa_datos.casos_uso import MapaDatosCasos, MapaDatosError
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
@@ -47,6 +49,15 @@ from app.domain.mapa_datos import analisis
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
 from app.domain.auditoria.acciones import Accion
+from app.api.schemas.mapa_datos import (
+    ElementoEntrada,
+    FlujoEntrada,
+    VersionEntrada,
+    RevisionEntrada,
+    PlantillaEntrada,
+    AceptarSugerenciaEntrada,
+    EnviarInformeEntrada,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,44 +85,6 @@ async def _ejecutar(coro):
         raise _http(e)
 
 
-# ------------------------------------------------------------------ esquemas de entrada
-class _Base(BaseModel):
-    # Los campos desconocidos se rechazan: un error de tipeo no debe pasar en silencio
-    model_config = ConfigDict(extra="forbid")
-
-
-class ElementoEntrada(_Base):
-    version: int = Field(..., ge=0, description="Versión del mapa que vio el usuario")
-    tipo: str | None = Field(None, max_length=20)
-    subtipo: str | None = Field(None, max_length=30)
-    nombre: str | None = Field(None, max_length=200)
-    descripcion: str | None = Field(None, max_length=800)
-    proveedor: str | None = Field(None, max_length=200)
-    pais: str | None = Field(None, max_length=2)
-    responsable: str | None = Field(None, max_length=200)
-    categorias_datos: list[str] | None = Field(None, max_length=60)
-    categorias_titulares: list[str] | None = Field(None, max_length=60)
-    nna_declarado: bool | None = None
-    rol_tercero: str | None = Field(None, max_length=20)
-    contrato_firmado: bool | None = None
-    pendiente_revision: bool | None = None
-
-
-class FlujoEntrada(_Base):
-    version: int = Field(..., ge=0)
-    origen_id: int | None = Field(None, ge=1)
-    destino_id: int | None = Field(None, ge=1)
-    finalidad: str | None = Field(None, max_length=500)
-    categorias_datos: list[str] | None = Field(None, max_length=60)
-    categorias_titulares: list[str] | None = Field(None, max_length=60)
-    nna_declarado: bool | None = None
-    frecuencia: str | None = Field(None, max_length=20)
-    medio: str | None = Field(None, max_length=20)
-    cifrado: bool | None = None
-    garantia: str | None = Field(None, max_length=30)
-    pendiente_revision: bool | None = None
-
-
 def _datos(payload: BaseModel, editar: bool) -> dict:
     """Campos enviados (sin la versión). Al editar, solo lo que vino en el cuerpo (null = borrar el valor)."""
     datos = payload.model_dump(exclude_unset=editar)
@@ -119,37 +92,6 @@ def _datos(payload: BaseModel, editar: bool) -> dict:
     if not editar:
         datos = {k: v for k, v in datos.items() if v is not None}
     return datos
-
-
-class VersionEntrada(_Base):
-    version: int = Field(..., ge=0)
-
-
-class RevisionEntrada(_Base):
-    version: int = Field(..., ge=0)
-    todo: bool = False
-    elementos: list[int] | None = Field(None, max_length=2000)
-    flujos: list[int] | None = Field(None, max_length=5000)
-
-
-class PlantillaEntrada(_Base):
-    version: int = Field(..., ge=0)
-    codigo: str = Field(..., max_length=30)
-
-
-class AceptarSugerenciaEntrada(_Base):
-    version: int = Field(..., ge=0)
-    origen_id: int | None = Field(None, ge=1)
-
-
-class EnviarInformeEntrada(_Base):
-    email: str | None = Field(None, max_length=100, description="Vacío = el correo del usuario de la empresa")
-    sensibles: bool = False
-    nna: bool = False
-    internacional: bool = False
-    tercero: int | None = Field(None, ge=1)
-    pais: str | None = Field(None, max_length=2)
-    tipo: str | None = Field(None, max_length=20)
 
 
 # ------------------------------------------------------------------ catálogo y mapa
@@ -277,10 +219,10 @@ async def restaurar_version(numero: int, payload: VersionEntrada,
 
 # ------------------------------------------------------------------ informe (C3)
 def _pdf(datos) -> bytes:
-    from app.application.mapa_datos.pdf_mapa import PdfNoDisponibleError, generar_pdf_mapa
+    from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 
     try:
-        return generar_pdf_mapa(datos)
+        return fabricas().documentos.pdf_mapa_datos(datos)
     except PdfNoDisponibleError as e:
         raise HTTPException(status_code=503, detail={"codigo": "PDF_NO_DISPONIBLE", "mensaje": str(e)})
 
@@ -293,7 +235,7 @@ async def descargar_informe(
     cliente: ClienteConServicio = Depends(empresa_con_servicio), db: AsyncSession = Depends(get_db),
 ):
     """C3: informe PDF del mapa con los mismos filtros del mapa navegable."""
-    from app.application.mapa_datos.pdf_mapa import nombre_archivo
+    from app.application.mapa_datos.informe_mapa import nombre_archivo
 
     casos = _casos(db, cliente)
     filtros = analisis.parsear_filtros(sensibles, nna, internacional, tercero, pais, tipo)
@@ -311,7 +253,7 @@ async def descargar_informe(
 async def enviar_informe(payload: EnviarInformeEntrada, cliente: ClienteConServicio = Depends(empresa_con_servicio),
                          db: AsyncSession = Depends(get_db), limitador: Limitador = Depends(obtener_limitador)):
     """C3: envía el informe PDF del mapa por correo (por defecto, al correo del usuario de la empresa)."""
-    from app.application.mapa_datos.pdf_mapa import cuerpo_correo, nombre_archivo
+    from app.application.mapa_datos.informe_mapa import cuerpo_correo, nombre_archivo
 
     def error(status: int, codigo: str, mensaje: str, **extra):
         return HTTPException(status_code=status, detail={"codigo": codigo, "mensaje": mensaje, **extra})
@@ -342,15 +284,15 @@ async def enviar_informe(payload: EnviarInformeEntrada, cliente: ClienteConServi
         cuenta = analisis.contar_hallazgos(analisis.hallazgos(datos.elementos, datos.flujos))
         completitud = analisis.completitud(datos.elementos, datos.flujos)["porcentaje"]
         texto, html = cuerpo_correo(datos.razon_social, datos.version, res, cuenta, completitud)
-        modo = await correo.enviar(
+        modo = await fabricas().correo.enviar(
             destino, f"Mapa de datos personales · versión {datos.version}", texto, html,
-            [correo.Adjunto(nombre_archivo(datos.version, datos.generado), pdf)])
-    except (correo.CorreoFallidoError, correo.CorreoNoDisponibleError, HTTPException) as e:
+            [Adjunto(nombre_archivo(datos.version, datos.generado), pdf)])
+    except (CorreoFallidoError, CorreoNoDisponibleError, HTTPException) as e:
         await limitador.devolver(clave)
         if isinstance(e, HTTPException):
             raise
         logger.warning("[mapa_datos] envío fallido empresa %s: %s", casos.empresa_id, e)
-        raise error(502 if isinstance(e, correo.CorreoFallidoError) else 503, "CORREO_FALLIDO",
+        raise error(502 if isinstance(e, CorreoFallidoError) else 503, "CORREO_FALLIDO",
                     "No pudimos enviar el correo. Inténtalo de nuevo en unos minutos o descarga el PDF.")
     casos.registrar_informe(Accion.MAPA_INFORME_ENVIADO, datos.version, filtros, modo=modo,
                             destino_propio=destino == casos.email_usuario)

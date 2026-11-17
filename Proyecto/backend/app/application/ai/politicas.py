@@ -34,11 +34,11 @@ from app.application.ai.prompts import asistente_rat as prompt_asistente
 from app.application.ai.prompts import borrador as prompt_borrador
 from app.application.ai.prompts import tutor, validar_evidencia
 from app.application.ai.prompts.base import PromptRenderizado
-from app.application.ai.verificacion_salida import verificar_evidencia
-from app.application.schemas.asistente_rat import AsistenteRatRespuesta
-from app.application.schemas.borrador import BorradorIA
+from app.application.ai.verificacion_salida_evidencias import verificar_evidencia
+from app.application.ai.schemas.asistente_rat import AsistenteRatRespuesta
+from app.application.ai.schemas.borrador import BorradorIA
 from app.domain.evidencias.validacion import EvidenceValidation
-from app.application.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
+from app.application.ai.schemas.tutor import TipoRespuestaTutor, TutorRespuesta
 
 
 # HU-07: el gateway agrega a los datos de `validar_salida` los textos no confiables tal como
@@ -140,7 +140,7 @@ def _validar_salida_tutor(r: TutorRespuesta, datos: dict[str, Any] | None = None
         adv.append("respuesta_vacia")
     # HU-18: fugas del system prompt (canario, frases del prompt), código, enlaces y alcance.
     # Aquí solo se REGISTRAN en la métrica; el nodo "validar_salida" del agente las aplica.
-    from app.application.ai.agente.salida import problemas
+    from app.application.ai.agente.salida_tutor import problemas
     adv += problemas(r, (datos or {}).get("canario"), tutor.SYSTEM)
     # v1.1: números de artículo que no están en las fuentes del contexto (el modelo los inventaba)
     if datos and datos.get("contexto") is not None:
@@ -170,7 +170,7 @@ def _validar_salida_borrador(r: BorradorIA, datos: dict[str, Any] | None = None)
     """Solo REGISTRA en la métrica; el nodo "validar_borrador" del agente aplica las reglas."""
     if not datos or datos.get("plantilla") is None:
         return []
-    from app.application.borradores.salida_ia import problemas
+    from app.application.borradores.salida_borrador import problemas
     return problemas(r, plantilla=datos["plantilla"], contexto=datos["contexto"],
                      canario=datos.get("canario"), system_prompt=prompt_borrador.SYSTEM)
 
@@ -192,7 +192,7 @@ def _prompt_asistente(textos: dict[str, str], datos: dict[str, Any]) -> PromptRe
 
 def _validar_salida_asistente(r: AsistenteRatRespuesta, datos: dict[str, Any] | None = None) -> list[str]:
     """Solo REGISTRA en la métrica; el nodo "validar_asistente" del agente aplica las reglas."""
-    from app.application.asistente.salida_ia import problemas
+    from app.application.rat.asistente.salida_asistente import problemas
     return problemas(r, (datos or {}).get("canario"), prompt_asistente.SYSTEM)
 
 

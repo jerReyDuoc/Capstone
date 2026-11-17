@@ -8,9 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from app.application.fabricas import fabricas
 
 from app.application.informes.analisis import (
@@ -23,14 +21,7 @@ from app.application.informes.analisis import (
 from app.core.config import settings
 from app.domain.models.benchmark import Benchmark
 from app.domain.models.catalogo_brechas import CatalogoBrechas
-from app.domain.models.dominio import Dominio
-from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.matriz_control import MatrizControl
-from app.domain.models.respuesta import Respuesta
-from app.domain.models.resumen import Resumen
-from app.domain.models.rubro import Rubro
 from app.domain.models.ruta_formativa import RutaFormativa
-from app.domain.models.usuario_temporal import UsuarioTemporal
 
 
 class SinResultadosError(Exception):
@@ -70,19 +61,13 @@ async def version_matriz_vigente(db: AsyncSession) -> str:
     ("<etiqueta del admin>+<huella>"). Sin versiones guardadas, el cálculo de HU-21.
     """
     from app.application.informes.ficha import huella_matriz, version_matriz
-    from app.domain.models.matriz_version import ESTADO_PUBLICADA, MatrizVersion
 
-    texto = (await db.execute(
-        select(MatrizVersion.version_texto).where(MatrizVersion.estado == ESTADO_PUBLICADA)
-    )).scalar_one_or_none()
+    repo = fabricas().informes(db)
+    texto = await repo.version_publicada_texto()
     if texto:
         return texto
 
-    filas = (await db.execute(select(
-        MatrizControl.id_control, MatrizControl.codigo_control, MatrizControl.dominio_id,
-        MatrizControl.pregunta_evaluacion, MatrizControl.aplicabilidad, MatrizControl.criticidad,
-        MatrizControl.obligacion, MatrizControl.catalogo_brechas_id_brecha,
-    ))).all()
+    filas = await repo.filas_matriz_para_huella()
     return version_matriz(settings.MATRIZ_VERSION, huella_matriz(tuple(f) for f in filas))
 
 
@@ -142,19 +127,17 @@ def _brecha(b: CatalogoBrechas | None, rutas: dict[int, RutaCatalogo]) -> Brecha
 
 
 async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvaluacion:
-    evaluacion = await db.get(Evaluacion, evaluacion_id)
+    repo = fabricas().informes(db)
+    evaluacion = await repo.evaluacion(evaluacion_id)
     if evaluacion is None:
         raise SinResultadosError("Evaluación no encontrada")
 
-    filas_resumen = (await db.execute(
-        select(Resumen, Dominio).join(Dominio, Resumen.dominio_id == Dominio.id)
-        .where(Resumen.evaluacion_id == evaluacion_id)
-    )).all()
+    filas_resumen = await repo.resumenes_con_dominio(evaluacion_id)
     if not filas_resumen:
         raise SinResultadosError("La evaluación todavía no tiene resultados: complétala primero.")
 
     nombres_dominio = {d.id: d.nombre_dominio or f"Dominio {d.id}"
-                       for d in (await db.execute(select(Dominio))).scalars().all()}
+                       for d in await repo.dominios()}
 
     dominios = [
         DominioResultado(dominio_id=d.id, nombre=d.nombre_dominio or f"Dominio {d.id}",
@@ -168,19 +151,14 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
     )
 
     # Catálogo vigente en las tablas (respaldo para ids que la versión no tenga)
-    rutas_orm = (await db.execute(select(RutaFormativa).order_by(RutaFormativa.id))).scalars().all()
+    rutas_orm = await repo.rutas()
     rutas = {r.id: _ruta(r, nombres_dominio) for r in rutas_orm}
     rutas_activas = {r.id for r in rutas_orm if getattr(r, "activo", True) is not False}
     brechas = {
         b.id_brecha: _brecha(b, rutas)
-        for b in (await db.execute(select(CatalogoBrechas))).scalars().all()
+        for b in await repo.brechas()
     }
-    controles = {
-        c.id_control: c
-        for c in (await db.execute(
-            select(MatrizControl).options(selectinload(MatrizControl.dominio))
-        )).scalars().all()
-    }
+    controles = {c.id_control: c for c in await repo.controles_con_dominio()}
     # HU-24 criterio 2: una evaluación respondida con una versión de la matriz se informa con
     # los textos, brechas y rutas de ESA versión, aunque el admin haya publicado otra después.
     if evaluacion.matriz_version_id:
@@ -194,9 +172,7 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
             for c in contenido.get("controles", []):
                 controles[int(c["id"])] = _control_de_version(c, nombres_dominio)
 
-    respuestas_orm = (await db.execute(
-        select(Respuesta).where(Respuesta.evaluacion_id == evaluacion_id).order_by(Respuesta.id)
-    )).scalars().all()
+    respuestas_orm = await repo.respuestas(evaluacion_id)
     respuestas: list[RespuestaFila] = []
     en_revision = 0
     for r in respuestas_orm:
@@ -216,12 +192,12 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
             brecha_control=brechas.get(c.catalogo_brechas_id_brecha) if c and c.catalogo_brechas_id_brecha else None,
         ))
 
-    usuario = await db.get(UsuarioTemporal, evaluacion.usuario_temporal_id) if evaluacion.usuario_temporal_id else None
+    usuario = await repo.usuario_temporal(evaluacion.usuario_temporal_id) if evaluacion.usuario_temporal_id else None
     # HU-29: el rubro de la empresa cliente manda (la reevaluación no tiene usuario temporal)
     from app.application.use_cases.historial_empresa import rubro_id_de_evaluacion
 
     rubro_id = await rubro_id_de_evaluacion(db, evaluacion)
-    rubro = await db.get(Rubro, rubro_id) if rubro_id else None
+    rubro = await repo.rubro(rubro_id) if rubro_id else None
     # HU-10: el promedio del rubro sale con la supresión k-anónima (cohortes < k ocultas)
     from app.application.benchmark.sector import filas_del_rubro, publicar_fila
 

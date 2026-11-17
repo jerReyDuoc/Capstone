@@ -23,10 +23,10 @@ from datetime import datetime
 
 import pytest
 
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     ADMIN_EMAIL, ADMIN_PASSWORD, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api,
 )
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 if MODO == "en_proceso":

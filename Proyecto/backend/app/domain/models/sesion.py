@@ -20,7 +20,7 @@ class SesionUsuario(Base):
     """
     HU-28: sesión de un administrador o de un usuario definitivo.
 
-    El token bearer sigue siendo el HMAC de app/infrastructure/security/autenticacion.py, pero ahora lleva
+    El token bearer sigue siendo el HMAC de app/infrastructure/security/cripto/autenticacion.py, pero ahora lleva
     un identificador de sesión (`sid`, 24 bytes aleatorios). Aquí solo queda su SHA-256,
     y en cada petición se comprueba que la sesión exista, no haya vencido y no se haya
     cerrado. Así "Cerrar sesión" invalida el token en el servidor al instante (no solo

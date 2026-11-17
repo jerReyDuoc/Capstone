@@ -46,7 +46,7 @@ import httpx  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
-from app.infrastructure.security.cifrado import CifradorEntidades  # noqa: E402
+from app.infrastructure.security.cripto.cifrado import CifradorEntidades  # noqa: E402
 from test_e2e_capa_ia import ACTA, INYECCION, JUSTIFICACION, PII, PII_VARIANTES, paso  # noqa: E402
 
 EVAL_ID = int(os.getenv("LIVE_EVALUACION_ID", "9101"))

@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
-from app.domain.ports.sanitizer_port import TipoEntidad
+from app.domain.ports.sanitizador_port import TipoEntidad
 
 if TYPE_CHECKING:  # solo tipos
     from app.application.borradores.generador import ContextoBorrador

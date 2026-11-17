@@ -1,7 +1,7 @@
 -- T-06 — Datos SINTÉTICOS para probar la auditoría en una BD vacía (nunca en producción).
 -- Reproducen lo que escribe el código de main antes de T-06, incluido el hallazgo H1
 -- (supresión ARCOP de un encuestado público que no borra su correo opcional) y una fila
--- antigua sin anonimizar (como si no se hubiera corrido scripts/migrar_pii_hu06.py).
+-- antigua sin anonimizar (como si no se hubiera corrido scripts/migraciones_datos/migrar_pii_hu06.py).
 --   docker compose cp backend/scripts/sql/t06_datos_sinteticos.sql db:/tmp/t06_datos_sinteticos.sql
 --   docker compose exec db psql -U postgres -d complaince_db -f /tmp/t06_datos_sinteticos.sql
 BEGIN;

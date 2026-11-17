@@ -24,20 +24,26 @@ empresa, sin rol ni cuenta adicional (criterio 1). Lo de otra empresa responde 4
 """
 from __future__ import annotations
 
-from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.revision_interna import RevisionError, RevisionInternaCasos
+from app.application.rat.casos_uso.revision_interna import RevisionError, RevisionInternaCasos
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.revision_interna import (
+    VerificacionEntrada,
+    ObservacionEntrada,
+    CierreEntrada,
+    MarcaEntrada,
+    ConfiguracionEntrada,
+    EnvioEntrada,
+)
 
 router = APIRouter(prefix="/api/registro-actividades/revision", tags=["revisión interna del registro (HU-40)"])
 
@@ -59,47 +65,6 @@ def _archivo(contenido: bytes, nombre: str, mime: str, extra: dict | None = None
     return Response(content=contenido, media_type=mime, headers={
         **_SIN_CACHE, "Content-Disposition": f'attachment; filename="{nombre}"', "X-Content-Type-Options": "nosniff",
         **(extra or {})})
-
-
-class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class VerificacionEntrada(_Base):
-    clave: str = Field(..., min_length=3, max_length=40, pattern=r"^(actividad|elemento|flujo):\d{1,9}$")
-    criterios: list[str] | None = Field(None, max_length=10, description="Vacío = todos los puntos que aplican")
-    decision: Literal["verificado", "aceptado", "pendiente"]
-    nota: str | None = Field(None, max_length=1000)
-
-
-class ObservacionEntrada(_Base):
-    clave: str = Field(..., min_length=3, max_length=40, pattern=r"^(actividad|elemento|flujo|registro):\d{1,9}$")
-    criterio: str | None = Field(None, max_length=40)
-    prioridad: Literal["alta", "media", "baja"] = "media"
-    texto: str = Field(..., min_length=1, max_length=1000)
-
-
-class CierreEntrada(_Base):
-    nota: str = Field(..., min_length=1, max_length=1000)
-
-
-class MarcaEntrada(_Base):
-    revisor_nombre: str = Field(..., min_length=1, max_length=120)
-    revisor_cargo: str | None = Field(None, max_length=120)
-    conclusion: str | None = Field(None, max_length=1500)
-    huella: str | None = Field(None, min_length=64, max_length=64, description="La huella del registro que se revisó")
-    confirmo: bool = False
-
-
-class ConfiguracionEntrada(_Base):
-    plazo_meses: int = Field(..., ge=1, le=36)
-    aviso_dias: int = Field(..., ge=0, le=90)
-    recordatorio_correo: bool = True
-
-
-class EnvioEntrada(_Base):
-    email: str | None = Field(None, max_length=100, description="Vacío = el correo del usuario de la empresa")
-    con_paquete: bool = False
 
 
 @router.get("")

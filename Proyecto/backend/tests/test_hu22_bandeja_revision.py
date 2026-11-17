@@ -16,7 +16,7 @@ from datetime import date, datetime
 import pytest
 from sqlalchemy import select
 
-from _api_harness import MODO, cliente_api, encabezados_qa  # noqa: E402
+from apoyo.api_harness import MODO, cliente_api, encabezados_qa  # noqa: E402
 from app.application.use_cases.bandeja_revision import (  # noqa: E402
     BAJA_CONFIANZA, CONCORDANTE, DIVERGENCIA, RESUELTA_POR_LLM, SEGURIDAD, SIN_RESOLVER,
     EvidenciaLLM, calcular_motivos, clave_prioridad, esta_pendiente, ultima_del_llm,
@@ -121,7 +121,7 @@ async def _audit(accion: str):
 
 async def _respuesta_divergente(c) -> int:
     """El usuario declara 'cumplido'; el LLM (confianza alta) lo baja a 'no_cumplido'."""
-    from _api_harness import TODOS_LOS_CONTROLES, body_filtro
+    from apoyo.api_harness import TODOS_LOS_CONTROLES, body_filtro
     from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
     from app.domain.models import Evidencia, Respuesta
 

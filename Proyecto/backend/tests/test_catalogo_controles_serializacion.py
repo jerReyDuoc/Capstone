@@ -1,7 +1,7 @@
 """A-20: la caché del catálogo ya no usa ControlResponse; su serialización debe ser idéntica."""
 from types import SimpleNamespace
 
-from app.application.schemas.api_schemas import ControlResponse
+from app.api.schemas.api_schemas import ControlResponse
 from app.infrastructure.cache.catalogo_controles import _serializar
 
 

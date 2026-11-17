@@ -19,15 +19,15 @@ import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.asistente_rat import AsistenteError, AsistenteRat
+from app.application.rat.casos_uso.asistente_rat import AsistenteError, AsistenteRat
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.asistente_rat import NuevaSesion, CambioArea, Respuesta, Aceptacion, Descarte
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def obtener_servicios_asistente(
     from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
     from app.api.dependencias.contenedor import crear_agente, crear_anonimizador
     from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
     try:
         agente = crear_agente(sesion_ia)
@@ -88,29 +88,6 @@ async def _ejecutar(corutina, status: int = 200):
         raise HTTPException(status_code=503, detail={
             "codigo": "LIMITADOR_NO_DISPONIBLE",
             "mensaje": "El asistente no está disponible ahora. Puedes completar el mapa y el registro a mano."})
-
-
-class NuevaSesion(BaseModel):
-    area: str | None = Field(default=None, max_length=20)
-
-
-class CambioArea(BaseModel):
-    area: str = Field(max_length=20)
-
-
-class Respuesta(BaseModel):
-    texto: str | None = Field(default=None, max_length=8000)
-    omitir: bool = False
-    sin_ia: bool = False   # guardar sin ayuda automática (cuando la ayuda falló)
-
-
-class Aceptacion(BaseModel):
-    payload: dict | None = None
-    version_mapa: int | None = Field(default=None, ge=0)
-
-
-class Descarte(BaseModel):
-    motivo: str | None = Field(default=None, max_length=20)
 
 
 @router.get("")

@@ -12,7 +12,7 @@ QA - HU-01 Cuestionario adaptativo: pruebas de cierre de la historia.
 Ejecutar desde Proyecto/backend/:
     pytest tests/test_hu01_cuestionario.py -v
 
-En proceso (por defecto): app real + SQLite en memoria (ver _api_harness.py).
+En proceso (por defecto): app real + SQLite en memoria (ver apoyo/api_harness.py).
 Con LATENCIA_BASE_URL=http://127.0.0.1:8000 corre SOLO la prueba de concurrencia
 contra el servidor real (PostgreSQL), sobre la evaluación LATENCIA_EVALUACION_ID.
 """
@@ -23,11 +23,11 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api,
 )
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO  # noqa: E402
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase  # noqa: E402
+from app.application.use_cases.crear_respuesta import CreateRespuestaUseCase  # noqa: E402
 from app.domain.models.respuesta import Respuesta  # noqa: E402
 from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion  # noqa: E402
 from app.infrastructure.repositories.respuesta_repository import RespuestaDuplicadaError  # noqa: E402
@@ -290,7 +290,7 @@ def test_evaluacion_cerrada_no_admite_respuestas_ni_cambios(estado):
 async def _esperado_version_anterior(codigos):
     """Lo que devolvía el endpoint antes de la optimización (ORM + Pydantic)."""
     from sqlalchemy import select
-    from app.application.schemas.api_schemas import ControlResponse
+    from app.api.schemas.api_schemas import ControlResponse
     from app.domain.models.matriz_control import MatrizControl
     gen = await _sesion()
     s = await gen.__anext__()

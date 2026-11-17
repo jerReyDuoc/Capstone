@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-from _api_harness import MODO  # noqa: E402
+from apoyo.api_harness import MODO  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from test_hu27_empresa_cliente import (  # noqa: E402  (mismo arnés: encuestado con evaluación completada)
     SECRETO, _alta, _bd, _bearer, _codigo, _correr, _evaluacion_completada, admin, cuerpo_solicitud,
@@ -313,7 +313,8 @@ def test_c3_aviso_por_correo_a_therion_sin_datos_de_contacto():
 
 def test_c3_sin_destinatario_o_con_el_correo_caido_la_solicitud_igual_queda(monkeypatch):
     async def esc(c):
-        from app.application.informes import correo
+        from app.domain.ports.correo_port import CorreoFallidoError
+        from app.infrastructure.correo import smtp
 
         monkeypatch.setattr(settings, "CONTRATACION_AVISO_EMAIL", None)
         a = await _evaluacion_completada(c, con_evidencia=False)
@@ -322,8 +323,8 @@ def test_c3_sin_destinatario_o_con_el_correo_caido_la_solicitud_igual_queda(monk
         monkeypatch.setattr(settings, "CONTRATACION_AVISO_EMAIL", AVISO)
 
         async def caido(*_a, **_k):
-            raise correo.CorreoFallidoError("smtp caído")
-        monkeypatch.setattr(correo, "enviar", caido)
+            raise CorreoFallidoError("smtp caído")
+        monkeypatch.setattr(smtp, "enviar", caido)
         b = await _evaluacion_completada(c, con_evidencia=False)
         assert (await _enviar(c, b, email_contacto="b@acme.cl")).status_code == 201
 
@@ -371,7 +372,7 @@ def test_c3_limite_diario_por_defecto_es_el_de_la_encuesta_publica():
 def test_c3_captcha_en_el_servidor_con_su_propia_accion(monkeypatch):
     async def esc(c):
         import app.api.routes.contratacion as ruta
-        from app.infrastructure.security.captcha import ResultadoCaptcha
+        from app.infrastructure.servicios_externos.captcha import ResultadoCaptcha
 
         vistos = []
 

@@ -1,7 +1,7 @@
 """
 HU-07 · Verificación de alucinaciones y sintaxis en las salidas del modelo (OWASP Top 10 for LLM).
 
-Pruebas del verificador de salida (app/application/ai/verificacion_salida.py), sin BD, red ni LLM:
+Pruebas del verificador de salida (app/application/ai/verificacion_salida_evidencias.py), sin BD, red ni LLM:
 
   C1  test-set automatizado de 124 casos borde (tests/data/alucinaciones_evidencias.jsonl):
       evidencias reales de cumplimiento (políticas, actas, RACI, DPA, inventarios, documentos en
@@ -20,7 +20,7 @@ recibió el modelo (evidencia, justificación del usuario y datos del control): 
 fecha, artículo, código de control o dato extraído que no aparece, o "cumplido"/"parcial" sobre
 una evidencia vacía o que el propio modelo declara insuficiente. Un error de criterio (clasificar
 "parcial" algo que la verdad de referencia considera "cumplido") es un error de exactitud, no una
-alucinación: lo mide scripts/evaluar_alucinaciones.py contra el modelo real.
+alucinación: lo mide scripts/evaluacion/evaluar_alucinaciones.py contra el modelo real.
 
 La integración con el backend (revisión humana, alerta y modo marcar) está en
 tests/test_hu07_integracion.py.
@@ -32,7 +32,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.application.ai import verificacion_salida as vs
+from app.application.ai import verificacion_salida_evidencias as vs
 from app.application.ai.metricas import FilaLlamada, resumen_verificacion
 from app.domain.evidencias.validacion import EvidenceValidation
 

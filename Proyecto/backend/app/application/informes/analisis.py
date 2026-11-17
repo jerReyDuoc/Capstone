@@ -51,7 +51,7 @@ NIVELES = ("Inicial", "Intermedio", "Avanzado")
 PESO_NIVEL = {n: i for i, n in enumerate(NIVELES)}
 
 # Corte de madurez -> nivel de capacitación que se asigna a la dimensión.
-# Mismos cortes que generate_resumen.nivel_madurez:
+# Mismos cortes que generar_resumen.nivel_madurez:
 #   inicial (≤25) y en desarrollo (≤50) -> Inicial: faltan las bases.
 #   gestionado (≤75)                    -> Intermedio: hay controles, falta aplicarlos bien.
 #   optimizado (>75)                    -> Avanzado: mejora continua y casos complejos.

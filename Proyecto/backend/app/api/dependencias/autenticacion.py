@@ -14,7 +14,7 @@ contrato vigente), así desactivar a alguien corta su acceso
 sin esperar a que expire el token.
 
 Roles y Actor: app/domain/auth/actor.py. Firma y verificación del token:
-app/infrastructure/security/autenticacion.py.
+app/infrastructure/security/cripto/autenticacion.py.
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.auth.actor import Actor, Rol
-from app.infrastructure.security.autenticacion import TokenInvalidoError, verificar_token
+from app.infrastructure.security.cripto.autenticacion import TokenInvalidoError, verificar_token
 
 _NO_AUTENTICADO = {"WWW-Authenticate": "Bearer"}
 

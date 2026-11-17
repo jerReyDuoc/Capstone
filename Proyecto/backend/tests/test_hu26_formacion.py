@@ -169,7 +169,8 @@ def test_constancia_pdf_de_una_pagina_con_el_codigo():
     pytest.importorskip("reportlab")
     pypdf = pytest.importorskip("pypdf")
     import io
-    from app.application.formacion.constancia_pdf import DatosConstancia, fecha_larga, generar_constancia, nombre_constancia
+    from app.application.formacion.constancia import DatosConstancia, fecha_larga, nombre_constancia
+    from app.infrastructure.documentos.pdf.constancia import generar_constancia
 
     d = DatosConstancia(
         razon_social="ACME Servicios SpA", rut="76086428-5", participante="Gabriela Rojas",
@@ -208,7 +209,7 @@ def hu27(monkeypatch, tmp_path):
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-26: solo en proceso")
     from app.core.config import settings
@@ -229,7 +230,7 @@ def hu27(monkeypatch, tmp_path):
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api(rol=None) as c:

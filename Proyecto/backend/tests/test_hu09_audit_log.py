@@ -24,8 +24,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select, text
 
-from _api_harness import MODO, cliente_api  # noqa: E402
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+from apoyo.api_harness import MODO, cliente_api  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.auditoria import auditoria_hash  # noqa: E402
 
@@ -38,7 +38,7 @@ SECRETO = "secreto-de-pruebas-hu09-0123456789abcdef"
 RAIZ = Path(__file__).resolve().parents[1]
 MIGRACION = RAIZ / "migrations" / "versions" / "d2f8a6c4e1b9_hu09_audit_log_inmutable.py"
 PASSWORD_AUDITOR = "Auditoria-Externa-2026"
-REFERENTE_ID = 1   # sembrado por el arnés (_api_harness._sembrar)
+REFERENTE_ID = 1   # sembrado por el arnés (apoyo.api_harness._sembrar)
 
 
 @pytest.fixture(autouse=True)
@@ -109,7 +109,7 @@ async def _auditor(c, email="auditora@firma-externa.cl", dias=30) -> tuple[int, 
 
 async def _actividad(c, n: int = 3) -> None:
     """Genera registros reales en el log: logins de admin (éxito y fallidos)."""
-    from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD
+    from apoyo.api_harness import ADMIN_EMAIL, ADMIN_PASSWORD
     for _ in range(n):
         assert (await c.post("/api/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})).status_code == 200
     assert (await c.post("/api/auth/login", json={"email": ADMIN_EMAIL, "password": "mala"})).status_code == 401
@@ -197,7 +197,7 @@ def test_c2_cada_registro_trae_fecha_actor_ip_accion_y_resultado():
 
 def test_c2_ip_del_bff_solo_con_su_secreto_y_siempre_normalizada(monkeypatch):
     async def esc(c):
-        from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD
+        from apoyo.api_harness import ADMIN_EMAIL, ADMIN_PASSWORD
         cuerpo = {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
         monkeypatch.setattr(settings, "BFF_SHARED_SECRET", "b" * 32)
         await c.post("/api/auth/login", json=cuerpo, headers={"X-BFF-Secret": "b" * 32, "X-Cliente-IP": "200.27.10.5"})
@@ -577,7 +577,7 @@ def test_rutas_hu09_por_rol(metodo, url, kwargs):
 # ===================================================================== modificaciones y supresiones
 def test_modificacion_de_respuesta_y_revision_quedan_en_el_log_sin_texto():
     async def esc(c):
-        from _api_harness import TODOS_LOS_CONTROLES
+        from apoyo.api_harness import TODOS_LOS_CONTROLES
         from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE
 
         cuerpo = {"respuestas": [{"codigo": f"F{i}", "respuesta": i == 1} for i in range(1, 8)]}

@@ -18,11 +18,11 @@ from typing import Any, TypedDict
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
-from app.application.ai.agente import salida as validacion
+from app.application.ai.agente import salida_tutor as validacion
 from app.application.ai.gateway import AIGateway, ResultadoIA
 from app.application.ai.politicas import TareaIA
 from app.domain.ports.filtro_agente_port import CategoriaAtaque, FiltroAgentePort, ResultadoFiltro
-from app.domain.ports.prompt_guard_port import PromptGuardPort
+from app.domain.ports.guardia_prompt_port import PromptGuardPort
 from app.domain.ports.registro_ia_port import ContextoLlamada
 
 
@@ -142,7 +142,7 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
             lineas = []
             for linea in texto.splitlines():
                 if politica == NEUTRALIZAR_DOCUMENTO and guard is not None:
-                    from app.domain.ports.prompt_guard_port import PERFIL_EVIDENCIA
+                    from app.domain.ports.guardia_prompt_port import PERFIL_EVIDENCIA
 
                     g = guard.analizar(linea, PERFIL_EVIDENCIA)
                     r = ResultadoFiltro(g.bloquear, _categoria(g.categoria), g.regla) if g.bloquear \
@@ -212,7 +212,7 @@ async def nodo_validar_asistente(estado: EstadoAgente, config: RunnableConfig) -
     conoce el mapa de la empresa.
     """
     from app.application.ai.prompts.asistente_rat import SYSTEM
-    from app.application.asistente import salida_ia
+    from app.application.rat.asistente import salida_asistente as salida_ia
 
     resultado: ResultadoIA = estado["resultado"]
     canario = (estado.get("datos") or {}).get("canario")
@@ -289,12 +289,12 @@ async def nodo_anclar_contexto(estado: EstadoAgente, config: RunnableConfig) -> 
 async def nodo_validar_borrador(estado: EstadoAgente, config: RunnableConfig) -> dict:
     """
     HU-16: la salida del redactor se valida y se ancla a la plantilla antes de entrar al
-    documento (app/application/borradores/salida_ia.py). Una fuga del system prompt descarta
+    documento (app/application/borradores/salida_borrador.py). Una fuga del system prompt descarta
     TODO lo que aportó el modelo: el borrador queda con la plantilla base.
     """
     from app.application.ai.prompts.borrador import SYSTEM
-    from app.application.borradores.salida_ia import anclar
-    from app.application.schemas.borrador import BorradorIA, SeccionBorrador
+    from app.application.borradores.salida_borrador import anclar
+    from app.application.ai.schemas.borrador import BorradorIA, SeccionBorrador
 
     resultado: ResultadoIA = estado["resultado"]
     datos = estado.get("datos") or {}
@@ -362,7 +362,7 @@ class AgenteIA:
                  filtro: FiltroAgentePort | None = None):
         self.gateway = gateway
         self.guard = guard
-        # HU-18: el filtro del agente (infrastructure/security/filtro_agente.py). Sin él, la
+        # HU-18: el filtro del agente (infrastructure/security/prompt_injection/filtro_agente.py). Sin él, la
         # guardia usa solo PromptGuardPort (comportamiento de HU-15).
         self.filtro = filtro or (_FiltroSoloGuard(guard) if guard is not None else None)
 

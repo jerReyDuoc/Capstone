@@ -31,6 +31,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
+from app.domain.ports.correo_port import CorreoNoDisponibleError
 from app.application.use_cases.activacion_cuenta import (
     ActivacionError, generar_token, hash_token, validar_contrasena,
 )
@@ -132,8 +133,8 @@ def cuerpo_aviso_cambio() -> tuple[str, str]:
 async def enviar_en_segundo_plano(pendiente: CorreoPendiente) -> None:
     """Tarea de fondo (BackgroundTasks). No toca la BD: el pedido ya quedó en la bitácora."""
     try:
-        await correo.enviar(pendiente.destino, pendiente.asunto, pendiente.texto, pendiente.html, [])
-    except correo.CorreoNoDisponibleError:
+        await fabricas().correo.enviar(pendiente.destino, pendiente.asunto, pendiente.texto, pendiente.html, [])
+    except CorreoNoDisponibleError:
         logger.warning("Recuperación de contraseña: el correo no está habilitado (CORREO_MODO)")
     except Exception as e:  # noqa: BLE001  (nunca debe romper la respuesta ya enviada)
         logger.warning("No se pudo enviar un correo de recuperación (%s)", type(e).__name__)

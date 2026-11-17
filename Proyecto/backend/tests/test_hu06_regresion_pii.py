@@ -8,7 +8,7 @@ Ejecutar desde Proyecto/backend/ (en Docker):
 
 Camino real, sin atajos internos: API FastAPI -> casos de uso -> worker
 (process_evidence_task) -> capa de IA (factory, gateway, NER, registro) -> BD.
-  - BD: SQLite en memoria con el esquema de los modelos (como _api_harness).
+  - BD: SQLite en memoria con el esquema de los modelos (como apoyo.api_harness).
   - NER: spaCy real si está instalado; si no, un NLP simulado que reconoce el nombre.
   - LLM: proveedor simulado; un espía guarda todo lo que sale hacia él.
   - La BD se lee en CRUDO (SQL directo, sin los tipos del ORM): lo que vería quien
@@ -40,13 +40,13 @@ pytest.importorskip("aiosqlite")
 pytest.importorskip("arq")
 pytest.importorskip("httpx")
 
-import _api_harness as h  # noqa: E402
-from _capa_ia_fakes import FakeProvider, StubNLP  # noqa: E402
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+import apoyo.api_harness as h  # noqa: E402
+from apoyo.capa_ia_fakes import FakeProvider, StubNLP  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.domain.ports.llm_provider_port import LLMProviderPort  # noqa: E402
-import app.infrastructure.security.ner_sanitizer as ner_sanitizer_mod  # noqa: E402
-from app.infrastructure.security.ner_sanitizer import NERSanitizer  # noqa: E402
+from app.domain.ports.proveedor_llm_port import LLMProviderPort  # noqa: E402
+import app.infrastructure.security.pii.sanitizador_ner as ner_sanitizer_mod  # noqa: E402
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer  # noqa: E402
 
 if h.MODO == "live":
     pytest.skip("La regresión de PII corre en proceso (lee la BD en crudo).", allow_module_level=True)
@@ -109,7 +109,7 @@ class EspiaProveedor(LLMProviderPort):
 
 def _sanitizador():
     try:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         cargar_spacy()
         return NERSanitizer, "spaCy real (es_core_news_md)"
     except Exception:  # noqa: BLE001

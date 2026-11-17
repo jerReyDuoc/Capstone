@@ -13,7 +13,7 @@ Uso en un modelo:  mapped_column("descripcion", TextoCifrado, nullable=False)
 
 - La columna sigue siendo TEXT: no requiere migración de esquema.
 - Lo que no lleva el prefijo "enc:v1:" se lee tal cual (filas anteriores a HU-06);
-  scripts/migrar_pii_hu06.py las cifra.
+  scripts/migraciones_datos/migrar_pii_hu06.py las cifra.
 - Sin ENTITY_MAP_KEY no se puede escribir (fail-closed): nunca se guarda en claro.
 
 Excepción documentada (A-02, variante B): los modelos de domain/models importan este módulo de infraestructura, igual que heredan de Base (A-01).
@@ -25,7 +25,7 @@ from sqlalchemy import Text
 from sqlalchemy.types import TypeDecorator
 
 from app.core.config import settings
-from app.infrastructure.security.cifrado import CifradorDatos, ClaveCifradoInvalida
+from app.infrastructure.security.cripto.cifrado import CifradorDatos, ClaveCifradoInvalida
 
 logger = logging.getLogger("cifrado")
 

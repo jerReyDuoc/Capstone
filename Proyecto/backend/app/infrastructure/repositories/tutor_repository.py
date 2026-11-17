@@ -12,6 +12,10 @@ from datetime import datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.models.evidencia import Evidencia
+from app.domain.models.formacion import AvanceFormativo, EstadoAvance
+from app.domain.models.matriz_control import MatrizControl
+from app.domain.models.respuesta import Respuesta
 from app.domain.models.tutor import ConversacionTutor, MensajeTutor
 
 
@@ -86,3 +90,26 @@ class TutorRepository:
 
     async def eliminar_ids(self, ids: list[int]) -> int:
         return await self._borrar(ids) if ids else 0
+
+    # ------------------------------------------------------------------ contexto del tutor
+    async def rutas_completadas(self, empresa_id: int) -> set[int]:
+        return set((await self.session.execute(
+            select(AvanceFormativo.ruta_formativa_id).where(
+                AvanceFormativo.empresa_id == empresa_id,
+                AvanceFormativo.estado == EstadoAvance.COMPLETADO.value,
+            )
+        )).scalars().all())
+
+    async def controles_de_respuestas(self, respuesta_ids: list[int]) -> list:
+        """Filas (respuesta_id, justificacion_usuario, MatrizControl|None) de las respuestas."""
+        return list((await self.session.execute(
+            select(Respuesta.id, Respuesta.justificacion_usuario, MatrizControl)
+            .outerjoin(MatrizControl, MatrizControl.id_control == Respuesta.matriz_controles_id_control)
+            .where(Respuesta.id.in_(respuesta_ids))
+        )).all())
+
+    async def evidencias_de_respuestas(self, respuesta_ids: list[int]) -> list[Evidencia]:
+        """Evidencias de las respuestas, de la más antigua a la más nueva."""
+        return list((await self.session.execute(
+            select(Evidencia).where(Evidencia.respuesta_id.in_(respuesta_ids)).order_by(Evidencia.id_evidencia)
+        )).scalars().all())

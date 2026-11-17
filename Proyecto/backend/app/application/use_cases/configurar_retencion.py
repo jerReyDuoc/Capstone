@@ -35,6 +35,7 @@ from app.domain.models.configuracion_retencion import (
 )
 from app.domain.auditoria.acciones import Accion
 from app.application.fabricas import fabricas
+from app.domain.ports.repositorios_empresa import RetencionRepositoryPort
 
 MODO_ENTORNO = "entorno"
 MODO_PLAZO = "plazo"
@@ -156,6 +157,11 @@ async def liberar_bloqueo(s: AsyncSession, marca: datetime) -> None:
     await s.execute(update(Conf).where(Conf.id == ID_UNICO, Conf.ejecucion_desde == marca)
                     .values(ejecucion_desde=None).execution_options(synchronize_session=False))
     await s.commit()
+
+
+async def usuarios_sin_vencimiento(repo: RetencionRepositoryPort) -> int:
+    """Usuarios temporales vigentes sin fecha de expiración (la regla R1 no los alcanza)."""
+    return int(await repo.contar_usuarios_sin_vencimiento())
 
 
 def proxima_ejecucion(ahora: datetime | None = None) -> datetime:

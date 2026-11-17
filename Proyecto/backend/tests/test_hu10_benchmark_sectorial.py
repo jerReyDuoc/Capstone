@@ -118,9 +118,9 @@ async def _sembrar_cohorte(c, n: int, *, repetidas_de_una: int = 0):
     Datos y Gobernanza; si `repetidas_de_una`, además esa cantidad de evaluaciones extra del
     MISMO usuario temporal (no deben aumentar k). Devuelve el id de la primera evaluación.
     """
-    from _api_harness import DOMINIOS
+    from apoyo.api_harness import DOMINIOS
 
-    from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+    from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
     from app.core.database import get_db
     from app.domain.models import Evaluacion, UsuarioTemporal
     from app.domain.models.resumen import Resumen
@@ -154,7 +154,7 @@ async def _sembrar_cohorte(c, n: int, *, repetidas_de_una: int = 0):
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api() as c:  # admin: puede ver cualquier evaluación

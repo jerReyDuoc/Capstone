@@ -40,14 +40,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.application.ai.politicas import TEXTOS_ENVIADOS, PoliticaTarea, TareaIA
-from app.domain.ports.llm_provider_port import LLMProviderError, LLMProviderPort, LLMRequest
+from app.domain.ports.proveedor_llm_port import LLMProviderError, LLMProviderPort, LLMRequest
 from app.domain.ports.registro_ia_port import (
     ContextoLlamada,
     RegistroIAPort,
     RegistroLlamada,
     RegistroSanitizacion,
 )
-from app.domain.ports.sanitizer_port import SanitizacionError, SanitizerPort
+from app.domain.ports.sanitizador_port import SanitizacionError, SanitizerPort
 
 logger = logging.getLogger("capa_ia")
 

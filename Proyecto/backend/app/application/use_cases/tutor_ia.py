@@ -8,7 +8,7 @@ las brechas de gobernanza identificadas.
 
   C1  Carga AISLADA del contexto: solo las brechas no conformes (no cumplido y
       parcialmente cumplido) de la evaluación más reciente de LA empresa del token
-      (app/application/tutor/contexto.py). Se recarga en cada mensaje.
+      (app/application/tutor/contexto_tutor.py). Se recarga en cada mensaje.
   C2  Explicaciones y planes de acción por nivel (Inicial, Intermedio, Avanzado). Por
       defecto el nivel de la ruta (la del módulo desde el que se abrió, o la de la brecha
       más prioritaria); el usuario lo puede cambiar.
@@ -45,12 +45,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.application.ai.agente import AgenteIA, SkillIA
-from app.application.ai.agente.salida import RESPUESTA_FUGA, SUGERENCIAS_FUGA
+from app.application.ai.agente.salida_tutor import RESPUESTA_FUGA, SUGERENCIAS_FUGA
 from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
 from app.application.ai.gateway import CapaIAError
 from app.application.ai.prompts.tutor import texto_antecedentes, turno_historial
-from app.application.schemas.tutor import NivelTutor, TutorRespuesta
-from app.application.tutor.contexto import ContextoTutor, ContextoTutorError, cargar_contexto_tutor
+from app.application.ai.schemas.tutor import NivelTutor, TutorRespuesta
+from app.application.tutor.contexto_tutor import ContextoTutor, ContextoTutorError, cargar_contexto_tutor
 from app.application.use_cases.limites_encuesta import Reserva, ventana_diaria
 from app.application.seguridad.huella import huella
 from app.application.fabricas import fabricas
@@ -281,7 +281,7 @@ class TutorIA:
 
     async def _anon_salida(self, texto: str | None) -> str | None:
         """Correcciones 05-11: lo del modelo, anonimizado y sin etiquetas usadas como vocativo."""
-        from app.application.ai.agente.salida import sin_vocativos_anonimizados
+        from app.application.ai.agente.salida_tutor import sin_vocativos_anonimizados
         return sin_vocativos_anonimizados(await self._anon(texto))
 
     async def _respuesta_anonimizada(self, r: TutorRespuesta, ctx: ContextoTutor) -> tuple[str, dict]:

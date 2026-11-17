@@ -17,7 +17,6 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.iniciar_encuesta_publica import (
@@ -35,7 +34,8 @@ from app.domain.models.evaluacion import Evaluacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.infrastructure.security.captcha import verificar_captcha
+from app.infrastructure.servicios_externos.captcha import verificar_captcha
+from app.api.schemas.encuesta_publica import IniciarEncuestaRequest, EmailOpcionalRequest
 
 logger = logging.getLogger(__name__)
 
@@ -43,22 +43,6 @@ router = APIRouter(prefix="/api/encuesta-publica", tags=["encuesta pública (HU-
 
 _SIN_CACHE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s.]{2,}$")
-
-
-class AvisoLegalAceptado(BaseModel):
-    version: str = Field(..., max_length=20)
-    aceptado: bool
-
-
-class IniciarEncuestaRequest(BaseModel):
-    rubro_id: int = Field(..., ge=1)
-    aviso_legal: AvisoLegalAceptado
-    captcha_token: str = Field("", max_length=2048)
-
-
-class EmailOpcionalRequest(BaseModel):
-    # null = borrar el email registrado
-    email: str | None = Field(None, max_length=100)
 
 
 def _error(status: int, codigo: str, mensaje: str, reintentar_en_s: int | None = None, **extra) -> HTTPException:

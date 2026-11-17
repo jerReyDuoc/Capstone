@@ -31,16 +31,16 @@ import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchem
 import app.application.fabricas as fabricas_mod
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE, CONTROLES_POR_FILTRO
 from app.domain.evidencias.validacion import EvidenceValidation
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, EvaluacionCerradaError
-from app.application.use_cases.generate_resumen import GenerateResumenUseCase, nivel_madurez
-from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
-from app.application.use_cases.upload_evidence import UploadEvidenceUseCase
+from app.application.use_cases.crear_respuesta import CreateRespuestaUseCase, EvaluacionCerradaError
+from app.application.use_cases.generar_resumen import GenerateResumenUseCase, nivel_madurez
+from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
+from app.application.use_cases.subir_evidencia import UploadEvidenceUseCase
 from app.core.config import settings
 from app.domain.models.evidencia import Evidencia, EstadoValidacion
 from app.domain.models.respuesta import Respuesta, EstadoClasificacion, FuenteClasificacion
 from app.domain.models.resumen import Resumen
 from app.infrastructure.repositories.evaluacion_repository import ContextoEvaluacion
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
 NA = EstadoClasificacion.NO_APLICA.value
 CUMP = EstadoClasificacion.CUMPLIDO.value
@@ -603,7 +603,7 @@ class TestProcesamientoSinEvidencia:
 
     def test_evidencia_muy_larga_se_trunca_antes_del_llm(self):
         # El recorte ahora lo hace la capa de IA (sanitiza primero, recorta después).
-        from _capa_ia_fakes import crear_validador
+        from apoyo.capa_ia_fakes import crear_validador
         texto = ("La organizacion mantiene un inventario de modelos actualizado. " * 2000).encode()
         validator, gw = crear_validador(max_chars_evidencia=settings.MAX_CHARS_EVIDENCIA_LLM)
         # Sin guard: el texto repetido dispara la heurística anti-inyección y

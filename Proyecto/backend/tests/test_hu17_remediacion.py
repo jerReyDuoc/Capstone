@@ -21,14 +21,14 @@ from app.application.evidencias.archivos import (
     DOCX,
     PDF,
     TXT,
-    ArchivoIlegibleError,
     ArchivoNoAdmitidoError,
     detectar_tipo,
-    extraer_texto,
     recuperar_fragmentos,
     terminos_control,
     terminos_del_control,
 )
+from app.domain.ports.extractor_texto_port import ArchivoIlegibleError
+from app.infrastructure.archivos.extractor_texto import extraer_texto
 
 TEXTO = "Política de uso responsable de IA aprobada por el directorio. Incluye inventario de modelos."
 
@@ -142,7 +142,7 @@ api = pytest.mark.skipif(not _hay_api(), reason="Requiere FastAPI, SQLAlchemy y 
 def test_worker_la_remediacion_solo_mejora_y_recalcula():
     from types import SimpleNamespace
 
-    from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+    from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
     from app.domain.models.evidencia import ORIGEN_REMEDIACION, EstadoValidacion, Evidencia
     from app.domain.models.respuesta import Respuesta
 
@@ -209,7 +209,7 @@ def entorno(monkeypatch, tmp_path):
     """Mismo entorno que test_hu27_empresa_cliente.py (se reutilizan sus helpers)."""
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-17: solo en proceso")
     import test_hu27_empresa_cliente as m
@@ -230,13 +230,13 @@ def entorno(monkeypatch, tmp_path):
 async def _procesar(m, evidencia_id, clasificacion, confianza):
     """Lo que hace el worker ARQ (process_evidence_task) con un LLM simulado."""
     from app.domain.evidencias.validacion import EvidenceValidation
-    from app.application.use_cases.generate_resumen import GenerateResumenUseCase
-    from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+    from app.application.use_cases.generar_resumen import GenerateResumenUseCase
+    from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
     from app.application.use_cases.remediacion import puntaje_general_actual
     from app.bootstrap import crear_storage_evidencias
     from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
     from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
     class LLM:
         async def validate(self, contenido, control, respuesta, brecha=None, justificacion=None, contexto=None):
@@ -254,7 +254,7 @@ async def _procesar(m, evidencia_id, clasificacion, confianza):
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api(rol=None) as c:

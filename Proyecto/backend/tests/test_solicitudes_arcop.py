@@ -4,13 +4,13 @@ QA - Solicitudes de derechos ARCOP (historia de usuario del Titular de Datos Per
 Ejecutar desde Proyecto/backend/:
   pytest tests/test_solicitudes_arcop.py -v
 
-Usa el arnés en proceso (_api_harness.py): app FastAPI real + SQLite en memoria.
+Usa el arnés en proceso (apoyo/api_harness.py): app FastAPI real + SQLite en memoria.
 No requiere PostgreSQL, Redis ni Groq. En modo live (LATENCIA_BASE_URL) se omite,
 porque los tokens se firman con el AUTH_SECRET del servidor.
 
 Cubre:
   - login de administrador y acceso del titular (app/api/routes/auth.py)
-  - firma/expiración de tokens, roles y revocación (app/infrastructure/security/autenticacion.py)
+  - firma/expiración de tokens, roles y revocación (app/infrastructure/security/cripto/autenticacion.py)
   - anonimización al aprobar una supresión
   - plazos legales (30 días corridos, prórroga única, bloqueo en 2 días hábiles)
   - código de seguimiento único y consulta pública sin datos personales
@@ -28,11 +28,11 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     ADMIN_EMAIL, ADMIN_PASSWORD, EVAL_NA_ID, MODO, body_filtro, cliente_api,
 )
 
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.domain.auth.actor import Actor  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.domain.models.solicitud_arcop import (  # noqa: E402
@@ -46,7 +46,7 @@ from app.application.use_cases.clave_acceso_encuestado import (  # noqa: E402
 )
 
 SECRETO = "secreto-solo-para-pytest-0123456789abcdef"
-TITULAR_ID = 1       # usuarios sembrados por el arnés (_api_harness._sembrar)
+TITULAR_ID = 1       # usuarios sembrados por el arnés (apoyo.api_harness._sembrar)
 OTRO_TITULAR_ID = 2
 ADMIN_ID = 1
 DESCRIPCION = "Solicito acceso a todos mis datos personales tratados por la plataforma."

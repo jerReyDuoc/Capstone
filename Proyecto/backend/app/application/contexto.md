@@ -1,1 +1,0 @@
-casos de uso y schemas

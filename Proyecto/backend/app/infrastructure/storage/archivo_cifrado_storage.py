@@ -13,8 +13,8 @@ Ciclo de vida de un archivo de evidencia:
 Decorador de cualquier FileStoragePort: hoy envuelve LocalFileStorage. Lee también
 archivos sin cifrar (anteriores a HU-06 o ya reemplazados por el texto anonimizado).
 """
-from app.domain.ports.file_storage_port import FileStoragePort
-from app.infrastructure.security.cifrado import CifradorDatos
+from app.domain.ports.almacenamiento_port import FileStoragePort
+from app.infrastructure.security.cripto.cifrado import CifradorDatos
 
 
 class ArchivoCifradoStorage(FileStoragePort):

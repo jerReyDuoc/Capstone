@@ -22,7 +22,7 @@ from test_solicitudes_arcop import (  # noqa: E402
     ADMIN, DESCRIPCION, OTRO, TITULAR, _clave_de, _correr, _llevar_a_en_proceso, _token_encuestado,
     _auth_secret,  # noqa: F401  (fixture autouse: AUTH_SECRET y plazos de prueba)
 )
-from _api_harness import EVAL_NA_ID, body_filtro  # noqa: E402
+from apoyo.api_harness import EVAL_NA_ID, body_filtro  # noqa: E402
 from test_hu30_contrato import _cliente, api, hu27  # noqa: E402,F401  (fixture del usuario definitivo)
 from test_hu30_contrato import _correr as _correr_hu30  # noqa: E402
 

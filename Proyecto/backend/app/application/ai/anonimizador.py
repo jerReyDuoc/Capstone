@@ -25,7 +25,7 @@ import asyncio
 import os
 import re
 
-from app.domain.ports.sanitizer_port import SanitizerPort
+from app.domain.ports.sanitizador_port import SanitizerPort
 
 _EXTENSION_SEGURA = re.compile(r"^\.[A-Za-z0-9]{1,10}$")
 MAX_NOMBRE_ARCHIVO = 255

@@ -1,6 +1,6 @@
 """Selección del proveedor LLM concreto a partir de la configuración (LLM_PROVIDER)."""
 from app.core.config import settings
-from app.domain.ports.llm_provider_port import LLMProviderPort
+from app.domain.ports.proveedor_llm_port import LLMProviderPort
 
 
 def crear_proveedor() -> LLMProviderPort:

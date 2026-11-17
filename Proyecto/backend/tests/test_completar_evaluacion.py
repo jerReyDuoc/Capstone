@@ -12,7 +12,7 @@ evaluaciones cerradas.
 Ejecutar desde Proyecto/backend/:
     pytest tests/test_completar_evaluacion.py -v
 
-En proceso (app real + SQLite en memoria, ver _api_harness.py). En modo live
+En proceso (app real + SQLite en memoria, ver apoyo/api_harness.py). En modo live
 (LATENCIA_BASE_URL) se omiten: cambian el estado de la evaluación.
 """
 import asyncio
@@ -21,7 +21,7 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api  # noqa: E402
+from apoyo.api_harness import EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api  # noqa: E402
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE  # noqa: E402
 
 if MODO == "en_proceso":

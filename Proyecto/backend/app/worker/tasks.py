@@ -10,16 +10,16 @@ from app.bootstrap import (
     crear_storage_evidencias,
     crear_validador_evidencias,
 )
-from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
-from app.application.use_cases.generate_resumen import GenerateResumenUseCase
+from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
+from app.application.use_cases.generar_resumen import GenerateResumenUseCase
 from app.domain.models.bitacora_auditoria import RESULTADO_OK, RESULTADO_RECHAZADO
 from app.domain.auditoria.acciones import ROL_SISTEMA, Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
 from app.application.use_cases.aplicar_retencion import AplicarRetencionUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 from app.core.contexto_auditoria import ORIGEN_WORKER, fijar_origen_por_defecto
 
 configurar()  # raíz de composición (A-40)
@@ -113,7 +113,7 @@ async def sellar_audit_log_task(ctx):
 
 async def recordar_revision_rat_task(ctx):
     """HU-40 criterio 5: recordatorio de la revisión periódica del registro (vence pronto o está vencida)."""
-    from app.application.use_cases.revision_interna import enviar_recordatorios
+    from app.application.rat.casos_uso.revision_interna import enviar_recordatorios
     async with AsyncSessionLocal() as session:
         return await enviar_recordatorios(session)
 
@@ -124,7 +124,7 @@ async def startup(ctx):
     # HU-09: lo que el worker registre fuera de una petición HTTP queda con origen "sistema:worker"
     fijar_origen_por_defecto(ORIGEN_WORKER)
     if settings.SANITIZER_ENABLED:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         cargar_spacy()
 
 

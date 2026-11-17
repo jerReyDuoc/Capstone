@@ -12,10 +12,10 @@ import asyncio
 
 import pytest
 
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     DOMINIOS, MODO, TODOS_LOS_CONTROLES, body_filtro, cliente_api, encabezados_qa,
 )
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 if MODO == "en_proceso":
@@ -251,7 +251,7 @@ def test_limite_de_evaluaciones_por_ip_y_dia(monkeypatch):
 
 def test_captcha_rechazado(monkeypatch):
     from app.api.routes import encuesta_publica
-    from app.infrastructure.security.captcha import ResultadoCaptcha
+    from app.infrastructure.servicios_externos.captcha import ResultadoCaptcha
 
     async def falso(token, ip, accion="iniciar_encuesta"):
         return ResultadoCaptcha(False, "invalid-input-response")
@@ -373,7 +373,7 @@ def test_las_evaluaciones_por_invitacion_no_tienen_cuota(monkeypatch):
 # ===================================================================== C4
 def test_benchmark_excluye_abandonadas_y_de_prueba():
     async def esc(c):
-        from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+        from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
         from app.core.database import get_db
         from app.domain.models import Evaluacion, UsuarioTemporal
         from app.domain.models.benchmark import Benchmark

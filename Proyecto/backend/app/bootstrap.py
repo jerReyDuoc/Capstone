@@ -8,16 +8,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ai.agente import AgenteIA
 from app.application.ai.anonimizador import AnonimizadorPII
-from app.application.ai.evidence_validator import GatewayEvidenceValidator
+from app.application.ai.validador_evidencias import GatewayEvidenceValidator
 from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import crear_politicas
 from app.application import fabricas as _fabricas
 from app.core.config import settings
-from app.domain.ports.file_storage_port import ClaveNoConfiguradaError
+from app.domain.ports.almacenamiento_port import ClaveNoConfiguradaError
+from app.infrastructure.archivos.extractor_texto import ExtractorTexto
+from app.infrastructure.correo.smtp import CorreoSmtp
+from app.infrastructure.documentos.generador import GeneradorDocumentos
 from app.infrastructure.llm.proveedores import crear_proveedor
 from app.infrastructure.cache.cache_matriz import CacheMatriz
 from app.infrastructure.repositories.anonimizacion_repository import AnonimizacionRepository
+from app.infrastructure.repositories.asistente_rat_repository import AsistenteRatRepository
+from app.infrastructure.repositories.benchmark_repository import BenchmarkRepository
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.infrastructure.repositories.informe_repository import InformeRepository
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.integridad_bitacora import IntegridadBitacora
@@ -25,11 +31,13 @@ from app.infrastructure.repositories.matriz_repository import MatrizRepository
 from app.infrastructure.repositories.pregunta_filtro_repository import PreguntaFiltroRepository
 from app.infrastructure.repositories.respuesta_filtro_repository import RespuestaFiltroRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
+from app.infrastructure.repositories.registro_actividades_repository import RegistroActividadesRepository
+from app.infrastructure.repositories.revision_interna_repository import RevisionInternaRepository
 from app.infrastructure.repositories.tutor_repository import TutorRepository
 from app.infrastructure.repositories.registro_ia_repository import RegistroIARepository
-from app.infrastructure.security.autenticacion import CredencialesPBKDF2
-from app.infrastructure.security.cifrado import CifradorDatos, CifradorEntidades
-from app.infrastructure.security.ner_sanitizer import NERSanitizer
+from app.infrastructure.security.cripto.autenticacion import CredencialesPBKDF2
+from app.infrastructure.security.cripto.cifrado import CifradorDatos, CifradorEntidades
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
 from app.infrastructure.storage.archivo_cifrado_storage import ArchivoCifradoStorage
 from app.infrastructure.storage.local_storage import LocalFileStorage
 
@@ -84,8 +92,8 @@ def crear_gateway(sesion_auditoria: AsyncSession) -> AIGateway:
 
 def crear_agente(sesion_auditoria: AsyncSession) -> AgenteIA:
     """HU-15: agente de LangGraph con sus skills (validar_evidencia, tutor y, HU-16, borrador)."""
-    from app.infrastructure.security.filtro_agente import FiltroAgente
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.filtro_agente import FiltroAgente
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
     guard = ReglasPromptGuard()
     return AgenteIA(crear_gateway(sesion_auditoria), guard=guard, filtro=FiltroAgente(guard))  # HU-18
 
@@ -140,4 +148,12 @@ def configurar() -> None:
         respuestas_filtro=RespuestaFiltroRepository,
         matriz=MatrizRepository,
         anonimizacion=AnonimizacionRepository,
+        informes=InformeRepository,
+        benchmark=BenchmarkRepository,
+        revision_interna=RevisionInternaRepository,
+        asistente_rat=AsistenteRatRepository,
+        registro_actividades=RegistroActividadesRepository,
+        documentos=GeneradorDocumentos(),
+        correo=CorreoSmtp(),
+        extractor_texto=ExtractorTexto(),
     ))

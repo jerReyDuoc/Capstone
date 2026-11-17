@@ -11,15 +11,25 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.ports.generador_documentos_port import GeneradorDocumentosPort
 from app.domain.ports.bitacora_port import BitacoraPort
 from app.domain.ports.cache_matriz_port import CacheMatrizPort
+from app.domain.ports.correo_port import CorreoPort
 from app.domain.ports.credenciales_port import CredencialesPort
-from app.domain.ports.file_storage_port import FileStoragePort
+from app.domain.ports.extractor_texto_port import ExtractorTextoPort
+from app.domain.ports.almacenamiento_port import FileStoragePort
 from app.domain.ports.integridad_bitacora_port import IntegridadBitacoraPort
+from app.domain.ports.repositorios_rat import (
+    AsistenteRatRepositoryPort,
+    RegistroActividadesRepositoryPort,
+    RevisionInternaRepositoryPort,
+)
 from app.domain.ports.repositorios import (
     AnonimizacionRepositoryPort,
+    BenchmarkRepositoryPort,
     EvaluacionRepositoryPort,
     EvidenciaRepositoryPort,
+    InformeRepositoryPort,
     MatrizRepositoryPort,
     PreguntaFiltroRepositoryPort,
     RespuestaFiltroRepositoryPort,
@@ -44,6 +54,14 @@ class Fabricas:
     respuestas_filtro: Callable[[AsyncSession], RespuestaFiltroRepositoryPort]
     matriz: Callable[[AsyncSession], MatrizRepositoryPort]
     anonimizacion: Callable[[AsyncSession], AnonimizacionRepositoryPort]
+    informes: Callable[[AsyncSession], InformeRepositoryPort]
+    benchmark: Callable[[AsyncSession], BenchmarkRepositoryPort]
+    revision_interna: Callable[[AsyncSession], RevisionInternaRepositoryPort]
+    asistente_rat: Callable[[AsyncSession], AsistenteRatRepositoryPort]
+    registro_actividades: Callable[[AsyncSession], RegistroActividadesRepositoryPort]
+    documentos: GeneradorDocumentosPort
+    correo: CorreoPort
+    extractor_texto: ExtractorTextoPort
 
 
 _actual: Fabricas | None = None

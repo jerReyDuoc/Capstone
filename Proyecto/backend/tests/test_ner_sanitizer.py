@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from _capa_ia_fakes import StubNLP, sanitizer_stub
+from apoyo.capa_ia_fakes import StubNLP, sanitizer_stub
 from app.application.ai.metricas import EntidadGold, evaluar_ner
-from app.domain.ports.sanitizer_port import ETIQUETAS, SanitizacionError, TipoEntidad
-from app.infrastructure.security import seguridad
-from app.infrastructure.security.cifrado import CifradorEntidades, ClaveCifradoInvalida
-from app.infrastructure.security.ner_sanitizer import NERSanitizer, dv_rut, rut_valido
+from app.domain.ports.sanitizador_port import ETIQUETAS, SanitizacionError, TipoEntidad
+from app.infrastructure.security.prompt_injection import seguridad
+from app.infrastructure.security.cripto.cifrado import CifradorEntidades, ClaveCifradoInvalida
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer, dv_rut, rut_valido
 
 GOLD = [json.loads(l) for l in (Path(__file__).parent / "data" / "ner_gold.jsonl").read_text("utf-8").splitlines() if l.strip()]
 NOMBRES_GOLD = [e["valor"] for c in GOLD for e in c["entidades"] if e["tipo"] == "NOMBRE"]
@@ -175,7 +175,7 @@ def test_precision_con_spacy_real():
     """Precisión real del motor. Umbral de cobertura alto: una entidad no cubierta es una fuga."""
     pytest.importorskip("spacy")
     try:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         cargar_spacy()
     except OSError:
         pytest.skip("modelo es_core_news_md no instalado")

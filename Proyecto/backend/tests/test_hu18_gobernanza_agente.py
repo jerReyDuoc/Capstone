@@ -10,7 +10,7 @@ QA - HU-18: el Agente IA cumple los mismos estándares de gobernanza que el sist
       equipo (28-oct) y advertencia por abuso reiterado (sin bloquear el tutor).
 
 Umbrales (los mide la parte DETERMINISTA, sin LLM; la prueba en vivo con Groq la hace
-scripts/evaluar_ataques_tutor.py):
+scripts/evaluacion/evaluar_ataques_tutor.py):
   inyección y fuga del prompt            100 % bloqueado
   delimitadores                          100 % bloqueado
   jailbreak, ofuscados (codificado,
@@ -26,15 +26,15 @@ from pathlib import Path
 
 import pytest
 
-from _capa_ia_fakes import FakeRegistro, crear_gateway
+from apoyo.capa_ia_fakes import FakeRegistro, crear_gateway
 from app.application.ai.agente import AgenteIA, SkillIA
-from app.application.ai.agente import salida as validacion
+from app.application.ai.agente import salida_tutor as validacion
 from app.application.ai.prompts import tutor as prompt_tutor
-from app.application.schemas.tutor import PasoAccion, TutorRespuesta
+from app.application.ai.schemas.tutor import PasoAccion, TutorRespuesta
 from app.domain.auditoria import auditoria_hash
 from app.domain.ports.filtro_agente_port import CategoriaAtaque
-from app.infrastructure.security.filtro_agente import FiltroAgente
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.filtro_agente import FiltroAgente
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 from test_hu15_tutor import (  # noqa: F401  (fixtures y datos de HU-15)
     INYECCION,
     FakeTutor,

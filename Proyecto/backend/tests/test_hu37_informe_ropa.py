@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.application.ropa import informe as R
+from app.application.ropa import informe_ropa as R
 from app.domain.mapa_datos.modelo import ErrorValidacion
 from app.domain.rat import modelo as M
 from app.domain.ropa import datos as D
@@ -172,7 +172,7 @@ def _pdf_texto(datos: bytes) -> str:
 
 def test_pdf_con_fecha_version_aviso_y_las_dos_partes():
     pytest.importorskip("reportlab")
-    from app.application.ropa.pdf_ropa import generar_pdf_ropa
+    from app.infrastructure.documentos.pdf.ropa import generar_pdf_ropa
 
     inf = R.armar(_registro(), DATOS, None, GENERADO).con_emision(R.codigo(31, 2026), 3)
     datos = generar_pdf_ropa(inf)
@@ -191,7 +191,7 @@ def test_pdf_con_fecha_version_aviso_y_las_dos_partes():
 
 def test_pdf_de_una_sola_parte():
     pytest.importorskip("reportlab")
-    from app.application.ropa.pdf_ropa import generar_pdf_ropa
+    from app.infrastructure.documentos.pdf.ropa import generar_pdf_ropa
 
     inf = R.armar(_registro(), DATOS, ["responsable"], GENERADO).con_emision(R.codigo(32, 2026), 1)
     texto = _pdf_texto(generar_pdf_ropa(inf))
@@ -200,7 +200,7 @@ def test_pdf_de_una_sola_parte():
 
 def test_xlsx_con_las_hojas_de_cada_parte_y_sin_formulas():
     openpyxl = pytest.importorskip("openpyxl")
-    from app.application.ropa.xlsx_ropa import generar_xlsx_ropa
+    from app.infrastructure.documentos.xlsx.ropa import generar_xlsx_ropa
 
     datos = {**DATOS, "direccion": "=HYPERLINK(\"http://x\")"}
     inf = R.armar(_registro(), datos, None, GENERADO).con_emision(R.codigo(33, 2026), 2)
@@ -225,7 +225,7 @@ def test_xlsx_con_las_hojas_de_cada_parte_y_sin_formulas():
 
 def test_xlsx_de_una_sola_parte_no_trae_la_otra_hoja():
     openpyxl = pytest.importorskip("openpyxl")
-    from app.application.ropa.xlsx_ropa import generar_xlsx_ropa
+    from app.infrastructure.documentos.xlsx.ropa import generar_xlsx_ropa
 
     inf = R.armar(_registro(), DATOS, ["encargado"], GENERADO).con_emision(R.codigo(34, 2026), 1)
     wb = openpyxl.load_workbook(io.BytesIO(generar_xlsx_ropa(inf)))
@@ -252,7 +252,7 @@ def hu27(monkeypatch, tmp_path):
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-37: solo en proceso")
     from app.core.config import settings

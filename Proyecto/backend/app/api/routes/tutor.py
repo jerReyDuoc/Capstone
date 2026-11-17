@@ -19,7 +19,6 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.tutor_ia import TutorError, TutorIA
@@ -27,6 +26,7 @@ from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.tutor import NuevaConversacion, CambioNivel, NuevoMensaje
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def obtener_servicios_tutor(
     sesion_ia: AsyncSession = Depends(get_db, use_cache=False),
 ) -> ServiciosTutor:
     from app.api.dependencias.contenedor import crear_agente, crear_anonimizador
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
     from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
     from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
 
@@ -107,11 +107,6 @@ async def listar(
     return JSONResponse(await _tutor(db, cliente, None, None).listar(), headers=_SIN_CACHE)
 
 
-class NuevaConversacion(BaseModel):
-    ruta_id: int | None = Field(None, ge=1, description="Módulo formativo desde el que se abre (fija el nivel por defecto)")
-    nivel: str | None = Field(None, max_length=20, description="Inicial | Intermedio | Avanzado (vacío = el de la ruta)")
-
-
 @router.post("/conversaciones", status_code=201)
 async def crear(
     payload: NuevaConversacion | None = None,
@@ -143,10 +138,6 @@ async def obtener(
         raise _sin_limitador()
 
 
-class CambioNivel(BaseModel):
-    nivel: str = Field(..., max_length=20)
-
-
 @router.patch("/conversaciones/{conversacion_id}")
 async def cambiar_nivel(
     conversacion_id: int,
@@ -172,11 +163,6 @@ async def eliminar(
     except TutorError as e:
         raise _http(e)
     return Response(status_code=204)
-
-
-class NuevoMensaje(BaseModel):
-    # El largo real lo controla TUTOR_MAX_CHARS_MENSAJE en el caso de uso; esto es un tope duro.
-    texto: str = Field(..., max_length=20000)
 
 
 @router.post("/conversaciones/{conversacion_id}/mensajes")

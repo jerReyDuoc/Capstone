@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.application.schemas.api_schemas import ControlResponse
-from app.domain.models.matriz_control import MatrizControl
+from app.api.schemas.api_schemas import ControlResponse
+from app.infrastructure.repositories.catalogo_repository import CatalogoRepository
 
 
 router = APIRouter(prefix="/api/controles", tags=["controles"])
@@ -23,17 +22,7 @@ async def list_controles(
     - dominio_id: para obtener solo los controles de un dominio
     - criticidad: para obtener solo los de una criticidad específica
     """
-    # HU-24: los retirados en una versión de la matriz no se listan (se conservan en la BD)
-    query = select(MatrizControl).where(MatrizControl.activo.is_(True)).order_by(MatrizControl.id_control)
-
-    if dominio_id is not None:
-        query = query.where(MatrizControl.dominio_id == dominio_id)
-
-    if criticidad is not None:
-        query = query.where(MatrizControl.criticidad == criticidad)
-
-    result = await db.execute(query)
-    return list(result.scalars().all())
+    return await CatalogoRepository(db).list_controles(dominio_id=dominio_id, criticidad=criticidad)
 
 
 @router.get("/{control_id}", response_model=ControlResponse)
@@ -42,10 +31,7 @@ async def get_control(
     db: AsyncSession = Depends(get_db),
 ):
     """Detalle de un control específico, con dominio y brecha anidados."""
-    result = await db.execute(
-        select(MatrizControl).where(MatrizControl.id_control == control_id)
-    )
-    control = result.scalar_one_or_none()
+    control = await CatalogoRepository(db).get_control(control_id)
 
     if not control:
         raise HTTPException(status_code=404, detail="Control no encontrado")

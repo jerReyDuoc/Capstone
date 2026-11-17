@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from app.infrastructure.security import seguridad as s
+from app.infrastructure.security.prompt_injection import seguridad as s
 
 DATA = Path(__file__).parent / "data"
 CORPUS = DATA / "documentos_legitimos.jsonl"

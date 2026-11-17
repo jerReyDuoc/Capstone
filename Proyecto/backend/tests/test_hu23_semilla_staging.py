@@ -1,8 +1,8 @@
 """
-HU-23 · Datos semilla del ambiente de staging (scripts/sembrar_staging.py).
+HU-23 · Datos semilla del ambiente de staging (scripts/operacion/sembrar_staging.py).
 
 Corre contra SQLite en memoria con los mismos catálogos mínimos que el resto de la suite
-(_api_harness._sembrar). Verifica que la semilla:
+(apoyo.api_harness._sembrar). Verifica que la semilla:
   - crea el administrador sin pedir nada por teclado y no lo pisa en la segunda ejecución;
   - crea evaluaciones completadas, con resumen, sin datos personales;
   - deja el benchmark con k = evaluaciones por rubro (la comparativa se puede publicar);
@@ -13,8 +13,8 @@ import asyncio
 import pytest
 from sqlalchemy import func, select
 
-import _api_harness as h
-from scripts import sembrar_staging as semilla
+import apoyo.api_harness as h
+from scripts.operacion import sembrar_staging as semilla
 
 
 def _bd():
@@ -63,7 +63,7 @@ async def _ejecutar(Session, **kw):
 
 def test_crea_admin_evaluaciones_y_benchmark():
     async def caso(Session):
-        from app.infrastructure.security.autenticacion import verificar_password
+        from app.infrastructure.security.cripto.autenticacion import verificar_password
         from app.domain.models import Benchmark, Evaluacion, Resumen, UsuarioAdmin, UsuarioTemporal
 
         r = await _ejecutar(Session)
@@ -102,7 +102,7 @@ def test_crea_admin_evaluaciones_y_benchmark():
 
 def test_es_idempotente_y_no_pisa_la_clave():
     async def caso(Session):
-        from app.infrastructure.security.autenticacion import verificar_password
+        from app.infrastructure.security.cripto.autenticacion import verificar_password
         from app.domain.models import Evaluacion, Respuesta, UsuarioAdmin
 
         await _ejecutar(Session)

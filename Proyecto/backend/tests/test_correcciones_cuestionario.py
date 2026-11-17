@@ -11,7 +11,7 @@ import pytest
 pytest.importorskip("httpx")
 
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE  # noqa: E402
-from app.application.use_cases.create_respuesta import validar_justificacion  # noqa: E402
+from app.application.use_cases.crear_respuesta import validar_justificacion  # noqa: E402
 from app.core.config import Settings, settings  # noqa: E402
 from test_hu02_matriz_estados import (  # noqa: E402
     CUMP, EVAL_ID, PARC, REV, SOLO_BASE, _body, _correr, _procesar_con_llm, _subir, solo_en_proceso,

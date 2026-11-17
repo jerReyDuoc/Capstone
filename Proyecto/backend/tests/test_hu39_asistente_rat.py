@@ -1,7 +1,7 @@
 """
 HU-39 · Asistente de IA para el mapa de datos, el RAT y los informes.
 
-Pruebas sin BD, sin spaCy y sin LLM real (dobles de app/tests/_capa_ia_fakes.py):
+Pruebas sin BD, sin spaCy y sin LLM real (dobles de app/tests/apoyo/capa_ia_fakes.py):
 
   C1  banco de preguntas por área y avance de la entrevista
   C2  anclaje a los catálogos, inconsistencias y riesgo calculados por el backend; flujos sin actividad
@@ -18,20 +18,20 @@ import asyncio
 
 import pytest
 
-from _capa_ia_fakes import FakeRegistro, sanitizer_stub
+from apoyo.capa_ia_fakes import FakeRegistro, sanitizer_stub
 from app.application.ai.agente import AgenteIA, SkillIA
 from app.application.ai.gateway import AIGateway, PreciosModelo
 from app.application.ai.politicas import TareaIA, crear_politicas
 from app.application.ai.prompts import asistente_rat as prompt
-from app.application.asistente import anclaje, banco, contexto, documento, inconsistencias, salida_ia
-from app.application.schemas.asistente_rat import (
+from app.application.rat.asistente import anclaje, banco, contexto_asistente as contexto, documento, inconsistencias, salida_asistente as salida_ia
+from app.application.ai.schemas.asistente_rat import (
     ActividadIA, AsistenteRatRespuesta, ElementoIA, Explicacion, FlujoIA, PlazoIA, PropuestaIA,
 )
 from app.domain.mapa_datos.modelo import Elemento, Flujo
-from app.domain.ports.llm_provider_port import LLMProviderPort, LLMResponse
+from app.domain.ports.proveedor_llm_port import LLMProviderPort, LLMResponse
 from app.domain.rat import cobertura
-from app.infrastructure.security.filtro_agente import FiltroAgente
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.filtro_agente import FiltroAgente
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
 
 # ====================================================================== utilidades
@@ -310,7 +310,7 @@ def test_edicion_solo_cambia_campos_del_tipo():
 
 def test_etiqueta_visible_de_la_ia():
     pytest.importorskip("sqlalchemy")
-    from app.application.use_cases.asistente_rat import etiqueta_ia   # noqa: PLC0415 (usa SQLAlchemy)
+    from app.application.rat.casos_uso.asistente_rat import etiqueta_ia   # noqa: PLC0415 (usa SQLAlchemy)
     assert etiqueta_ia("openai/gpt-oss-20b", "asistente_rat/1.0.0") == \
         "Sugerido por IA · Modelo openai/gpt-oss-20b · Guía v1.0.0"
     assert etiqueta_ia("sin_ia", "banco/1.0.0") is None
@@ -611,7 +611,7 @@ def test_api_ayuda_ocupada_no_avanza_y_se_puede_guardar_sin_ayuda(hu27, ia):
     """Si el proveedor falla (p. ej. límite de tokens por minuto), la pregunta no avanza y no se pierde nada."""
     async def esc(c):
         from app.domain.models import AsistenteMensaje, BitacoraAuditoria
-        from app.domain.ports.llm_provider_port import LLMProviderError, TipoErrorLLM
+        from app.domain.ports.proveedor_llm_port import LLMProviderError, TipoErrorLLM
 
         h = (await _cliente(hu27, c))["hc"]
         s = (await c.post("/api/asistente/sesiones", headers=h, json={})).json()["sesion"]

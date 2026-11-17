@@ -5,7 +5,7 @@ from app.domain.models.base import Base
 
 
 # Estados de `estado_progreso` en los que la evaluación ya no admite respuestas.
-# "completada" es el estado que usa el benchmark (update_benchmark.py).
+# "completada" es el estado que usa el benchmark (actualizar_benchmark.py).
 ESTADOS_CERRADOS = frozenset({"completada", "cerrada"})
 
 # HU-19: de dónde viene la evaluación. Solo el backend la fija; el frontend nunca la envía.

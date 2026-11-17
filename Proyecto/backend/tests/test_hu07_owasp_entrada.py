@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from app.application.ai.prompts.base import escapar_para_prompt, sanear_texto_no_confiable
-from app.infrastructure.security import seguridad as s
+from app.infrastructure.security.prompt_injection import seguridad as s
 
 DATA = Path(__file__).parent / "data"
 CASOS = [json.loads(x) for x in (DATA / "ataques_owasp_evidencias.jsonl").read_text(encoding="utf-8").splitlines()

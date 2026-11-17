@@ -6,9 +6,9 @@ leer promedio_puntaje / percentiles de Benchmark para mostrarlos.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.fabricas import fabricas
 from app.domain.benchmark.k_anonimato import SUPRIMIDA, Publicacion, diferencia, posicion, publicar
 from app.core.config import settings
 from app.domain.models.benchmark import Benchmark
@@ -33,7 +33,7 @@ async def filas_del_rubro(db: AsyncSession, rubro_id: int | None) -> dict[int | 
     """{dominio_id: fila}; la clave None es el puntaje general del rubro."""
     if rubro_id is None:
         return {}
-    filas = (await db.execute(select(Benchmark).where(Benchmark.rubro_id == rubro_id))).scalars().all()
+    filas = await fabricas().benchmark(db).filas_del_rubro(rubro_id)
     return {b.dominio_id: b for b in filas}
 
 

@@ -18,17 +18,17 @@ import pytest
 from test_seguridad_integracion import (
     FakeEvaluaciones, FakeEventoRepo, FakeRespuestaRepo, _control, _process, _respuesta,
 )
-from app.application.evidencias.archivos import extraer_texto
+from app.infrastructure.archivos.extractor_texto import extraer_texto
 from app.application.use_cases.bandeja_revision import BandejaRevision
-from app.application.use_cases.create_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
+from app.application.use_cases.crear_respuesta import CreateRespuestaUseCase, InyeccionDetectadaError
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad, _regla_segura
 from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.evidencia import EstadoValidacion
 from app.domain.models.respuesta import EstadoClasificacion
-from app.domain.ports.prompt_guard_port import (
+from app.domain.ports.guardia_prompt_port import (
     PERFIL_EVIDENCIA, PERFIL_JUSTIFICACION, PromptGuardPort, ResultadoGuard,
 )
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
 RACI = (
     "Matriz RACI – Gestión de datos personales\n"

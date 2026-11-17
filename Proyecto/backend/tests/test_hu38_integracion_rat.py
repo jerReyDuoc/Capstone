@@ -22,7 +22,7 @@ import pytest
 from app.application.borradores import generador as G
 from app.application.borradores import registro as BR
 from app.application.borradores.plantillas import TipoPlantilla, plantilla
-from app.application.rat import informe as I
+from app.application.rat import informe_rat as I
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import analisis as A
 from app.domain.rat import cumplimiento as CU
@@ -183,8 +183,8 @@ def test_pdf_y_xlsx_incluyen_la_matriz_de_mayor_riesgo():
 
     from openpyxl import load_workbook
 
-    from app.application.rat.pdf_rat import generar_pdf_rat
-    from app.application.rat.xlsx_rat import generar_xlsx_rat
+    from app.infrastructure.documentos.pdf.rat import generar_pdf_rat
+    from app.infrastructure.documentos.xlsx.rat import generar_xlsx_rat
 
     els, fls = _mapa()
     c = _atencion(els, fls, decisiones={"existe": True, "logica": "Prioriza consultas", "intervencion_humana": True})
@@ -347,7 +347,7 @@ def hu27(monkeypatch, tmp_path):
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-38: solo en proceso")
     from app.core.config import settings

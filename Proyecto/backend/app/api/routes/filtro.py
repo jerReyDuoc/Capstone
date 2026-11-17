@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.application.schemas.api_schemas import ControlResponse, ProgresoCuestionarioResponse
-from app.application.use_cases.progreso_cuestionario import calcular_progreso
+from app.api.schemas.api_schemas import ControlResponse
+from app.application.use_cases.progreso_cuestionario import ProgresoCuestionarioResponse, calcular_progreso
 from app.infrastructure.cache import catalogo_controles
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
 
 from app.api.dependencias.alcance import alcance_evaluacion
 from app.core.database import get_db
 from app.application.use_cases.responder_filtro import ResponderFiltroUseCase
-from app.application.schemas.api_schemas import (
+from app.api.schemas.api_schemas import (
     PreguntaFiltroResponse,
     EstadoFiltroResponse,
     RespuestaFiltroResponse,

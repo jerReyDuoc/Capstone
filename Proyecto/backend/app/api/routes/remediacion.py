@@ -26,7 +26,7 @@ from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleErro
 from app.api.dependencias.contenedor import obtener_limitador
 from app.api.dependencias.contenedor import ClaveNoConfiguradaError, crear_anonimizador, crear_storage_evidencias
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
 router = APIRouter(prefix="/api/remediacion", tags=["remediación con evidencia (HU-17)"])
 

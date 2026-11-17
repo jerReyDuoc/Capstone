@@ -1,1 +1,0 @@
-worker de arq

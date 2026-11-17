@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from html import escape
 
-from app.application.informes import motor_pdf as M
-from app.application.rat.pdf_revision import DatosConstancia
+from app.application.informes import formato as M
+from app.application.rat.constancia_revision import DatosConstancia
 
 
 def _marco(titulo: str, cuerpo_html: str, color: str = "#0b7a5a") -> str:

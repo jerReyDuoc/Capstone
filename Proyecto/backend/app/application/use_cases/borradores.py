@@ -25,7 +25,7 @@ Reglas:
   - El LLM no toca la BD ni ve la razón social, el RUT ni datos de contacto: recibe la
     plantilla, datos de catálogo y las instrucciones de la empresa, que pasan por el filtro
     del agente (HU-18: un ataque bloquea sin llamar al NER ni al LLM) y por el NER del gateway.
-  - La salida del modelo se valida y se ancla (salida_ia.py). Si el LLM falla, no está
+  - La salida del modelo se valida y se ancla (salida_borrador.py). Si el LLM falla, no está
     habilitado o se agotó la cuota, el borrador se arma igual con la plantilla y se avisa.
   - Cuota de borradores con IA por empresa y día (BORRADORES_IA_DIA_EMPRESA) + cuota global
     del LLM. Si el servicio de IA falla, la cuota se devuelve.
@@ -52,7 +52,7 @@ from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
 from app.application.ai.gateway import CapaIAError
 from app.application.borradores import generador
 from app.application.borradores.generador import AdaptacionIA, IdentidadEmpresa
-from app.application.borradores.pdf_borrador import PdfNoDisponibleError, generar_pdf_borrador
+from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.borradores.plantillas import (
     PLANTILLAS,
     VERSION_PLANTILLAS,
@@ -162,7 +162,7 @@ class Borradores:
     # ------------------------------------------------------------------ HU-38: el registro de actividades
     async def _registro(self):
         from app.application.borradores import registro as reg_borrador
-        from app.application.use_cases.informe_rat import InformeRatCasos
+        from app.application.rat.casos_uso.generar_informe import InformeRatCasos
 
         return reg_borrador.desde_informe(await InformeRatCasos(self.db, self.cliente).armar())
 
@@ -454,8 +454,8 @@ class Borradores:
         pie = (f"{self.empresa.razon_social} · Versión consolidada el {fecha:%d-%m-%Y}" if consolidado
                else f"{self.empresa.razon_social} · Borrador en revisión (versión {b.version})")
         try:
-            return generar_pdf_borrador(b.contenido, titulo=b.titulo, pie=pie,
-                                        marca_agua=None if consolidado else "BORRADOR")
+            return fabricas().documentos.pdf_borrador(b.contenido, titulo=b.titulo, pie=pie,
+                                                      marca_agua=None if consolidado else "BORRADOR")
         except PdfNoDisponibleError as e:
             raise BorradorError(503, "PDF_NO_DISPONIBLE", str(e))
 

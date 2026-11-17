@@ -19,13 +19,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.privacidad_plataforma import PrivacidadPlataformaCasos, PrivacidadPlataformaError
 from app.api.dependencias.alcance import solo_admin
 from app.domain.auth.actor import Actor
 from app.core.database import get_db
+from app.api.schemas.admin_privacidad import EmitirEntrada, DatosRopaEntrada
 
 router = APIRouter(prefix="/api/admin/privacidad-plataforma", tags=["admin · privacidad de la plataforma (HU-41)"])
 
@@ -41,24 +41,6 @@ async def _ejecutar(coro):
         return await coro
     except PrivacidadPlataformaError as e:
         raise HTTPException(status_code=e.status, detail={"codigo": e.codigo, "mensaje": e.mensaje, **e.extra})
-
-
-class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class EmitirEntrada(_Base):
-    tipo: str = Field(..., pattern="^(rat|ropa)$")
-    forzar: bool = False
-
-
-class DatosRopaEntrada(_Base):
-    direccion: str | None = Field(None, max_length=200)
-    correo: str | None = Field(None, max_length=100)
-    telefono: str | None = Field(None, max_length=25)
-    tiene_dpo: bool | None = None
-    dpo_cargo: str | None = Field(None, max_length=120)
-    dpo_correo: str | None = Field(None, max_length=100)
 
 
 def _archivo(contenido: bytes, nombre: str, mime: str) -> Response:

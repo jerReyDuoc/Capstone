@@ -31,11 +31,8 @@ Todas las rutas son solo de admin_therion (401 sin token, 403 con otro rol).
 El admin nunca ve ni define la contraseña del cliente, ni recibe el token de activación:
 el enlace solo va al correo del usuario definitivo.
 """
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import false as sa_false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.activacion_cuenta import ResultadoCorreo
@@ -49,14 +46,18 @@ from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
 from app.domain.models.empresa import Empresa
-from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.resumen import Resumen
-from app.domain.models.rubro import Rubro
 from app.domain.models.solicitud_contratacion import SolicitudContratacion
 from app.domain.models.usuario_definitivo import UsuarioDefinitivo
-from app.domain.models.usuario_temporal import UsuarioTemporal
-from app.domain.auditoria.acciones import Accion, categoria
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.domain.auditoria.acciones import categoria
+from app.application.use_cases.panel_clientes import PanelClientesError, PanelClientesUseCase
+from app.infrastructure.repositories.panel_clientes_repository import PanelClientesRepository
+from app.api.schemas.admin_clientes import (
+    CambiarEstadoRequest,
+    AltaEmpresaRequest,
+    AsociarRequest,
+    RenovacionRequest,
+    MotivoContratoRequest,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin · empresas cliente (HU-27)"])
 
@@ -65,59 +66,16 @@ def _error(e: ContratacionError | MigracionError | ContratoError) -> HTTPExcepti
     return HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": str(e), **e.extra})
 
 
-# ------------------------------------------------------------------ esquemas
-class CambiarEstadoRequest(BaseModel):
-    estado: str = Field(..., max_length=20)
-
-
-class EmpresaRequest(BaseModel):
-    razon_social: str = Field(..., max_length=200)
-    rut: str = Field(..., max_length=20)
-    rubro_id: int = Field(..., ge=1)
-    fecha_inicio_contrato: date
-    fecha_termino_contrato: date
-
-
-class UsuarioRequest(BaseModel):
-    nombre: str = Field(..., max_length=200)
-    email: str = Field(..., max_length=200)
-
-
-class AltaEmpresaRequest(BaseModel):
-    empresa: EmpresaRequest
-    usuario: UsuarioRequest
-    solicitudes_ids: list[int] = Field(..., min_length=1, max_length=20)
-
-
-class AsociarRequest(BaseModel):
-    solicitudes_ids: list[int] = Field(..., min_length=1, max_length=20)
-
-
-class RenovacionRequest(BaseModel):
-    fecha_termino_contrato: date
-
-
-class MotivoContratoRequest(BaseModel):
-    motivo: str = Field(..., max_length=30, description="no_pago | solicitud_cliente | incumplimiento | "
-                                                          "fin_acuerdo | otro")
-
-
 # ------------------------------------------------------------------ serialización
 async def _datos_evaluacion(db: AsyncSession, evaluacion_id: int) -> dict:
-    fila = (await db.execute(
-        select(Evaluacion, Rubro.id, Rubro.nombre_rubro)
-        .outerjoin(UsuarioTemporal, Evaluacion.usuario_temporal_id == UsuarioTemporal.id)
-        .outerjoin(Rubro, UsuarioTemporal.rubro_id == Rubro.id)
-        .where(Evaluacion.id == evaluacion_id)
-    )).first()
-    if fila is None:
+    datos = await PanelClientesUseCase(db, PanelClientesRepository(db)).datos_evaluacion(evaluacion_id)
+    if datos is None:
         return {"id": evaluacion_id}
-    ev, rubro_id, rubro = fila
-    puntaje = await db.scalar(select(func.avg(Resumen.puntaje_obtenido)).where(Resumen.evaluacion_id == ev.id))
+    ev, puntaje = datos.evaluacion, datos.puntaje
     return {
         "id": ev.id, "origen": ev.origen, "estado_progreso": ev.estado_progreso,
         "fecha_inicio": ev.fecha_inicio, "completada": ev.esta_cerrada,
-        "rubro_id": rubro_id, "rubro": rubro,
+        "rubro_id": datos.rubro_id, "rubro": datos.rubro,
         "puntaje_general": round(puntaje, 1) if puntaje is not None else None,
         "empresa_id": ev.empresa_id, "fecha_migracion": ev.fecha_migracion,
     }
@@ -329,13 +287,13 @@ async def terminar_contrato(empresa_id: int, payload: MotivoContratoRequest,
 async def formacion_empresa(empresa_id: int, evaluacion_id: int | None = Query(None, ge=1),
                             _: Actor = Depends(solo_admin), db: AsyncSession = Depends(get_db)):
     """HU-26: avance formativo de la empresa (lo mismo que ve el cliente en su panel)."""
-    from app.application.use_cases.formacion_empresa import FormacionError, avance_de_empresa_para_admin
+    from app.application.use_cases.formacion_empresa import FormacionError
 
-    empresa = await db.get(Empresa, empresa_id)
-    if empresa is None:
-        raise HTTPException(status_code=404, detail={"codigo": "NO_ENCONTRADO", "mensaje": "Empresa no encontrada."})
     try:
-        return await avance_de_empresa_para_admin(db, empresa, evaluacion_id)
+        return await PanelClientesUseCase(db, PanelClientesRepository(db)).formacion_empresa(
+            empresa_id, evaluacion_id)
+    except PanelClientesError as e:
+        raise HTTPException(status_code=e.status_code, detail={"codigo": e.codigo, "mensaje": e.mensaje})
     except FormacionError as e:
         raise HTTPException(status_code=e.status, detail={"codigo": e.codigo, "mensaje": e.mensaje})
 
@@ -355,43 +313,20 @@ async def listar_evaluaciones_admin(
     HU-28 criterio 2: evaluaciones del panel interno, con su rubro, puntaje general y la
     empresa a la que se migraron (si ya contrató). Sin datos de contacto del encuestado.
     """
-    filtros = []
-    if estado:
-        filtros.append(Evaluacion.estado_progreso == estado)
-    if origen:
-        filtros.append(Evaluacion.origen == origen)
-    if empresa_id is not None:
-        filtros.append(Evaluacion.empresa_id == empresa_id)
-    if not incluir_prueba:
-        filtros.append(Evaluacion.es_prueba == sa_false())
-    total = (await db.execute(select(func.count()).select_from(Evaluacion).where(*filtros))).scalar_one()
-    puntaje = (
-        select(Resumen.evaluacion_id, func.avg(Resumen.puntaje_obtenido).label("puntaje"))
-        .group_by(Resumen.evaluacion_id).subquery()
-    )
-    filas = (await db.execute(
-        select(Evaluacion, Rubro.nombre_rubro, Empresa.razon_social, puntaje.c.puntaje)
-        .outerjoin(UsuarioTemporal, Evaluacion.usuario_temporal_id == UsuarioTemporal.id)
-        .outerjoin(Rubro, UsuarioTemporal.rubro_id == Rubro.id)
-        .outerjoin(Empresa, Evaluacion.empresa_id == Empresa.id)
-        .outerjoin(puntaje, puntaje.c.evaluacion_id == Evaluacion.id)
-        .where(*filtros)
-        .order_by(Evaluacion.id.desc()).offset((page - 1) * size).limit(size)
-    )).all()
-    conteo = dict((await db.execute(
-        select(Evaluacion.estado_progreso, func.count()).where(Evaluacion.es_prueba == sa_false())
-        .group_by(Evaluacion.estado_progreso)
-    )).all())
+    pagina = await PanelClientesUseCase(db, PanelClientesRepository(db)).listar_evaluaciones(
+        estado=estado, origen=origen, empresa_id=empresa_id, incluir_prueba=incluir_prueba, page=page, size=size)
     return {
         "items": [{
-            "id": ev.id, "origen": ev.origen, "estado_progreso": ev.estado_progreso,
-            "completada": ev.esta_cerrada, "fecha_inicio": ev.fecha_inicio, "es_prueba": ev.es_prueba,
-            "rubro": rubro, "puntaje_general": round(p, 1) if p is not None else None,
-            "empresa": {"id": ev.empresa_id, "razon_social": razon} if ev.empresa_id else None,
-            "fecha_migracion": ev.fecha_migracion,
-        } for ev, rubro, razon, p in filas],
-        "total": total, "page": page, "size": size,
-        "conteo_por_estado": {str(k or "sin_estado"): v for k, v in conteo.items()},
+            "id": d.evaluacion.id, "origen": d.evaluacion.origen, "estado_progreso": d.evaluacion.estado_progreso,
+            "completada": d.evaluacion.esta_cerrada, "fecha_inicio": d.evaluacion.fecha_inicio,
+            "es_prueba": d.evaluacion.es_prueba,
+            "rubro": d.rubro, "puntaje_general": round(d.puntaje, 1) if d.puntaje is not None else None,
+            "empresa": ({"id": d.evaluacion.empresa_id, "razon_social": d.empresa_razon_social}
+                        if d.evaluacion.empresa_id else None),
+            "fecha_migracion": d.evaluacion.fecha_migracion,
+        } for d in pagina.filas],
+        "total": pagina.total, "page": page, "size": size,
+        "conteo_por_estado": {str(k or "sin_estado"): v for k, v in pagina.conteo_por_estado.items()},
     }
 
 
@@ -406,8 +341,8 @@ async def bitacora(
     _: Actor = Depends(solo_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    filas, total = await BitacoraRepository(db).listar(entidad=entidad, entidad_id=entidad_id, accion=accion,
-                                                       page=page, size=size)
+    filas, total = await PanelClientesUseCase(db, PanelClientesRepository(db)).listar_bitacora(
+        entidad=entidad, entidad_id=entidad_id, accion=accion, page=page, size=size)
     return {
         "items": [{"id": f.id, "fecha": f.fecha, "actor_rol": f.actor_rol, "actor_id": f.actor_id,
                    "ip": f.ip, "accion": f.accion, "categoria": categoria(f.accion),
@@ -428,14 +363,7 @@ async def verificar_bitacora(
     fuera del sistema para detectar también un borrado de las últimas filas.
     HU-09: además verifica cada lote sellado (`lotes`, `filas`, `ancla_lote`).
     """
-    from app.infrastructure.repositories.audit_log_lotes import verificar_lotes
-    r = await verificar_lotes(db)
-    BitacoraRepository(db).registrar(
-        accion=Accion.AUDITORIA_VERIFICACION, entidad="audit_log", actor=actor,
-        resultado="ok" if r["integra"] else "rechazado",
-        detalle={"integra": r["integra"], "lotes": r["lotes"]["total"], "lotes_con_falla": r["lotes"]["con_falla"],
-                 "filas": r["filas"]["total"]})
-    await db.commit()
+    r = await PanelClientesUseCase(db, PanelClientesRepository(db)).verificar_bitacora(actor)
     # Mismas claves que HU-18 (integra, total, verificadas, primera_falla, ancla) + las de HU-09
     return {**r["cadena"], "integra": r["integra"], "lotes": r["lotes"], "filas": r["filas"],
             "ancla_lote": r["ancla"], "metodo": r["metodo"], "fecha_verificacion": r["fecha_verificacion"]}

@@ -1,7 +1,5 @@
-from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.clave_acceso_encuestado import (
@@ -26,55 +24,20 @@ from app.core.config import settings
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
 from app.core.database import get_db
+from app.api.schemas.auth import (
+    LoginAdminRequest,
+    AccesoTitularRequest,
+    AccesoEncuestadoRequest,
+    GenerarClaveRequest,
+    LoginClienteRequest,
+    VerificarActivacionRequest,
+    ActivarCuentaRequest,
+    SolicitarRecuperacionRequest,
+    VerificarRecuperacionRequest,
+    RestablecerRequest,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-class LoginAdminRequest(BaseModel):
-    email: str = Field(..., max_length=200)
-    password: str = Field(..., max_length=200)
-
-
-class AccesoTitularRequest(BaseModel):
-    usuario_temporal_id: int
-    email: str
-
-
-class AccesoEncuestadoRequest(BaseModel):
-    evaluacion_id: int
-    clave: str
-
-
-class GenerarClaveRequest(BaseModel):
-    evaluacion_id: int
-
-
-class LoginClienteRequest(BaseModel):
-    email: str = Field(..., max_length=200)
-    password: str = Field(..., max_length=200)
-
-
-class VerificarActivacionRequest(BaseModel):
-    token: str = Field(..., max_length=200)
-
-
-class ActivarCuentaRequest(BaseModel):
-    token: str = Field(..., max_length=200)
-    password: str = Field(..., max_length=200)
-
-
-class SolicitarRecuperacionRequest(BaseModel):
-    tipo: Literal["cliente", "admin"] = "cliente"
-    email: str = Field(..., max_length=200)
-
-
-class VerificarRecuperacionRequest(BaseModel):
-    token: str = Field(..., max_length=200)
-
-
-class RestablecerRequest(BaseModel):
-    token: str = Field(..., max_length=200)
-    password: str = Field(..., max_length=200)
 
 
 def _exigir_secreto():

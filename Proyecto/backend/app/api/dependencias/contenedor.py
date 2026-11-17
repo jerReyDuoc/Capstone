@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import bootstrap
-from app.domain.ports.file_storage_port import ClaveNoConfiguradaError  # noqa: F401  (re-export)
+from app.domain.ports.almacenamiento_port import ClaveNoConfiguradaError  # noqa: F401  (re-export)
 
 # Mismo objeto que usan los tests en `app.dependency_overrides[obtener_limitador]`.
 from app.infrastructure.cache.limitador import obtener_limitador  # noqa: F401

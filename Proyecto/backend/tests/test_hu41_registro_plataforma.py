@@ -262,10 +262,10 @@ def test_informe_oficial_solo_si_todas_las_actividades_estan_completas():
 def test_rat_y_ropa_con_los_mismos_generadores_del_cliente():
     pytest.importorskip("reportlab")
     openpyxl = pytest.importorskip("openpyxl")
-    from app.application.rat.pdf_rat import generar_pdf_rat
-    from app.application.rat.xlsx_rat import generar_xlsx_rat
-    from app.application.ropa.pdf_ropa import generar_pdf_ropa
-    from app.application.ropa.xlsx_ropa import generar_xlsx_ropa
+    from app.infrastructure.documentos.pdf.rat import generar_pdf_rat
+    from app.infrastructure.documentos.xlsx.rat import generar_xlsx_rat
+    from app.infrastructure.documentos.pdf.ropa import generar_pdf_ropa
+    from app.infrastructure.documentos.xlsx.ropa import generar_xlsx_ropa
     from test_hu36_informe_rat import _informe, _mapa, _remuneraciones, _vigente
 
     reg = R.generar(_conf())
@@ -318,13 +318,13 @@ def test_vistas_para_el_panel_en_lenguaje_simple():
 def _api():
     pytest.importorskip("httpx")
     pytest.importorskip("aiosqlite")
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("emite informes y cambia los datos de la plataforma; solo en proceso")
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api() as c:
@@ -337,9 +337,9 @@ B = "/api/admin/privacidad-plataforma"
 
 def test_api_solo_admin():
     _api()
-    from _api_harness import EVAL_ID, encabezados_qa
+    from apoyo.api_harness import EVAL_ID, encabezados_qa
     from app.domain.auth.actor import Rol
-    from app.infrastructure.security.autenticacion import emitir_token
+    from app.infrastructure.security.cripto.autenticacion import emitir_token
 
     async def esc(c):
         rutas = [("GET", B, {}), ("GET", f"{B}/actividades/arcop", {}),

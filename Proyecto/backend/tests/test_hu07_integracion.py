@@ -26,20 +26,20 @@ import pytest
 from test_seguridad_integracion import (
     FakeEventoRepo, FakeEvidenciaRepo, FakeRespuestaRepo, FakeStorage, _control, _evidencia, _respuesta,
 )
-from _capa_ia_fakes import FakeProvider, FakeRegistro, crear_gateway
+from apoyo.capa_ia_fakes import FakeProvider, FakeRegistro, crear_gateway
 from app.application.ai.politicas import TareaIA
 from app.domain.evidencias.validacion import EvidenceValidation
-from app.application.use_cases import process_evidence as pe
-from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+from app.application.use_cases import procesar_evidencia as pe
+from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
 from app.application.use_cases.registrar_evento_seguridad import RegistrarEventoSeguridad
 from app.core.config import settings
 from app.domain.models.evento_seguridad import OrigenEvento
 from app.domain.models.evidencia import EstadoValidacion, ORIGEN_REMEDIACION
 from app.domain.models.respuesta import EstadoClasificacion, FuenteClasificacion
-from app.domain.ports.llm_provider_port import LLMProviderError, LLMRequest, LLMResponse, TipoErrorLLM
+from app.domain.ports.proveedor_llm_port import LLMProviderError, LLMRequest, LLMResponse, TipoErrorLLM
 from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.infrastructure.llm.ollama_provider import OllamaProvider
-from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
 
 ACTA = ("Política de uso de IA v2. Aprobada por el Directorio en sesión del 14 de marzo de 2025. "
         "Se comunicó a 320 colaboradores mediante la intranet.")

@@ -1,1 +1,0 @@
-Capa de Políticas e IA: intermediario entre los casos de uso y el proveedor LLM (gateway, políticas por tarea, prompts versionados, métricas)

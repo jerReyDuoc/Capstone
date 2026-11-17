@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.application.schemas.api_schemas import (
+from app.api.schemas.api_schemas import (
     DominioResponse,
     RubroResponse,
     RutaFormativaResponse,

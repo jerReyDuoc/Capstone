@@ -7,9 +7,9 @@ from app.core.database import get_db
 from app.application.use_cases.limites_encuesta import LimiteEncuestaError, LimitesEncuesta
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
-from app.application.use_cases.upload_evidence import UploadEvidenceUseCase
-from app.application.schemas.api_schemas import EvidenciaUploadResponse, EvidenciaDetalleResponse
-from app.application.use_cases.create_respuesta import RespuestaRechazadaError
+from app.application.use_cases.subir_evidencia import UploadEvidenceUseCase
+from app.api.schemas.api_schemas import EvidenciaUploadResponse, EvidenciaDetalleResponse
+from app.application.use_cases.crear_respuesta import RespuestaRechazadaError
 from app.infrastructure.repositories.evaluacion_repository import EvaluacionRepository
 from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
 from app.infrastructure.repositories.respuesta_repository import RespuestaRepository

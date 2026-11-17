@@ -209,7 +209,7 @@ def test_reutiliza_la_anonimizacion_de_arcop(sin_plazos_entorno, monkeypatch):
 
 
 def test_conserva_puntajes_y_el_benchmark_no_cambia(sin_plazos_entorno):
-    from app.application.use_cases.update_benchmark import UpdateBenchmarkUseCase
+    from app.application.use_cases.actualizar_benchmark import UpdateBenchmarkUseCase
 
     async def foto(s):
         await UpdateBenchmarkUseCase(s).execute()
@@ -350,13 +350,13 @@ def test_una_ejecucion_que_se_cae_igual_queda_registrada_y_libera_la_marca(sin_p
 def _api():
     pytest.importorskip("httpx")
     pytest.importorskip("aiosqlite")
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("cambia la configuración de retención; solo en proceso")
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api() as c:
@@ -408,8 +408,8 @@ def test_api_panel_configura_previsualiza_simula_y_encola(sin_plazos_entorno):
 
 def test_api_retencion_solo_admin():
     _api()
-    from _api_harness import EVAL_ID, encabezados_qa
-    from app.infrastructure.security.autenticacion import emitir_token
+    from apoyo.api_harness import EVAL_ID, encabezados_qa
+    from app.infrastructure.security.cripto.autenticacion import emitir_token
 
     async def esc(c):
         rutas = [("GET", B, {}), ("PATCH", B, {"json": {"modo": "entorno"}}),

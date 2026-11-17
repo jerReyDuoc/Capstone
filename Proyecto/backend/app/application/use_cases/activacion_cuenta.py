@@ -26,6 +26,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes import correo
+from app.domain.ports.correo_port import CorreoFallidoError, CorreoNoDisponibleError
 from app.application.fabricas import fabricas
 from app.domain.auth.actor import Actor
 from app.core.config import settings
@@ -174,11 +175,11 @@ async def enviar_correo_activacion(db: AsyncSession, usuario: UsuarioDefinitivo,
     texto, html = cuerpo_activacion(usuario.nombre, empresa.razon_social, url_activacion(token),
                                     settings.ACTIVACION_TTL_HORAS)
     try:
-        modo = await correo.enviar(usuario.email, "Activa tu cuenta de ComplianceIA", texto, html, [])
+        modo = await fabricas().correo.enviar(usuario.email, "Activa tu cuenta de ComplianceIA", texto, html, [])
         resultado = ResultadoCorreo(enviado=True, modo=modo)
-    except correo.CorreoNoDisponibleError:
+    except CorreoNoDisponibleError:
         resultado = ResultadoCorreo(enviado=False, motivo="CORREO_NO_DISPONIBLE")
-    except (correo.CorreoFallidoError, ValueError) as e:
+    except (CorreoFallidoError, ValueError) as e:
         logger.warning("No se pudo enviar el enlace de activación (%s)", type(e).__name__)
         resultado = ResultadoCorreo(enviado=False, motivo="CORREO_FALLIDO")
     fabricas().bitacora(db).registrar(

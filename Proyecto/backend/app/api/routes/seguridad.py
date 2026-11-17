@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.respuestas import anonimizar_comentario, validar_comentario
@@ -13,32 +12,10 @@ from app.domain.models.evento_seguridad import ResolucionEvento
 from app.domain.auditoria.acciones import Accion
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
 from app.infrastructure.repositories.evento_seguridad_repository import EventoSeguridadRepository
+from app.api.schemas.seguridad import EventoSeguridadResponse, RevisionEventoRequest
 
 # HU-20: la bandeja de eventos de seguridad es solo para administradores de Therion Labs
 router = APIRouter(prefix="/api/seguridad", tags=["seguridad"], dependencies=[Depends(solo_admin)])
-
-
-class EventoSeguridadResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id_evento: int
-    fecha: datetime
-    tipo: str
-    origen: str
-    evaluacion_id: int | None
-    matriz_control_id: int | None
-    respuesta_id: int | None
-    evidencia_id: int | None
-    extracto: str | None
-    revisado: bool
-    # HU-22
-    resolucion: str | None = None
-    comentario_revision: str | None = None
-    fecha_revision: datetime | None = None
-
-
-class RevisionEventoRequest(BaseModel):
-    resolucion: str
-    comentario: str | None = None
 
 
 def _ahora() -> datetime:

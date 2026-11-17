@@ -1,1 +1,0 @@
-rutas fastapi

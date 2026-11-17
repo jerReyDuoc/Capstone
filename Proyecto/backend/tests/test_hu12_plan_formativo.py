@@ -12,7 +12,7 @@ Ejecutar desde Proyecto/backend/:
     pytest tests/test_hu12_plan_formativo.py -v
 
 Las pruebas de lógica pura no necesitan BD. Las de API corren en proceso (SQLite en
-memoria, ver _api_harness.py) y se omiten en modo live.
+memoria, ver apoyo/api_harness.py) y se omiten en modo live.
 """
 import asyncio
 
@@ -213,7 +213,8 @@ def test_pdf_generado_es_valido_y_lleva_las_secciones():
     from datetime import datetime, timezone
 
     from app.application.informes.analisis import ComparativaDominio, FiltrosBrechas
-    from app.application.informes.pdf_informe import DatosInforme, generar_pdf
+    from app.application.informes.datos_informe import DatosInforme
+    from app.infrastructure.documentos.pdf.informe_evaluacion import generar_pdf
 
     brechas = construir_brechas(RESPUESTAS)
     pdf = generar_pdf(DatosInforme(
@@ -240,7 +241,7 @@ api = pytest.mark.skipif(not _HAY_API, reason="requiere httpx y aiosqlite (pip i
 
 
 def _api():
-    from _api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api
+    from apoyo.api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api
     if MODO == "live":
         pytest.skip("cambian el estado de la evaluación; solo en proceso")
     return EVAL_ID, TODOS_LOS_CONTROLES, cliente_api

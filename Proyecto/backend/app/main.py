@@ -22,7 +22,7 @@ async def _precargar_motor_ner() -> None:
     if not settings.SANITIZER_ENABLED:
         return
     try:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         await asyncio.to_thread(cargar_spacy)
     except Exception as e:  # noqa: BLE001
         logger.warning("No se pudo precargar el motor NER en la API (%s)", type(e).__name__)

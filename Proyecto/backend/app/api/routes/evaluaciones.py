@@ -1,20 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencias.alcance import actor_de_evaluaciones, alcance_evaluacion, empresa_del_cliente, solo_admin
-from app.domain.auth.actor import Actor, Rol
-from app.domain.auditoria.acciones import Accion
-from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
-from app.core.database import get_db
-from app.application.schemas.api_schemas import (
+from app.api.dependencias.alcance import actor_de_evaluaciones, alcance_evaluacion, solo_admin
+from app.api.dependencias.consultas import consultar_evaluaciones_uc
+from app.api.schemas.api_schemas import (
     EvaluacionResumenResponse,
     RespuestaResumenResponse,
 )
-from app.domain.models.evaluacion import ORIGEN_EMPRESA, ORIGEN_PUBLICA, Evaluacion
-from app.domain.models.respuesta import Respuesta
+from app.api.schemas.evaluaciones import MarcarPruebaRequest
+from app.application.use_cases.consultar_evaluaciones import (
+    ConsultarEvaluacionesUseCase,
+    EvaluacionNoEncontradaError,
+)
+from app.domain.auth.actor import Actor
 
 
 router = APIRouter(prefix="/api/evaluaciones", tags=["evaluaciones"])
@@ -25,7 +22,7 @@ async def list_evaluaciones(
     page: int = Query(1, ge=1, description="Número de página (empieza en 1)"),
     size: int = Query(20, ge=1, le=100, description="Registros por página (máx 100)"),
     estado_progreso: str | None = Query(None, description="Filtrar por estado"),
-    db: AsyncSession = Depends(get_db),
+    uc: ConsultarEvaluacionesUseCase = Depends(consultar_evaluaciones_uc),
     actor: Actor | None = Depends(actor_de_evaluaciones),
 ):
     """
@@ -33,64 +30,26 @@ async def list_evaluaciones(
 
     Ejemplo: GET /api/evaluaciones?page=1&size=20
     """
-    query = select(Evaluacion).order_by(Evaluacion.id.desc())
-    count_query = select(func.count()).select_from(Evaluacion)
-
-    if estado_progreso:
-        query = query.where(Evaluacion.estado_progreso == estado_progreso)
-        count_query = count_query.where(Evaluacion.estado_progreso == estado_progreso)
-
-    # HU-19/HU-20: sin token -> 401 (actor_de_evaluaciones). Las de la encuesta pública
-    # solo las lista un admin; un encuestado ve solo la suya y un referente solo las de su
-    # invitación. Sin token solo se llega aquí con EXIGIR_TOKEN_EVALUACIONES=false (dev).
-    if actor is None:
-        filtro = Evaluacion.origen.not_in((ORIGEN_PUBLICA, ORIGEN_EMPRESA))
-    elif actor.es_encuestado:
-        filtro = Evaluacion.id == actor.id
-    elif actor.rol == Rol.REFERENTE.value:
-        filtro = (Evaluacion.usuario_temporal_id == actor.id) & (Evaluacion.origen != ORIGEN_PUBLICA)
-    elif actor.es_cliente:
-        # HU-27: solo las evaluaciones de su empresa (migradas y, HU-29, sus reevaluaciones)
-        empresa_id = await empresa_del_cliente(db, actor)
-        filtro = (Evaluacion.empresa_id == empresa_id) if empresa_id is not None else (Evaluacion.id == -1)
-    elif actor.es_admin:
-        filtro = None
-    else:  # rol desconocido: nada (nunca "todo" por omisión)
-        filtro = Evaluacion.id == -1
-    if filtro is not None:
-        query = query.where(filtro)
-        count_query = count_query.where(filtro)
-
-    total = (await db.execute(count_query)).scalar() or 0
-
-    offset = (page - 1) * size
-    result = await db.execute(query.offset(offset).limit(size))
-    items = list(result.scalars().all())
-
+    pagina = await uc.listar(actor, page, size, estado_progreso)
     return {
-        "items": [EvaluacionResumenResponse.model_validate(e) for e in items],
-        "total": total,
+        "items": [EvaluacionResumenResponse.model_validate(e) for e in pagina.items],
+        "total": pagina.total,
         "page": page,
         "size": size,
-        "pages": (total + size - 1) // size if size > 0 else 0,
+        "pages": pagina.pages,
     }
 
 
 @router.get("/{evaluacion_id}", response_model=EvaluacionResumenResponse, dependencies=[Depends(alcance_evaluacion)])
 async def get_evaluacion(
     evaluacion_id: int,
-    db: AsyncSession = Depends(get_db),
+    uc: ConsultarEvaluacionesUseCase = Depends(consultar_evaluaciones_uc),
 ):
     """Detalle de una evaluación."""
-    result = await db.execute(
-        select(Evaluacion).where(Evaluacion.id == evaluacion_id)
-    )
-    evaluacion = result.scalar_one_or_none()
-
-    if not evaluacion:
-        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-
-    return evaluacion
+    try:
+        return await uc.detalle(evaluacion_id)
+    except EvaluacionNoEncontradaError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{evaluacion_id}/respuestas", dependencies=[Depends(alcance_evaluacion)])
@@ -100,56 +59,24 @@ async def list_respuestas_evaluacion(
     size: int = Query(20, ge=1, le=100),
     estado_final: str | None = Query(None, description="Filtrar por estado_clasificacion_final"),
     fuente: str | None = Query(None, description="Filtrar por fuente: usuario | llm"),
-    db: AsyncSession = Depends(get_db),
+    uc: ConsultarEvaluacionesUseCase = Depends(consultar_evaluaciones_uc),
 ):
     """
     Lista las respuestas de una evaluación con paginación.
 
     Ejemplo: GET /api/evaluaciones/1/respuestas?page=1&size=10
     """
-    # Verificar que la evaluación existe
-    eval_exists = await db.execute(
-        select(func.count()).select_from(Evaluacion).where(Evaluacion.id == evaluacion_id)
-    )
-    if (eval_exists.scalar() or 0) == 0:
-        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-
-    query = (
-        select(Respuesta)
-        .where(Respuesta.evaluacion_id == evaluacion_id)
-        .order_by(Respuesta.id.desc())
-    )
-    count_query = (
-        select(func.count())
-        .select_from(Respuesta)
-        .where(Respuesta.evaluacion_id == evaluacion_id)
-    )
-
-    if estado_final:
-        query = query.where(Respuesta.estado_clasificacion_final == estado_final)
-        count_query = count_query.where(Respuesta.estado_clasificacion_final == estado_final)
-
-    if fuente:
-        query = query.where(Respuesta.fuente_clasificacion == fuente)
-        count_query = count_query.where(Respuesta.fuente_clasificacion == fuente)
-
-    total = (await db.execute(count_query)).scalar() or 0
-
-    offset = (page - 1) * size
-    result = await db.execute(query.offset(offset).limit(size))
-    items = list(result.scalars().all())
-
+    try:
+        pagina = await uc.listar_respuestas(evaluacion_id, page, size, estado_final, fuente)
+    except EvaluacionNoEncontradaError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {
-        "items": [RespuestaResumenResponse.model_validate(r) for r in items],
-        "total": total,
+        "items": [RespuestaResumenResponse.model_validate(r) for r in pagina.items],
+        "total": pagina.total,
         "page": page,
         "size": size,
-        "pages": (total + size - 1) // size if size > 0 else 0,
+        "pages": pagina.pages,
     }
-
-
-class MarcarPruebaRequest(BaseModel):
-    es_prueba: bool
 
 
 @router.patch("/{evaluacion_id}/prueba")
@@ -157,23 +84,15 @@ async def marcar_prueba(
     evaluacion_id: int,
     payload: MarcarPruebaRequest,
     actor: Actor = Depends(solo_admin),
-    db: AsyncSession = Depends(get_db),
+    uc: ConsultarEvaluacionesUseCase = Depends(consultar_evaluaciones_uc),
 ):
     """
     HU-19 criterio 4 (solo admin): marca (o desmarca) una evaluación como de prueba para
     que no entre al benchmark sectorial aunque esté completada. El cambio se refleja en
     el próximo recálculo del benchmark.
     """
-    evaluacion = await db.get(Evaluacion, evaluacion_id)
-    if evaluacion is None:
-        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-    anterior = bool(evaluacion.es_prueba)
-    evaluacion.es_prueba = payload.es_prueba
-    if anterior != bool(payload.es_prueba):
-        # HU-09: modificación de datos (entra o sale del benchmark) en la misma transacción
-        BitacoraRepository(db).registrar(
-            accion=Accion.EVALUACION_PRUEBA, entidad="evaluacion", entidad_id=evaluacion.id, actor=actor,
-            detalle={"es_prueba_anterior": anterior, "es_prueba": bool(payload.es_prueba)},
-        )
-    await db.commit()
+    try:
+        evaluacion = await uc.marcar_prueba(evaluacion_id, payload.es_prueba, actor)
+    except EvaluacionNoEncontradaError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {"evaluacion_id": evaluacion.id, "origen": evaluacion.origen, "es_prueba": evaluacion.es_prueba}

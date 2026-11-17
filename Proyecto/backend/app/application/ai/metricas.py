@@ -116,7 +116,7 @@ def resumen_verificacion(filas: list[FilaLlamada], umbral: float = UMBRAL_TASA_A
     GRAVE por categoría. La tasa de alucinación es la de las salidas del modelo (antes de que el
     backend las retenga): es la que hay que mantener bajo el umbral.
     """
-    from app.application.ai.verificacion_salida import CATEGORIA_POR_PREFIJO, CODIGOS_NO_BLOQUEANTES
+    from app.application.ai.verificacion_salida_evidencias import CATEGORIA_POR_PREFIJO, CODIGOS_NO_BLOQUEANTES
 
     exitosas = [f for f in filas if f.exito]
     por_categoria = {c: 0 for c in CATEGORIA_POR_PREFIJO.values()}

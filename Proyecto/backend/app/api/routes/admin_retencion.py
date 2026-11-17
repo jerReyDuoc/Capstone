@@ -18,8 +18,6 @@ La vista previa no es una ejecución y no se registra (se pide al escribir el pl
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.use_cases.aplicar_retencion import ORIGEN_MANUAL, AplicarRetencionUseCase
@@ -29,28 +27,21 @@ from app.application.use_cases.configurar_retencion import (
     actualizar_plazo,
     plazo_titular_vigente,
     proxima_ejecucion,
+    usuarios_sin_vencimiento,
     ahora_utc,
 )
 from app.api.dependencias.alcance import solo_admin
 from app.domain.auth.actor import Actor
 from app.core.config import settings
 from app.core.database import get_db
-from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.auditoria.acciones import Accion
+from app.infrastructure.repositories.retencion_repository import RetencionRepository
 from app.infrastructure.repositories.bitacora_repository import BitacoraRepository
+from app.api.schemas.admin_retencion import CambioRetencion, PedidoEjecucion
 
 router = APIRouter(prefix="/api/admin/retencion", tags=["admin · retención (HU-25)"])
 
 JOB_MANUAL = "retencion-manual"
-
-
-class CambioRetencion(BaseModel):
-    modo: str = Field(..., max_length=20)
-    plazo_titular_dias: int | None = None
-
-
-class PedidoEjecucion(BaseModel):
-    confirmar: bool = False
 
 
 def _error(e: RetencionError) -> HTTPException:
@@ -83,10 +74,7 @@ def _fila(f) -> dict:
 
 async def _estado(db: AsyncSession) -> dict:
     p = await plazo_titular_vigente(db)
-    sin_vencimiento = (await db.execute(
-        select(func.count()).select_from(UsuarioTemporal)
-        .where(UsuarioTemporal.fecha_anonimizacion.is_(None), UsuarioTemporal.fecha_expiracion.is_(None))
-    )).scalar_one()
+    sin_vencimiento = await usuarios_sin_vencimiento(RetencionRepository(db))
     bitacora = BitacoraRepository(db)
     ultimas, _ = await bitacora.listar(accion=Accion.RETENCION_EJECUCION, page=1, size=1)
     cambios, _ = await bitacora.listar(accion=Accion.RETENCION_CONFIGURACION, page=1, size=5)

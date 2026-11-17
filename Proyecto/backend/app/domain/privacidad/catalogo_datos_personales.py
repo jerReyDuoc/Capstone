@@ -8,7 +8,7 @@ tratamiento. Es la "matriz de minimización" en forma de código:
   - tests/test_t06_minimizacion.py falla si alguien agrega una columna al modelo sin
     clasificarla aquí (o deja aquí una columna que ya no existe). Así la auditoría no
     queda obsoleta con la primera migración nueva.
-  - scripts/auditoria_minimizacion.py la cruza con el esquema REAL de PostgreSQL,
+  - scripts/evaluacion/auditoria_minimizacion.py la cruza con el esquema REAL de PostgreSQL,
     genera el DER y la matriz en CSV y revisa el contenido de las columnas.
 
 Principios aplicados (Ley 21.719, art. 3): finalidad, proporcionalidad (solo los datos
@@ -83,7 +83,7 @@ class Dato:
     finalidad: str = ""
     base: str = ""
     conservacion: str = ""
-    # Qué revisa scripts/auditoria_minimizacion.py en el CONTENIDO de la columna:
+    # Qué revisa scripts/evaluacion/auditoria_minimizacion.py en el CONTENIDO de la columna:
     #   "pii"     -> no debe haber RUT, correos ni teléfonos en claro
     #   "cifrado" -> todo valor no nulo debe llevar el prefijo enc:v1:
     #   "nulo"    -> todo valor debe ser NULL

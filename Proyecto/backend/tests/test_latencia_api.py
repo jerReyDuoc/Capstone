@@ -12,7 +12,7 @@ Ejecutar desde Proyecto/backend/:
   LATENCIA_BASE_URL=http://127.0.0.1:8000 pytest tests/test_latencia_api.py -v -s
 
   En live el arnés verifica /health, crea las evaluaciones 9001 y 9002 si no
-  existen y borra sus datos antes y después (ver tests/_api_harness.py).
+  existen y borra sus datos antes y después (ver tests/apoyo/api_harness.py).
 
 Variables opcionales:
   LATENCIA_UMBRAL_MS       umbral en ms (defecto 500)
@@ -46,7 +46,7 @@ import pytest
 
 pytest.importorskip("httpx")
 
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     BASE_URL_LIVE, EVAL_ID, EVAL_NA_ID, MODO, body_filtro, cliente_api,
 )
 

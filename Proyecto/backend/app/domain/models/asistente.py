@@ -2,7 +2,7 @@
 HU-39 · Asistente de IA para armar el mapa de datos, el RAT y los informes.
 
   asistente_sesion     una entrevista guiada por áreas (personas, clientes, proveedores, marketing, TI y
-                       uso de IA). Guarda en qué pregunta del banco va (app/application/asistente/banco.py).
+                       uso de IA). Guarda en qué pregunta del banco va (app/application/rat/asistente/banco.py).
   asistente_mensaje    cada turno de la entrevista. SOLO texto anonimizado: el mismo que vio el LLM (las
                        preguntas son del banco y no tienen datos). Un mensaje bloqueado no guarda su texto.
   asistente_documento  un documento que subió la empresa (política, contrato con proveedor, aviso). El

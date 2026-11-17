@@ -20,14 +20,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.use_cases.informe_rat import FORMATOS, InformeRatCasos, InformeRatError
+from app.application.rat.casos_uso.generar_informe import FORMATOS, InformeRatCasos, InformeRatError
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.informe_rat import EmitirEntrada, EnviarEntrada
 
 router = APIRouter(prefix="/api/registro-actividades/informes", tags=["informe del registro de actividades (HU-36)"])
 
@@ -43,19 +43,6 @@ async def _ejecutar(coro):
         return await coro
     except InformeRatError as e:
         raise HTTPException(status_code=e.status, detail={"codigo": e.codigo, "mensaje": e.mensaje, **e.extra})
-
-
-class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class EmitirEntrada(_Base):
-    forzar: bool = Field(False, description="Emitir aunque el registro no haya cambiado desde la última emisión")
-
-
-class EnviarEntrada(_Base):
-    email: str | None = Field(None, max_length=100, description="Vacío = el correo del usuario de la empresa")
-    formatos: list[str] = Field(default_factory=lambda: list(FORMATOS), min_length=1, max_length=2)
 
 
 @router.get("")

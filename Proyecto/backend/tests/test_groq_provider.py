@@ -12,7 +12,7 @@ groq = pytest.importorskip("groq")
 import httpx  # noqa: E402
 
 from app.domain.evidencias.validacion import EvidenceValidation  # noqa: E402
-from app.domain.ports.llm_provider_port import LLMProviderError, LLMRequest, TipoErrorLLM  # noqa: E402
+from app.domain.ports.proveedor_llm_port import LLMProviderError, LLMRequest, TipoErrorLLM  # noqa: E402
 from app.infrastructure.llm.groq_provider import GroqProvider, esquema_estricto  # noqa: E402
 
 SALIDA_OK = {

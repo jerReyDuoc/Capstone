@@ -12,7 +12,7 @@ QA - HU-02 Matriz de estados de cada control.
 Ejecutar desde Proyecto/backend/:
     pytest tests/test_hu02_matriz_estados.py -v
 
-Unitarias (sin BD) + API en proceso (app real + SQLite en memoria, ver _api_harness.py).
+Unitarias (sin BD) + API en proceso (app real + SQLite en memoria, ver apoyo/api_harness.py).
 En modo live (LATENCIA_BASE_URL) se omiten las de API.
 """
 import asyncio
@@ -22,11 +22,11 @@ import pytest
 pytest.importorskip("httpx")
 
 import app.domain.models  # noqa: E402,F401
-from _api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api  # noqa: E402
+from apoyo.api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api  # noqa: E402
 from app.application.ai.prompts import validar_evidencia  # noqa: E402
 from app.domain.matriz.arbol_aplicabilidad import CONTROLES_BASE  # noqa: E402
 from app.domain.evidencias.validacion import EvidenceValidation  # noqa: E402
-from app.application.use_cases.create_respuesta import (  # noqa: E402
+from app.application.use_cases.crear_respuesta import (  # noqa: E402
     JustificacionObligatoriaError, normalizar_justificacion, validar_justificacion,
 )
 from app.core.config import settings  # noqa: E402
@@ -151,10 +151,10 @@ async def _filas(sql, **params):
 
 async def _procesar_con_llm(evidencia_id, clasificacion, confianza):
     """Lo que hace el worker ARQ, con la BD del arnés y un LLM simulado."""
-    from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+    from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
     from app.infrastructure.repositories.evidencia_repository import EvidenciaRepository
     from app.infrastructure.repositories.respuesta_repository import RespuestaRepository
-    from app.infrastructure.security.prompt_guard import ReglasPromptGuard
+    from app.infrastructure.security.prompt_injection.prompt_guard import ReglasPromptGuard
     from app.bootstrap import crear_storage_evidencias  # HU-06: archivos cifrados
 
     class LLM:

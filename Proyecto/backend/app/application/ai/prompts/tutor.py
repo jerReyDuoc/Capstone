@@ -29,7 +29,7 @@ Historial de versiones:
          formato de sistema (no_cumplido…) en lo que lee el usuario: las brechas se nombran
          por lo que significan. Los códigos solo van en "brechas_referenciadas". Respuestas
          más cortas por defecto. El backend además humaniza cualquier código que se escape
-         (agente/salida.py: humanizar_codigos).
+         (agente/salida_tutor.py: humanizar_codigos).
   1.4.0  correcciones 05-11 (2.ª ronda): "charla simple". Un saludo, un gracias o una
          despedida se responden como una persona, en 1 o 2 frases, sin resumir la evaluación
          ni proponer planes (antes un "hola" devolvía el estado completo de la empresa).
@@ -44,10 +44,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
-from app.domain.ports.sanitizer_port import TipoEntidad
+from app.domain.ports.sanitizador_port import TipoEntidad
 
 if TYPE_CHECKING:  # solo tipos
-    from app.application.tutor.contexto import BrechaTutor, ContextoTutor
+    from app.application.tutor.contexto_tutor import BrechaTutor, ContextoTutor
 
 PROMPT_VERSION = "tutor/1.4.1"
 

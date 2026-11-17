@@ -22,20 +22,20 @@ import pytest
 
 import app.domain.models  # noqa: F401  (registra todos los modelos de SQLAlchemy)
 from app.application.ai.anonimizador import AnonimizacionError, AnonimizadorPII
-from app.application.use_cases.create_respuesta import (
+from app.application.use_cases.crear_respuesta import (
     AnonimizacionNoDisponibleError,
     CreateRespuestaUseCase,
 )
-from app.application.use_cases.process_evidence import ProcessEvidenceUseCase
+from app.application.use_cases.procesar_evidencia import ProcessEvidenceUseCase
 from app.core.config import settings
 from app.domain.models.evidencia import EstadoValidacion, Evidencia
 from app.domain.ports.registro_ia_port import ContextoLlamada, RegistroSanitizacion
-from app.domain.ports.sanitizer_port import EntidadDetectada, TipoEntidad
-from app.infrastructure.security.cifrado import CifradorDatos, CifradorEntidades
-from app.infrastructure.security.ner_sanitizer import NERSanitizer
+from app.domain.ports.sanitizador_port import EntidadDetectada, TipoEntidad
+from app.infrastructure.security.cripto.cifrado import CifradorDatos, CifradorEntidades
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
 from app.infrastructure.storage.archivo_cifrado_storage import ArchivoCifradoStorage
 
-from _capa_ia_fakes import StubNLP
+from apoyo.capa_ia_fakes import StubNLP
 from test_seguridad_integracion import (
     FakeEvaluaciones, FakeEvidenciaRepo, FakeRespuestaRepo, FakeValidator, _control, _respuesta,
 )
@@ -259,7 +259,7 @@ def test_texto_arcop_se_cifra_al_escribir_y_se_descifra_al_leer():
 
 def test_texto_arcop_sin_clave_no_se_escribe(monkeypatch):
     from app.infrastructure.persistencia.tipos_cifrados import TextoCifrado
-    from app.infrastructure.security.cifrado import ClaveCifradoInvalida
+    from app.infrastructure.security.cripto.cifrado import ClaveCifradoInvalida
 
     monkeypatch.setattr(settings, "ENTITY_MAP_KEY", None)
     with pytest.raises(ClaveCifradoInvalida):
@@ -268,6 +268,6 @@ def test_texto_arcop_sin_clave_no_se_escribe(monkeypatch):
 
 def test_subclaves_independientes():
     arcop, evid = CifradorDatos(CLAVE, "arcop"), CifradorDatos(CLAVE, "evidencias")
-    from app.infrastructure.security.cifrado import ClaveCifradoInvalida
+    from app.infrastructure.security.cripto.cifrado import ClaveCifradoInvalida
     with pytest.raises(ClaveCifradoInvalida):
         evid.descifrar_texto(arcop.cifrar_texto("x"))

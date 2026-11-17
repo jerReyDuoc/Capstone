@@ -10,7 +10,7 @@ con las mismas herramientas que vendemos.
   C2  Los plazos son el valor VIGENTE de cada ajuste (el de titulares, el del panel de retención si se fijó
       allí). tests/test_hu41_registro_plataforma.py falla si difieren o si aparece una tabla sin actividad.
   C3  Los proveedores activos figuran como encargados con país y garantía de la transferencia.
-  C4  El RAT y el RoPA se generan con los mismos módulos del cliente (pdf_rat, xlsx_rat, pdf_ropa, xlsx_ropa).
+  C4  El RAT y el RoPA se generan con el mismo generador de documentos del cliente (fabricas().documentos).
 
 Además, la revisión interna (app/application/plataforma/revision.py) y el PDF del mapa de la plataforma.
 
@@ -29,10 +29,11 @@ from datetime import datetime, time as dtime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.informes.motor_pdf import ZONA, PdfNoDisponibleError, fecha_local
+from app.application.informes.formato import ZONA, fecha_local
+from app.application.ports.generador_documentos_port import PdfNoDisponibleError, XlsxNoDisponibleError
 from app.application.plataforma import registro as R
 from app.application.plataforma import revision as V
-from app.application.rat import informe as I
+from app.application.rat import informe_rat as I
 from app.application.fabricas import fabricas
 from app.domain.auth.actor import Actor
 from app.core.config import settings
@@ -270,17 +271,13 @@ class PrivacidadPlataformaCasos:
         prefijo = R.PREFIJO_RAT if tipo == TIPO_RAT else R.PREFIJO_ROPA
         codigo = R.codigo(prefijo, fila.id, generado.astimezone(ZONA).year)
 
-        from app.application.rat.pdf_rat import generar_pdf_rat
-        from app.application.rat.xlsx_rat import XlsxNoDisponibleError as XlsxRatNoDisponible, generar_xlsx_rat
-        from app.application.ropa.pdf_ropa import generar_pdf_ropa
-        from app.application.ropa.xlsx_ropa import XlsxNoDisponibleError as XlsxRopaNoDisponible, generar_xlsx_ropa
-
         inf = inf.con_emision(codigo, version)
-        gen_pdf, gen_xlsx = ((generar_pdf_rat, generar_xlsx_rat) if tipo == TIPO_RAT
-                             else (generar_pdf_ropa, generar_xlsx_ropa))
+        docs = fabricas().documentos
+        gen_pdf, gen_xlsx = ((docs.pdf_rat, docs.xlsx_rat) if tipo == TIPO_RAT
+                             else (docs.pdf_ropa, docs.xlsx_ropa))
         try:
             pdf, xlsx = await asyncio.gather(asyncio.to_thread(gen_pdf, inf), asyncio.to_thread(gen_xlsx, inf))
-        except (PdfNoDisponibleError, XlsxRatNoDisponible, XlsxRopaNoDisponible) as e:
+        except (PdfNoDisponibleError, XlsxNoDisponibleError) as e:
             await self.db.rollback()
             raise PrivacidadPlataformaError(503, "INFORME_NO_DISPONIBLE", str(e))
 
@@ -377,8 +374,7 @@ class PrivacidadPlataformaCasos:
                             "para presentar la versión actual.")}
 
     async def pdf_mapa(self) -> tuple[bytes, str]:
-        from app.application.mapa_datos.pdf_mapa import DatosInformeMapa, PdfNoDisponibleError as MapaNoDisponible
-        from app.application.mapa_datos.pdf_mapa import generar_pdf_mapa
+        from app.application.mapa_datos.informe_mapa import DatosInformeMapa
         from app.domain.mapa_datos.analisis import FiltrosMapa
 
         generado = _ahora()
@@ -388,8 +384,8 @@ class PrivacidadPlataformaCasos:
                                  fecha_version=None, huella=reg.huella, elementos=list(reg.elementos),
                                  flujos=list(reg.flujos), filtros=FiltrosMapa(), generado=generado)
         try:
-            pdf = await asyncio.to_thread(generar_pdf_mapa, datos)
-        except (MapaNoDisponible, PdfNoDisponibleError) as e:
+            pdf = await asyncio.to_thread(fabricas().documentos.pdf_mapa_datos, datos)
+        except PdfNoDisponibleError as e:
             raise PrivacidadPlataformaError(503, "INFORME_NO_DISPONIBLE", str(e))
         self.bitacora.registrar(accion=Accion.PLATAFORMA_MAPA_DESCARGADO, entidad="plataforma_registro",
                                 entidad_id=ID_REGISTRO, actor=self.actor,

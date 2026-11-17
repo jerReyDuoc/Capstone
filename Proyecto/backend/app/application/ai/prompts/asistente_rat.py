@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.application.ai.prompts.base import PromptRenderizado, escapar_para_prompt
-from app.domain.ports.sanitizer_port import TipoEntidad
+from app.domain.ports.sanitizador_port import TipoEntidad
 
 PROMPT_VERSION = "asistente_rat/1.1.0"
 
@@ -131,7 +131,7 @@ editarla o descartarla. Si no hay nada que proponer, devuelve listas vacías."""
 
 @dataclass(frozen=True)
 class ContextoAsistente:
-    """Datos CONFIABLES que arma el backend (app/application/asistente/contexto.py)."""
+    """Datos CONFIABLES que arma el backend (app/application/rat/asistente/contexto_asistente.py)."""
     area: str
     area_nombre: str
     pregunta: str | None

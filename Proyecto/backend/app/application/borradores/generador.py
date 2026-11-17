@@ -8,7 +8,7 @@ Entrada:
     de cada control tomada de la matriz,
   - la identidad de la empresa (razón social, RUT y rubro), que escribe el backend y que el
     LLM nunca ve,
-  - opcionalmente las secciones que adaptó el Agente IA, ya validadas por salida_ia.py.
+  - opcionalmente las secciones que adaptó el Agente IA, ya validadas por salida_borrador.py.
 
 Salida: un documento Markdown editable con
   - encabezado con la identificación de la empresa, el aviso de borrador y una tabla de
@@ -143,7 +143,7 @@ class IdentidadEmpresa:
 
 @dataclass(frozen=True)
 class AdaptacionIA:
-    """Lo que el Agente IA aportó, YA validado y anclado (salida_ia.py)."""
+    """Lo que el Agente IA aportó, YA validado y anclado (salida_borrador.py)."""
     introduccion: str | None = None
     secciones: dict[str, str] = field(default_factory=dict)
     notas: tuple[str, ...] = ()

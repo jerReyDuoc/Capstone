@@ -1,11 +1,11 @@
 """
 HU-41 · Mapa de datos, RAT y RoPA de la PROPIA plataforma, generados desde el inventario (lógica PURA).
 
-Sin BD, sin red y sin reportlab, como app/application/rat/informe.py: recibe la configuración (`conf`, el
+Sin BD, sin red y sin reportlab, como app/application/rat/informe_rat.py: recibe la configuración (`conf`, el
 objeto Settings o uno equivalente) y el plazo de titulares vigente, y arma las MISMAS estructuras que el
 registro de una empresa cliente (Elemento, Flujo, contenido de actividad, FuenteActividad). Después se usan
 los mismos módulos del cliente sin cambiarlos: rat/analisis.py calcula lo que la actividad toma del mapa y
-su completitud, rat/informe.py arma el informe y pdf_rat/xlsx_rat/pdf_ropa/xlsx_ropa lo dibujan.
+su completitud, rat/informe_rat.py arma el informe y infrastructure/documentos (pdf/rat, xlsx/rat, pdf/ropa, xlsx/ropa) lo dibujan.
 
   Actividades   app/domain/privacidad/catalogo_datos_personales.py: ACTIVIDADES_PLATAFORMA (tablas, finalidades, base,
                 titulares, elementos y medidas). Las categorías de datos salen de las columnas personales
@@ -32,7 +32,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from app.application.informes.ficha import AvisoInforme
-from app.application.rat import informe as I
+from app.application.rat import informe_rat as I
 from app.domain.privacidad import catalogo_datos_personales as inv
 from app.domain.catalogos import catalogo_tratamiento as cat_mapa
 from app.domain.mapa_datos.modelo import Elemento, Flujo
@@ -394,7 +394,7 @@ def huella_ropa(reg: RegistroPlataforma, datos: dict | None) -> str:
 
 def informe_ropa(reg: RegistroPlataforma, datos: dict | None, version_registro: int, generado: datetime):
     """El RoPA de la plataforma (Therion Labs como responsable) con el armado del cliente."""
-    from app.application.ropa import informe as R
+    from app.application.ropa import informe_ropa as R
     inf = R.armar(informe_rat(reg, version_registro, generado), datos, None, generado)
     return replace(inf, huella=huella_ropa(reg, datos))
 

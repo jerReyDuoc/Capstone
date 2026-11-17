@@ -30,7 +30,7 @@ os.environ["EVIDENCIA_OBLIGATORIA_CUMPLIDO"] = "false"
 import tempfile  # noqa: E402
 
 os.environ.setdefault("STORAGE_DIR", tempfile.mkdtemp(prefix="qa_storage_"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar _api_harness
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # para importar apoyo.api_harness
 
 # Raíz de composición (A-40): conftest no importa app.main, así que la configura aquí.
 from app.bootstrap import configurar as _configurar_composicion  # noqa: E402
@@ -52,7 +52,7 @@ def bd_live():
     y limpia sus datos al inicio y al final de la sesión. En otro caso no hace nada.
     """
     import asyncio
-    import _api_harness as h
+    import apoyo.api_harness as h
 
     if not h.PREPARAR_BD:
         yield
@@ -65,7 +65,7 @@ def bd_live():
 
 def _spacy_disponible() -> bool:
     try:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         cargar_spacy()
         return True
     except Exception:  # noqa: BLE001
@@ -88,8 +88,8 @@ def _motor_ner_para_la_api():
         yield
         return
     import app.bootstrap as factory
-    from app.infrastructure.security.ner_sanitizer import NERSanitizer
-    from _capa_ia_fakes import StubNLP
+    from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer
+    from apoyo.capa_ia_fakes import StubNLP
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(factory, "NERSanitizer", lambda: NERSanitizer(lambda: StubNLP()))

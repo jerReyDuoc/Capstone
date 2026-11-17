@@ -1,7 +1,7 @@
 """
 HU-28: sesiones revocables de los usuarios con contraseña (admin_therion y cliente).
 
-El token bearer sigue siendo stateless (HMAC, app/infrastructure/security/autenticacion.py), pero al iniciar
+El token bearer sigue siendo stateless (HMAC, app/infrastructure/security/cripto/autenticacion.py), pero al iniciar
 sesión se crea una fila en sesion_usuario y el token lleva su identificador (`sid`). En
 cada petición obtener_actor() comprueba que esa sesión siga abierta, así:
 

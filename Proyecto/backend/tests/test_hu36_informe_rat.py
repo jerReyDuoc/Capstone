@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.application.mapa_datos import plantillas as P
-from app.application.rat import informe as I
+from app.application.rat import informe_rat as I
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import analisis as A
 from app.domain.rat import modelo as M
@@ -195,7 +195,8 @@ def _pdf_texto(datos: bytes) -> str:
 
 def test_pdf_oficial_con_portada_resumen_detalle_matriz_y_aviso():
     pytest.importorskip("reportlab")
-    from app.application.rat.pdf_rat import generar_pdf_rat, nombre_archivo
+    from app.application.rat.informe_rat import nombre_archivo
+    from app.infrastructure.documentos.pdf.rat import generar_pdf_rat
 
     els, fls, ids = _mapa()
     inf = _informe([_vigente(1, _remuneraciones(els, fls, ids), els, fls)]).con_emision(I.codigo(7, 2026), 2)
@@ -213,7 +214,8 @@ def test_pdf_oficial_con_portada_resumen_detalle_matriz_y_aviso():
 
 def test_pdf_borrador_con_marca_de_agua_y_aviso_en_la_portada():
     pytest.importorskip("reportlab")
-    from app.application.rat.pdf_rat import generar_pdf_rat, nombre_archivo
+    from app.application.rat.informe_rat import nombre_archivo
+    from app.infrastructure.documentos.pdf.rat import generar_pdf_rat
 
     els, fls, ids = _mapa()
     nueva = M.normalizar({"nombre": "Selección de personal"})
@@ -227,7 +229,7 @@ def test_pdf_borrador_con_marca_de_agua_y_aviso_en_la_portada():
 
 def test_xlsx_con_las_mismas_hojas_y_sin_formulas():
     openpyxl = pytest.importorskip("openpyxl")
-    from app.application.rat.xlsx_rat import generar_xlsx_rat
+    from app.infrastructure.documentos.xlsx.rat import generar_xlsx_rat
 
     els, fls, ids = _mapa()
     rem = M.normalizar({"descripcion": "=HYPERLINK(\"http://x\")"}, _remuneraciones(els, fls, ids))
@@ -268,7 +270,7 @@ def hu27(monkeypatch, tmp_path):
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-36: solo en proceso")
     from app.core.config import settings
@@ -370,7 +372,7 @@ def test_api_informe_borrador_oficial_documentos_correo_y_audit_log(hu27):
                        "rat.informe_verificado", "documento.generado"):
             assert accion in acciones, accion
         for b in await hu35._filas(hu27, BitacoraAuditoria):
-            if b.accion.startswith("rat.informe"):
+            if b.accion.startswith("rat.informe_rat"):
                 assert "remuneraciones" not in str(b.detalle).lower() and "@" not in str(b.detalle)
     hu35._correr(esc)
 

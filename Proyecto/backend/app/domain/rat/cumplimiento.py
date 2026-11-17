@@ -5,7 +5,7 @@ Criterio 3 — el RAT como evidencia de los controles de protección de datos de
   Un registro VIGENTE Y COMPLETO (al menos una actividad; todas las no archivadas vigentes, sin
   cambios del mapa pendientes de revisar y con los 13 campos completos; y ningún flujo del mapa sin
   actividad) aporta, para cada control de APORTES, el estado que demuestra. El caso de uso
-  (app/application/use_cases/cumplimiento_rat.py) lo aplica SOLO si es mejor que el estado vigente
+  (app/application/rat/casos_uso/cumplimiento.py) lo aplica SOLO si es mejor que el estado vigente
   del control: el registro nunca baja un control (misma regla que una evidencia de remediación).
 
   Control   Qué demuestra el registro                                         Estado que aporta

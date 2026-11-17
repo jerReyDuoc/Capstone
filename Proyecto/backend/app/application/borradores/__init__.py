@@ -13,9 +13,9 @@ documentación legal e institucional requerida para mitigar las no-conformidades
   generador.py    arma el Markdown del borrador a partir del contexto de la evaluación de la
                   empresa (brechas y puntajes por dimensión) y, si las hay, de las secciones
                   que adaptó el Agente IA (ya validadas). Lógica pura: se prueba sin BD.
-  salida_ia.py    reglas deterministas sobre lo que devolvió el modelo (anclaje a las
+  salida_borrador.py reglas deterministas sobre lo que devolvió el modelo (anclaje a las
                   cláusulas pedidas, artículos verificados, sin código ni enlaces).
-  pdf_borrador.py Markdown -> PDF (reportlab), para la descarga previa y la consolidación.
+  infrastructure/documentos/pdf/borrador.py Markdown -> PDF (reportlab), para la descarga previa y la consolidación.
 
 El LLM nunca toca la BD ni ve la razón social, el RUT ni datos de contacto: recibe las
 cláusulas base y datos de catálogo; la identidad de la empresa la escribe el backend.

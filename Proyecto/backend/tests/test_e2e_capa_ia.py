@@ -20,7 +20,7 @@ Escenario: la empresa demo declara "cumplido" en 4 controles y sube evidencias.
 Qué es real y qué se simula:
   - Real: app FastAPI, rutas, casos de uso, worker, factory, AIGateway, NERSanitizer,
     cifrado Fernet, repositorios SQLAlchemy, endpoints de métricas y revisión.
-  - BD: SQLite en memoria (mismo esquema de los modelos), igual que _api_harness.
+  - BD: SQLite en memoria (mismo esquema de los modelos), igual que apoyo.api_harness.
   - Cola: ARQ falso; el job se ejecuta llamando a la función real del worker.
   - NER: spaCy real si es_core_news_md está instalado; si no, un NLP simulado.
   - LLM: proveedor simulado y determinista (sin costo). Con E2E_LLM_REAL=1 se usa
@@ -44,14 +44,14 @@ pytest.importorskip("arq")
 
 from sqlalchemy import select  # noqa: E402
 
-import _api_harness as h  # noqa: E402
-from _capa_ia_fakes import FakeProvider, StubNLP  # noqa: E402
+import apoyo.api_harness as h  # noqa: E402
+from apoyo.capa_ia_fakes import FakeProvider, StubNLP  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.domain.ports.llm_provider_port import (  # noqa: E402
+from app.domain.ports.proveedor_llm_port import (  # noqa: E402
     LLMProviderError, LLMProviderPort, TipoErrorLLM,
 )
-from app.infrastructure.security.cifrado import CifradorEntidades  # noqa: E402
-from app.infrastructure.security.ner_sanitizer import NERSanitizer  # noqa: E402
+from app.infrastructure.security.cripto.cifrado import CifradorEntidades  # noqa: E402
+from app.infrastructure.security.pii.sanitizador_ner import NERSanitizer  # noqa: E402
 
 LLM_REAL = os.getenv("E2E_LLM_REAL") == "1"
 
@@ -117,7 +117,7 @@ class EspiaProveedor(LLMProviderPort):
 
 def _spacy_disponible() -> bool:
     try:
-        from app.infrastructure.security.ner_sanitizer import cargar_spacy
+        from app.infrastructure.security.pii.sanitizador_ner import cargar_spacy
         cargar_spacy()
         return True
     except Exception:  # noqa: BLE001

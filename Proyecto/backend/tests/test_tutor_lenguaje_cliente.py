@@ -2,7 +2,7 @@
 Correcciones 05-11 · El tutor no muestra códigos internos al cliente (prompt tutor/1.3.0 +
 humanizar_codigos en la salida del agente).
 """
-from app.application.ai.agente.salida import humanizar_codigos, nombre_legible, sin_vocativos_anonimizados
+from app.application.ai.agente.salida_tutor import humanizar_codigos, nombre_legible, sin_vocativos_anonimizados
 from app.application.ai.prompts import tutor as prompt_tutor
 
 NOMBRES = {"GOB-001": nombre_legible("No existe una política de uso de IA aprobada."),

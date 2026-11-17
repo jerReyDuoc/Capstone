@@ -13,7 +13,7 @@ HU-38 criterio 2 · Los borradores toman lo que ya dice el registro de actividad
                                sensibles o de NNA, el uso de IA y los plazos de conservación. Es un texto
                                para las personas: nunca nombra los sistemas internos de la empresa.
 
-Entrada: el InformeRat (app/application/rat/informe.py), el mismo que el PDF del registro, así el borrador
+Entrada: el InformeRat (app/application/rat/informe_rat.py), el mismo que el PDF del registro, así el borrador
 usa la versión VIGENTE de cada actividad (o su copia de trabajo si nunca estuvo vigente, con aviso).
 
 Salida: `textos(tipo)` → {id de cláusula: texto} que reemplazan el texto base de la plantilla
@@ -137,7 +137,7 @@ class RegistroBorrador:
 
 # ============================================================ desde el informe del registro
 def _actividad(a) -> ActividadBorrador:
-    from app.application.rat import informe as I
+    from app.application.rat import informe_rat as I
 
     c, mp = a.contenido, a.mapa
     base_op = cat.BASES_POR_CODIGO.get(c.get("base_licitud") or "")

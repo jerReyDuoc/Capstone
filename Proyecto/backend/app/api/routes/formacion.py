@@ -18,15 +18,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.formacion.constancia_pdf import PdfNoDisponibleError
+from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.use_cases.formacion_empresa import FormacionEmpresa, FormacionError
 from app.core.database import get_db
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
 from app.domain.ports.limitador_port import Limitador, LimitadorNoDisponibleError
 from app.api.dependencias.contenedor import obtener_limitador
+from app.api.schemas.formacion import VistaRequest, VerificacionRequest
 
 router = APIRouter(prefix="/api/formacion", tags=["formación de la empresa (HU-26)"])
 
@@ -73,10 +73,6 @@ async def modulo(
         raise _http(e)
 
 
-class VistaRequest(BaseModel):
-    evaluacion_id: int | None = Field(None, ge=1)
-
-
 @router.post("/modulos/{ruta_id}/lecciones/{orden}/vista")
 async def marcar_vista(
     ruta_id: int,
@@ -90,12 +86,6 @@ async def marcar_vista(
             ruta_id, orden, payload.evaluacion_id if payload else None)
     except FormacionError as e:
         raise _http(e)
-
-
-class VerificacionRequest(BaseModel):
-    # {pregunta_id: id de la opción elegida}
-    respuestas: dict[int, int] = Field(default_factory=dict, max_length=50)
-    evaluacion_id: int | None = Field(None, ge=1)
 
 
 @router.post("/modulos/{ruta_id}/verificacion")

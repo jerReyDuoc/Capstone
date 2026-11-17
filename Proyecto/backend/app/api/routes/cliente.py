@@ -40,10 +40,9 @@ responder la reevaluación con la sesión del cliente.
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.use_cases.espacio_empresa import EmpresaNoEncontradaError, EspacioEmpresa
 from app.application.use_cases.documentos_empresa import DocumentoError, DocumentosEmpresa
 from app.application.use_cases.gestionar_contrato import contrato_dict
 from app.application.use_cases.historial_empresa import (
@@ -57,13 +56,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.api.dependencias import servicio_pagado
 from app.api.dependencias.servicio_pagado import ClienteConServicio, empresa_con_documentos, empresa_con_servicio
-from app.domain.models.empresa import Empresa
-from app.domain.models.evaluacion import Evaluacion
-from app.domain.models.formacion import AvanceFormativo
-from app.domain.models.resumen import Resumen
-from app.domain.models.rubro import Rubro
-from app.domain.models.ruta_formativa import RutaFormativa
-from app.domain.models.usuario_definitivo import UsuarioDefinitivo
+from app.api.schemas.cliente import ArchivarInformeRequest
+from app.infrastructure.repositories.espacio_empresa_repository import EspacioEmpresaRepository
 
 router = APIRouter(prefix="/api/cliente", tags=["cliente · espacio de la empresa (HU-28, HU-29, HU-30)"])
 
@@ -72,25 +66,21 @@ solo_cliente = requerir_rol(Rol.CLIENTE)
 _SIN_CACHE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
 
 
-async def _evaluaciones(db: AsyncSession, empresa_id: int):
-    puntaje = (
-        select(Resumen.evaluacion_id, func.avg(Resumen.puntaje_obtenido).label("puntaje"))
-        .group_by(Resumen.evaluacion_id).subquery()
-    )
-    return (await db.execute(
-        select(Evaluacion, puntaje.c.puntaje)
-        .outerjoin(puntaje, puntaje.c.evaluacion_id == Evaluacion.id)
-        .where(Evaluacion.empresa_id == empresa_id)
-        .order_by(Evaluacion.id.desc())  # HU-29: la más reciente primero (ver historial_empresa.py)
-    )).all()
+def _espacio(db: AsyncSession) -> EspacioEmpresa:
+    return EspacioEmpresa(EspacioEmpresaRepository(db))
+
+
+def _empresa_no_encontrada() -> HTTPException:
+    return HTTPException(status_code=404, detail={"codigo": "NO_ENCONTRADO", "mensaje": "Empresa no encontrada."})
 
 
 @router.get("/empresa")
 async def mi_empresa(cliente: ClienteConServicio = Depends(empresa_con_servicio),
                      db: AsyncSession = Depends(get_db)):
     usuario, empresa = cliente.usuario, cliente.empresa
-    rubro = await db.scalar(select(Rubro.nombre_rubro).where(Rubro.id == empresa.rubro_id))
-    filas = await _evaluaciones(db, empresa.id)
+    espacio = _espacio(db)
+    rubro = await espacio.nombre_rubro(empresa.rubro_id)
+    filas = await espacio.evaluaciones(empresa.id)
     return {
         "usuario": {"nombre": usuario.nombre, "email": usuario.email},
         "empresa": {
@@ -119,32 +109,21 @@ async def mi_contrato(actor: Actor = Depends(solo_cliente), db: AsyncSession = D
     servicio cortado lista lo gratuito (informe PDF y plan formativo de sus evaluaciones)
     y, mientras dure el plazo de gracia, sus constancias para descargar.
     """
-    usuario = await db.get(UsuarioDefinitivo, actor.id)
-    empresa = await db.get(Empresa, usuario.empresa_id) if usuario else None
-    if usuario is None or empresa is None:  # obtener_actor ya lo comprobó; defensa en profundidad
-        raise HTTPException(status_code=404, detail={"codigo": "NO_ENCONTRADO", "mensaje": "Empresa no encontrada."})
+    espacio = _espacio(db)
+    try:
+        empresa = await espacio.empresa_del_usuario(actor.id)
+    except EmpresaNoEncontradaError:  # obtener_actor ya lo comprobó; defensa en profundidad
+        raise _empresa_no_encontrada() from None
     contrato = contrato_dict(empresa)
 
-    constancias = []
-    if contrato["documentos_disponibles"]:
-        filas = (await db.execute(
-            select(AvanceFormativo, RutaFormativa.nombre)
-            .join(RutaFormativa, RutaFormativa.id == AvanceFormativo.ruta_formativa_id)
-            .where(AvanceFormativo.empresa_id == empresa.id, AvanceFormativo.codigo_constancia.is_not(None))
-            .order_by(AvanceFormativo.fecha_completado.desc())
-        )).all()
-        constancias = [{
-            "ruta_id": a.ruta_formativa_id, "modulo": nombre or f"Ruta {a.ruta_formativa_id}",
-            "fecha_completado": a.fecha_completado, "codigo": a.codigo_constancia,
-            "url": f"/api/formacion/modulos/{a.ruta_formativa_id}/constancia",
-        } for a, nombre in filas if a.completado]
+    constancias = await espacio.constancias(empresa.id) if contrato["documentos_disponibles"] else []
 
     evaluaciones = [{
         "id": ev.id, "completada": ev.esta_cerrada,
         # Funciones gratuitas: disponibles con o sin contrato
         "informe_pdf": f"/api/evaluaciones/{ev.id}/informe/pdf",
         "plan_formativo": f"/api/evaluaciones/{ev.id}/plan-formativo",
-    } for ev, _ in await _evaluaciones(db, empresa.id)]
+    } for ev, _ in await espacio.evaluaciones(empresa.id)]
 
     return JSONResponse(content=jsonable_encoder({
         "empresa": {"id": empresa.id, "razon_social": empresa.razon_social},
@@ -166,10 +145,10 @@ async def mis_evaluaciones(actor: Actor = Depends(solo_cliente), db: AsyncSessio
     /api/evaluaciones/{id}/resumen. `puede_reevaluar` dice si el usuario puede iniciar una
     reevaluación hoy (contrato vigente y ninguna en curso).
     """
-    usuario = await db.get(UsuarioDefinitivo, actor.id)
-    empresa = await db.get(Empresa, usuario.empresa_id) if usuario else None
-    if empresa is None:  # obtener_actor ya lo comprobó; defensa en profundidad
-        raise HTTPException(status_code=404, detail={"codigo": "NO_ENCONTRADO", "mensaje": "Empresa no encontrada."})
+    try:
+        empresa = await _espacio(db).empresa_del_usuario(actor.id)
+    except EmpresaNoEncontradaError:  # obtener_actor ya lo comprobó; defensa en profundidad
+        raise _empresa_no_encontrada() from None
     historial = await historial_de_empresa(db, empresa.id)
     en_curso = historial["resumen"]["evaluacion_en_curso_id"]
     habilitado = servicio_pagado.servicio_habilitado(empresa)  # por módulo: las pruebas la reemplazan
@@ -220,10 +199,6 @@ async def mis_documentos(cliente: ClienteConServicio = Depends(empresa_con_docum
     """Criterio 3 · "Mis documentos": informes PDF, borradores (HU-16), evidencias y constancias."""
     datos = await DocumentosEmpresa(db, cliente).listar()
     return JSONResponse(content=jsonable_encoder(datos), headers=_SIN_CACHE)
-
-
-class ArchivarInformeRequest(BaseModel):
-    evaluacion_id: int = Field(..., ge=1)
 
 
 @router.post("/documentos/informes", status_code=201)

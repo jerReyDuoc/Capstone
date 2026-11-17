@@ -2,7 +2,7 @@
 HU-10 · Comparativa sectorial con protección k-anónima.
 
 Reglas puras (sin base de datos) para publicar estadísticas de un sector sin exponer a
-las empresas que lo forman. Las usan el recálculo del benchmark (update_benchmark.py), la
+las empresas que lo forman. Las usan el recálculo del benchmark (actualizar_benchmark.py), la
 comparativa de una evaluación, el panorama por sector y el informe PDF.
 
 Qué es la "cohorte" (k)

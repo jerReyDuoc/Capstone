@@ -7,8 +7,8 @@ ilegible al NER y al LLM (hallazgo de la revisión del backlog, T-SM-54). Ahora:
   - detectar_tipo()     lista blanca por CONTENIDO (no solo por extensión): PDF (%PDF-),
                         DOCX (ZIP con word/document.xml) y TXT (UTF-8 legible). Cualquier
                         otro archivo se rechaza en la API antes de guardarlo (T-SM-55).
-  - extraer_texto()     texto plano del archivo para el NER y el LLM. PDF con pypdf; DOCX
-                        con la librería estándar (zipfile + XML); TXT tal cual.
+  - extraer_texto()     (A-14: vive en app/infrastructure/archivos/extractor_texto.py, tras
+                        ExtractorTextoPort) texto plano del archivo para el NER y el LLM.
   - terminos_control()  HU-17 C2: verificación LOCAL (sin LLM) de qué términos del control
                         aparecen en el texto, para mostrarlos y no gastar cuota del LLM en
                         archivos que no tienen nada que ver.
@@ -21,24 +21,16 @@ import io
 import re
 import unicodedata
 import zipfile
-from xml.etree import ElementTree
-
-from app.infrastructure.security.seguridad import normalizar_vinetas
 
 PDF, DOCX, TXT = "pdf", "docx", "txt"
 MIME = {PDF: "application/pdf",
         DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         TXT: "text/plain"}
 EXTENSIONES = {".pdf": PDF, ".docx": DOCX, ".txt": TXT, ".md": TXT, ".csv": TXT}
-_MAX_DOCX_XML = 20 * 1024 * 1024  # bomba ZIP: no se descomprime más que esto
 
 
 class ArchivoNoAdmitidoError(ValueError):
     codigo = "TIPO_NO_ADMITIDO"
-
-
-class ArchivoIlegibleError(ValueError):
-    codigo = "ARCHIVO_ILEGIBLE"
 
 
 def _extension(nombre: str | None) -> str:
@@ -91,78 +83,6 @@ def detectar_tipo(nombre: str | None, contenido: bytes) -> str:
             "archivo debe coincidir con su contenido."
         )
     return real
-
-
-def _texto_pdf(contenido: bytes) -> str:
-    try:
-        from pypdf import PdfReader
-    except ImportError as e:  # pragma: no cover - depende del entorno
-        raise ArchivoIlegibleError("El servidor no puede leer PDF (falta pypdf: pip install -r requirements.txt).") from e
-    try:
-        lector = PdfReader(io.BytesIO(contenido))
-        if lector.is_encrypted:
-            try:
-                lector.decrypt("")
-            except Exception as e:  # noqa: BLE001
-                raise ArchivoIlegibleError("El PDF está protegido con contraseña. Súbelo sin protección.") from e
-        return "\n".join((pagina.extract_text() or "") for pagina in lector.pages)
-    except ArchivoIlegibleError:
-        raise
-    except Exception as e:  # noqa: BLE001 - PDF dañado
-        raise ArchivoIlegibleError("No pudimos leer el PDF. Revisa que no esté dañado.") from e
-
-
-_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-
-
-def _texto_docx(contenido: bytes) -> str:
-    try:
-        with zipfile.ZipFile(io.BytesIO(contenido)) as z:
-            info = z.getinfo("word/document.xml")
-            if info.file_size > _MAX_DOCX_XML:
-                raise ArchivoIlegibleError("El documento Word es demasiado grande para analizarlo.")
-            raiz = ElementTree.fromstring(z.read(info))
-    except ArchivoIlegibleError:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise ArchivoIlegibleError("No pudimos leer el documento Word. Revisa que no esté dañado.") from e
-    parrafos = []
-    for p in raiz.iter(f"{_W}p"):
-        partes = []
-        for nodo in p.iter():
-            if nodo.tag == f"{_W}t" and nodo.text:
-                partes.append(nodo.text)
-            elif nodo.tag == f"{_W}tab":
-                partes.append("\t")
-            elif nodo.tag in (f"{_W}br", f"{_W}cr"):
-                partes.append("\n")
-        parrafos.append("".join(partes))
-    return "\n".join(parrafos)
-
-
-def _texto_plano(contenido: bytes) -> str:
-    # Igual que antes de HU-17: lo que no es UTF-8 válido se descarta (no se inventan caracteres)
-    return contenido.decode("utf-8", errors="ignore")
-
-
-def extraer_texto(contenido: bytes) -> str:
-    """Texto plano del archivo según su contenido real (sirve también para el .txt ya anonimizado).
-
-    HU-33: las viñetas de PDF y Word (\\x7f y los caracteres del área privada de Symbol/Wingdings),
-    el guion blando y el BOM se normalizan aquí, para que el detector de prompt injection no
-    los confunda con caracteres de control. Los caracteres bidi y "tag" NO se tocan."""
-    if contenido.startswith(b"%PDF-"):
-        texto = _texto_pdf(contenido)
-    elif _es_docx(contenido):
-        texto = _texto_docx(contenido)
-    else:
-        # el texto plano llega tal cual (como antes de HU-17), salvo las viñetas
-        return normalizar_vinetas(_texto_plano(contenido))
-    texto = normalizar_vinetas(texto)
-    # Espacios repetidos y líneas vacías de más (los PDF suelen traer muchos)
-    texto = re.sub(r"[ \t\f\v]+", " ", texto)
-    texto = re.sub(r"\n\s*\n+", "\n\n", texto)
-    return texto.strip()
 
 
 # --------------------------------------------------------------------- términos del control

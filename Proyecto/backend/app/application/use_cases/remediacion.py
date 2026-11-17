@@ -7,7 +7,7 @@ actualizar automáticamente el puntaje de madurez y cerrar la brecha sin repetir
 autodiagnóstico.
 
   C1  Carga de archivos PDF, DOCX y TXT en la vista de remediación (lista blanca por
-      contenido y tamaño máximo; upload_evidence.validar_archivo).
+      contenido y tamaño máximo; subir_evidencia.validar_archivo).
   C2  Análisis local: extracción del texto y NER antes del LLM (HU-06) y verificación de los
       términos del control (archivos.terminos_control).
   C3  El worker actualiza el estado del control y recalcula el puntaje global y el radar
@@ -32,9 +32,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.ai.anonimizador import AnonimizacionError
 from app.application.informes.analisis import ESTADOS_BRECHA, NO_CUMPLIDO, calcular_severidad, PESO_SEVERIDAD
 from app.application.informes.carga import SinResultadosError, cargar_evaluacion
-from app.application.use_cases.create_respuesta import normalizar_justificacion
+from app.application.use_cases.crear_respuesta import normalizar_justificacion
 from app.application.use_cases.limites_encuesta import ventana_diaria
-from app.application.use_cases.upload_evidence import ArchivoDemasiadoGrandeError, TipoArchivoNoAdmitidoError, validar_archivo
+from app.application.use_cases.subir_evidencia import ArchivoDemasiadoGrandeError, TipoArchivoNoAdmitidoError, validar_archivo
 from app.application.fabricas import fabricas
 from app.core.config import settings
 from app.domain.models.evaluacion import Evaluacion
@@ -42,7 +42,7 @@ from app.domain.models.evidencia import ORIGEN_REMEDIACION, ORIGENES_REMEDIACION
 from app.domain.models.formacion import AvanceFormativo, EstadoAvance
 from app.domain.models.matriz_control import MatrizControl
 from app.domain.models.respuesta import EstadoClasificacion, Respuesta
-from app.domain.ports.prompt_guard_port import PERFIL_JUSTIFICACION
+from app.domain.ports.guardia_prompt_port import PERFIL_JUSTIFICACION
 from app.domain.auditoria.acciones import Accion
 
 ESTADOS_CON_BRECHA = (EstadoClasificacion.NO_CUMPLIDO.value, EstadoClasificacion.PARCIALMENTE_CUMPLIDO.value,

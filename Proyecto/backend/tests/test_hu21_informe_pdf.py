@@ -10,7 +10,7 @@ Ejecutar desde Proyecto/backend/:
     pytest tests/test_hu21_informe_pdf.py -v
 
 Las pruebas de lógica y de PDF no necesitan BD (el texto del PDF se lee con pypdf). Las de
-API corren en proceso (SQLite en memoria, ver _api_harness.py) y se omiten en modo live.
+API corren en proceso (SQLite en memoria, ver apoyo/api_harness.py) y se omiten en modo live.
 """
 import asyncio
 import io
@@ -66,7 +66,7 @@ def _datos(**cambios):
 
 
 def _informe(datos=None, generado=datetime(2026, 11, 2, 18, 0, tzinfo=timezone.utc), filtros=None):
-    from app.application.informes.informe import construir_informe
+    from app.application.informes.informe_evaluacion import construir_informe
 
     return construir_informe(datos or _datos(), filtros or FiltrosBrechas(), generado)
 
@@ -80,7 +80,7 @@ def _paginas(pdf: bytes) -> list[str]:
 
 def _pdf(informe) -> bytes:
     pytest.importorskip("reportlab")
-    from app.application.informes.pdf_informe import generar_pdf
+    from app.infrastructure.documentos.pdf.informe_evaluacion import generar_pdf
 
     return generar_pdf(informe)
 
@@ -181,7 +181,7 @@ def test_dimension_sin_preguntas_aplicables_se_informa_y_no_desaparece():
 
 
 def test_las_dimensiones_salen_del_catalogo_de_la_bd():
-    # Una instalación con otro catálogo (como _api_harness.py) no recibe dimensiones inventadas
+    # Una instalación con otro catálogo (como apoyo/api_harness.py) no recibe dimensiones inventadas
     catalogo = ["Datos", "Gobernanza", "Riesgos", "Seguridad"]
     dominios = [DominioResultado(1, "Datos", 50.0, "en_desarrollo", 6),
                 DominioResultado(2, "Gobernanza", 40.0, "en_desarrollo", 5)]
@@ -234,7 +234,7 @@ def test_huella_estable_entre_descargas_y_sensible_a_los_resultados():
 
 
 def test_la_huella_del_pdf_es_la_de_la_ficha():
-    from app.application.informes.informe import ficha_a_dict
+    from app.application.informes.informe_evaluacion import ficha_a_dict
 
     informe = _informe()
     ficha = ficha_a_dict(informe)
@@ -243,7 +243,7 @@ def test_la_huella_del_pdf_es_la_de_la_ficha():
 
 
 def test_ficha_json_tiene_lo_que_muestra_la_pagina_sin_codigos_internos():
-    from app.application.informes.informe import ficha_a_dict
+    from app.application.informes.informe_evaluacion import ficha_a_dict
 
     f = ficha_a_dict(_informe())
     assert {"codigo", "fecha_evaluacion", "fecha_completado", "version_matriz", "version_matriz_registrada",
@@ -269,7 +269,7 @@ api = pytest.mark.skipif(not _HAY_API, reason="requiere httpx y aiosqlite (pip i
 
 
 def _correr(escenario):
-    from _api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api
+    from apoyo.api_harness import EVAL_ID, MODO, TODOS_LOS_CONTROLES, cliente_api
     if MODO == "live":
         pytest.skip("cambian el estado de la evaluación; solo en proceso")
 

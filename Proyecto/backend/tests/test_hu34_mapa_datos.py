@@ -305,9 +305,10 @@ def test_informe_pdf_completo_y_filtrado():
     pytest.importorskip("reportlab")
     from datetime import datetime, timezone
 
-    from app.application.mapa_datos.pdf_mapa import (
-        DatosInformeMapa, VersionResumen, cuerpo_correo, generar_pdf_mapa, nombre_archivo,
+    from app.application.mapa_datos.informe_mapa import (
+        DatosInformeMapa, VersionResumen, cuerpo_correo, nombre_archivo,
     )
+    from app.infrastructure.documentos.pdf.mapa_datos import generar_pdf_mapa
 
     els, fls, _ = _mapa("salud")
     ahora = datetime.now(timezone.utc)
@@ -350,7 +351,7 @@ def hu27(monkeypatch, tmp_path):
     if not _hay_api():
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-34: solo en proceso")
     from app.core.config import settings
@@ -371,7 +372,7 @@ def hu27(monkeypatch, tmp_path):
 
 
 def _correr(escenario):
-    from _api_harness import cliente_api
+    from apoyo.api_harness import cliente_api
 
     async def _main():
         async with cliente_api(rol=None) as c:

@@ -12,7 +12,7 @@ Reúne en un solo lugar lo que la empresa tiene guardado en la plataforma:
                 disco solo queda su texto ANONIMIZADO (HU-06): eso es lo que se descarga.
   constancias   las de los módulos formativos completados (HU-26).
   registro_actividades   HU-36: informes del Registro de Actividades de Tratamiento (PDF y XLSX de
-                cada emisión, con su código verificable). Los guarda app/application/use_cases/informe_rat.py
+                cada emisión, con su código verificable). Los guarda app/application/rat/casos_uso/generar_informe.py
                 con guardar_documento().
 
 Cada descarga y cada eliminación queda en la bitácora de auditoría (HU-09) con el tipo y
@@ -39,7 +39,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes.analisis import parsear_filtros
 from app.application.informes.carga import SinResultadosError, cargar_evaluacion
-from app.application.informes.pdf_informe import DatosInforme, PdfNoDisponibleError, generar_pdf
+from app.application.informes.datos_informe import DatosInforme
+from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.fabricas import fabricas
 from app.domain.auth.actor import Actor
 from app.core.config import settings
@@ -128,7 +129,7 @@ async def guardar_documento(
 
 def _datos_informe(datos) -> DatosInforme:
     """El informe completo (sin filtros), igual al que se descarga desde el panel (HU-21)."""
-    from app.application.informes.informe import construir_informe
+    from app.application.informes.informe_evaluacion import construir_informe
 
     return construir_informe(datos, parsear_filtros(None, None, None, None), datetime.now(timezone.utc))
 
@@ -155,7 +156,7 @@ async def archivar_informe(db: AsyncSession, evaluacion: Evaluacion, actor: Acto
         raise DocumentoError(409, "SIN_RESULTADOS", str(e))
     informe = _datos_informe(datos)
     try:
-        pdf = generar_pdf(informe)
+        pdf = fabricas().documentos.pdf_informe(informe)
     except PdfNoDisponibleError as e:
         raise DocumentoError(503, "PDF_NO_DISPONIBLE", str(e))
     nombre = f"informe_evaluacion-{evaluacion.id}_{informe.generado:%Y-%m-%d_%H%M%S}.pdf"

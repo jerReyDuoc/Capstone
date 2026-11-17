@@ -5,7 +5,7 @@ import uuid
 import aiofiles
 
 from app.core.config import settings
-from app.domain.ports.file_storage_port import FileStoragePort
+from app.domain.ports.almacenamiento_port import FileStoragePort
 
 _EXTENSION_SEGURA = re.compile(r"^\.[A-Za-z0-9]{1,10}$")
 

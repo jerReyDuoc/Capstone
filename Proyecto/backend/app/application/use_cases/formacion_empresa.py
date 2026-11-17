@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.formacion.constancia_pdf import DatosConstancia, generar_constancia, nombre_constancia
+from app.application.formacion.constancia import DatosConstancia, nombre_constancia
 from app.application.formacion.logica import (
     AvanceModulo,
     Leccion,
@@ -359,7 +359,7 @@ class FormacionEmpresa:
             modalidad=ruta.modalidad, objetivo=ruta.objetivo, fecha_completado=a.fecha_completado,
             puntaje=a.mejor_puntaje, codigo=a.codigo_constancia,
         )
-        pdf = generar_constancia(datos)
+        pdf = fabricas().documentos.pdf_constancia_formacion(datos)
         self.bitacora.registrar(
             accion=Accion.FORMACION_CONSTANCIA, entidad="avance_formativo", entidad_id=a.id,
             actor=self.cliente.actor, detalle={"ruta_id": ruta_id},

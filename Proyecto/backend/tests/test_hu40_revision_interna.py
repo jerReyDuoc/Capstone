@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from app.application.rat import informe as I
+from app.application.rat import informe_rat as I
 from app.application.rat import paquete_revision as P
 from app.domain.mapa_datos.modelo import Elemento, Flujo
 from app.domain.rat import modelo as M
@@ -209,8 +209,8 @@ def test_la_marca_aparece_en_el_informe_pdf_y_excel():
     pytest.importorskip("openpyxl")
     from openpyxl import load_workbook
 
-    from app.application.rat.pdf_rat import generar_pdf_rat
-    from app.application.rat.xlsx_rat import generar_xlsx_rat
+    from app.infrastructure.documentos.pdf.rat import generar_pdf_rat
+    from app.infrastructure.documentos.xlsx.rat import generar_xlsx_rat
 
     inf, _, _ = _registro()
     marca = I.MarcaRevision(id=3, numero=2, fecha=datetime(2026, 11, 13, 15, 0), revisor="Jason Sánchez",
@@ -248,7 +248,7 @@ def _texto_pdf(pdf: bytes) -> str:
 
 # ===================================================================== constancia y paquete
 def _datos_constancia(estado="revisada"):
-    from app.application.rat.pdf_revision import DatosConstancia
+    from app.application.rat.constancia_revision import DatosConstancia
 
     inf, els, fls = _registro()
     objs = R.objetos(list(inf.actividades), els, fls)
@@ -283,7 +283,8 @@ def _datos_constancia(estado="revisada"):
 
 def test_constancia_pdf_revisada_y_en_curso():
     pytest.importorskip("reportlab")
-    from app.application.rat.pdf_revision import generar_pdf_revision, nombre_archivo
+    from app.application.rat.constancia_revision import nombre_archivo
+    from app.infrastructure.documentos.pdf.revision_interna import generar_pdf_revision
 
     d, _ = _datos_constancia()
     pdf = generar_pdf_revision(d)
@@ -297,7 +298,7 @@ def test_constancia_pdf_revisada_y_en_curso():
 
 
 def _paquete():
-    from app.application.rat.pdf_revision import generar_pdf_revision
+    from app.infrastructure.documentos.pdf.revision_interna import generar_pdf_revision
 
     d, inf = _datos_constancia()
     a = inf.actividades[0]
@@ -393,7 +394,7 @@ def hu35(monkeypatch, tmp_path):
         pytest.skip("sin FastAPI/SQLAlchemy")
     import test_hu27_empresa_cliente as m
     import test_hu35_rat as m35
-    from _api_harness import MODO
+    from apoyo.api_harness import MODO
     if MODO == "live":
         pytest.skip("HU-40: solo en proceso")
     from app.core.config import settings
@@ -528,7 +529,7 @@ def test_api_recordatorio_periodico(hu35, monkeypatch):
     m35, hu27 = hu35
 
     async def esc(c):
-        from app.application.use_cases.revision_interna import enviar_recordatorios
+        from app.application.rat.casos_uso.revision_interna import enviar_recordatorios
 
         await _registro_vigente(m35, hu27, c)
         futuro = datetime.now(timezone.utc) + timedelta(days=400)

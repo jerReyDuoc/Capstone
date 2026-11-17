@@ -7,7 +7,7 @@ aplicabilidad con versionado, sin modificar código.
   C3  Cada cambio queda en el audit log.
 
 Parte 1: lógica pura (app/domain/matriz); corre en cualquier entorno, sin BD.
-Parte 2: API en proceso (SQLite, _api_harness.py).
+Parte 2: API en proceso (SQLite, apoyo/api_harness.py).
 """
 import asyncio
 import itertools
@@ -162,7 +162,7 @@ def test_el_detalle_del_cambio_es_apto_para_el_audit_log():
 
 
 # ===================================================================== parte 2: API en proceso
-from _api_harness import (  # noqa: E402
+from apoyo.api_harness import (  # noqa: E402
     EVAL_ID, EVAL_NA_ID, MODO, TODOS_LOS_CONTROLES, cliente_api, encabezados_qa,
 )
 
@@ -225,7 +225,7 @@ async def _bitacora(c, accion=None):
 @api
 def test_rutas_hu24_solo_admin():
     from app.domain.auth.actor import Rol
-    from app.infrastructure.security.autenticacion import emitir_token
+    from app.infrastructure.security.cripto.autenticacion import emitir_token
 
     async def esc(c):
         await _borrador(c)

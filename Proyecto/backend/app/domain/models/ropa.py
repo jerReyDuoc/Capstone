@@ -11,7 +11,7 @@ HU-37 · Informe RoPA del registro de actividades de tratamiento.
 
   version        correlativo por empresa: sube cuando cambia la huella respecto de la emisión anterior.
   codigo         CIA-ROPA-AAAA-NNNNNN-D (dígito verificador módulo 11 sobre el id): lo calcula el caso de
-                 uso apenas conoce el id (app/application/ropa/informe.py: codigo()).
+                 uso apenas conoce el id (app/application/ropa/informe_ropa.py: codigo()).
   documento_*    si la empresa elimina el archivo desde "Mis documentos", queda en NULL (ON DELETE SET NULL).
 
 En PostgreSQL un trigger impide cambiar lo que identifica a una emisión (código, versión, huella, partes y

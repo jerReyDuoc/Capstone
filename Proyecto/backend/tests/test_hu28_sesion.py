@@ -22,8 +22,8 @@ import pytest
 from sqlalchemy import select
 
 import test_hu27_empresa_cliente as hu27
-from _api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, cliente_api  # noqa: E402
-import app.infrastructure.security.autenticacion as auth  # noqa: E402
+from apoyo.api_harness import ADMIN_EMAIL, ADMIN_PASSWORD, MODO, cliente_api  # noqa: E402
+import app.infrastructure.security.cripto.autenticacion as auth  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 if MODO == "en_proceso":
