@@ -200,3 +200,12 @@
   .opciones { grid-template-columns: minmax(0, 1fr); }
   .detalleCabeza, .detalleCuerpo { padding-left: var(--sp-4); padding-right: var(--sp-4); }
 }
+
+/* Auditoría UX 16-11 · Fase 10.2: filtros en una fila + panel "Más filtros" */
+.botonMasFiltros { align-self: flex-end; }
+.panelFiltros { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.notaConteos { margin: 0; font-size: var(--fs-xs); color: var(--text-subtle); }
+.puntoConfirmada { background: var(--ok); }
+.puntoCorregida { background: var(--severity-medium); }
+.puntoAtaque { background: var(--severity-critical); }
+.puntoFalso { background: var(--severity-none); }

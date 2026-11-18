@@ -12,6 +12,7 @@
  * Correcciones 29-10: es su propia página (/empresa/evaluaciones); el subtítulo largo pasó a un
  * botón (i) y el cliente ya no ve los números internos de cada evaluación.
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -23,11 +24,12 @@ import {
   type EvaluacionHistorial, type HistorialApi,
 } from "@/lib/empresa";
 import { formatoPuntaje, NIVELES } from "@/lib/madurez";
-import s from "@/components/admin/admin.module.css";
+import s from "@/components/ui/comunes.module.css";
 
 type Estado = { tipo: "cargando" } | { tipo: "listo"; datos: HistorialApi } | { tipo: "error" };
 
-const TONO_NIVEL: Record<string, string> = { inicial: "alto", en_desarrollo: "medio", gestionado: "bajo", optimizado: "ok" };
+// Auditoría UX 16-11: mismos tonos que BadgeNivel (lib/madurez.ts); el verde, solo para "Optimizado"
+const TONO_NIVEL: Record<string, string> = Object.fromEntries(Object.entries(NIVELES).map(([k, v]) => [k, v.tono]));
 
 export function MisEvaluaciones() {
   const router = useRouter();
@@ -117,16 +119,20 @@ export function MisEvaluaciones() {
               Continuar evaluación
             </Link>
           ) : (
-            <button
-              type="button"
+            <BotonConMotivo
               className="btn btn-primary"
               onClick={nueva}
-              disabled={!datos.puede_reevaluar || ocupado !== null}
+              ocupado={ocupado !== null}
               aria-busy={ocupado === "nueva"}
-              title={!datos.servicio_habilitado ? "Requiere el servicio activo de tu empresa" : undefined}
+              alinear="fin"
+              motivo={
+                ocupado !== null || datos.puede_reevaluar ? null
+                  : !datos.servicio_habilitado ? "Requiere el servicio activo de tu empresa"
+                  : "Por ahora no puedes iniciar otra evaluación"
+              }
             >
               Nueva evaluación
-            </button>
+            </BotonConMotivo>
           )}
         </div>
       </header>

@@ -121,7 +121,8 @@
 
 .alto { color: var(--alto); }
 .medio { color: var(--medio); }
-.bajo { color: var(--bajo); }
+/* Auditoría UX 16-11: estar sobre el rubro es favorable, pero no es "Cumplido": azul, no verde */
+.bajo { color: var(--nivel-gestionado); }
 
 /* ---------- Leyenda ---------- */
 .leyenda {

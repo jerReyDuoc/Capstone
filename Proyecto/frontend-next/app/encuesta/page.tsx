@@ -17,7 +17,7 @@ export default async function Encuesta() {
   const token = (await cookies()).get(COOKIE_SESION)?.value;
   if (!sesionDelToken(token)) redirect("/retomar?motivo=sesion");
   return (
-    <PaginaPublica enlaces={false}>
+    <PaginaPublica enlaces={false} ancho="amplio">
       <div className={`${s.contenedorAncho} ${s.flujo}`}>
         <header className={s.flujoCabecera}>
           <h1 className={s.flujoTitulo}>Mi autodiagnóstico</h1>

@@ -11,8 +11,10 @@
  *   - Las brechas que genera el registro (sin base de licitud, sin plazo, transferencia sin garantía,
  *     envío sin actividad) con su ruta: corregir, módulo de formación y re-evaluar el control.
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { BadgeSeveridad } from "@/components/ui/Basicos";
 import { Icon } from "@/components/ui/Icon";
 import { ErrorBff } from "@/lib/encuesta/cliente";
 import {
@@ -21,7 +23,6 @@ import {
 } from "@/lib/registroActividades";
 import c from "./cumplimiento.module.css";
 
-const TONO_SEVERIDAD: Record<string, string> = { Crítica: "tone-critico", Alta: "tone-alto", Media: "tone-medio", Baja: "tone-ok" };
 const MAX_LISTA = 5;
 
 export function EstadoProteccionDatos() {
@@ -150,9 +151,10 @@ export function EstadoProteccionDatos() {
                 ))}
               </ul>
               <div className={c.acciones}>
-                <button type="button" className="btn btn-primary btn-sm" onClick={usarComoEvidencia} disabled={ocupado || !evidencia.por_mejorar}>
+                <BotonConMotivo className="btn btn-primary btn-sm" onClick={usarComoEvidencia} ocupado={ocupado}
+                                motivo={!ocupado && !evidencia.por_mejorar ? "Tu registro aún no mejora ninguna respuesta" : null}>
                   {ocupado ? "Actualizando…" : "Usar mi registro como evidencia"}
-                </button>
+                </BotonConMotivo>
                 <span className={c.pie}>
                   {evidencia.por_mejorar
                     ? `Mejorará ${evidencia.por_mejorar} control${evidencia.por_mejorar > 1 ? "es" : ""} y recalculará tu puntaje. Nunca baja un control.`
@@ -205,7 +207,7 @@ export function EstadoProteccionDatos() {
               {brechasVisibles.map((b, i) => (
                 <li key={`${b.codigo}-${b.actividad?.id ?? b.flujo_id ?? i}`} className={c.brecha}>
                   <div className={c.brechaCabeza}>
-                    <span className={`badge ${TONO_SEVERIDAD[b.severidad] ?? "tone-info"}`}>{b.severidad}</span>
+                    <BadgeSeveridad severidad={b.severidad} />
                     <strong>{b.titulo}</strong>
                   </div>
                   <p className={c.pie}>{b.texto}</p>

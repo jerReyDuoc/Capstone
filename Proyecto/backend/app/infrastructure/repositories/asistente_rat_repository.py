@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.models.asistente import AsistenteDocumento, AsistenteMensaje, AsistentePropuesta, AsistenteSesion
+from app.domain.models.mapa_datos_tablas import MapaDatos, MapaElemento, MapaFlujo
 from app.domain.models.rat_modelo import RatActividad
 
 
@@ -44,6 +45,17 @@ class AsistenteRatRepository:
     async def propuesta_por_clave(self, empresa_id: int, clave: str) -> Any | None:
         return (await self.session.execute(select(AsistentePropuesta).where(
             AsistentePropuesta.empresa_id == empresa_id, AsistentePropuesta.clave == clave))).scalar_one_or_none()
+
+    async def entidad_de_propuesta(self, tipo: str, propuesta_id: int, empresa_id: int) -> int | None:
+        """T-12: id del elemento, flujo o actividad que ya creó esta propuesta (reintento), o None."""
+        if tipo in ("elemento", "flujo"):
+            modelo = MapaElemento if tipo == "elemento" else MapaFlujo
+            q = (select(modelo.id).join(MapaDatos, MapaDatos.id == modelo.mapa_id)
+                 .where(modelo.propuesta_ia_id == propuesta_id, MapaDatos.empresa_id == empresa_id))
+        else:
+            q = select(RatActividad.id).where(RatActividad.propuesta_ia_id == propuesta_id,
+                                              RatActividad.empresa_id == empresa_id)
+        return (await self.session.execute(q.order_by(q.selected_columns[0]).limit(1))).scalar_one_or_none()
 
     async def claves_de_propuestas(self, empresa_id: int) -> list[str]:
         return list((await self.session.execute(

@@ -1,0 +1,51 @@
+/*
+ * Auditoría UX 16-11 · Fase 11 — PROTOTIPO de identidad visual (solo para validar; NO está en el producto).
+ * Se inyecta sobre la app actual para tomar capturas: cambia únicamente tokens (y quita el fondo
+ * decorativo). Contrastes AA verificados en propuesta_identidad_visual.md.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface-2: #f1f0eb;
+  --surface-3: #ecebe6;
+  --line: #e4e2da;
+  --line-strong: #d6d3c9;
+  --line-control: #7c7a70;
+  --text: #1c1f1d;
+  --text-muted: #4a4f4b;
+  --text-subtle: #5f645c;
+  --accent: #0d6b52;
+  --accent-hover: #0a5843;
+  --accent-strong: #0d6b52;
+  --accent-soft: #e3efe9;
+  --accent-glow: rgba(13, 107, 82, 0.12);
+  --on-accent: #ffffff;
+  --severity-critical: #b4123a;
+  --severity-critical-soft: #f8e3e8;
+  --on-severity-critical: #ffffff;
+  --severity-high: #a8460a;
+  --severity-high-soft: #f8ebe1;
+  --severity-medium: #7d5800;
+  --severity-medium-soft: #f6efdc;
+  --severity-low: #355a8c;
+  --severity-low-soft: #e6edf6;
+  --severity-none: #56606b;
+  --severity-none-soft: #eceef0;
+  --nivel-gestionado: #2f5fa8;
+  --nivel-gestionado-soft: #e5ecf7;
+  --barra-neutra: #7c8a94;
+  --disabled-bg: #ecebe6;
+  --disabled-text: #5f645c;
+  --disabled-line: #d6d3c9;
+  --serie-industria: #5b6fd6;
+  --serie-meta: #8a6400;
+  --grid: #e4e2da;
+  --font-display: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+}
+body { background-image: none !important; background: var(--bg) !important; }
+.card { background: var(--surface) !important; box-shadow: 0 1px 2px rgba(28, 31, 29, 0.06); }
+.sidebar, .barra-movil, .nav-inferior { background: #fbfaf7 !important; }
+/* Sin el eyebrow verde en mayúsculas sobre cada título */
+.eyebrow { display: none !important; }
+.page-title { font-weight: 600; letter-spacing: -0.01em; }

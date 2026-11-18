@@ -27,24 +27,60 @@
   --accent-glow: rgba(20, 216, 158, 0.16);
   --on-accent: #03110c;     /* texto sobre --accent: 10,4:1 */
 
-  /* Semánticos de riesgo (criticidad / madurez) */
-  --alto: #f2605c;
-  --alto-soft: rgba(242, 96, 92, 0.14);
-  --medio: #f2b53f;
-  --medio-soft: rgba(242, 181, 63, 0.14);
-  --bajo: #3dbe74;
-  --bajo-soft: rgba(61, 190, 116, 0.14);
-  --ok: var(--accent);
+  /* Auditoría UX 16-11 · Escala ÚNICA de severidad (Crítica · Alta · Media · Baja).
+     Cuatro tonos distinguibles entre sí y, además, una FORMA propia por nivel (ver .badge::before):
+     crítica = insignia sólida + octágono, alta = triángulo, media = rombo, baja = círculo hueco.
+     El verde queda SOLO para la marca y para "Cumplido". Contraste (sobre --surface #0a100e /
+     sobre su fondo suave): crítica 5,9:1 / 5,1:1 · alta 8,2:1 / 6,7:1 · media 11,8:1 / 9,1:1 ·
+     baja 8,6:1 / 6,9:1 · sin clasificar 7,2:1 / 5,9:1. Detalle en Extras/Cambios/HANDOFF_auditoria_ux.md. */
+  --severity-critical: #ff4d5e;
+  --severity-critical-soft: rgba(255, 77, 94, 0.16);
+  --on-severity-critical: #1a0208;  /* texto sobre la insignia sólida: 6,1:1 */
+  --severity-high: #ff8a3d;
+  --severity-high-soft: rgba(255, 138, 61, 0.14);
+  --severity-medium: #f5c542;
+  --severity-medium-soft: rgba(245, 197, 66, 0.14);
+  --severity-low: #8fb0d9;           /* azul acero neutro: "baja" no es "bien" */
+  --severity-low-soft: rgba(143, 176, 217, 0.14);
+  --severity-none: #93a0a8;
+  --severity-none-soft: rgba(147, 160, 168, 0.14);
+
+  /* Semánticos de riesgo (criticidad del control / estado). Apuntan a la escala única. */
+  --alto: var(--severity-high);
+  --alto-soft: var(--severity-high-soft);
+  --medio: var(--severity-medium);
+  --medio-soft: var(--severity-medium-soft);
+  --bajo: var(--severity-low);
+  --bajo-soft: var(--severity-low-soft);
+  --ok: var(--accent);       /* "Cumplido": único uso semántico del verde */
   --ok-soft: rgba(20, 216, 158, 0.14);
-  /* HU-11 · severidad de brechas. "Crítica" se distingue también por FORMA (insignia sólida),
-     no solo por color: su tono y el de --alto son casi iguales para daltónicos. */
-  --critico: #ff5c7a;       /* 6,5:1 sobre surface */
-  --critico-soft: rgba(255, 92, 122, 0.16);
-  --on-critico: #1a0208;    /* texto sobre --critico: 6,7:1 */
-  --naranja: #f58a4b;       /* severidad Alta: 7,9:1 sobre surface */
-  --naranja-soft: rgba(245, 138, 75, 0.14);
-  --info: #93a0a8;
-  --info-soft: rgba(147, 160, 168, 0.14);
+  /* Error de formulario o de sistema (no es una severidad): mismo rojo que "crítica" */
+  --error: var(--severity-critical);
+  /* Alias históricos (HU-11): se conservan para no romper módulos que aún los nombran */
+  --critico: var(--severity-critical);
+  --critico-soft: var(--severity-critical-soft);
+  --on-critico: var(--on-severity-critical);
+  --naranja: var(--severity-high);
+  --naranja-soft: var(--severity-high-soft);
+  --info: var(--severity-none);
+  --info-soft: var(--severity-none-soft);
+
+  /* Niveles de madurez (más es mejor): inicial → optimizado. Solo "optimizado" usa el verde. */
+  --nivel-inicial: var(--severity-high);
+  --nivel-desarrollo: var(--severity-medium);
+  --nivel-gestionado: #7fb2ff;       /* 8,9:1 sobre surface */
+  --nivel-gestionado-soft: rgba(127, 178, 255, 0.14);
+
+  /* Barras de conteo donde "más" es peor (brechas por dominio): neutro, nunca verde */
+  --barra-neutra: #6f8a99;           /* 4,6:1 sobre --surface-3 (WCAG 1.4.11) */
+
+  /* Estado desactivado (botones): gris, sin marca. Texto 6,4:1 sobre su fondo. */
+  --disabled-bg: #1f2a26;
+  --disabled-text: #a3aca8;
+  --disabled-line: #2c3a35;
+
+  /* Barra de navegación inferior (móvil) */
+  --bottom-nav-h: 64px;
 
   /* Series de gráficos */
   --serie-empresa: var(--accent);
@@ -363,7 +399,29 @@ button, select, input { font: inherit; color: inherit; }
 /* el área clicable de los botones pequeños se amplía a 44px sin cambiar su aspecto */
 .btn-sm { position: relative; }
 .btn-sm::after { content: ""; position: absolute; inset: -4px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; } /* HU-19 */
+/* Auditoría UX 16-11 · Desactivado inconfundible: fondo gris, texto gris legible (6,4:1), sin
+   color de marca, sin sombra ni hover. Vale para disabled y para aria-disabled (enfocable). */
+.btn:disabled,
+.btn[aria-disabled="true"],
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-color: var(--disabled-line);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 1;
+}
+.btn:disabled svg, .btn[aria-disabled="true"] svg { opacity: 0.7; }
+/* Motivo visible de un botón desactivado (no solo tooltip) */
+.motivo-desactivado {
+  display: flex; align-items: flex-start; gap: var(--sp-1);
+  margin: 0; font-size: var(--fs-sm); color: var(--text-muted);
+}
+.motivo-desactivado svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--text-subtle); }
+.boton-con-motivo { display: inline-grid; gap: var(--sp-1); justify-items: start; min-width: 0; }
+.boton-con-motivo[data-alinear="fin"] { justify-items: end; text-align: right; }
 
 .chip-group { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .chip {
@@ -440,12 +498,26 @@ button, select, input { font: inherit; color: inherit; }
   font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .tone-alto { background: var(--alto-soft); color: var(--alto); }
 .tone-medio { background: var(--medio-soft); color: var(--medio); }
 .tone-bajo { background: var(--bajo-soft); color: var(--bajo); }
 .tone-ok { background: var(--ok-soft); color: var(--ok); }
 .tone-info { background: var(--info-soft); color: var(--info); }
+/* Niveles de madurez (BadgeNivel) */
+.tone-nivel-inicial { background: var(--severity-high-soft); color: var(--nivel-inicial); }
+.tone-nivel-desarrollo { background: var(--severity-medium-soft); color: var(--nivel-desarrollo); }
+.tone-nivel-gestionado { background: var(--nivel-gestionado-soft); color: var(--nivel-gestionado); }
+.tone-nivel-optimizado { background: var(--ok-soft); color: var(--ok); }
+
+/* Auditoría UX 16-11 · Forma propia por severidad (se distinguen también en escala de grises).
+   Se aplica a las insignias (.badge.sev-forma-*) y a la marca de las filas/tarjetas. */
+.badge[class*="sev-forma-"]::before { width: 9px; height: 9px; border-radius: 0; }
+.sev-forma-critica::before { clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+.sev-forma-alta::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.sev-forma-media::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.badge.sev-forma-baja::before { background: transparent; border: 2px solid currentColor; border-radius: 50%; }
+.badge.sev-forma-ninguna::before { background: transparent; border: 1.5px dashed currentColor; border-radius: 50%; }
 .badge-demo { background: var(--medio-soft); color: var(--medio); text-transform: uppercase; letter-spacing: 0.1em; }
 
 /* ---------- Gráficos ---------- */
@@ -507,7 +579,7 @@ button, select, input { font: inherit; color: inherit; }
 .link-btn::after { content: ""; position: absolute; inset: -4px; }
 
 /* ---------- Tablas ---------- */
-.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .table caption { text-align: left; padding: var(--sp-3) var(--sp-4); color: var(--text-muted); }
 .table th, .table td { padding: var(--sp-3) var(--sp-4); text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -560,6 +632,9 @@ button, select, input { font: inherit; color: inherit; }
 .domain-filter:hover { border-color: var(--line-control); }
 .domain-filter[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .domain-filter .domain-bar { height: 8px; }
+/* Auditoría UX 16-11 · en "Brechas por dominio" más largo es PEOR: barra neutra, nunca verde */
+.domain-filter .domain-bar .fill { background: var(--barra-neutra); }
+.domain-filter[aria-pressed="true"] .domain-bar .fill { background: var(--text-muted); }
 .domain-filter-count { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* Estados */
@@ -644,11 +719,11 @@ button, select, input { font: inherit; color: inherit; }
 .sev-tile[aria-pressed="true"] .sev-tile-check { opacity: 1; }
 .sev-tile-valor { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .sev-tile-guia { font-size: var(--fs-sm); color: var(--text-muted); }
-.sev-critico { --sev: var(--critico); --sev-soft: var(--critico-soft); }
-.sev-naranja { --sev: var(--naranja); --sev-soft: var(--naranja-soft); }
-.sev-medio { --sev: var(--medio); --sev-soft: var(--medio-soft); }
-.sev-bajo { --sev: var(--bajo); --sev-soft: var(--bajo-soft); }
-.sev-info { --sev: var(--info); --sev-soft: var(--info-soft); }
+.sev-critico { --sev: var(--severity-critical); --sev-soft: var(--severity-critical-soft); }
+.sev-naranja { --sev: var(--severity-high); --sev-soft: var(--severity-high-soft); }
+.sev-medio { --sev: var(--severity-medium); --sev-soft: var(--severity-medium-soft); }
+.sev-bajo { --sev: var(--severity-low); --sev-soft: var(--severity-low-soft); }
+.sev-info { --sev: var(--severity-none); --sev-soft: var(--severity-none-soft); }
 .sev-critico .sev-tile-valor { color: var(--critico); }
 
 /* Matriz de priorización impacto × estado */
@@ -1261,3 +1336,368 @@ textarea { font: inherit; color: inherit; }
   .informe-sev { font-weight: 700; color: var(--sev); white-space: nowrap; }
   .informe-pie { margin-top: 10px; font-size: 8pt; color: var(--text-subtle); }
 }
+
+/* =====================================================================
+   Auditoría UX 16-11 · Fase 1: sin desborde horizontal a 390 px
+   Regla general: los hijos de grid/flex pueden encogerse (min-width: 0) y los textos largos
+   se cortan de línea en vez de empujar el ancho de la página.
+   ===================================================================== */
+.grid > *, .main-inner > *, .card > * { min-width: 0; }
+.kpi-label, .kpi-value, .kpi-hint, .card-title, .card-sub, .page-title, .page-sub { overflow-wrap: anywhere; }
+.pin-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.modulo-grid { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+
+/* Contenedor con desplazamiento interno contenido + sombra que indica "hay más a la derecha" */
+.scroll-x {
+  /* relative: los textos .sr-only (absolutos) de adentro no escapan del contenedor */
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background:
+    linear-gradient(90deg, var(--surface) 30%, transparent) left / 24px 100% no-repeat local,
+    linear-gradient(270deg, var(--surface) 30%, transparent) right / 24px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.55), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.55), transparent) right / 12px 100% no-repeat scroll;
+}
+
+@media (max-width: 599.98px) {
+  .grid > .kpi { grid-column: span 12; }
+  .kpi-label { letter-spacing: 0.08em; flex-wrap: wrap; }
+  .select { min-width: 0; width: 100%; }
+  .toolbar > .field { flex: 1 1 100%; }
+  .page-actions { width: 100%; }
+  .page-title { font-size: var(--fs-2xl); }
+  .card { padding: var(--sp-4); }
+
+  /* Barras "Brechas por dominio": etiqueta arriba, barra a todo el ancho debajo, valor visible */
+  .domain-filter { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--sp-2); padding: var(--sp-3); }
+  .domain-filter .domain-bar { grid-column: 1 / -1; grid-row: 2; }
+  .domain-filter-name { overflow-wrap: anywhere; }
+  .domain-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .domain-row .domain-bar { grid-column: 1 / -1; }
+
+  /* Tabla → tarjetas apiladas (cada celda con su rótulo) */
+  /* los rótulos de cada celda (data-label) reemplazan al encabezado */
+  .table-tarjetas thead { display: none; }
+  .table-tarjetas, .table-tarjetas tbody, .table-tarjetas tr, .table-tarjetas td { display: block; width: 100%; }
+  .table-wrap:has(.table-tarjetas) { border: 0; overflow: visible; }
+  .table-tarjetas tbody { display: grid; gap: var(--sp-3); }
+  .table-tarjetas tbody tr {
+    position: relative; padding: var(--sp-3) var(--sp-4) var(--sp-3) calc(var(--sp-4) + 4px);
+    border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-2);
+  }
+  .table-tarjetas tbody tr[data-sev] td:first-child { box-shadow: none; }
+  .table-tarjetas tbody tr[data-sev]::before {
+    content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px;
+    border-radius: 0 4px 4px 0; background: var(--sev);
+  }
+  .table-tarjetas td { padding: var(--sp-1) 0; border: 0; min-width: 0 !important; overflow-wrap: anywhere; }
+  .table-tarjetas td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-subtle);
+  }
+  .table-tarjetas td.rank { width: auto; }
+
+  /* Cerrar brechas: tarjeta de evidencia y botones a todo el ancho */
+  .remed-item { padding-left: calc(var(--sp-4) + 4px); }
+  .remed-form { padding: var(--sp-4); }
+  .remed-acciones { justify-content: stretch; }
+  .remed-acciones > .btn, .remed-form .btn { width: 100%; }
+  .archivo { width: 100%; max-width: 100%; }
+  .export-group { width: 100%; }
+  .export-group > .btn, .export-group > * { flex: 1 1 100%; }
+}
+.celda-insignias { display: grid; gap: 6px; justify-items: start; }
+.table .celda-brecha { min-width: 260px; }
+.table .celda-accion { min-width: 200px; }
+@media (max-width: 599.98px) {
+  .celda-insignias { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .matriz { min-width: 340px; }
+}
+/* Nombres de archivo largos: se cortan de línea en vez de ensanchar la tarjeta */
+.remed-resultado-linea > span, .remed-historial-archivo, .remed-titulo, .remed-espera { min-width: 0; overflow-wrap: anywhere; }
+
+/* Auditoría UX 16-11 · "Actualizado hace X" (reemplaza al botón Actualizar) */
+.actualizado {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.actualizado-boton { width: var(--target); height: var(--target); }
+.actualizado-boton::after { display: none; }
+.girando { animation: girar 900ms linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Auditoría UX 16-11 · Menú de cuenta (Cerrar sesión y datos de la cuenta) */
+.menu-cuenta { position: relative; flex: none; }
+.menu-cuenta-boton {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--target); padding: 0 var(--sp-3) 0 var(--sp-1);
+  border: 1px solid var(--line-control); border-radius: var(--radius-pill);
+  background: transparent; color: var(--text); font-weight: 600; font-size: var(--fs-sm); cursor: pointer;
+}
+.menu-cuenta-boton:hover, .menu-cuenta-boton[aria-expanded="true"] { background: var(--surface-2); }
+.menu-cuenta-avatar { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-3); }
+.menu-cuenta-avatar svg { width: 18px; height: 18px; }
+.menu-cuenta-chevron { width: 16px; height: 16px; color: var(--text-muted); transition: transform var(--dur) var(--ease); }
+.menu-cuenta-boton[aria-expanded="true"] .menu-cuenta-chevron { transform: rotate(180deg); }
+.menu-cuenta-panel {
+  position: absolute; right: 0; top: calc(100% + var(--sp-2)); z-index: 60;
+  min-width: 240px; max-width: calc(100vw - 32px);
+  display: grid; padding: var(--sp-2);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  background: var(--surface-3); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.menu-cuenta-datos { display: grid; gap: 2px; padding: var(--sp-2) var(--sp-3) var(--sp-3); margin-bottom: var(--sp-1); border-bottom: 1px solid var(--line-strong); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.menu-cuenta-datos span { color: var(--text-muted); font-size: var(--fs-xs); }
+.menu-cuenta-item {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: var(--target); padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text); font: inherit; font-size: var(--fs-sm); text-align: left; text-decoration: none; cursor: pointer;
+}
+.menu-cuenta-item svg { width: 18px; height: 18px; color: var(--text-muted); }
+.menu-cuenta-item:hover, .menu-cuenta-item:focus-visible { background: var(--surface-2); outline-offset: -2px; }
+@media (max-width: 599.98px) { .menu-cuenta-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .menu-cuenta-boton { padding-right: var(--sp-2); } }
+
+/* Auditoría UX 16-11 · Barras comparadas por dominio (reemplazan al radar) */
+.barras-comparadas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.bc-fila {
+  width: 100%; display: grid; gap: var(--sp-2);
+  padding: var(--sp-3); border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; color: var(--text); text-align: left; font: inherit;
+}
+.bc-fila-boton { cursor: pointer; }
+.bc-fila-boton:hover { background: var(--surface-2); border-color: var(--line-strong); }
+.bc-cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); }
+.bc-nombre { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.bc-valores { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bc-valores strong { color: var(--text); font-size: var(--fs-md); }
+.bc-pistas { position: relative; display: grid; gap: 4px; }
+.bc-pista { display: block; height: 12px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; }
+.bc-barra { display: block; height: 100%; border-radius: inherit; transition: width 600ms var(--ease); }
+.bc-empresa { background: var(--serie-empresa); }
+/* El rubro se distingue también por forma (rayado), no solo por color */
+.bc-rubro { background: repeating-linear-gradient(135deg, var(--serie-industria) 0 4px, rgba(143, 163, 255, 0.45) 4px 7px); }
+.bc-meta { position: absolute; top: -4px; bottom: -4px; width: 0; margin-left: -1px; border-left: 2px dotted var(--serie-meta); }
+.bc-pie { font-size: var(--fs-xs); color: var(--text-subtle); }
+.bc-escala { display: flex; justify-content: space-between; margin: 0; padding: 0 var(--sp-3); font-size: var(--fs-xs); color: var(--text-subtle); }
+.barra-muestra-empresa { background: var(--serie-empresa); }
+.barra-muestra-rubro { background: repeating-linear-gradient(135deg, var(--serie-industria) 0 3px, transparent 3px 5px); }
+.barra-muestra-meta { background: transparent; border: 2px dotted var(--serie-meta); }
+
+/* Auditoría UX 16-11 · "¿Cómo se calcula?" (metodología plegada) */
+.como-se-calcula { border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface); }
+.como-se-calcula > summary {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--target); padding: var(--sp-2) var(--sp-4);
+  list-style: none; cursor: pointer; font-weight: 600; font-size: var(--fs-sm); color: var(--text);
+}
+.como-se-calcula > summary::-webkit-details-marker { display: none; }
+.como-se-calcula > summary svg { flex: none; width: 18px; height: 18px; color: var(--text-muted); }
+.como-se-calcula-chevron { margin-left: auto; transition: transform var(--dur) var(--ease); }
+.como-se-calcula[open] .como-se-calcula-chevron { transform: rotate(180deg); }
+.como-se-calcula > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-md); }
+.como-se-calcula-cuerpo { display: grid; gap: var(--sp-4); padding: 0 var(--sp-4) var(--sp-4); font-size: var(--fs-sm); color: var(--text-muted); }
+.como-se-calcula-cuerpo strong { color: var(--text); }
+
+/* Auditoría UX 16-11 · Bloque único de resultado (Diagnóstico) */
+.resultado { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-4) var(--sp-8); align-items: center; }
+.resultado-cifra { display: grid; gap: var(--sp-2); justify-items: start; }
+.resultado-puntaje { font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.resultado-puntaje small { margin-left: var(--sp-1); font-family: var(--font-body); font-size: var(--fs-md); color: var(--text-subtle); font-weight: 500; }
+.resultado-texto { display: grid; gap: var(--sp-2); font-size: var(--fs-md); color: var(--text-muted); }
+.resultado-texto strong { color: var(--text); }
+.resultado-linea { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.resultado .meter { width: 180px; }
+.cifra-critica { color: var(--severity-critical); }
+.cifra-alta { color: var(--severity-high); }
+@media (max-width: 599.98px) { .resultado { grid-template-columns: 1fr; } }
+
+/* Auditoría UX 16-11 · Resumen por severidad en una fila (Brechas) */
+.chips-severidad { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.chip-severidad { min-height: var(--target); gap: var(--sp-2); padding: 0 var(--sp-4); color: var(--text); border-color: var(--line-control); }
+.chip-severidad::before {
+  content: ""; flex: none; width: 10px; height: 10px; background: var(--sev);
+}
+.chip-severidad.sev-forma-baja::before { background: transparent; border: 2px solid var(--sev); border-radius: 50%; }
+.chip-severidad strong { font-family: var(--font-display); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.chip-severidad[aria-pressed="true"] { background: var(--sev-soft); border-color: var(--sev); }
+.chip-severidad:disabled { opacity: 0.55; cursor: default; }
+.brechas-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+/* Utilidades de pila (reemplazan estilos en línea "display: grid; gap: …") */
+.pila { display: grid; gap: var(--sp-6); }
+.pila-chica { display: grid; gap: var(--sp-3); align-content: start; }
+.tarjeta-apilada { display: grid; gap: var(--sp-5); align-content: start; }
+.card-head-fin { margin-bottom: 0; align-items: flex-end; }
+.matriz td.matriz-esquina { border: 0; background: transparent; }
+
+/* Auditoría UX 16-11 · Capacitación: resumen en una línea + filtros */
+.plan-resumen { display: grid; gap: var(--sp-4); }
+.plan-resumen-linea { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-6); font-size: var(--fs-md); color: var(--text-muted); }
+.plan-resumen-linea strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.plan-filtros { align-items: center; }
+.plan-conteo { align-self: center; }
+.plan-acciones { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-left: auto; }
+.esqueleto-avance { height: 220px; }
+/* Texto leíble ≥ 14 px (antes 11–12 px); las microetiquetas en mayúsculas quedan en 12 px */
+.modulo-meta, .modulo-secuencia, .chip-brecha, .modulo-progreso-texto, .nivel-rango, .riel-meta,
+.avance-leyenda, .stack-leyenda, .remed-dim-detalle, .gap-meta { font-size: var(--fs-sm); }
+.modulo-meta svg, .modulo-secuencia svg { width: 16px; height: 16px; }
+
+/* =====================================================================
+   Auditoría UX 16-11 · Fases 7 y 8.A: navegación por tareas
+   ===================================================================== */
+/* Menú lateral: cabe sin cortarse a 1440 × 900 (13 entradas de 44 px en 4 grupos) */
+.sidebar { gap: var(--sp-3); }
+.sidebar .nav-list { gap: 0; }
+.sidebar .nav-heading { margin-bottom: var(--sp-1); }
+.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-foot { padding: 0; border: 0; background: none; }
+.sidebar .menu-cuenta-boton { width: 100%; }
+.sidebar .menu-cuenta-chevron { margin-left: auto; transform: rotate(180deg); }
+.sidebar .menu-cuenta-boton[aria-expanded="true"] .menu-cuenta-chevron { transform: none; }
+.sidebar .menu-cuenta-panel { top: auto; bottom: calc(100% + var(--sp-2)); left: 0; right: auto; }
+.barra-movil, .nav-inferior { display: none; }
+
+@media (max-width: 1279.98px) and (min-width: 1024px) {
+  /* Barra compacta: la cuenta queda como un avatar al pie */
+  .sidebar-foot { display: grid; justify-items: center; }
+  .sidebar-foot .badge-demo, .sidebar .menu-cuenta-texto, .sidebar .menu-cuenta-chevron { display: none; }
+  .sidebar .menu-cuenta-boton { width: auto; padding: var(--sp-1); }
+}
+
+/* Móvil y tablet vertical: barra superior compacta + barra inferior con rótulos */
+@media (max-width: 1023.98px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .shell > .sidebar { display: none; }
+  .barra-movil {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+    min-height: 56px; padding: var(--sp-1) var(--sp-4);
+    border-bottom: 1px solid var(--line); background: rgba(5, 8, 7, 0.94); backdrop-filter: blur(8px);
+  }
+  .barra-movil .brand { padding: 0; }
+  .barra-movil .brand-mark { width: 30px; height: 30px; }
+  .barra-movil .brand-text { display: flex; }
+  .barra-movil .badge-demo { margin-left: auto; }
+  /* El contenido no queda tapado por la barra inferior */
+  .main { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + var(--sp-8)); }
+
+  .nav-inferior {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: block;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--line-strong); background: rgba(10, 16, 14, 0.97); backdrop-filter: blur(8px);
+  }
+  .nav-inferior ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+  .nav-inferior-item {
+    position: relative;
+    display: grid; justify-items: center; align-content: center; gap: 2px;
+    width: 100%; min-height: var(--bottom-nav-h); padding: var(--sp-1) 2px;
+    border: 0; background: none; color: var(--text-muted); font: inherit;
+    font-size: var(--fs-xs); font-weight: 600; text-decoration: none; cursor: pointer;
+  }
+  .nav-inferior-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-inferior-item svg { width: 22px; height: 22px; }
+  .nav-inferior-item[aria-current="page"], .nav-inferior-item[aria-expanded="true"] { color: var(--text); }
+  .nav-inferior-item[aria-current="page"] svg { color: var(--accent); }
+  .nav-inferior-item[aria-current="page"]::before {
+    content: ""; position: absolute; top: 0; left: 25%; right: 25%; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+  }
+  .nav-inferior-item:focus-visible { outline-offset: -3px; }
+
+  /* Hoja "Más": todas las entradas, agrupadas */
+  .hoja-fondo { position: fixed; inset: 0; z-index: 35; background: rgba(2, 4, 3, 0.6); }
+  .hoja {
+    position: fixed; left: 0; right: 0; z-index: 38;
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    max-height: min(72vh, 640px); overflow-y: auto; overscroll-behavior: contain;
+    display: grid; gap: var(--sp-4); padding: var(--sp-5) var(--sp-4);
+    border-top: 1px solid var(--line-strong); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: var(--surface);
+  }
+  .hoja-titulo { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-lg); }
+  .hoja .nav-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); gap: var(--sp-1); }
+  .hoja .nav-heading { display: block; }
+  .hoja .nav-link { white-space: normal; }
+  .hoja .nav-link::after { display: none; }
+  .hoja .nav-link[aria-current="page"]::before { display: none; }
+}
+@media (max-width: 1023.98px) {
+  /* Dentro de la hoja los rótulos SIEMPRE se ven (anula el modo compacto de la barra lateral) */
+  .hoja .nav-link { justify-content: flex-start; padding: var(--sp-2) var(--sp-3); min-height: var(--target); }
+  .hoja .nav-link .nav-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
+  .hoja .nav-count { position: static; margin-left: auto; }
+  .hoja .nav { width: 100%; }
+}
+@media (max-width: 1023.98px) {
+  .hoja .nav { display: grid; gap: var(--sp-1); flex-direction: column; padding-left: 0; border-left: 0; }
+  .hoja .nav + .nav { padding-left: 0; border-left: 0; }
+  .hoja .nav-list { display: grid; }
+}
+.esqueleto-ficha { height: 220px; }
+
+/* Auditoría UX 16-11 · Siglas con nombre completo al pasar el mouse o con el foco */
+.sigla { position: relative; display: inline; border-radius: 2px; cursor: help; }
+.sigla abbr { text-decoration: underline dotted; text-underline-offset: 3px; }
+.sigla-globo {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); z-index: 50;
+  width: max-content; max-width: min(280px, 80vw); transform: translateX(-50%);
+  padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--surface-3); color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-size: var(--fs-xs); font-weight: 500; line-height: 1.4; letter-spacing: normal; text-transform: none; white-space: normal;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur) var(--ease);
+}
+.sigla:hover .sigla-globo, .sigla:focus-visible .sigla-globo { opacity: 1; visibility: visible; }
+
+/* Auditoría UX 16-11 · Campo de archivo propio (cuestionario y Cerrar brechas) */
+.campo-archivo-raiz { display: grid; gap: var(--sp-2); min-width: 0; }
+.campo-archivo {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-width: 0; min-height: calc(var(--target) + var(--sp-2)); padding: var(--sp-1) var(--sp-2);
+  border: 1px dashed var(--line-control); border-radius: var(--radius-md); background: var(--surface-3);
+}
+.campo-archivo[data-encima] { border-color: var(--accent); background: var(--accent-soft); }
+.campo-archivo[data-error] { border-color: var(--error); }
+.campo-archivo-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.campo-archivo-input:focus-visible + .campo-archivo-boton { outline: 2px solid var(--accent); outline-offset: 2px; }
+.campo-archivo-boton { flex: none; cursor: pointer; }
+.campo-archivo-nombre {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm); color: var(--text);
+}
+.campo-archivo-vacio { color: var(--text-muted); white-space: normal; }
+.campo-archivo-quitar { flex: none; }
+@media (max-width: 599.98px) {
+  .campo-archivo { flex-wrap: wrap; }
+  .campo-archivo-boton { width: 100%; }
+  .campo-archivo-nombre { flex-basis: calc(100% - 52px); }
+}
+@media (hover: none) { .campo-archivo-vacio { font-size: 0; } .campo-archivo-vacio::after { content: "Ningún archivo elegido"; font-size: var(--fs-sm); } }
+
+/* Chip de filtro activo que se puede quitar */
+.chip-quitable { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.chip-quitable svg { width: 14px; height: 14px; }
+
+/* Auditoría UX 16-11 · Línea de estado (reemplaza tarjetas de KPI en cero) e intro plegada */
+.linea-estado { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.linea-estado svg { flex: none; width: 18px; height: 18px; color: var(--text-subtle); }
+.intro-mas { margin-top: var(--sp-3); max-width: 72ch; }
+
+/* Auditoría UX 16-11 · Fase 9.8: utilidades que reemplazan estilos en línea (vía tokens) */
+.icono-estado { flex: none; }
+.icono-ok { color: var(--accent); }
+.icono-atencion { color: var(--severity-medium); }
+.icono-alerta { color: var(--error); }
+.icono-tenue { opacity: 0.5; }
+.esq-96 { height: 96px; } .esq-120 { height: 120px; } .esq-132 { height: 132px; }
+.esq-320 { height: 320px; } .esq-360 { height: 360px; } .esq-460 { height: 460px; }
+.pila-mini { display: grid; gap: var(--sp-1); }
+.pila-media { display: grid; gap: var(--sp-4); align-content: start; }
+.fila-mini { display: flex; gap: var(--sp-2); align-items: center; }
+.card-head-sin-margen { margin-bottom: 0; }
+.texto-fuerte { color: var(--text); }
+.alinear-inicio { justify-self: start; }
+.gap-top .code.gap-prioridad { margin-left: 0; color: var(--text); }

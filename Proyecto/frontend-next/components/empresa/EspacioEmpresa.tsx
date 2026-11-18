@@ -18,13 +18,15 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { diasParaTermino, fechaCorta, type ContratoClienteApi } from "@/lib/empresa";
 import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
 import { EstadoProteccionDatos } from "./EstadoProteccionDatos";
-import s from "@/components/admin/admin.module.css";
+import { TableroEmpresa } from "./TableroEmpresa";
+import e from "./empresa.module.css";
+import s from "@/components/ui/comunes.module.css";
 
 export function EspacioEmpresa() {
   const estado = useEspacioEmpresa();
 
   if (estado.tipo === "cargando") {
-    return <div className="skeleton" style={{ height: 220 }} role="status" aria-label="Cargando el espacio de tu empresa" />;
+    return <div className="skeleton esqueleto-ficha" role="status" aria-label="Cargando el espacio de tu empresa" />;
   }
   if (estado.tipo === "error") {
     return <div className={s.alerta} role="alert"><strong>{estado.mensaje}</strong></div>;
@@ -32,7 +34,6 @@ export function EspacioEmpresa() {
   if (estado.tipo === "sin_servicio") return <SinServicio datos={estado.contrato} />;
 
   const { datos } = estado;
-  const dias = diasParaTermino(datos.empresa.fecha_termino_contrato);
 
   return (
     <>
@@ -41,11 +42,42 @@ export function EspacioEmpresa() {
           <span className="eyebrow">Mi empresa</span>
           <h1 className="page-title">Hola, {datos.usuario.nombre.split(" ")[0]}</h1>
           <p className="page-sub">
-            Este es el espacio de <strong>{datos.empresa.razon_social}</strong> en ComplianceAI.
+            Esto es lo que conviene hacer ahora en <strong>{datos.empresa.razon_social}</strong>.
           </p>
         </div>
       </header>
 
+      {/* Auditoría UX 16-11 · Fase 8.C: arriba, lo accionable (vencimientos, propuestas por revisar,
+          brechas críticas y el estado real del registro). Las seis tarjetas que repetían el menú se
+          quitaron y la ficha de la empresa pasó a Configuración. */}
+      <TableroEmpresa datos={datos} />
+
+      <EstadoProteccionDatos />
+    </>
+  );
+}
+
+/** Ficha de la empresa y su contrato (Configuración). */
+export function FichaEmpresa() {
+  const estado = useEspacioEmpresa();
+  if (estado.tipo === "cargando") {
+    return <div className="skeleton esqueleto-ficha" role="status" aria-label="Cargando los datos de tu empresa" />;
+  }
+  if (estado.tipo === "error") {
+    return <div className={s.alerta} role="alert"><strong>{estado.mensaje}</strong></div>;
+  }
+  if (estado.tipo === "sin_servicio") return <SinServicio datos={estado.contrato} />;
+  const { datos } = estado;
+  const dias = diasParaTermino(datos.empresa.fecha_termino_contrato);
+  return (
+    <>
+      <header className="page-head">
+        <div>
+          <span className="eyebrow">Mi empresa</span>
+          <h1 className="page-title">Configuración</h1>
+          <p className="page-sub">Los datos de tu empresa, su contrato y tu cuenta.</p>
+        </div>
+      </header>
       {dias <= 30 ? (
         <p className="callout" role="status">
           {dias >= 0
@@ -53,45 +85,21 @@ export function EspacioEmpresa() {
             : "El contrato de tu empresa terminó. Contacta a Therion Labs."}
         </p>
       ) : null}
-
-      <nav aria-label="Accesos directos" className={s.rejilla}>
-        <Acceso href="/empresa/evaluaciones" icono="historial" titulo="Mis evaluaciones">
-          Tu historial, cómo evoluciona la madurez y las reevaluaciones.
-        </Acceso>
-        <Acceso href="/panel" icono="diagnostico" titulo="Resultados">
-          Diagnóstico, dominios y brechas de la evaluación más reciente.
-        </Acceso>
-        <Acceso href="/empresa/documentos" icono="carpeta" titulo="Mis documentos">
-          Informes, borradores, evidencias y constancias.
-        </Acceso>
-        <Acceso href="/empresa/borradores" icono="documento" titulo="Borradores de cumplimiento">
-          Política de uso de IA, aviso de privacidad y PIA adaptados a tus brechas.
-        </Acceso>
-        <Acceso href="/empresa/mapa-datos" icono="mapa" titulo="Mapa de datos personales">
-          Qué datos tratas, de quién, dónde están y con quién los compartes.
-        </Acceso>
-        <Acceso href="/empresa/registro-actividades" icono="lista" titulo="Registro de actividades">
-          Tus actividades de tratamiento, su nivel de riesgo y su vigencia.
-        </Acceso>
-      </nav>
-
-      <EstadoProteccionDatos />
-
       <section className="card" aria-labelledby="titulo-empresa">
         <div className="card-head">
           <h2 id="titulo-empresa" className="card-title">Tu empresa</h2>
         </div>
-        <dl style={{ display: "grid", gap: 8, margin: 0 }}>
-          <div><dt className={s.sub}>Razón social</dt><dd style={{ margin: 0 }}>{datos.empresa.razon_social}</dd></div>
-          <div><dt className={s.sub}>RUT</dt><dd style={{ margin: 0 }}>{datos.empresa.rut}</dd></div>
-          <div><dt className={s.sub}>Rubro</dt><dd style={{ margin: 0 }}>{datos.empresa.rubro ?? "—"}</dd></div>
+        <dl className={e.ficha}>
+          <div><dt className={s.sub}>Razón social</dt><dd>{datos.empresa.razon_social}</dd></div>
+          <div><dt className={s.sub}>RUT</dt><dd>{datos.empresa.rut}</dd></div>
+          <div><dt className={s.sub}>Rubro</dt><dd>{datos.empresa.rubro ?? "—"}</dd></div>
           <div>
             <dt className={s.sub}>Contrato</dt>
-            <dd style={{ margin: 0 }}>
+            <dd>
               {fechaCorta(datos.empresa.fecha_inicio_contrato)} al {fechaCorta(datos.empresa.fecha_termino_contrato)}
             </dd>
           </div>
-          <div><dt className={s.sub}>Usuario</dt><dd style={{ margin: 0 }}>{datos.usuario.email}</dd></div>
+          <div><dt className={s.sub}>Tu usuario</dt><dd>{datos.usuario.nombre} · {datos.usuario.email}</dd></div>
         </dl>
       </section>
     </>

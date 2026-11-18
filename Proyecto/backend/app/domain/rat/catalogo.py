@@ -127,6 +127,15 @@ INICIOS_PLAZO: tuple[Opcion, ...] = (
 )
 MAX_PLAZO = {"dias": 3650, "meses": 600, "anios": 100}
 
+
+def plazo_definido(p: dict | None) -> bool:
+    """T-11: un plazo cuenta como definido con número y unidad, o con una CONDICIÓN escrita sin número
+    ("mientras ejerza el cargo"). La condición solo la usa el registro de la propia plataforma: la API del
+    cliente no la acepta (modelo_actividad normaliza los plazos)."""
+    if not p:
+        return False
+    return bool((p.get("plazo") and p.get("unidad")) or (p.get("condicion") or "").strip())
+
 # ============================================================ medidas de seguridad
 GRUPOS_MEDIDAS = ("Técnicas", "Organizativas")
 MEDIDAS_SEGURIDAD: tuple[Opcion, ...] = (

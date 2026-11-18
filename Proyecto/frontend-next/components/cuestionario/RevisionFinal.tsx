@@ -11,6 +11,7 @@
  * Al completar se va al panel de resultados (/panel?evaluacion=ID), que para el encuestado
  * se carga vía BFF (ver hooks/usePanel.tsx).
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
@@ -208,10 +209,22 @@ export function RevisionFinal({ evaluacionId, c }: { evaluacionId: number; c: Cu
             Cambiar preguntas iniciales
           </button>
         )}
-        <button type="button" className="btn btn-primary" onClick={completar} disabled={!puedeCompletar} aria-busy={enviando}>
+        <BotonConMotivo
+          className="btn btn-primary"
+          alinear="fin"
+          onClick={completar}
+          ocupado={enviando}
+          aria-busy={enviando}
+          motivo={
+            puedeCompletar || enviando ? null
+              : verificando ? "Estamos revisando tus evidencias…"
+              : bloqueos.length ? "Resuelve las preguntas pendientes de la lista para completar"
+              : "Confirma que revisaste tus respuestas para completar"
+          }
+        >
           {enviando ? "Calculando resultados…" : sinControles ? "Completar" : "Completar y ver resultados"}
           {!enviando ? <Icon name="flecha" /> : null}
-        </button>
+        </BotonConMotivo>
       </div>
     </section>
   );

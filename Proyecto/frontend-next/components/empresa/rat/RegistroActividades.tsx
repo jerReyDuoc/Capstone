@@ -13,6 +13,8 @@
  * El asistente de registro (botón flotante) orienta con respuestas cortas y revisa el registro en simple.
  * Es parte del servicio contratado: sin contrato vigente, la página lo explica.
  */
+import { Sigla } from "@/components/ui/Sigla";
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,6 +44,8 @@ const FILTROS: { id: FiltroEstado; titulo: string }[] = [
   { id: "vigente", titulo: "Vigentes" },
   { id: "archivada", titulo: "Archivadas" },
 ];
+
+const MOTIVO_SIN_ACTIVIDADES = "Registra al menos una actividad para generar este informe";
 
 export function RegistroActividades() {
   const espacio = useEspacioEmpresa();
@@ -124,6 +128,7 @@ export function RegistroActividades() {
     [registro, filtro, busqueda],
   );
 
+  const sinActividades = (registro?.actividades.length ?? 0) === 0;
   const encabezado = (
     <header className="page-head">
       <div>
@@ -136,22 +141,38 @@ export function RegistroActividades() {
       </div>
       {registro && abierta === null ? (
         <div className={s.acciones}>
-          <button type="button" className="btn btn-ghost" onClick={() => setInforme(true)} title="Descarga el informe en PDF o Excel">
+          {/* Auditoría UX 16-11: sin actividades no hay informe que generar; el motivo queda a la vista */}
+          <BotonConMotivo
+            className="btn btn-ghost"
+            onClick={() => setInforme(true)}
+            title="Descarga el informe en PDF o Excel"
+            motivo={sinActividades ? MOTIVO_SIN_ACTIVIDADES : null}
+          >
             <Icon name="documento" />
             Informe del registro
-          </button>
-          <button type="button" className="btn btn-ghost" onClick={() => setRopa(true)}>
+          </BotonConMotivo>
+          <BotonConMotivo className="btn btn-ghost" onClick={() => setRopa(true)} motivo={sinActividades ? MOTIVO_SIN_ACTIVIDADES : null}>
             <Icon name="tabla" />
-            Informe RoPA
-          </button>
-          <Link href="/empresa/registro-actividades/revision" className="btn btn-ghost" title="Revisa el registro y deja constancia">
-            <Icon name="constancia" />
-            Revisión interna
-          </Link>
-          <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
-            <Icon name="mas" />
-            Nueva actividad
-          </button>
+            Informe <Sigla s="RoPA" />
+          </BotonConMotivo>
+          {sinActividades ? (
+            <BotonConMotivo className="btn btn-ghost" motivo="Registra al menos una actividad para revisar el registro">
+              <Icon name="constancia" />
+              Revisión interna
+            </BotonConMotivo>
+          ) : (
+            <Link href="/empresa/registro-actividades/revision" className="btn btn-ghost" title="Revisa el registro y deja constancia">
+              <Icon name="constancia" />
+              Revisión interna
+            </Link>
+          )}
+          {/* Con el registro vacío la única acción principal es "Registrar la primera actividad" */}
+          {!sinActividades ? (
+            <button type="button" className="btn btn-primary" onClick={() => setCreando(true)}>
+              <Icon name="mas" />
+              Nueva actividad
+            </button>
+          ) : null}
         </div>
       ) : null}
     </header>
@@ -162,8 +183,8 @@ export function RegistroActividades() {
     return (
       <div className={s.pagina}>
         {encabezado}
-        <div className="skeleton" style={{ height: 120 }} role="status" aria-label="Cargando el registro de actividades" />
-        <div className="skeleton" style={{ height: 320 }} />
+        <div className="skeleton esq-120" role="status" aria-label="Cargando el registro de actividades" />
+        <div className="skeleton esq-320" />
       </div>
     );
   }
@@ -264,16 +285,8 @@ export function RegistroActividades() {
     <div className={s.pagina}>
       {encabezado}
 
-      {!registro.mapa.iniciado ? (
-        <p className="callout callout-aviso" role="status">
-          <Icon name="mapa" />
-          <span>
-            <strong>Primero arma tu mapa de datos.</strong> Las actividades toman de allí los sistemas, bases de datos,
-            terceros y flujos. <Link href="/empresa/mapa-datos">Ir al mapa de datos</Link>
-          </span>
-        </p>
-      ) : null}
-
+      {/* Auditoría UX 16-11: el aviso "Primero arma tu mapa de datos" lo reemplaza el indicador de
+          pasos del flujo (PasosRegistro), con el siguiente paso a la vista. */}
       {registro.actividades.length === 0 ? (
         <section className={s.vacio} aria-labelledby="titulo-vacio">
           <h2 id="titulo-vacio" className="card-title">Aún no registras actividades</h2>

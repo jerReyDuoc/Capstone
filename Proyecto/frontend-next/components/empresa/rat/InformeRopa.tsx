@@ -13,6 +13,7 @@
  * El botón «Generar PDF y Excel» queda fijo en el pie: se bloquea con el motivo si falta algo y, al generar,
  * el resultado (código y descargas) aparece en el mismo pie. Las explicaciones van en el ícono de información.
  */
+import { Sigla } from "@/components/ui/Sigla";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -486,7 +487,7 @@ export function InformeRopa({ onCerrar, onSesionVencida }: { onCerrar: () => voi
       icono="tabla"
       titulo={
         <span className={s.ropaTituloDialogo}>
-          Informe RoPA
+          Informe <Sigla s="RoPA" />
           {lista ? <span className={s.versionInforme}>Versión N.º {lista.version_siguiente}</span> : null}
           <span className={s.ropaInfo} ref={infoRef}>
             <button type="button" className={s.ropaInfoBoton} aria-label="Más información" aria-expanded={info}

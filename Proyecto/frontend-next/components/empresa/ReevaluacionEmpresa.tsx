@@ -11,7 +11,7 @@ import Link from "next/link";
 import { BotonCerrarSesion } from "@/components/acceso/BotonCerrarSesion";
 import { Cuestionario } from "@/components/cuestionario/Cuestionario";
 import { BrandMark } from "@/components/ui/Icon";
-import s from "@/components/admin/admin.module.css";
+import s from "./empresa.module.css";
 
 export function ReevaluacionEmpresa({ evaluacionId }: { evaluacionId: number }) {
   return (

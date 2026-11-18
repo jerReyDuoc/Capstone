@@ -16,6 +16,7 @@
  *
  * El admin nunca ve ni define la contraseña: el enlace va solo al correo del usuario.
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import {
@@ -199,10 +200,10 @@ export function PanelClientes() {
 
       <main id="contenido" className={s.contenido}>
         <div>
-          <h1 className="page-title">Panel interno</h1>
+          {/* Auditoría UX 16-11 · Fase 10.3: el título coincide con el menú ("Empresas cliente") */}
+          <h1 className="page-title">Empresas cliente</h1>
           <p className="page-sub">
-            Gestiona las solicitudes de contratación, da de alta a la empresa que contrató con su usuario definitivo,
-            traspásale la evaluación que hizo como usuario temporal y revisa todas las evaluaciones.
+            Solicitudes de contratación, alta de empresas con su usuario y traspaso de su evaluación.
           </p>
         </div>
 
@@ -221,7 +222,7 @@ export function PanelClientes() {
           </div>
         ) : null}
 
-        <div className={s.pestanas} role="tablist" aria-label="Secciones del panel">
+        <div className={s.pestanas} role="tablist" aria-label="Secciones de Empresas cliente">
           {(
             [
               ["solicitudes", "Solicitudes de contratación"],
@@ -268,8 +269,15 @@ export function PanelClientes() {
                                 alternar={(id) => setSeleccion((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id])}
                                 cambiarEstado={cambiarEstado} />
             </section>
-            <FormAlta elegidas={elegidas} rubros={rubros} empresas={empresas ?? []}
-                      onError={manejarError} onListo={alTerminarAlta} limpiarError={() => setError(null)} />
+            {/* Auditoría UX 16-11 · Fase 10.4: el formulario de alta aparece solo al elegir solicitudes */}
+            {elegidas.length ? (
+              <FormAlta elegidas={elegidas} rubros={rubros} empresas={empresas ?? []}
+                        onError={manejarError} onListo={alTerminarAlta} limpiarError={() => setError(null)} />
+            ) : (
+              <p className={s.nota}>
+                Para dar de alta una empresa, marca en la tabla las solicitudes contratadas que pasarán a ella.
+              </p>
+            )}
           </>
         ) : null}
 
@@ -347,6 +355,7 @@ function TablaSolicitudes({
                 </td>
                 <td><Estado texto={e.texto} tono={e.tono} /></td>
                 <td>
+                  {ACCIONES_SOLICITUD[x.estado].length === 0 ? <span className={s.sub}>Sin acciones</span> : null}
                   <div className={s.acciones}>
                     {ACCIONES_SOLICITUD[x.estado].map((a) => (
                       <button
@@ -595,9 +604,14 @@ function FormAlta({
         )}
 
         <div className={s.acciones}>
-          <button type="submit" className="btn btn-primary" disabled={enviando || !elegidas.length}>
+          <BotonConMotivo
+            type="submit"
+            className="btn btn-primary"
+            ocupado={enviando}
+            motivo={!enviando && !elegidas.length ? "Elige una solicitud de la lista" : null}
+          >
             {enviando ? "Procesando…" : modo === "nueva" ? "Crear empresa y traspasar" : "Traspasar a la empresa"}
-          </button>
+          </BotonConMotivo>
         </div>
         <p className={s.nota}>
           Al traspasar, la clave temporal deja de funcionar y el usuario temporal queda cerrado: su correo y el contacto de

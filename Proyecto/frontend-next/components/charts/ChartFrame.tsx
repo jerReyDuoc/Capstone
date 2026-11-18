@@ -38,7 +38,7 @@ export function ChartFrame({
 
   return (
     <figure className="chart" aria-labelledby={idTitulo} aria-describedby={idResumen}>
-      <div className="card-head" style={{ marginBottom: 0 }}>
+      <div className="card-head card-head-sin-margen">
         <div>
           <h2 className="card-title" id={idTitulo}>{titulo}</h2>
           {subtitulo ? <p className="card-sub">{subtitulo}</p> : null}
@@ -50,7 +50,7 @@ export function ChartFrame({
 
       <figcaption className={resumenVisible ? "chart-foot" : "chart-foot chart-foot-solo"}>
         <span id={idResumen} className={resumenVisible ? undefined : "sr-only"}>{resumen}</span>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <span className="fila-mini">
           {pie}
           <button
             type="button"

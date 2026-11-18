@@ -12,8 +12,8 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
   const top = brechas.slice(0, limite);
 
   return (
-    <section className="card" aria-labelledby="resumen-brechas-titulo" style={{ display: "grid", gap: 16, alignContent: "start" }}>
-      <div className="card-head" style={{ marginBottom: 0 }}>
+    <section className="card pila-media" aria-labelledby="resumen-brechas-titulo">
+      <div className="card-head card-head-sin-margen">
         <div>
           <h2 className="card-title" id="resumen-brechas-titulo">Brechas prioritarias</h2>
           <p className="card-sub">
@@ -31,7 +31,7 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
           {top.map((b) => (
             <li key={b.respuestaId} className="gap-item">
               <div className="gap-top">
-                <span className="code" style={{ marginLeft: 0, color: "var(--text)" }}>#{b.prioridad}</span>
+                <span className="code gap-prioridad">#{b.prioridad}</span>
                 <BadgeSeveridad severidad={b.severidad} />
                 <BadgeEstado estado={b.estado} />
               </div>
@@ -46,7 +46,7 @@ export function ResumenBrechas({ brechas, limite = 4 }: { brechas: BrechaVista[]
       )}
 
       {brechas.length > 0 ? (
-        <Link href={href("/panel/brechas")} className="btn btn-ghost" style={{ justifySelf: "start" }}>
+        <Link href={href("/panel/brechas")} className="btn btn-ghost alinear-inicio">
           Ver listado priorizado
           <Icon name="flecha" />
         </Link>

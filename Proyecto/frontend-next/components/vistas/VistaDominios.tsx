@@ -60,7 +60,7 @@ export function VistaDominios() {
                         {formatoPuntaje(d.puntaje)}
                         <small>/ 100</small>
                       </p>
-                      <p className="card-sub" style={{ color: d.diferenciaMeta < 0 ? "var(--alto)" : "var(--bajo)", fontWeight: 600 }}>
+                      <p className="card-sub" style={{ color: d.diferenciaMeta < 0 ? "var(--alto)" : "var(--ok)", fontWeight: 600 }}>
                         {formatoDiferenciaMeta(d.diferenciaMeta)}
                       </p>
                       {d.promedioIndustria != null ? (

@@ -24,12 +24,17 @@ export const NIVEL_FORMATIVO_INFO: Record<NivelFormativo, { rango: string; enfoq
   Avanzado: { rango: "76–100 pts", enfoque: "Mejora continua: medir, auditar y resolver casos complejos." },
 };
 
+/**
+ * Auditoría UX 16-11: un solo vocabulario en toda la plataforma. El módulo hereda la severidad
+ * de la brecha más urgente que cierra y se nombra igual que en Brechas (Crítica · Alta · Media ·
+ * Baja); la prioridad de acción se deriva de SEVERIDAD_GUIA. Antes: Urgente/Prioritario/Planificar.
+ */
 export const PRIORIDAD_TEXTO: Record<ModuloPlanApi["prioridad"], string> = {
-  Crítica: "Urgente",
-  Alta: "Prioritario",
-  Media: "Planificar",
-  Baja: "Cuando se pueda",
-  "Sin clasificar": "Por clasificar",
+  Crítica: "Crítica",
+  Alta: "Alta",
+  Media: "Media",
+  Baja: "Baja",
+  "Sin clasificar": "Sin clasificar",
   Complementario: "Base del nivel",
 };
 

@@ -7,6 +7,10 @@ from app.domain.auditoria.acciones import Accion
 from app.domain.models.asistente import MOTIVOS_DESCARTE
 
 
+# Tabla donde queda lo que se crea al aceptar cada tipo de propuesta
+DESTINO_POR_TIPO = {"elemento": "mapa_elemento", "flujo": "mapa_flujo", "actividad": "rat_actividad"}
+
+
 class DecisionesMixin:
     """Depende de los atributos que fija AsistenteRat.__init__ (db, repo, limitador, agente, ...)."""
 
@@ -31,54 +35,77 @@ class DecisionesMixin:
 
     async def aceptar(self, propuesta_id: int, payload_editado: dict | None = None,
                       version_mapa: int | None = None) -> dict:
+        """
+        T-12: crear el elemento, el flujo o la actividad y cerrar la propuesta van en UN solo commit.
+          - Si falla cualquier paso, no se crea nada y la propuesta sigue "por revisar".
+          - Aceptar dos veces no duplica ni responde NOMBRE_DUPLICADO: la segunda vez devuelve lo ya aceptado.
+          - Si en un reintento ya existe lo que creó la propuesta (propuesta_ia_id), la propuesta se marca
+            como aceptada sin crear otra vez (la versión del mapa y el audit log se escriben una sola vez).
+        """
         from app.application.mapa_datos.casos_uso import MapaDatosCasos, MapaDatosError
         from app.application.rat.casos_uso.registro_actividades_casos import RatError, RegistroActividadesCasos
 
-        p = await self._propuesta(propuesta_id)
+        # La propuesta se bloquea: dos "Aceptar" simultáneos se ordenan y el segundo ve la decisión del primero
+        p = await self._propuesta(propuesta_id, bloquear=True)
+        if p.estado in ("aceptada", "editada") and p.entidad_destino_id:
+            ya = {"propuesta_id": p.id, "destino": p.entidad_destino, "destino_id": p.entidad_destino_id}
+            await self.db.commit()     # libera el bloqueo (no hay cambios que guardar)
+            return {**await self.estado(), "aceptada": ya}
         if p.estado != "sugerida":
             raise AsistenteError(409, "PROPUESTA_DECIDIDA", "Esta propuesta ya fue revisada.")
         if payload_editado is not None and not isinstance(payload_editado, dict):
             raise AsistenteError(422, "DATOS_INVALIDOS", "Los cambios no son válidos.")
         final, cambiados = anclaje.aplicar_edicion(p.tipo, p.payload_propuesto, payload_editado)
         datos_ia = {"modelo": p.modelo, "prompt_version": p.prompt_version, "traza_id": p.traza_id}
-        try:
-            if p.tipo in ("elemento", "flujo"):
-                casos = MapaDatosCasos(self.db, self.cliente)
-                version = version_mapa if version_mapa is not None else (await self._mapa())[0]
-                if p.tipo == "elemento":
-                    datos = {k: v for k, v in final.items() if k in anclaje.CAMPOS_ELEMENTO}
-                    await casos.crear_elemento(datos, version, origen="ia", propuesta_ia_id=p.id)
-                    destino = "mapa_elemento"
-                else:
-                    datos = {k: v for k, v in final.items() if k not in ("origen", "destino")}
-                    datos["origen_id"] = await self._resolver(final.get("origen"), "elemento")
-                    datos["destino_id"] = await self._resolver(final.get("destino"), "elemento")
-                    await casos.crear_flujo(datos, version, origen="ia", propuesta_ia_id=p.id)
-                    destino = "mapa_flujo"
-                destino_id = casos.ultimo_id
-            else:
-                contenido = await self._contenido_actividad(final)
-                r = await RegistroActividadesCasos(self.db, self.cliente).crear(contenido, origen="ia",
-                                                                                propuesta_ia_id=p.id)
-                destino, destino_id = "rat_actividad", r["actividad"]["id"]
-        except (MapaDatosError, RatError) as e:
-            raise AsistenteError(e.status, e.codigo, e.mensaje, **e.extra)
+        destino = DESTINO_POR_TIPO.get(p.tipo, "rat_actividad")
 
-        # El elemento, flujo o actividad ya quedó guardado (y en la bitácora) por su propio caso de uso.
-        # Ahora se cierra la propuesta (Human-in-the-Loop): quién decidió, cuándo y si la editó.
-        p = await self._propuesta(propuesta_id)
-        editada = bool(cambiados)
-        p.estado = "editada" if editada else "aceptada"
-        p.payload_final = final
-        p.campos_editados = cambiados or None
-        p.entidad_destino, p.entidad_destino_id = destino, destino_id
-        p.decidido_por, p.fecha_decision = self.usuario_id, _ahora()
-        self.bitacora.registrar(
-            accion=Accion.ASISTENTE_PROPUESTA_EDITADA if editada else Accion.ASISTENTE_PROPUESTA_ACEPTADA,
-            entidad="asistente_propuesta", entidad_id=p.id, actor=self.actor,
-            detalle={"tipo": p.tipo, "destino": destino, "destino_id": destino_id, "campos_editados": cambiados,
-                     **datos_ia})
-        await self.db.commit()
+        # Reintento: lo que esta propuesta creó en un intento anterior ya está guardado
+        destino_id = await self.repo.entidad_de_propuesta(p.tipo, p.id, self.empresa_id)
+        reintento = destino_id is not None
+        if not reintento:
+            try:
+                if p.tipo in ("elemento", "flujo"):
+                    casos = MapaDatosCasos(self.db, self.cliente, confirmar=False)
+                    version = version_mapa if version_mapa is not None else (await self._mapa())[0]
+                    if p.tipo == "elemento":
+                        datos = {k: v for k, v in final.items() if k in anclaje.CAMPOS_ELEMENTO}
+                        await casos.crear_elemento(datos, version, origen="ia", propuesta_ia_id=p.id)
+                    else:
+                        datos = {k: v for k, v in final.items() if k not in ("origen", "destino")}
+                        datos["origen_id"] = await self._resolver(final.get("origen"), "elemento")
+                        datos["destino_id"] = await self._resolver(final.get("destino"), "elemento")
+                        await casos.crear_flujo(datos, version, origen="ia", propuesta_ia_id=p.id)
+                    destino_id = casos.ultimo_id
+                else:
+                    contenido = await self._contenido_actividad(final)
+                    r = await RegistroActividadesCasos(self.db, self.cliente, confirmar=False).crear(
+                        contenido, origen="ia", propuesta_ia_id=p.id)
+                    destino_id = r["actividad"]["id"]
+            except (MapaDatosError, RatError) as e:
+                await self.db.rollback()
+                raise AsistenteError(e.status, e.codigo, e.mensaje, **e.extra)
+            except Exception:
+                await self.db.rollback()
+                raise
+
+        # Se cierra la propuesta (Human-in-the-Loop) en la MISMA transacción que creó el destino: si algo falla
+        # aquí, el rollback deshace también lo creado y la propuesta sigue "por revisar".
+        try:
+            editada = bool(cambiados)
+            p.estado = "editada" if editada else "aceptada"
+            p.payload_final = final
+            p.campos_editados = cambiados or None
+            p.entidad_destino, p.entidad_destino_id = destino, destino_id
+            p.decidido_por, p.fecha_decision = self.usuario_id, _ahora()
+            self.bitacora.registrar(
+                accion=Accion.ASISTENTE_PROPUESTA_EDITADA if editada else Accion.ASISTENTE_PROPUESTA_ACEPTADA,
+                entidad="asistente_propuesta", entidad_id=p.id, actor=self.actor,
+                detalle={"tipo": p.tipo, "destino": destino, "destino_id": destino_id, "campos_editados": cambiados,
+                         "reintento": reintento, **datos_ia})
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
         return {**await self.estado(), "aceptada": {"propuesta_id": p.id, "destino": destino,
                                                     "destino_id": destino_id}}
 

@@ -1384,6 +1384,15 @@ docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE
 
 **Frontend (`frontend-next`):** `npm test` corre 5 suites vitest (66 pruebas, 13 de HU-12: meta, BFF, CSV del plan, plan demo).
 
+**Prueba visual móvil (Playwright, auditoría UX 16-nov-2026):** `tests/e2e/desborde-movil.spec.ts` abre 24 pantallas de las cuatro áreas (público, encuestado, cliente y admin) a **390 × 844** y falla si alguna es más ancha que la ventana (`scrollWidth > innerWidth`), indicando qué elemento se sale. No necesita backend: `tests/e2e/simulacion.ts` responde las llamadas al BFF con datos de prueba (los del modo demo).
+
+```bash
+cd frontend-next
+npx playwright install chromium        # una vez
+npm run test:e2e                       # construye la app y la levanta en el puerto 3100
+# o contra una app ya corriendo:  E2E_BASE_URL=http://localhost:3100 npx playwright test
+```
+
 **Últimos resultados reportados**
 
 - **HU-12 · plan formativo, comparativa y correo (22-oct-2026):** 25 pruebas de lógica y PDF aprobadas (las 7 de API se corren en Docker); 66/66 del frontend. Recorrido en Chromium a 1440, 1024 y 720 px sin errores; PDF descargado directo; correo real recibido vía Gmail SMTP tras desactivar el Escudo de correo de Avast.

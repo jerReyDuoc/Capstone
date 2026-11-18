@@ -1,0 +1,45 @@
+/* Espacio de la empresa (usuario definitivo). Auditoría UX 16-11: módulo propio; las páginas de la
+   empresa ya no reutilizan admin.module.css. Lo común está en components/ui/comunes.module.css. */
+
+/* Tablero de próximos pasos (Mi empresa) */
+.tablero { display: grid; gap: var(--sp-4); }
+.esqueletoTablero { height: 220px; }
+.pasos { list-style: none; margin: 0; padding: 0; display: grid; }
+.paso {
+  --tono: var(--text-subtle);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4) 0; border-top: 1px solid var(--line);
+}
+.paso:first-child { border-top: 0; padding-top: 0; }
+.paso[data-tono="urgente"] { --tono: var(--severity-critical); }
+.paso[data-tono="atencion"] { --tono: var(--severity-medium); }
+.paso[data-tono="info"] { --tono: var(--severity-low); }
+.paso[data-tono="ok"] { --tono: var(--ok); }
+.pasoIcono { width: 22px; height: 22px; color: var(--tono); }
+.pasoTexto { display: grid; gap: 2px; font-size: var(--fs-sm); color: var(--text-muted); }
+.pasoTexto strong { color: var(--text); font-size: var(--fs-md); }
+@media (max-width: 599.98px) {
+  .paso { grid-template-columns: auto minmax(0, 1fr); }
+  .paso > :global(.btn) { grid-column: 2; justify-self: start; }
+}
+
+/* Ficha de la empresa (Configuración) */
+.ficha { display: grid; gap: var(--sp-3); margin: 0; }
+.ficha > div { display: grid; gap: 2px; }
+.ficha dd { margin: 0; }
+
+/* Reevaluación (/empresa/evaluacion/[id]): página sin barra lateral */
+.pagina { min-height: 100vh; background: var(--bg); }
+.barra {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.marca { display: flex; align-items: center; gap: var(--sp-3); font-family: var(--font-display); font-weight: 600; }
+.marca svg { width: 28px; height: 28px; }
+.marcaSub { display: block; font-family: var(--font-body); font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
+.contenido { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-8) var(--sp-6) var(--sp-12); display: grid; gap: var(--sp-6); }
+@media (max-width: 640px) {
+  .barra { padding: var(--sp-3) var(--sp-4); }
+  .contenido { padding: var(--sp-6) var(--sp-4) var(--sp-10); }
+}

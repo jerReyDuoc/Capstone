@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import { useId, type SVGProps } from "react";
 
 /** Íconos de trazo 24×24 (estilo lineal como en el sitio). Decorativos por defecto. */
 const PATHS = {
@@ -49,6 +49,12 @@ const PATHS = {
   empresa: "M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18M8 7h4M8 11h4M8 15h4",
   carpeta: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z",
   salir: "M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3",
+  // Auditoría UX 16-11: menú de cuenta, navegación inferior y acciones descriptivas (no la "chispa" para todo)
+  chevron: "m6 9 6 6 6-6",
+  menu: "M4 6h16M4 12h16M4 18h16",
+  puntos: "M5 12h.01M12 12h.01M19 12h.01",
+  engranaje: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.6 7.6 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.6 7.6 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z",
+  pasos: "M4 6h4v4H4zM10 8h10M4 14h4v4H4zM10 16h10",
   flechaIzq: "M19 12H5m6 6-6-6 6-6",
   // HU-10: comparativa sectorial (tu barra frente a las del grupo)
   sector: "M3 21h18M6 21v-6M10.5 21V9M15 21v-9M19.5 21V6",
@@ -94,16 +100,19 @@ export function Icon({
 
 /** Marca TherionLabs (hexágono). Reemplazable por public/therion-logo.svg. */
 export function BrandMark(props: SVGProps<SVGSVGElement>) {
+  // Auditoría UX 16-11: id propio por instancia. Con dos marcas en la página (barra lateral oculta
+  // en móvil + barra superior) un id fijo apuntaba al degradado de la que no se ve.
+  const id = `bm-g${useId().replace(/:/g, "")}`;
   return (
     <svg viewBox="0 0 40 40" aria-hidden="true" focusable="false" {...props}>
       <defs>
-        <linearGradient id="bm-g" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#3be3b2" />
           <stop offset="1" stopColor="#1fa6e0" />
         </linearGradient>
       </defs>
-      <path d="M20 3 35 11.5v17L20 37 5 28.5v-17L20 3Z" fill="#0b1512" stroke="url(#bm-g)" strokeWidth="2" />
-      <path d="M12 15.5 20 20l8-4.5M20 20v9.5M12 15.5v9l8 4.5M28 15.5v9" fill="none" stroke="url(#bm-g)" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M20 3 35 11.5v17L20 37 5 28.5v-17L20 3Z" fill="#0b1512" stroke={`url(#${id})`} strokeWidth="2" />
+      <path d="M12 15.5 20 20l8-4.5M20 20v9.5M12 15.5v9l8 4.5M28 15.5v9" fill="none" stroke={`url(#${id})`} strokeWidth="2.2" strokeLinejoin="round" />
     </svg>
   );
 }

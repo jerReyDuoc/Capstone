@@ -1,9 +1,10 @@
 """Consultas de la retención de datos: usuarios temporales (HU-25), ARCOP, eventos de seguridad (T-06)."""
 from __future__ import annotations
 
+import secrets
 from datetime import date, datetime
 
-from sqlalchemy import exists, func, or_, select, update
+from sqlalchemy import delete, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,9 +22,18 @@ from app.domain.models.solicitud_arcop import (
     EventoSolicitudARCOP,
     SolicitudARCOP,
 )
+from app.domain.models.solicitud_contratacion import EstadoSolicitudContratacion as EstadoContratacion, SolicitudContratacion
 from app.domain.models.usuario_temporal import UsuarioTemporal
 from app.domain.ports.repositorios_empresa import ConfiguracionRetencionLeida
 from app.domain.privacidad.anonimizacion import TEXTO_ANONIMIZADO
+
+
+# T-11: un código de seguimiento retirado empieza así (20 caracteres en total, como la columna)
+PREFIJO_SEGUIMIENTO_RETIRADO = "RET-"
+
+
+def codigo_retirado() -> str:
+    return PREFIJO_SEGUIMIENTO_RETIRADO + secrets.token_hex(8)
 
 
 class RetencionRepository:
@@ -158,6 +168,43 @@ class RetencionRepository:
             actor_rol=actor_sistema, actor_id=None,
             comentario=None,
         ))
+
+    # ------------------------------------------------------------------ T-11 R5 contrataciones descartadas
+    async def ids_contrataciones_descartadas(self, limite: datetime) -> list[int]:
+        """Solicitudes descartadas antes de `limite` (la fecha del descarte es fecha_actualizacion)."""
+        fecha = func.coalesce(SolicitudContratacion.fecha_actualizacion, SolicitudContratacion.fecha_creacion)
+        return list((await self.session.execute(
+            select(SolicitudContratacion.id).where(
+                SolicitudContratacion.estado == EstadoContratacion.DESCARTADA.value, fecha < limite,
+            ).order_by(SolicitudContratacion.id))).scalars().all())
+
+    async def borrar_contrataciones(self, ids: list[int]) -> int:
+        if not ids:
+            return 0
+        r = await self.session.execute(delete(SolicitudContratacion).where(SolicitudContratacion.id.in_(ids))
+                                       .execution_options(synchronize_session=False))
+        return int(r.rowcount or 0)
+
+    # ------------------------------------------------------------------ T-11 R6 seguimiento ARCOP
+    async def ids_seguimiento_arcop_vencido(self, limite: datetime) -> list[int]:
+        """Solicitudes cerradas antes de `limite` cuyo código de seguimiento aún sirve."""
+        return list((await self.session.execute(
+            select(SolicitudARCOP.id).where(
+                SolicitudARCOP.fecha_cierre.is_not(None), SolicitudARCOP.fecha_cierre < limite,
+                ~SolicitudARCOP.codigo_seguimiento.startswith(PREFIJO_SEGUIMIENTO_RETIRADO),
+            ).order_by(SolicitudARCOP.id))).scalars().all())
+
+    async def retirar_seguimiento_arcop(self, ids: list[int], ahora: datetime) -> None:
+        """El código deja de servir (uno aleatorio, que nadie conoce) y el historial pierde al actor."""
+        s = self.session
+        for solicitud_id in ids:
+            await s.execute(update(SolicitudARCOP).where(SolicitudARCOP.id == solicitud_id)
+                            .values(codigo_seguimiento=codigo_retirado(), fecha_actualizacion=ahora)
+                            .execution_options(synchronize_session=False))
+        await s.execute(update(EventoSolicitud)
+                        .where(EventoSolicitud.solicitud_id.in_(ids), EventoSolicitud.actor_id.is_not(None))
+                        .values(actor_id=None)
+                        .execution_options(synchronize_session=False))
 
     # ------------------------------------------------------------------ R3 eventos de seguridad
     @staticmethod

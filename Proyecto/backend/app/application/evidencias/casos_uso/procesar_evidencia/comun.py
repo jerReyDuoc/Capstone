@@ -33,3 +33,7 @@ def _texto_alerta(result) -> str:
     conf_txt = f"{conf:.2f}" if isinstance(conf, (int, float)) and not isinstance(conf, bool) else "sin dato"
     return (f"Propuesta de la IA: {getattr(result, 'clasificacion', None)} (confianza {conf_txt}). "
             f"{getattr(result, 'justificacion', '') or ''}")
+
+
+# T-13: la respuesta cambió mientras se validaba la evidencia; la clasificación de la IA no se aplica
+AVISO_RESPUESTA_CAMBIADA = "Tu respuesta cambió mientras revisábamos el documento; vuelve a subirlo."

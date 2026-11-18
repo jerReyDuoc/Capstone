@@ -12,8 +12,10 @@ from app.application.fabricas import fabricas
 class RegistroActividadesCasos(LecturaMixin, EdicionMixin, EstadosMixin):
     """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
-    def __init__(self, db: AsyncSession, cliente):
+    def __init__(self, db: AsyncSession, cliente, *, confirmar: bool = True):
+        """T-12: con `confirmar=False`, crear() no confirma su commit (lo hace quien lo llama)."""
         self.db = db
+        self.confirmar = confirmar
         self.cliente = cliente
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id

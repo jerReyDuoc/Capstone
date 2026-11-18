@@ -261,9 +261,9 @@ def items_actividad(a: ActividadRevisable) -> list[ElementoRevision]:
     categorias = [t["codigo"] for t in m.get("tipos_datos") or []]
     plazos = {p.get("categoria"): p for p in c.get("plazos") or []}
     sin_plazo = [cat_mapa.nombre_dato(x) for x in categorias
-                 if not (plazos.get(x) and plazos[x].get("plazo") and plazos[x].get("unidad"))]
+                 if not cat.plazo_definido(plazos.get(x))]
     sin_fundamento = [cat_mapa.nombre_dato(x) for x in categorias
-                      if plazos.get(x) and plazos[x].get("plazo") and not plazos[x].get("fundamento")]
+                      if cat.plazo_definido(plazos.get(x)) and not plazos[x].get("fundamento")]
     if not categorias:
         items.append(_item(K["plazos"], FALLA, "La actividad no tiene datos elegidos: no se pueden revisar plazos."))
     elif sin_plazo:

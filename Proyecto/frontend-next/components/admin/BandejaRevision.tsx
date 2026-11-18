@@ -11,6 +11,9 @@
  *     y debajo el formulario para confirmar o corregir con comentario.
  * Al resolver, se abre solo el siguiente pendiente. Cada decisión queda en el audit log (backend).
  */
+import { Icon } from "@/components/ui/Icon";
+import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { comoErrorAdmin, type ErrorAdmin } from "@/lib/admin/api";
@@ -49,6 +52,8 @@ import {
   type Resolucion,
   type Resolutiva,
   type ResumenReferencia,
+  MIN_REVISIONES_METRICA,
+  textoAcuerdo,
 } from "@/lib/admin/revision";
 import { BarraAdmin } from "./BarraAdmin";
 import a from "./admin.module.css";
@@ -252,18 +257,24 @@ function FranjaReferencia({ resumen }: { resumen: ResumenReferencia | null }) {
     <section className={s.referencia} aria-labelledby="titulo-referencia">
       <div>
         <h2 id="titulo-referencia" className="sr-only">Verdad de referencia</h2>
-        {p.n_revisadas ? (
+        {/* Auditoría UX 16-11: el porcentaje solo se muestra con suficientes revisiones, y sin
+            jerga ("F1 macro" → nivel de acuerdo con la revisión humana) */}
+        {textoAcuerdo(p.n_revisadas) ? (
+          <p className={s.referenciaFrase}>{textoAcuerdo(p.n_revisadas)}</p>
+        ) : (
           <p className={s.referenciaFrase}>
             La IA coincidió con tu revisión en <span className={s.referenciaCifra}>{porcentaje(p.accuracy)}</span> de{" "}
-            {p.n_revisadas} {p.n_revisadas === 1 ? "pregunta" : "preguntas"} que evaluó.
+            {p.n_revisadas} preguntas que evaluó.
           </p>
-        ) : (
-          <p className={s.referenciaFrase}>Aún no hay revisiones sobre decisiones de la IA.</p>
         )}
-        <p className={s.referenciaNota}>
-          Es la verdad de referencia con que se mide el modelo (F1 macro {p.f1_macro == null ? "—" : p.f1_macro.toFixed(2)}).
-          El detalle por clase está en las métricas de IA.
-        </p>
+        <ComoSeCalcula titulo="¿Qué mide el nivel de acuerdo?">
+          <p>
+            Cada vez que confirmas o corriges una clasificación de la IA, esa revisión humana pasa a ser la respuesta
+            correcta. El <strong>nivel de acuerdo con la revisión humana</strong> es qué parte de esas decisiones la IA
+            acertó{p.f1_macro != null && p.n_revisadas >= MIN_REVISIONES_METRICA ? <> ({Math.round(p.f1_macro * 100)} de 100 considerando por igual cumplido, parcial y no cumplido)</> : null}.
+          </p>
+          <p>Se muestra desde {MIN_REVISIONES_METRICA} revisiones: con menos, un solo error cambia mucho el porcentaje.</p>
+        </ComoSeCalcula>
       </div>
       <div className={s.balance}>
         {total ? (
@@ -274,13 +285,13 @@ function FranjaReferencia({ resumen }: { resumen: ResumenReferencia | null }) {
           </div>
         ) : null}
         <ul className={s.leyenda}>
-          <li><span className={s.punto} style={{ background: "var(--accent)" }} aria-hidden="true" />
+          <li><span className={`${s.punto} ${s.puntoConfirmada}`} aria-hidden="true" />
             Confirmadas <strong>{resumen.confirmadas}</strong></li>
-          <li><span className={s.punto} style={{ background: "var(--medio)" }} aria-hidden="true" />
+          <li><span className={`${s.punto} ${s.puntoCorregida}`} aria-hidden="true" />
             Corregidas <strong>{resumen.corregidas}</strong></li>
-          <li><span className={s.punto} style={{ background: "var(--critico)" }} aria-hidden="true" />
+          <li><span className={`${s.punto} ${s.puntoAtaque}`} aria-hidden="true" />
             Ataques confirmados <strong>{ev.ataques_confirmados}</strong></li>
-          <li><span className={s.punto} style={{ background: "var(--info)" }} aria-hidden="true" />
+          <li><span className={`${s.punto} ${s.puntoFalso}`} aria-hidden="true" />
             Falsos positivos <strong>{ev.falsos_positivos}</strong></li>
         </ul>
         {ev.precision_deteccion != null ? (
@@ -297,77 +308,119 @@ function Filtros({ filtros, cambiar, bandeja, dominios }: {
   dominios: { id: number; nombre_dominio: string | null }[];
 }) {
   const idEval = useId();
+  const idMas = useId();
   const [evaluacion, setEvaluacion] = useState(filtros.evaluacion_id ? String(filtros.evaluacion_id) : "");
+  const [masAbierto, setMasAbierto] = useState(false);
   useEffect(() => {
     setEvaluacion(filtros.evaluacion_id ? String(filtros.evaluacion_id) : "");
   }, [filtros.evaluacion_id]);
   const conteo = bandeja?.pendientes.por_motivo;
   const esClasif = filtros.vista === "clasificaciones";
+  const nombreDominio = (id: number) => dominios.find((d) => d.id === id)?.nombre_dominio ?? "Dimensión";
+
+  // Auditoría UX 16-11 · Fase 10.2: filtros activos como chips que se pueden quitar
+  const activos: { texto: string; quitar: Partial<FiltrosBandeja> }[] = [
+    ...(esClasif && filtros.motivo ? [{ texto: TEXTO_MOTIVO[filtros.motivo].corto, quitar: { motivo: null } }] : []),
+    ...(filtros.evaluacion_id ? [{ texto: `Evaluación n.º ${filtros.evaluacion_id}`, quitar: { evaluacion_id: null } }] : []),
+    ...(esClasif && filtros.dominio_id ? [{ texto: nombreDominio(filtros.dominio_id), quitar: { dominio_id: null } }] : []),
+    ...(esClasif && filtros.criticidad ? [{ texto: `Impacto ${filtros.criticidad.toLowerCase()}`, quitar: { criticidad: null } }] : []),
+  ];
+  const enPanel = [filtros.evaluacion_id, esClasif ? filtros.dominio_id : null, esClasif ? filtros.criticidad : null].filter(Boolean).length;
+
   return (
     <div className={s.filtros}>
+      {/* Una fila: estado de la revisión + los filtros más usados + "Más filtros" */}
       <div className={s.filaFiltros}>
         <div className={s.segmentado} role="group" aria-label="Estado de la revisión">
           {([["pendiente", "Pendientes"], ["revisada", "Revisadas"], ["todas", "Todas"]] as const).map(([v, t]) => (
             <button key={v} type="button" aria-pressed={filtros.estado === v} onClick={() => cambiar({ estado: v })}>{t}</button>
           ))}
         </div>
-        <form className={s.campoFiltro} onSubmit={(e) => {
-          e.preventDefault();
-          const n = Number(evaluacion);
-          cambiar({ evaluacion_id: Number.isInteger(n) && n > 0 ? n : null });
-        }}>
-          <label htmlFor={idEval}><span>Evaluación n.º</span></label>
-          <input id={idEval} className={`${s.selector} ${s.numero}`} inputMode="numeric" pattern="[0-9]*"
-                 value={evaluacion} placeholder="Todas"
-                 onChange={(e) => setEvaluacion(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                 onBlur={() => {
-                   const n = Number(evaluacion);
-                   const nuevo = Number.isInteger(n) && n > 0 ? n : null;
-                   if (nuevo !== filtros.evaluacion_id) cambiar({ evaluacion_id: nuevo });
-                 }} />
-        </form>
         {esClasif ? (
-          <>
-            <label className={s.campoFiltro}>
-              <span>Dimensión</span>
-              <select className={s.selector} value={filtros.dominio_id ?? ""}
-                      onChange={(e) => cambiar({ dominio_id: e.target.value ? Number(e.target.value) : null })}>
-                <option value="">Todas</option>
-                {dominios.map((d) => <option key={d.id} value={d.id}>{d.nombre_dominio ?? `Dimensión ${d.id}`}</option>)}
-              </select>
-            </label>
-            <label className={s.campoFiltro}>
-              <span>Criticidad</span>
-              <select className={s.selector} value={filtros.criticidad ?? ""}
-                      onChange={(e) => cambiar({ criticidad: e.target.value || null })}>
-                <option value="">Todas</option>
-                {["Crítica", "Alta", "Media", "Baja"].map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </label>
-            <label className={s.campoFiltro}>
-              <span>Orden</span>
-              <select className={s.selector} value={filtros.orden}
-                      onChange={(e) => cambiar({ orden: e.target.value as FiltrosBandeja["orden"] })}>
-                <option value="prioridad">Más urgente primero</option>
-                <option value="reciente">Más reciente primero</option>
-              </select>
-            </label>
-          </>
+          <label className={s.campoFiltro}>
+            <span>Motivo</span>
+            <select className={s.selector} value={filtros.motivo ?? ""}
+                    onChange={(e) => cambiar({ motivo: (e.target.value || null) as Motivo | null })}>
+              <option value="">{filtros.estado === "pendiente" ? "Todo lo urgente" : "Todos los motivos"}</option>
+              {MOTIVOS.map((mo) => (
+                <option key={mo} value={mo}>
+                  {TEXTO_MOTIVO[mo].corto}
+                  {conteo && filtros.estado === "pendiente" ? ` (${conteo[mo] ?? 0})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
+        {esClasif ? (
+          <label className={s.campoFiltro}>
+            <span>Orden</span>
+            <select className={s.selector} value={filtros.orden}
+                    onChange={(e) => cambiar({ orden: e.target.value as FiltrosBandeja["orden"] })}>
+              <option value="prioridad">Más urgente primero</option>
+              <option value="reciente">Más reciente primero</option>
+            </select>
+          </label>
+        ) : null}
+        <button type="button" className={`btn btn-ghost btn-sm ${s.botonMasFiltros}`} aria-expanded={masAbierto} aria-controls={idMas}
+                onClick={() => setMasAbierto((x) => !x)}>
+          <Icon name="filtro" aria-hidden="true" />
+          Más filtros{enPanel ? ` (${enPanel})` : ""}
+        </button>
       </div>
-      {esClasif ? (
-        <div className="chip-group" role="group" aria-label="Filtrar por motivo">
-          <button type="button" className="chip" aria-pressed={!filtros.motivo} onClick={() => cambiar({ motivo: null })}>
-            {filtros.estado === "pendiente" ? "Todo lo urgente" : "Todos los motivos"}
-          </button>
-          {MOTIVOS.map((mo) => (
-            <button key={mo} type="button" className="chip" aria-pressed={filtros.motivo === mo}
-                    title={TEXTO_MOTIVO[mo].ayuda} onClick={() => cambiar({ motivo: filtros.motivo === mo ? null : mo })}>
-              {TEXTO_MOTIVO[mo].corto}
-              {conteo && filtros.estado === "pendiente" ? <span> ({conteo[mo] ?? 0}<span className="sr-only"> pendientes</span>)</span> : null}
+
+      {masAbierto ? (
+        <div id={idMas} className={s.panelFiltros}>
+          <form className={s.campoFiltro} onSubmit={(e) => {
+            e.preventDefault();
+            const n = Number(evaluacion);
+            cambiar({ evaluacion_id: Number.isInteger(n) && n > 0 ? n : null });
+          }}>
+            <label htmlFor={idEval}><span>Evaluación n.º</span></label>
+            <input id={idEval} className={`${s.selector} ${s.numero}`} inputMode="numeric" pattern="[0-9]*"
+                   value={evaluacion} placeholder="Todas"
+                   onChange={(e) => setEvaluacion(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                   onBlur={() => {
+                     const n = Number(evaluacion);
+                     const nuevo = Number.isInteger(n) && n > 0 ? n : null;
+                     if (nuevo !== filtros.evaluacion_id) cambiar({ evaluacion_id: nuevo });
+                   }} />
+          </form>
+          {esClasif ? (
+            <>
+              <label className={s.campoFiltro}>
+                <span>Dimensión</span>
+                <select className={s.selector} value={filtros.dominio_id ?? ""}
+                        onChange={(e) => cambiar({ dominio_id: e.target.value ? Number(e.target.value) : null })}>
+                  <option value="">Todas</option>
+                  {dominios.map((d) => <option key={d.id} value={d.id}>{d.nombre_dominio ?? `Dimensión ${d.id}`}</option>)}
+                </select>
+              </label>
+              <label className={s.campoFiltro}>
+                <span>Impacto del control</span>
+                <select className={s.selector} value={filtros.criticidad ?? ""}
+                        onChange={(e) => cambiar({ criticidad: e.target.value || null })}>
+                  <option value="">Todos</option>
+                  {["Crítica", "Alta", "Media", "Baja"].map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activos.length ? (
+        <div className="chip-group" role="group" aria-label="Filtros activos">
+          {activos.map((f) => (
+            <button key={f.texto} type="button" className="chip chip-quitable" onClick={() => cambiar(f.quitar)}
+                    aria-label={`Quitar el filtro ${f.texto}`}>
+              {f.texto}
+              <Icon name="cerrar" aria-hidden="true" />
             </button>
           ))}
         </div>
+      ) : null}
+      {esClasif && conteo && filtros.estado === "pendiente" ? (
+        <p className={s.notaConteos}>Los números junto a cada motivo cuentan todos los pendientes, sin aplicar los demás filtros.</p>
       ) : null}
     </div>
   );
@@ -613,9 +666,10 @@ function PanelRespuesta({ id, umbral, volver, onError, onResuelta }: {
             </div>
           </div>
           <div className={s.acciones}>
-            <button type="submit" className="btn btn-primary" disabled={!elegida || enviando}>
+            <BotonConMotivo type="submit" className="btn btn-primary" ocupado={enviando}
+                            motivo={!enviando && !elegida ? "Elige una decisión para guardarla" : null}>
               {enviando ? "Guardando…" : textoBotonDecision(d, elegida)}
-            </button>
+            </BotonConMotivo>
             {decision === "corregida" && d.evaluacion.cerrada ? (
               <span className={s.nota}>La evaluación está cerrada: al corregir se recalculan sus puntajes.</span>
             ) : null}
@@ -799,9 +853,10 @@ function PanelEvento({ evento, volver, onError, onResuelto, irARespuesta }: {
             </div>
           </div>
           <div className={s.acciones}>
-            <button type="submit" className="btn btn-primary" disabled={!resolucion || enviando}>
-              {enviando ? "Guardando…" : resolucion ? `Guardar como «${t.nombreOpcion[resolucion]}»` : "Elige un veredicto"}
-            </button>
+            <BotonConMotivo type="submit" className="btn btn-primary" ocupado={enviando}
+                            motivo={!enviando && !resolucion ? "Elige un veredicto para guardarlo" : null}>
+              {enviando ? "Guardando…" : resolucion ? `Guardar como «${t.nombreOpcion[resolucion]}»` : "Guardar veredicto"}
+            </BotonConMotivo>
           </div>
         </form>
 

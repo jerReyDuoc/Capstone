@@ -50,7 +50,37 @@ export const SEVERIDAD_TONO: Record<Severidad, TonoSeveridad> = {
   "Sin clasificar": "info",
 };
 
-/** Microcopy de cada nivel: qué hacer, no un plazo legal. */
+/**
+ * Auditoría UX 16-11 · Forma propia de cada nivel (clase sev-forma-*): se distinguen también en
+ * escala de grises. Crítica = octágono sobre insignia sólida, Alta = triángulo, Media = rombo,
+ * Baja = círculo hueco, Sin clasificar = círculo punteado.
+ */
+export type FormaSeveridad = "critica" | "alta" | "media" | "baja" | "ninguna";
+export const SEVERIDAD_FORMA: Record<Severidad, FormaSeveridad> = {
+  Crítica: "critica",
+  Alta: "alta",
+  Media: "media",
+  Baja: "baja",
+  "Sin clasificar": "ninguna",
+};
+
+/** Clases de la insignia de una severidad (color + forma). Úsala en vez de armar la clase a mano. */
+export const claseBadgeSeveridad = (s: Severidad) => `badge tone-${SEVERIDAD_TONO[s]} sev-forma-${SEVERIDAD_FORMA[s]}`;
+
+/**
+ * Vocabulario ÚNICO de la plataforma (diccionario central). Cuestionario, Brechas y Capacitación
+ * nombran la severidad con estas palabras; el impacto de un control (Alta/Media/Baja del
+ * catálogo) se nombra "Impacto alto/medio/bajo", y la prioridad de acción se DERIVA de la
+ * severidad (SEVERIDAD_GUIA) en vez de tener una escala propia.
+ */
+export const VOCABULARIO_SEVERIDAD = {
+  titulo: "Severidad",
+  impacto: (i: ImpactoConocido) => `Impacto ${IMPACTO_TEXTO_BASE[i]}`,
+} as const;
+
+const IMPACTO_TEXTO_BASE: Record<ImpactoConocido, string> = { Alta: "alto", Media: "medio", Baja: "bajo" };
+
+/** Microcopy de cada nivel: qué hacer, no un plazo legal (prioridad de acción derivada). */
 export const SEVERIDAD_GUIA: Record<Severidad, string> = {
   Crítica: "Atender de inmediato",
   Alta: "Resolver en el corto plazo",
@@ -81,7 +111,10 @@ export function calcularSeveridad(
 }
 
 /** Concordancia para "Impacto alto/medio/bajo". */
-export const IMPACTO_TEXTO: Record<ImpactoConocido, string> = { Alta: "alto", Media: "medio", Baja: "bajo" };
+export const IMPACTO_TEXTO: Record<ImpactoConocido, string> = IMPACTO_TEXTO_BASE;
+
+/** Tono de la insignia "Impacto alto/medio/bajo" (criticidad del control en el cuestionario). */
+export const IMPACTO_TONO: Record<ImpactoConocido, TonoSeveridad> = { Alta: "naranja", Media: "medio", Baja: "bajo" };
 
 export function contarPorSeveridad(items: { severidad: Severidad }[]): Record<Severidad, number> {
   const base = Object.fromEntries(SEVERIDADES.map((s) => [s, 0])) as Record<Severidad, number>;

@@ -1,3 +1,4 @@
+import { mensajeEvidencia } from "@/lib/mensajesUsuario";
 /**
  * HU-01 / HU-02 · Modelo del cuestionario adaptativo (lógica pura, probada en tests/).
  *
@@ -298,10 +299,8 @@ export function motivoEvidencia(
   if (e.estado_validacion !== "rejected" || e.clasificacion_llm) return null;
   const primero = (e.errores_validacion ?? []).find((x): x is string => typeof x === "string" && x.trim() !== "");
   if (!primero) return null;
-  if (primero.startsWith("Bloqueo preventivo")) {
-    return "Encontramos texto que parece dar instrucciones a la IA (en la justificación o en el archivo), así que no lo analizamos. Esta pregunta quedó pendiente de revisión por nuestro equipo.";
-  }
-  return primero;
+  // Auditoría UX 16-11: mapeo central (lib/mensajesUsuario.ts), sin jerga técnica
+  return mensajeEvidencia(primero);
 }
 
 /**

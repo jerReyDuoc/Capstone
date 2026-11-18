@@ -67,6 +67,14 @@ async def procesar_evidencia_task(ctx, evidencia_id: int):
                 actor_rol=ROL_SISTEMA, detalle={"motivo": "hu06_solo_texto_anonimizado"},
             )
 
+        def auditar_descarte(evidencia, respuesta, detalle):
+            # T-13: la clasificación de la IA no se aplicó porque la respuesta cambió durante la validación
+            BitacoraRepository(session).registrar(
+                accion=Accion.EVIDENCIA_CLASIFICACION_DESCARTADA, entidad="evidencias",
+                entidad_id=evidencia.id_evidencia, actor_rol=ROL_SISTEMA, resultado=RESULTADO_RECHAZADO,
+                detalle={"respuesta_id": respuesta.id, "evaluacion_id": respuesta.evaluacion_id, **detalle},
+            )
+
         use_case = ProcesarEvidenciaUseCase(
             evidencia_repo, respuesta_repo, storage, validator,
             guard=guard,
@@ -76,6 +84,7 @@ async def procesar_evidencia_task(ctx, evidencia_id: int):
             puntaje_actual=puntaje_actual,
             auditar=auditar,
             auditar_supresion=auditar_supresion,
+            auditar_descarte=auditar_descarte,
         )
         await use_case.execute(evidencia_id)
 

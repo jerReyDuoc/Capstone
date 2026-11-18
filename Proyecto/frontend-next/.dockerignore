@@ -3,3 +3,5 @@ node_modules
 .env
 .env.local
 docs/capturas
+test-results
+playwright-report

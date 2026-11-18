@@ -18,6 +18,7 @@
  * Es parte del servicio contratado: sin contrato vigente, la página lo explica. Cada cambio
  * manda la versión del mapa que se está viendo; si otra pestaña guardó antes, se recarga.
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -294,10 +295,11 @@ export function MapaDatos() {
             <Icon name="mas" />
             Agregar elemento
           </button>
-          <button type="button" className="btn btn-ghost" onClick={() => setDialogo({ tipo: "flujo", origen: seleccion?.tipo === "elemento" ? seleccion.id : null })} disabled={ocupado || vista.elementos.length < 2}>
+          <BotonConMotivo className="btn btn-ghost" onClick={() => setDialogo({ tipo: "flujo", origen: seleccion?.tipo === "elemento" ? seleccion.id : null })}
+                          ocupado={ocupado} motivo={!ocupado && vista.elementos.length < 2 ? "Agrega al menos dos elementos para unirlos con un flujo" : null}>
             <Icon name="flujo" />
             Agregar flujo
-          </button>
+          </BotonConMotivo>
           <details className={s.menuExportar} ref={menuExportar}>
             <summary className="btn btn-ghost" aria-label="Exportar o enviar el mapa">
               <Icon name="descargar" />

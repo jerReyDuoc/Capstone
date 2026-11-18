@@ -6,7 +6,8 @@ import { AvanceEmpresa } from "@/components/formacion/AvanceEmpresa";
 import { TutorIA } from "@/components/formacion/TutorIA";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { BadgeNivel, EstadoPanel, Kpi } from "@/components/ui/Basicos";
+import { BadgeNivel, BadgeSeveridad, EstadoPanel } from "@/components/ui/Basicos";
+import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
 import { Icon } from "@/components/ui/Icon";
 import { usePanel } from "@/hooks/usePanel";
 import { useAvanceFormativo } from "@/hooks/useAvanceFormativo";
@@ -83,16 +84,16 @@ function Plan({ panel, onAviso }: { panel: PanelVista; onAviso: (t: string) => v
       <div role="status" aria-live="polite" className="grid">
         <span className="sr-only">Cargando el plan formativo…</span>
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton col-3 md-col-3" style={{ height: 132 }} />
+          <div key={i} className="skeleton col-3 md-col-3 esq-132" />
         ))}
-        <div className="skeleton col-12" style={{ height: 360 }} />
+        <div className="skeleton col-12 esq-360" />
       </div>
     );
   }
   if (estado.tipo === "no-disponible" || estado.tipo === "error") {
     return (
       <div className="state" role={estado.tipo === "error" ? "alert" : "status"}>
-        <Icon name="birrete" width={32} height={32} style={{ color: estado.tipo === "error" ? "var(--alto)" : "var(--medio)" }} />
+        <Icon name="birrete" width={32} height={32} className={`icono-estado ${estado.tipo === "error" ? "icono-alerta" : "icono-atencion"}`} />
         <h2>{estado.tipo === "error" ? "No pudimos cargar el plan" : "El plan aún no está disponible"}</h2>
         <p>{estado.mensaje}</p>
       </div>
@@ -123,12 +124,6 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
 
   return (
     <>
-      {avance ? <AvanceEmpresa avance={avance} evaluacionId={evaluacionId} /> : null}
-      {/* HU-15: Agente IA Tutor con todas las brechas de la evaluación vigente (solo cliente) */}
-      {avance ? <TutorIA variante="tarjeta" /> : null}
-      {estadoAvance.tipo === "cargando" ? (
-        <div className="skeleton" style={{ height: 220 }} role="status" aria-label="Cargando el avance de tu empresa" />
-      ) : null}
       {estadoAvance.tipo === "error" ? (
         <p className="callout callout-aviso" role="alert">
           <Icon name="alerta" />
@@ -148,91 +143,21 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
         </p>
       ) : null}
 
-      <div className="grid">
-        <Kpi
-          className="col-3 md-col-3 card-glow"
-          icono="birrete"
-          etiqueta="Módulos recomendados"
-          valor={r.modulos}
-          pista={`${porBrechas} cierran brechas · ${r.modulos - porBrechas} base de nivel`}
-        />
-        <Kpi
-          className="col-3 md-col-3"
-          icono="reloj"
-          etiqueta="Horas de formación"
-          valor={r.horas}
-          sufijo="h"
-          pista={r.horas ? `Unas ${Math.max(1, Math.round(r.horas / 8))} jornadas de 8 horas` : "Sin módulos con duración"}
-        />
-        <Kpi
-          className="col-3 md-col-3"
-          icono="check"
-          etiqueta="Brechas con ruta"
-          valor={`${r.brechas_mapeadas}/${r.brechas_total}`}
-          medidor={r.cobertura_mapeo}
-          pista={
-            r.brechas_total === 0
-              ? "Sin brechas abiertas"
-              : plan.brechas_sin_ruta.length
-                ? `${plan.brechas_sin_ruta.length} sin ruta en el catálogo`
-                : "Todas tienen una ruta del catálogo"
-          }
-        />
-        <Kpi
-          className="col-3 md-col-3"
-          icono="diana"
-          etiqueta="Empieza por"
-          valor={<span className="kpi-texto">{prioritaria?.dominio ?? "Mantener el nivel"}</span>}
-          pista={
-            prioritaria
-              ? `Nivel ${prioritaria.nivel_asignado} · ${prioritaria.brechas} ${prioritaria.brechas === 1 ? "brecha" : "brechas"}`
-              : "Ninguna brecha requiere capacitación"
-          }
-        />
-      </div>
-
-      {/* C1: de dónde sale el plan */}
-      <p className="analisis">
-        <Icon name="chispa" />
-        <span className="analisis-flujo">
+      {/* Auditoría UX 16-11 · Fase 5.C: una línea de resumen (antes, 4 tarjetas de KPI y una tira de
+          flujo con flechas) + filtros; la metodología va plegada. El primer módulo queda a la vista. */}
+      <section className="card plan-resumen" aria-labelledby="plan-resumen-titulo">
+        <h2 className="sr-only" id="plan-resumen-titulo">Resumen del plan</h2>
+        <p className="plan-resumen-linea">
+          <span><strong>{r.modulos}</strong> módulos</span>
+          <span><strong>{r.horas} h</strong> de formación</span>
           <span>
-            <strong>{r.brechas_total}</strong> brechas detectadas
+            <strong>{r.brechas_mapeadas} de {r.brechas_total}</strong> brechas con ruta
           </span>
-          <span className="sep" aria-hidden="true">→</span>
           <span>
-            <strong>{r.brechas_mapeadas}</strong> asociadas a una ruta del catálogo formativo
+            Empieza por <strong>{prioritaria?.dominio ?? "mantener el nivel"}</strong>
           </span>
-          <span className="sep" aria-hidden="true">→</span>
-          <span>
-            <strong>{r.modulos}</strong> módulos en <strong>{r.dimensiones}</strong> dimensiones
-          </span>
-        </span>
-      </p>
-
-      {/* C2: cómo se asigna el nivel + filtros */}
-      <section className="card" aria-labelledby="niveles-titulo" style={{ display: "grid", gap: 16 }}>
-        <div className="card-head" style={{ marginBottom: 0 }}>
-          <div>
-            <h2 className="card-title" id="niveles-titulo">Cómo asignamos el nivel</h2>
-            <p className="card-sub">Cada dimensión recibe el nivel que corresponde a su puntaje; las brechas suman los módulos que las cierran.</p>
-          </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={exportarCsv}>
-            <Icon name="tabla" />
-            Exportar plan CSV
-          </button>
-        </div>
-        <ol className="niveles-guia">
-          {NIVELES_FORMATIVOS.map((n, i) => (
-            <li key={n} className={`nivel-${slug(n)}`}>
-              <span className="nivel-paso" aria-hidden="true">{i + 1}</span>
-              <span>
-                <strong>{n}</strong> <span className="nivel-rango">{NIVEL_FORMATIVO_INFO[n].rango}</span>
-                <span className="nivel-enfoque">{NIVEL_FORMATIVO_INFO[n].enfoque}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <div className="toolbar" role="group" aria-label="Filtrar módulos">
+        </p>
+        <div className="toolbar plan-filtros" role="group" aria-label="Filtrar módulos">
           <div className="chip-group" role="group" aria-label="Nivel">
             <button type="button" className="chip" aria-pressed={filtros.nivel == null} onClick={() => setFiltros((f) => ({ ...f, nivel: null }))}>
               Todos los niveles
@@ -255,12 +180,42 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
               checked={filtros.soloBrechas}
               onChange={(e) => setFiltros((f) => ({ ...f, soloBrechas: e.target.checked }))}
             />
-            <span>Solo los módulos que cierran brechas</span>
+            <span>Solo los que cierran brechas</span>
           </label>
-          <p className="card-sub" role="status" aria-live="polite" style={{ marginLeft: "auto", alignSelf: "center" }}>
-            {hayFiltros ? `Mostrando ${totalVisibles} de ${r.modulos} módulos` : `${r.modulos} módulos`}
+          <p className="card-sub plan-conteo" role="status" aria-live="polite">
+            {hayFiltros ? `Mostrando ${totalVisibles} de ${r.modulos} módulos` : `${porBrechas} cierran brechas · ${r.modulos - porBrechas} base del nivel`}
           </p>
+          <div className="plan-acciones">
+            {/* HU-15: Agente IA Tutor con todas las brechas de la evaluación vigente (solo cliente) */}
+            {avance ? <TutorIA variante="boton" /> : null}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={exportarCsv}>
+              <Icon name="tabla" />
+              Exportar plan CSV
+            </button>
+          </div>
         </div>
+        <ComoSeCalcula>
+          <p>
+            Cada dimensión recibe el nivel que corresponde a su puntaje, y cada brecha suma el módulo que la cierra:{" "}
+            {r.brechas_total} brechas detectadas, {r.brechas_mapeadas} asociadas a una ruta del catálogo formativo, en {r.modulos}{" "}
+            módulos de {r.dimensiones} dimensiones.
+          </p>
+          <ol className="niveles-guia">
+            {NIVELES_FORMATIVOS.map((n, i) => (
+              <li key={n} className={`nivel-${slug(n)}`}>
+                <span className="nivel-paso" aria-hidden="true">{i + 1}</span>
+                <span>
+                  <strong>{n}</strong> <span className="nivel-rango">{NIVEL_FORMATIVO_INFO[n].rango}</span>
+                  <span className="nivel-enfoque">{NIVEL_FORMATIVO_INFO[n].enfoque}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p>
+            La etiqueta de cada módulo es la severidad de la brecha más urgente que cierra (Crítica, Alta, Media o Baja),
+            igual que en Brechas.
+          </p>
+        </ComoSeCalcula>
       </section>
 
       {/* C3: por dimensión normativa */}
@@ -286,6 +241,12 @@ function PlanListo({ plan, panel, onAviso }: { plan: PlanFormativoApi; panel: Pa
           </span>
         </p>
       ) : null}
+
+      {/* HU-26: avance de la empresa (solo usuario definitivo), después del plan */}
+      {avance ? <AvanceEmpresa avance={avance} evaluacionId={evaluacionId} /> : null}
+      {estadoAvance.tipo === "cargando" ? (
+        <div className="skeleton esqueleto-avance" role="status" aria-label="Cargando el avance de tu empresa" />
+      ) : null}
     </>
   );
 }
@@ -310,7 +271,7 @@ function Dimension({
   return (
     <section className="card dimension" aria-labelledby={`${id}-t`} id={id}>
       <header className="dimension-head">
-        <div style={{ display: "grid", gap: 6 }}>
+        <div className="pila-mini">
           <h2 className="card-title" id={`${id}-t`}>{d.dominio}</h2>
           <p className="card-sub">
             {d.puntaje != null ? <>Puntaje {formatoPuntaje(d.puntaje)} / 100 · </> : null}
@@ -363,7 +324,7 @@ function Dimension({
       {d.brechas > 0 ? (
         <div className="chart-foot">
           <span>
-            <strong style={{ color: "var(--text)" }}>{d.brechas}</strong> {d.brechas === 1 ? "brecha abierta" : "brechas abiertas"} en {d.dominio}
+            <strong className="texto-fuerte">{d.brechas}</strong> {d.brechas === 1 ? "brecha abierta" : "brechas abiertas"} en {d.dominio}
           </span>
           <Link href={hrefBrechas} className="btn btn-ghost btn-sm">
             Ver brechas<span className="sr-only"> de {d.dominio}</span>
@@ -404,11 +365,8 @@ function Modulo({
             </span>
             {m.nivel}
           </span>
-          {m.motivo === "brechas" ? (
-            <span className={`badge tone-${SEVERIDAD_TONO[m.prioridad as keyof typeof SEVERIDAD_TONO] ?? "info"}`}>
-              <span className="sr-only">Prioridad </span>
-              {PRIORIDAD_TEXTO[m.prioridad]}
-            </span>
+          {m.motivo === "brechas" && m.prioridad !== "Complementario" ? (
+            <BadgeSeveridad severidad={m.prioridad} />
           ) : (
             <span className="badge tone-info">{PRIORIDAD_TEXTO.Complementario}</span>
           )}

@@ -83,6 +83,20 @@ const BRECHAS: Record<number, [number, "no_cumplido" | "parcialmente_cumplido"][
 };
 
 export function panelDemo(evaluacionId: number): PanelVista {
+  return construirPanel(datosApiDemo(evaluacionId));
+}
+
+/**
+ * Las respuestas "crudas" de la API para el modo demo (resumen, comparativa, respuestas, catálogo
+ * y controles). Las reutilizan las pruebas de navegador (tests/e2e) como respuestas simuladas.
+ */
+export function datosApiDemo(evaluacionId: number): {
+  resumen: ResumenApi;
+  comparativa: ComparativaApi;
+  respuestas: RespuestaApi[];
+  catalogo: BrechaCatalogoApi[];
+  controles: ControlApi[];
+} {
   const id = PUNTAJES[evaluacionId] ? evaluacionId : DEMO_EVALUACIONES[0].id;
   const filas = PUNTAJES[id];
   const total = filas.reduce((s, f) => s + f[2], 0);
@@ -191,7 +205,7 @@ export function panelDemo(evaluacionId: number): PanelVista {
     },
   ];
 
-  return construirPanel({ resumen, comparativa, respuestas, catalogo: CATALOGO, controles: CONTROLES });
+  return { resumen, comparativa, respuestas, catalogo: CATALOGO, controles: CONTROLES };
 }
 
 /* ---------------------------------------------------------------- HU-12 (demo) */

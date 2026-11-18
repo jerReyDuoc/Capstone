@@ -180,6 +180,13 @@ class Settings(BaseSettings):
     RETENCION_ARCOP_CERRADAS_DIAS: int | None = None
     #   Eventos de seguridad: días después del evento, solo si ya fue revisado.
     RETENCION_EVENTOS_SEGURIDAD_DIAS: int | None = None
+    # T-11 · Solicitudes de contratación DESCARTADAS: días después de descartarlas; se borran
+    # completas (contacto, consentimientos y la fila) y queda el registro en el audit_log.
+    RETENCION_SOLICITUDES_DESCARTADAS_DIAS: int | None = 180
+    # T-11 · Código de seguimiento e historial de una solicitud ARCOP: días después del cierre.
+    # Vencido, el código deja de servir (se reemplaza por uno aleatorio) y el historial pierde
+    # quién hizo cada cambio; quedan tipo, estados y fechas como prueba de que se atendió.
+    RETENCION_ARCOP_SEGUIMIENTO_DIAS: int | None = 730
     # ------------------------------------------------ HU-25: retención de usuarios temporales
     # El Oficial de Privacidad cambia el plazo de RETENCION_DATOS_TITULAR_DIAS desde el panel
     # interno (/admin/retencion). Lo que fije allí queda en la tabla configuracion_retencion y
@@ -450,7 +457,8 @@ class Settings(BaseSettings):
                 "(T-06: la anonimización es irreversible por decisión del PO en HU-06)."
             )
         for nombre in ("RETENCION_DATOS_TITULAR_DIAS", "RETENCION_ARCOP_CERRADAS_DIAS",
-                       "RETENCION_EVENTOS_SEGURIDAD_DIAS", "TUTOR_RETENCION_DIAS"):
+                       "RETENCION_EVENTOS_SEGURIDAD_DIAS", "TUTOR_RETENCION_DIAS",
+                       "RETENCION_SOLICITUDES_DESCARTADAS_DIAS", "RETENCION_ARCOP_SEGUIMIENTO_DIAS"):
             valor = getattr(self, nombre)
             if valor is not None and valor < 1:
                 raise ValueError(f"{nombre} debe ser un número de días mayor que 0 (o vacío).")

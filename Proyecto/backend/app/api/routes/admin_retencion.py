@@ -90,7 +90,10 @@ async def _estado(db: AsyncSession) -> dict:
         "usuarios_sin_vencimiento": int(sin_vencimiento),
         "otras_reglas_dias": {"arcop_cerradas": settings.RETENCION_ARCOP_CERRADAS_DIAS,
                               "eventos_seguridad": settings.RETENCION_EVENTOS_SEGURIDAD_DIAS,
-                              "tutor": settings.TUTOR_RETENCION_DIAS},
+                              "tutor": settings.TUTOR_RETENCION_DIAS,
+                              # T-11
+                              "contratacion_descartada": settings.RETENCION_SOLICITUDES_DESCARTADAS_DIAS,
+                              "arcop_seguimiento": settings.RETENCION_ARCOP_SEGUIMIENTO_DIAS},
         "ultima_ejecucion": _fila(ultimas[0]) if ultimas else None,
         "cambios_recientes": [_fila(c) for c in cambios],
     }

@@ -81,7 +81,11 @@ class EdicionMixin:
             accion=accion_audit, entidad="mapa_datos", entidad_id=mapa.id, actor=self.actor,
             detalle={"version": mapa.version, "cambios": len(cambios), "elementos_total": len(el),
                      "flujos_total": len(fl), **detalle})
-        await self.db.commit()
+        # T-12: sin confirmar, el cambio queda en la transacción de quien llama (un solo commit)
+        if getattr(self, "confirmar", True):
+            await self.db.commit()
+        else:
+            await self.db.flush()
         return {**self._armar_vista(mapa, el, fl), "cambio": {"version": mapa.version, "resumen": texto,
                                                        "actividades_afectadas": len(afectadas)}}
 

@@ -273,10 +273,10 @@ def generar_xlsx_rat(inf: I.InformeRat) -> bytes:
         for t in a.mapa.get("tipos_datos") or []:
             pl = plazos.get(t["codigo"], {})
             datos.append([a.numero, a.nombre, t.get("nombre") or cat_mapa.nombre_dato(t["codigo"]),
-                          "Sí" if t.get("sensible") else "No", pl.get("plazo"),
-                          cat.nombre(cat.UNIDADES_POR_CODIGO, pl.get("unidad")) or "",
+                          "Sí" if t.get("sensible") else "No", pl.get("plazo") or pl.get("condicion"),
+                          cat.nombre(cat.UNIDADES_POR_CODIGO, pl.get("unidad")) or ("Por condición" if pl.get("condicion") else ""),
                           cat.nombre(cat.INICIOS_POR_CODIGO, pl.get("desde")) or "",
-                          pl.get("fundamento") or ("Sin plazo definido" if not pl.get("plazo") else "")])
+                          pl.get("fundamento") or ("Sin plazo definido" if not cat.plazo_definido(pl) else "")])
     tabla(ws, fila, ["N.º", "Actividad", "Categoría de datos", "Sensible", "Plazo", "Unidad", "Desde",
                      "Fundamento"], datos, w)
 

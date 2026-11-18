@@ -35,6 +35,9 @@ class RespuestaRepositoryPort(Protocol):
 
     async def get_brecha(self, brecha_id: int) -> Any | None: ...
 
+    # T-13 (opcional): releer con bloqueo. Sin este método, el caso de uso usa get() (dobles de prueba).
+    # async def releer_bloqueada(self, respuesta_id: int) -> Any | None: ...
+
 
 class EvidenciaRepositoryPort(Protocol):
     async def create(self, evidencia: Any) -> Any: ...

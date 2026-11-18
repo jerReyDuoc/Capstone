@@ -9,6 +9,7 @@
  * Cada guardado envía solo lo que cambió y la revisión que se está viendo. Si la actividad cambió
  * en otra pestaña o por un cambio en el mapa de datos, se recarga y se avisa (nada se pisa).
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -403,10 +404,11 @@ export function DetalleActividad({
                       {sinGuardar ? "Guardar y enviar a revisión" : "Enviar a revisión"}
                     </button>
                   ) : (
-                    <button type="button" className="btn btn-primary" onClick={() => setConfirmar("aprobar")} disabled={ocupado || !c.puede_quedar_vigente || sinGuardar}>
+                    <BotonConMotivo className="btn btn-primary" onClick={() => setConfirmar("aprobar")} ocupado={ocupado} alinear="fin"
+                                    motivo={ocupado ? null : sinGuardar ? "Guarda los cambios antes de dejarla vigente" : !c.puede_quedar_vigente ? "Completa los datos obligatorios de todos los pasos" : null}>
                       <Icon name="check" />
                       Dejar vigente
-                    </button>
+                    </BotonConMotivo>
                   )}
                 </span>
               </div>

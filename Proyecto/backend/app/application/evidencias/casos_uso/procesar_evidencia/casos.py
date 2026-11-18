@@ -35,6 +35,7 @@ class ProcesarEvidenciaUseCase(
         auditar: Callable[[Evidencia, Respuesta | None], Awaitable[None]] | None = None,
         auditar_supresion: Callable[[Evidencia], None] | None = None,
         verificador: Callable[..., VerificacionSalida] | None = verificar_evidencia,
+        auditar_descarte: Callable[[Evidencia, Respuesta, dict], None] | None = None,
     ):
         self.evidencia_repo = evidencia_repo
         self.respuesta_repo = respuesta_repo
@@ -56,6 +57,9 @@ class ProcesarEvidenciaUseCase(
         self.auditar_supresion = auditar_supresion
         # HU-07: verificación de la salida del modelo (None la desactiva; solo para pruebas)
         self.verificador = verificador
+        # T-13: registra en el audit_log (sin commit) que se descartó la clasificación porque la
+        # respuesta cambió mientras se validaba; va en la misma transacción que la evidencia.
+        self.auditar_descarte = auditar_descarte
 
     async def execute(self, evidencia_id: int) -> Evidencia:
         evidencia = await self.evidencia_repo.get(evidencia_id)

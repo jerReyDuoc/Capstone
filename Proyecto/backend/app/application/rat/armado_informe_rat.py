@@ -368,7 +368,9 @@ def _lista(nombres: list[str], vacio: str = "—") -> str:
 
 def texto_plazo(p: dict) -> str:
     if not p.get("plazo") or not p.get("unidad"):
-        return "Sin plazo definido"
+        # T-11: plazo por condición, sin número ("mientras ejerza el cargo")
+        condicion = (p.get("condicion") or "").strip()
+        return condicion[:1].upper() + condicion[1:] if condicion else "Sin plazo definido"
     unidad = cat.nombre(cat.UNIDADES_POR_CODIGO, p["unidad"])
     if p["plazo"] == 1:
         unidad = {"días": "día", "meses": "mes", "años": "año"}.get(unidad, unidad)

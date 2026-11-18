@@ -16,3 +16,6 @@ htmlcov/
 reports/
 frontend-next/docs
 backend/docs
+# Pruebas de navegador (Playwright): resultados locales
+frontend-next/test-results/
+frontend-next/playwright-report/

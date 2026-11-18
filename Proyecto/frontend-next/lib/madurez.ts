@@ -13,27 +13,28 @@ export function nivelDesdePuntaje(puntaje: number): NivelMadurez {
 
 export const NIVELES: Record<
   NivelMadurez,
-  { etiqueta: string; descripcion: string; tono: "alto" | "medio" | "bajo" | "ok" }
+  /** Auditoría UX 16-11: clase tone-nivel-* (el verde queda solo para "Optimizado"). */
+  { etiqueta: string; descripcion: string; tono: "nivel-inicial" | "nivel-desarrollo" | "nivel-gestionado" | "nivel-optimizado" }
 > = {
   inicial: {
     etiqueta: "Inicial",
     descripcion: "Prácticas ad hoc, sin controles formales de gobernanza.",
-    tono: "alto",
+    tono: "nivel-inicial",
   },
   en_desarrollo: {
     etiqueta: "En desarrollo",
     descripcion: "Existen controles, pero no se aplican de forma consistente.",
-    tono: "medio",
+    tono: "nivel-desarrollo",
   },
   gestionado: {
     etiqueta: "Gestionado",
     descripcion: "Controles definidos, documentados y con responsables.",
-    tono: "bajo",
+    tono: "nivel-gestionado",
   },
   optimizado: {
     etiqueta: "Optimizado",
     descripcion: "Mejora continua medida y revisada periódicamente.",
-    tono: "ok",
+    tono: "nivel-optimizado",
   },
 };
 

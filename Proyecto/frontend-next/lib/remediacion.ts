@@ -5,6 +5,7 @@
  * aquí solo se valida lo obvio antes de subir (para no gastar un intento) y se presentan los
  * resultados. Probado en tests/hu17_remediacion.test.ts.
  */
+import { mensajeEvidencia } from "./mensajesUsuario";
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
 import type {
   ControlRemediacionApi, DominioVista, EstadoClasificacion, EvidenciaRemediacionApi, MejoraRemediacionApi, RemediacionApi,
@@ -92,10 +93,11 @@ export function resultadoTexto(e: EvidenciaRemediacionApi): string {
         delta && delta !== "sin cambios" ? `Tu puntaje general subió ${delta}.` : "Actualizamos tu puntaje."
       }`;
     }
+    // Auditoría UX 16-11: nunca el texto técnico del servidor (LLM, prompt injection…)
     case "error":
-      return e.errores_validacion[0] ?? "No pudimos analizar el archivo. Vuelve a intentarlo.";
+      return mensajeEvidencia(e.errores_validacion[0]);
     default:
-      return e.errores_validacion.at(-1) ?? "La evidencia no cambió el estado del control.";
+      return mensajeEvidencia(e.errores_validacion.at(-1), "La evidencia no cambió el estado del control.");
   }
 }
 

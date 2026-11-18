@@ -37,6 +37,8 @@ def _conf(**kw):
     base = dict(
         RETENCION_DATOS_TITULAR_DIAS=365, RETENCION_ARCOP_CERRADAS_DIAS=730, RETENCION_EVENTOS_SEGURIDAD_DIAS=180,
         TUTOR_RETENCION_DIAS=30, CONTRATO_GRACIA_DIAS=30, LLM_PROVIDER="groq", CORREO_MODO="smtp",
+        # T-11: plazos de las solicitudes descartadas y del seguimiento ARCOP (valores por defecto de Settings)
+        RETENCION_SOLICITUDES_DESCARTADAS_DIAS=180, RETENCION_ARCOP_SEGUIMIENTO_DIAS=730,
         TURNSTILE_SECRET_KEY="clave-turnstile", PLATAFORMA_PAIS_ALOJAMIENTO="US", CORREO_PROVEEDOR_NOMBRE="Correo SA",
         CORREO_PROVEEDOR_PAIS="US", CORREO_PROVEEDOR_GARANTIA="clausulas_contractuales",
         PROVEEDORES_CONTRATO_CONFIRMADO="", THERION_RAZON_SOCIAL="Therion Labs SpA", THERION_RUT=None,
@@ -132,9 +134,11 @@ def test_toda_conservacion_que_nombra_un_ajuste_esta_enlazada_y_el_ajuste_existe
 
 @pytest.mark.parametrize("valores", [
     dict(RETENCION_DATOS_TITULAR_DIAS=365, RETENCION_ARCOP_CERRADAS_DIAS=730, RETENCION_EVENTOS_SEGURIDAD_DIAS=180,
-         TUTOR_RETENCION_DIAS=30, CONTRATO_GRACIA_DIAS=30),
+         TUTOR_RETENCION_DIAS=30, CONTRATO_GRACIA_DIAS=30,
+         RETENCION_SOLICITUDES_DESCARTADAS_DIAS=180, RETENCION_ARCOP_SEGUIMIENTO_DIAS=730),
     dict(RETENCION_DATOS_TITULAR_DIAS=45, RETENCION_ARCOP_CERRADAS_DIAS=400, RETENCION_EVENTOS_SEGURIDAD_DIAS=90,
-         TUTOR_RETENCION_DIAS=12, CONTRATO_GRACIA_DIAS=60),
+         TUTOR_RETENCION_DIAS=12, CONTRATO_GRACIA_DIAS=60,
+         RETENCION_SOLICITUDES_DESCARTADAS_DIAS=90, RETENCION_ARCOP_SEGUIMIENTO_DIAS=500),
 ])
 def test_los_plazos_del_rat_son_los_ajustes_configurados(valores):
     reg = R.generar(_conf(**valores))
@@ -242,7 +246,9 @@ def test_revision_interna_retencion_atrasada_y_capa_de_ia():
 def test_los_plazos_pendientes_del_po_quedan_a_la_vista():
     r = REV.revisar(R.generar(_conf()), _conf(), None, GENERADO.replace(tzinfo=None))
     titulos = " ".join(h["titulo"] for h in r["hallazgos"])
-    assert "registro de auditoría" in titulos and "Sesiones" in titulos and "contratación" in titulos
+    assert "registro de auditoría" in titulos and "Sesiones" in titulos
+    # T-11: las solicitudes de contratación descartadas ya tienen plazo (dejan de ser un pendiente del PO)
+    assert "contratación" not in titulos
 
 
 # ===================================================================== C4: informes con el formato del cliente

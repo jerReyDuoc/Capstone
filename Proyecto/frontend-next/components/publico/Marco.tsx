@@ -6,10 +6,18 @@ import type { ReactNode } from "react";
 import { BrandMark } from "@/components/ui/Icon";
 import s from "./publico.module.css";
 
-export function EncabezadoPublico({ enlaces = true }: { enlaces?: boolean }) {
+/**
+ * Auditoría UX 16-11 · Fase 4.B: encabezado, contenido y pie comparten EL MISMO contenedor.
+ * Desde HU-30 /encuesta usaba un contenedor más ancho (1440 px) solo para el contenido y el
+ * logo quedaba ~150 px más adentro que el título. Con `ancho="amplio"` los tres usan el ancho.
+ */
+export type AnchoPagina = "normal" | "amplio";
+const CONTENEDOR: Record<AnchoPagina, string> = { normal: s.contenedor, amplio: s.contenedorAncho };
+
+export function EncabezadoPublico({ enlaces = true, ancho = "normal" }: { enlaces?: boolean; ancho?: AnchoPagina }) {
   return (
     <header className={s.encabezado}>
-      <div className={`${s.contenedor} ${s.encabezadoFila}`}>
+      <div className={`${CONTENEDOR[ancho]} ${s.encabezadoFila}`}>
         <Link href="/" className={s.marca} aria-label="ComplianceAI, inicio">
           <BrandMark />
           <span>
@@ -36,33 +44,33 @@ export function EncabezadoPublico({ enlaces = true }: { enlaces?: boolean }) {
   );
 }
 
-export function PiePublico() {
+export function PiePublico({ ancho = "normal" }: { ancho?: AnchoPagina }) {
   return (
     <footer className={s.pie}>
-      <div className={`${s.contenedor} ${s.pieFila}`}>
+      <div className={`${CONTENEDOR[ancho]} ${s.pieFila}`}>
         <span>© {new Date().getFullYear()} TherionLabs · ComplianceAI</span>
         <span>
           Autodiagnóstico orientativo; no reemplaza una auditoría legal. <Link href="/aviso-legal" prefetch={false}>Aviso legal</Link>
           {" · "}
           {/* HU-32 */}
-          <Link href="/mis-derechos" prefetch={false}>Mis derechos (ARCOP)</Link>
+          <Link href="/mis-derechos" prefetch={false}>Mis derechos sobre tus datos</Link>
         </span>
       </div>
     </footer>
   );
 }
 
-export function PaginaPublica({ children, enlaces = true }: { children: ReactNode; enlaces?: boolean }) {
+export function PaginaPublica({ children, enlaces = true, ancho = "normal" }: { children: ReactNode; enlaces?: boolean; ancho?: AnchoPagina }) {
   return (
     <div className={s.pagina}>
       <a href="#contenido" className="skip-link">
         Saltar al contenido
       </a>
-      <EncabezadoPublico enlaces={enlaces} />
+      <EncabezadoPublico enlaces={enlaces} ancho={ancho} />
       <main id="contenido" tabIndex={-1}>
         {children}
       </main>
-      <PiePublico />
+      <PiePublico ancho={ancho} />
     </div>
   );
 }

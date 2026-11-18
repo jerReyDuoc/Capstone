@@ -1,0 +1,16 @@
+/* Auditoría UX 16-11 · Fase 9.8: estilos comunes del panel interno y del espacio de la empresa.
+   Antes las páginas de la empresa importaban admin.module.css; ahora ambos usan este módulo
+   (admin.module.css los compone con `composes`). */
+.sub { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
+.acciones { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.vacio { padding: var(--sp-8); text-align: center; color: var(--text-muted); }
+.rejilla { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.alerta { padding: var(--sp-4); border: 1px solid var(--severity-critical); border-radius: var(--radius-md); background: var(--severity-critical-soft); }
+.alerta strong { display: block; margin-bottom: 4px; }
+.pestanas { display: flex; flex-wrap: wrap; gap: var(--sp-2); border-bottom: 1px solid var(--line); }
+.pestana {
+  min-height: var(--target); padding: 0 var(--sp-4); border: 0; border-bottom: 2px solid transparent;
+  background: none; color: var(--text-muted); font-weight: 600; cursor: pointer;
+}
+.pestana[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.pestana:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

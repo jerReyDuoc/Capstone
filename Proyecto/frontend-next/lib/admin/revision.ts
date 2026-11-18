@@ -375,3 +375,14 @@ export function siguientePendiente<T extends { id: number; pendiente: boolean }>
   const resto = [...items.slice(i + 1), ...items.slice(0, Math.max(i, 0))];
   return resto.find((x) => x.pendiente && x.id !== actual) ?? null;
 }
+
+/**
+ * Auditoría UX 16-11 · Fase 10.1: el porcentaje de acuerdo entre la IA y la revisión humana solo
+ * se muestra desde este mínimo de revisiones (con 1 revisión, "0 %" alarma sin sentido).
+ */
+export const MIN_REVISIONES_METRICA = 10;
+
+export function textoAcuerdo(nRevisadas: number, minimo = MIN_REVISIONES_METRICA): string | null {
+  if (nRevisadas >= minimo) return null;
+  return `Aún no hay suficientes revisiones para medir el acuerdo (${nRevisadas} de ${minimo}).`;
+}

@@ -34,6 +34,15 @@ class RespuestaRepository:
         )
         return result.scalar_one_or_none()
 
+    async def releer_bloqueada(self, respuesta_id: int) -> Respuesta | None:
+        """T-13: relee la respuesta desde la BD con bloqueo (FOR UPDATE) y refresca el objeto ya cargado
+        (populate_existing), para ver si el usuario la cambió mientras se validaba su evidencia."""
+        result = await self.session.execute(
+            select(Respuesta).where(Respuesta.id == respuesta_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_evaluacion_control(self, evaluacion_id: int, control_id: int) -> Respuesta | None:
         result = await self.session.execute(
             select(Respuesta).where(

@@ -9,7 +9,7 @@
  */
 import { MisDocumentos } from "./MisDocumentos";
 import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
-import s from "@/components/admin/admin.module.css";
+import s from "@/components/ui/comunes.module.css";
 
 export function PaginaDocumentos() {
   const estado = useEspacioEmpresa();

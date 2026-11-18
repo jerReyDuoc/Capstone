@@ -90,7 +90,11 @@ class EdicionMixin:
             accion=Accion.RAT_ACTIVIDAD_CREADA, entidad="rat_actividad", entidad_id=f.id, actor=self.actor,
             detalle={"campos": modelo.campos_cambiados(modelo.contenido_vacio(), contenido),
                      "completitud": f.completitud, "version_mapa": version_mapa, "origen": origen})
-        await self.db.commit()
+        # T-12: sin confirmar, la actividad queda en la transacción de quien llama (un solo commit)
+        if getattr(self, "confirmar", True):
+            await self.db.commit()
+        else:
+            await self.db.flush()
         return {"actividad": self._vista(f, elementos, flujos, detalle=True), "cambio": "creada"}
 
     async def editar(self, actividad_id: int, datos: dict, revision: int) -> dict:

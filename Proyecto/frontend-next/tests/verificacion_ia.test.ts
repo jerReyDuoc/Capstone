@@ -66,7 +66,9 @@ describe("motivo de una evidencia sin resultado de la IA", () => {
 
   it("traduce el bloqueo de seguridad a palabras simples", () => {
     const m = motivoEvidencia({ ...base, errores_validacion: ["Bloqueo preventivo: posible prompt injection en la evidencia."] });
-    expect(m).toContain("instrucciones a la IA");
+    // Auditoría UX 16-11: texto acordado "No pudimos analizar este archivo. Revisa que no contenga instrucciones…"
+    expect(m).toContain("No pudimos analizar este archivo");
+    expect(m).toContain("instrucciones");
     expect(m).not.toMatch(/prompt injection|LLM/i);
   });
 

@@ -40,6 +40,12 @@ export interface SolicitudArcop {
   fecha_limite_informacion: string | null;
   plazo_vencido: boolean;
   fecha_prorroga: string | null;
+  /**
+   * Auditoría UX 16-11 · Dependencia del backend (opcional): nombre de la empresa del titular
+   * usuario definitivo. Hoy la API no lo envía; con él, la bandeja muestra el nombre en vez de un
+   * texto genérico.
+   */
+  empresa_razon_social?: string | null;
 }
 
 export interface EventoArcop {
@@ -335,9 +341,12 @@ export const GUIA_ADMIN: Record<TipoArcop, string> = {
 
 /** Quién es el titular, en una frase para el admin. */
 export function titularDe(s: SolicitudArcop): string {
-  if (s.usuario_definitivo_id != null) return `Usuario de empresa cliente (id ${s.usuario_definitivo_id})`;
+  // Auditoría UX 16-11: sin IDs internos a la vista; el nombre de la empresa si la API lo envía
+  if (s.usuario_definitivo_id != null) {
+    return s.empresa_razon_social ? `Usuario de ${s.empresa_razon_social}` : "Usuario de una empresa cliente";
+  }
   if (s.evaluacion_id != null) return `Autodiagnóstico sin cuenta · evaluación N.º ${s.evaluacion_id}`;
-  return `Invitado (usuario temporal ${s.usuario_temporal_id ?? "—"})`;
+  return "Persona invitada, sin cuenta";
 }
 
 /* ------------------------------------------------------------------ historial */

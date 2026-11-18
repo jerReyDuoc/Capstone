@@ -15,10 +15,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { RadarMadurez } from "@/components/charts/RadarMadurez";
+import { BarrasComparadas } from "@/components/charts/BarrasComparadas";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, BadgeSeveridad } from "@/components/ui/Basicos";
+import { CampoArchivo } from "@/components/ui/CampoArchivo";
 import { Icon } from "@/components/ui/Icon";
+import { tieneJerga } from "@/lib/mensajesUsuario";
 import { usePanel } from "@/hooks/usePanel";
 import { esSinServicio, hrefModulo } from "@/lib/formacion";
 import { SEVERIDAD_TONO } from "@/lib/severidad";
@@ -103,13 +105,13 @@ export function VistaRemediacion() {
       {estado.tipo === "cargando" ? (
         <div role="status" className="grid">
           <span className="sr-only">Cargando tus brechas…</span>
-          <div className="skeleton col-12" style={{ height: 96 }} />
-          <div className="skeleton col-12" style={{ height: 320 }} />
+          <div className="skeleton col-12 esq-96" />
+          <div className="skeleton col-12 esq-320" />
         </div>
       ) : null}
       {estado.tipo === "sin-servicio" ? (
         <div className="state" role="status">
-          <Icon name="candado" width={32} height={32} style={{ color: "var(--medio)" }} />
+          <Icon name="candado" width={32} height={32} className="icono-estado icono-atencion" />
           <h2>Cerrar brechas es parte del servicio contratado</h2>
           <p>
             Con la plataforma, tu empresa sube evidencia de cada control y su puntaje se actualiza sin repetir el
@@ -124,7 +126,7 @@ export function VistaRemediacion() {
       ) : null}
       {estado.tipo === "error" ? (
         <div className="state" role="alert">
-          <Icon name="alerta" width={32} height={32} style={{ color: "var(--alto)" }} />
+          <Icon name="alerta" width={32} height={32} className="icono-estado icono-alerta" />
           <h2>No pudimos cargar tus brechas</h2>
           <p>{estado.mensaje}</p>
           <button type="button" className="btn btn-primary" onClick={() => void cargar()}>
@@ -151,7 +153,7 @@ export function VistaRemediacion() {
 
           {datos.controles.length === 0 ? (
             <div className="state" role="status">
-              <Icon name="check" width={32} height={32} style={{ color: "var(--accent)" }} />
+              <Icon name="check" width={32} height={32} className="icono-estado icono-ok" />
               <h2>No quedan brechas abiertas</h2>
               <p>No hay brechas abiertas en esta evaluación.</p>
             </div>
@@ -306,9 +308,9 @@ function MadurezEnVivo({ datos, dominios }: { datos: RemediacionApi; dominios: D
       </div>
       <div className="card remed-radar">
         {dominios.length ? (
-          <RadarMadurez dominios={dominios} />
+          <BarrasComparadas dominios={dominios} />
         ) : (
-          <p className="card-sub">El radar aparece cuando el panel termina de cargar.</p>
+          <p className="card-sub">El gráfico aparece cuando el panel termina de cargar.</p>
         )}
       </div>
     </section>
@@ -476,30 +478,23 @@ function ControlRemediacion({
         <form id={`${id}-form`} className="remed-form" onSubmit={enviar} noValidate>
           <div className="field">
             <label className="field-label" htmlFor={`${id}-archivo`}>Archivo de la evidencia</label>
-            <input
+            <CampoArchivo
               ref={inputArchivo}
               id={`${id}-archivo`}
-              type="file"
-              className="archivo"
               accept={ACCEPT}
-              aria-describedby={`${id}-archivo-ayuda${errorArchivo ? ` ${id}-archivo-error` : ""}`}
-              aria-invalid={errorArchivo ? true : undefined}
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
+              archivo={archivo}
+              describedBy={`${id}-archivo-ayuda`}
+              error={errorArchivo}
+              onCambiar={(f) => {
                 setArchivo(f);
                 setErrorArchivo(f ? validarArchivo(f, maxMb) : null);
+                if (!f && inputArchivo.current) inputArchivo.current.value = "";
               }}
             />
             <p className="field-ayuda" id={`${id}-archivo-ayuda`}>
               PDF con texto seleccionable, Word (.docx) o texto (.txt), hasta {maxMb} MB. Los datos personales se anonimizan antes del
               análisis.
             </p>
-            {errorArchivo ? (
-              <p className="dialogo-error" id={`${id}-archivo-error`}>
-                <Icon name="alerta" />
-                {errorArchivo}
-              </p>
-            ) : null}
           </div>
 
           <fieldset className="field remed-declarar">
@@ -580,7 +575,7 @@ function ResultadoEvidencia({ evidencia: e }: { evidencia: EvidenciaRemediacionA
           {t.rag.pasajes_total}).
         </p>
       ) : null}
-      {e.justificacion_llm && fase !== "analizando" ? <p className="remed-ia">{e.justificacion_llm}</p> : null}
+      {e.justificacion_llm && fase !== "analizando" && !tieneJerga(e.justificacion_llm) ? <p className="remed-ia">{e.justificacion_llm}</p> : null}
     </div>
   );
 }

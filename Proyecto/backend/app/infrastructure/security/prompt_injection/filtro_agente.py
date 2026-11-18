@@ -62,7 +62,8 @@ _REGLAS: list[tuple[CategoriaAtaque, str, re.Pattern]] = [
         r"omitas|omitir|desatiende|anula|anules|anular|haz caso omiso|no hagas caso|deja de lado|pasa por alto|saltate|"
         r"saltar|no tomes en cuenta|no sigas|no obedezcas|no respetes)\b.{0,40}\b(instruccion\w*|indicacion\w*|regla\w*|"
         r"directri\w*|orden\w*|restriccion\w*|lo anterior|lo de arriba|lo que te (dijeron|indicaron|pidieron|dieron|"
-        r"configuraron)|tu (rol|proposito|funcion|papel|programacion)|la gobernanza|el sistema|anteriores|previas)\b")),
+        r"configuraron)|tu (rol|proposito|funcion|papel|programacion)|la gobernanza|el sistema|anteriores|previas|"
+        r"la guia|tu guia|las pautas|tus pautas)\b")),
     (C.INYECCION, "ignorar_ingles", re.compile(
         r"\b(disregard|override|bypass|ignore|forget)\b.{0,30}\b(above|previous|prior|instructions|rules|safety|system|"
         r"guidelines|everything)\b|\bsystem override\b")),
@@ -144,7 +145,8 @@ _REGLAS: list[tuple[CategoriaAtaque, str, re.Pattern]] = [
         r"(las|tus) (reglas|normas|restricciones|instrucciones)\b|\bdesactiva\w* (la|el|los|las) (seguridad|filtros?|"
         r"proteccion\w*|modo seguro|restricciones)\b|\bact like\b|\b(different|another|other) (ai|assistant|model)\b")),
     (C.JAILBREAK, "nueva_tarea", re.compile(
-        r"\btu (nueva |verdadera |unica )?(tarea|funcion|mision|rol|proposito|identidad|trabajo) (ahora )?(es|sera)\b"
+        r"\btu (nueva |nuevo |verdadera |verdadero |unica |unico )?(tarea|funcion|mision|rol|proposito|identidad|trabajo) "
+        r"(ahora )?(es|sera|cambio)\b"
         r"|\b(interpreta|haz|asume|adopta|toma) (el |un )?(papel|rol|personaje|identidad)\b|\bconviertete en\b"
         r"|\b(habla|responde|contesta|escribe|actua) como si (fueras|tu fueras|no tuvieras)\b"
         r"|\b(no|ya no) como (el |un )?tutor\b|\bse (un|una) (asistente|ia|chatbot|bot|modelo) (general|normal|libre|"
@@ -152,6 +154,19 @@ _REGLAS: list[tuple[CategoriaAtaque, str, re.Pattern]] = [
     (C.JAILBREAK, "jailbreak_ingles", re.compile(
         r"\b(pretend (to be|you are)|act as (if|an? )|roleplay|you are now|from now on you|"
         r"without (any )?(restrictions|filters|rules|limits)|no longer (bound|restricted))\b")),
+    # ---------------------------------------------------------- T-14: asistente de registro
+    (C.JAILBREAK, "asistente_sin_negativas", re.compile(
+        r"\b(eres|seas|seras|sea|actua como|comportate como) (un |una |el )?(asistente|ia|bot|modelo|sistema)\b.{0,25}"
+        r"\b(que )?(nunca se niega|no se niega|acepta (cualquier|todo)|aprueba todo|obedece (todo|cualquier)|hace todo)\b"
+        r"|\bnunca (te niegues|digas que no)\b")),
+    (C.JAILBREAK, "rol_privilegiado", re.compile(
+        r"\b(actua|actuas|actuar|comportate|te comportas|comportarte|asume|ahora eres|eres ahora|como si fueras)\b.{0,30}"
+        r"\b(el |un |la )?(administrador|admin|superusuario|root|desarrollador|developer|dueno de la plataforma|"
+        r"oficial de privacidad|auditor externo)\b|\b(con )?permisos (totales|de administrador|de root|ilimitados)\b")),
+    (C.FUGA_PROMPT, "lo_escrito_antes", re.compile(
+        r"\b(repite|repiteme|copia|muestra|muestrame|dime|escribe|imprime|pega)\b.{0,25}\b(todo )?lo que te "
+        r"(escribieron|pusieron|mandaron|enviaron|dieron)\b.{0,30}\b(antes|arriba|al inicio|primero)\b"
+        r"|\b(revela|muestra|reveal|show)\b.{0,30}\b(la |tu |the )?(configuracion|configuration)\b")),
     # ---------------------------------------------------------- uso indebido (fraude / ocultamiento)
     (C.USO_INDEBIDO, "evidencia_falsa", re.compile(
         r"\b(redact\w*|hac\w*|hazme|crea\w*|creame|genera\w*|escrib\w*|inventa\w*|dame|necesito|consigue\w*|prepara\w*|"
@@ -236,15 +251,22 @@ def _sin_tildes(texto: str) -> str:
     return "".join(c for c in t if unicodedata.category(c) != "Mn").lower()
 
 
+# T-14: homoglifos y formas que seguridad.normalizar no cubre (se aplican antes que todo lo demás)
+_HOMOGLIFOS_EXTRA = str.maketrans({"І": "I", "і": "i", "Ї": "I", "ї": "i", "Ј": "J", "ј": "j", "Ѕ": "S", "ѕ": "s",
+                                   "Ԁ": "D", "ԁ": "d", "Ɩ": "l", "ǀ": "l"})
+
+
 def _variantes(texto: str) -> list[str]:
     """Versiones normalizadas: la de seguridad.py (incluye leetspeak, ROT13, al revés...) y la base."""
+    texto = unicodedata.normalize("NFKC", texto).translate(_HOMOGLIFOS_EXTRA)
     try:
         vs = seguridad._variantes(texto)  # noqa: SLF001 (mismo paquete de seguridad)
     except Exception:  # noqa: BLE001
         vs = []
     base = re.sub(r"\s+", " ", _sin_tildes(seguridad.normalizar(texto)))
     guiones = re.sub(r"\s+", " ", re.sub(r"[_*~|]+", " ", base))        # "ignora_las_instrucciones"
-    return list(dict.fromkeys([base, guiones, *vs]))
+    sin_puntos = re.sub(r"(?<=\w)[.·•](?=\w)", "", base)                  # T-14: "ig.no.ra las ins.truc.cio.nes"
+    return list(dict.fromkeys([base, guiones, sin_puntos, *vs]))
 
 
 def _reglas(texto: str) -> ResultadoFiltro:
@@ -295,6 +317,26 @@ class FiltroAgente(FiltroAgentePort):
         # 6. todo lo que ya detectaba la capa de seguridad del proyecto
         if self.guard.detectar_inyeccion(_benigno(texto)):
             return ResultadoFiltro(True, C.INYECCION, "seguridad")
+        return ResultadoFiltro.limpio()
+
+    def evaluar_documento(self, linea: str) -> ResultadoFiltro:
+        """
+        T-14: una línea de un DOCUMENTO subido. Solo las señales de alta certeza (contenido codificado u oculto
+        y las reglas propias del agente: inyección dirigida, fuga del prompt, jailbreak, cambio de rol). NO usa
+        el respaldo estricto de seguridad.py, que confundiría el vocabulario formal de una política ("el
+        directorio aprueba…") con un ataque: para eso está el detector con contexto de HU-33.
+        """
+        if not linea or not linea.strip():
+            return ResultadoFiltro.limpio()
+        if seguridad._controles_sospechosos(linea) or len(_CONTROLES_INVISIBLES.findall(linea)) >= 3:  # noqa: SLF001
+            return ResultadoFiltro(True, C.CODIFICADO, "caracteres_ocultos")
+        for oculto in _decodificados(linea):
+            r = _reglas(oculto)
+            if r.bloquear or self.guard.detectar_inyeccion(oculto):
+                return ResultadoFiltro(True, C.CODIFICADO, f"decodificado:{r.regla or 'inyeccion'}")
+        r = _reglas(linea)
+        if r.bloquear and r.categoria != C.USO_INDEBIDO:
+            return r
         return ResultadoFiltro.limpio()
 
     def evaluar(self, texto: str, previos: list[str] | None = None) -> ResultadoFiltro:

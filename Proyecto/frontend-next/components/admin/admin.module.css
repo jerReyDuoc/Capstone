@@ -1,51 +1,67 @@
 /* HU-27 · Panel interno de Therion Labs: empresas cliente y migración de evaluaciones. */
 
 .pagina { min-height: 100vh; background: var(--bg); }
+
+/* Auditoría UX 16-11: lo común con el espacio de la empresa vive en components/ui/comunes.module.css */
+.sub { composes: sub from "../ui/comunes.module.css"; }
+.acciones { composes: acciones from "../ui/comunes.module.css"; }
+.vacio { composes: vacio from "../ui/comunes.module.css"; }
+.rejilla { composes: rejilla from "../ui/comunes.module.css"; }
+.alerta { composes: alerta from "../ui/comunes.module.css"; }
+.pestanas { composes: pestanas from "../ui/comunes.module.css"; }
+.pestana { composes: pestana from "../ui/comunes.module.css"; }
 .barra {
   position: sticky; top: 0; z-index: 10;
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4); /* HU-24: + navegación */
-  padding: var(--sp-3) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--surface);
+  /* Auditoría UX 16-11: una sola línea en escritorio (sin flex-wrap) */
+  display: flex; flex-wrap: nowrap; align-items: center; gap: var(--sp-4);
+  min-height: 64px; padding: var(--sp-2) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--surface);
 }
-.marca { display: flex; align-items: center; gap: var(--sp-3); font-family: var(--font-display); font-weight: 600; }
+.marca { display: flex; flex: none; align-items: center; gap: var(--sp-3); font-family: var(--font-display); font-weight: 600; color: var(--text); text-decoration: none; white-space: nowrap; }
 .marca svg { width: 28px; height: 28px; }
 .marcaSub { display: block; font-family: var(--font-body); font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
 .contenido { max-width: var(--content-max); margin: 0 auto; padding: var(--sp-8) var(--sp-6) var(--sp-12); display: grid; gap: var(--sp-6); }
 
 /* Correcciones 05-11 · barra común (BarraAdmin.tsx): secciones, Actualizar y Cerrar sesión */
-.nav { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.nav { display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: var(--sp-1); }
+.botonNav { display: none; }
 .navLink {
   display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--sp-3);
   border-radius: var(--radius-sm); color: var(--text-muted); font-weight: 600; font-size: var(--fs-sm); text-decoration: none;
+  white-space: nowrap;
 }
 .navLink:hover { color: var(--text); background: var(--surface-2); }
 .navLink[aria-current="page"] { color: var(--text); background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
 .navLink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.barraAcciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
-.actualizado { font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; min-width: 9ch; text-align: right; }
+.barraAcciones { display: flex; flex: none; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.actualizado { min-width: 0; }
 .girando { animation: girar 900ms linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .girando { animation: none; } }
-@media (max-width: 900px) { .barra .nav { order: 3; width: 100%; } }
-
-.pestanas { display: flex; flex-wrap: wrap; gap: var(--sp-2); border-bottom: 1px solid var(--line); }
-.pestana {
-  min-height: var(--target); padding: 0 var(--sp-4); border: 0; border-bottom: 2px solid transparent;
-  background: none; color: var(--text-muted); font-weight: 600; cursor: pointer;
+/* Laptops angostos: menos relleno en los enlaces */
+@media (max-width: 1439.98px) {
+  .barra :global(.menu-cuenta-texto) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .barra :global(.menu-cuenta-boton) { padding-right: var(--sp-2); }
 }
-.pestana[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
-.pestana:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 1439.98px) { .navLink { padding: 0 var(--sp-2); } .barra { gap: var(--sp-3); padding-inline: var(--sp-4); } }
+/* Tablet y móvil: barra compacta; las secciones se despliegan debajo con "Secciones" */
+@media (max-width: 1099.98px) {
+  .barra { flex-wrap: wrap; row-gap: 0; }
+  .botonNav { display: inline-flex; }
+  .nav { display: none; order: 4; flex-basis: 100%; flex-direction: column; padding: var(--sp-2) 0; }
+  .nav[data-abierta] { display: flex; }
+  .navLink { min-height: var(--target); }
+  .actualizado > span:first-child { display: none; }
+  .marcaSub { display: none; }
+}
+
 
 .filtros { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
-.vacio { padding: var(--sp-8); text-align: center; color: var(--text-muted); }
-.sub { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
-.acciones { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .casilla { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
 .casilla:disabled { cursor: not-allowed; opacity: 0.4; }
 
 .formulario { display: grid; gap: var(--sp-6); }
 .grupo { margin: 0; padding: 0; border: 0; display: grid; gap: var(--sp-4); }
 .grupo legend { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; margin-bottom: var(--sp-3); }
-.rejilla { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .campo { display: grid; gap: 6px; }
 .campo label { font-weight: 600; font-size: var(--fs-sm); }
 .control {
@@ -66,8 +82,6 @@
 .modo label { display: inline-flex; align-items: center; gap: var(--sp-2); font-weight: 600; cursor: pointer; }
 .modo input { accent-color: var(--accent); width: 18px; height: 18px; }
 
-.alerta { padding: var(--sp-4); border: 1px solid rgba(242, 96, 92, 0.45); border-radius: var(--radius-md); background: var(--alto-soft); }
-.alerta strong { display: block; margin-bottom: 4px; }
 .exito { padding: var(--sp-5); border: 1px solid rgba(20, 216, 158, 0.4); border-radius: var(--radius-md); background: var(--accent-soft); display: grid; gap: var(--sp-3); }
 .exito ul { margin: 0; padding-left: var(--sp-5); display: grid; gap: 4px; font-size: var(--fs-sm); }
 .nota { font-size: var(--fs-sm); color: var(--text-muted); }

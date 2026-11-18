@@ -62,7 +62,14 @@ C_ADMIN = "Mientras la cuenta esté activa"
 C_PRUEBA = "Mientras exista el registro (prueba del consentimiento o de la atención del derecho)"
 C_CLIENTE = ("Mientras dure el contrato de la empresa y CONTRATO_GRACIA_DIAS después de su término "
              "(HU-30); luego, las reglas de retención (HU-25)")
-C_CONTRATACION = "Hasta migrar la evaluación (se borra al pasar a la empresa) o descartar la solicitud"
+# T-11: la solicitud descartada se borra completa RETENCION_SOLICITUDES_DESCARTADAS_DIAS después del descarte
+C_CONTRATACION = ("Hasta migrar la evaluación (se borra al pasar a la empresa) o RETENCION_SOLICITUDES_DESCARTADAS_DIAS "
+                  "después de descartar la solicitud")
+C_CONTRATACION_PRUEBA = ("Mientras exista la solicitud, como prueba del consentimiento; si se descarta, se borra "
+                         "RETENCION_SOLICITUDES_DESCARTADAS_DIAS después")
+# T-11: código de seguimiento e historial de una solicitud ARCOP
+C_ARCOP_SEGUIMIENTO = ("RETENCION_ARCOP_SEGUIMIENTO_DIAS después del cierre de la solicitud (código de seguimiento "
+                       "e historial; luego solo tipo, estados y fechas)")
 C_SESION = "Mientras la cuenta exista (el PO fija una depuración de sesiones y enlaces vencidos, HU-28)"
 C_TUTOR = ("TUTOR_RETENCION_DIAS (30) días sin actividad en la conversación, o hasta la supresión ARCOP "
            "del usuario definitivo (HU-15); el usuario también la puede borrar")
@@ -73,7 +80,9 @@ C_AUDITORIA = ("Mientras exista el registro del audit_log (inmutable, HU-09). Pl
                "y purga por lote sellado: pendiente de definir por el PO")
 C_AUDITOR = "Mientras la cuenta del auditor exista (vence sola; el admin puede desactivarla)"
 # HU-41: datos de contacto de Therion Labs para su propio RoPA (fila única que se reemplaza al editarla)
-C_REGISTRO_PLATAFORMA = "Mientras Therion Labs mantenga el registro de la plataforma (se reemplaza al actualizarlo)"
+# T-11: plazo POR CONDICIÓN (sin número): el contacto se reemplaza cuando la persona deja el cargo
+C_REGISTRO_PLATAFORMA = ("Mientras la persona de contacto ejerza el cargo (se reemplaza al actualizar el registro "
+                         "de la plataforma)")
 
 
 @dataclass(frozen=True)
@@ -311,7 +320,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                   "fecha_limite_informacion", "fecha_prorroga"),
         "codigo_seguimiento": Dato(
             SEUDONIMO, EN_CLARO, finalidad="Que el titular siga su solicitud sin identificarse",
-            base=B_OBLIGACION_ARCOP, conservacion=C_PRUEBA,
+            base=B_OBLIGACION_ARCOP, conservacion=C_ARCOP_SEGUIMIENTO,
         ),
         "descripcion": Dato(
             TEXTO_LIBRE, CIFRADO, finalidad="Atender el derecho solicitado (excepción HU-06)",
@@ -327,7 +336,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                   "estado_anterior", "estado_nuevo", "actor_rol"),
         "actor_id": Dato(
             METADATO, finalidad="Trazabilidad: quién hizo cada cambio de la solicitud",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_ARCOP_SEGUIMIENTO,
         ),
         "comentario": Dato(
             TEXTO_LIBRE, CIFRADO, finalidad="Comunicación entre titular y responsable",
@@ -399,23 +408,23 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         ),
         "autoriza_migracion": Dato(
             METADATO, finalidad="Prueba de la autorización para traspasar la evaluación a la empresa",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_CONTRATACION_PRUEBA,
         ),
         "consentimiento_version": Dato(
             METADATO, finalidad="Prueba de qué texto de autorización aceptó",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_CONTRATACION_PRUEBA,
         ),
         "fecha_autorizacion": Dato(
             METADATO, finalidad="Prueba de cuándo autorizó el traspaso",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_CONTRATACION_PRUEBA,
         ),
         "consentimiento_contacto_version": Dato(
             METADATO, finalidad="Prueba de qué texto de contacto comercial aceptó (HU-31)",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_CONTRATACION_PRUEBA,
         ),
         "fecha_consentimiento_contacto": Dato(
             METADATO, finalidad="Prueba de cuándo aceptó ser contactado (HU-31)",
-            base=B_RESPONSABILIDAD, conservacion=C_PRUEBA,
+            base=B_RESPONSABILIDAD, conservacion=C_CONTRATACION_PRUEBA,
         ),
     },
     # ------------------------------------------------------------ HU-28: sesiones y recuperación
@@ -828,6 +837,14 @@ AJUSTE_POR_CONSERVACION: dict[str, str] = {
     C_EVENTOS: "RETENCION_EVENTOS_SEGURIDAD_DIAS",
     C_TUTOR: "TUTOR_RETENCION_DIAS",
     C_CLIENTE: "CONTRATO_GRACIA_DIAS",
+    # T-11
+    C_CONTRATACION: "RETENCION_SOLICITUDES_DESCARTADAS_DIAS",
+    C_CONTRATACION_PRUEBA: "RETENCION_SOLICITUDES_DESCARTADAS_DIAS",
+    C_ARCOP_SEGUIMIENTO: "RETENCION_ARCOP_SEGUIMIENTO_DIAS",
+}
+# T-11 · Conservación con plazo POR CONDICIÓN (sin número): cuenta como plazo definido en el registro
+CONDICION_POR_CONSERVACION: dict[str, str] = {
+    C_REGISTRO_PLATAFORMA: "mientras ejerza el cargo",
 }
 # Desde cuándo se cuenta cada plazo (códigos de app/domain/rat/catalogo.py: INICIOS_PLAZO)
 INICIO_POR_AJUSTE: dict[str, str] = {
@@ -836,6 +853,8 @@ INICIO_POR_AJUSTE: dict[str, str] = {
     "RETENCION_EVENTOS_SEGURIDAD_DIAS": "cumplida_finalidad",   # después de revisado el evento
     "TUTOR_RETENCION_DIAS": "ultima_interaccion",               # sin actividad en la conversación
     "CONTRATO_GRACIA_DIAS": "termino_relacion",                 # después del término del contrato
+    "RETENCION_SOLICITUDES_DESCARTADAS_DIAS": "cumplida_finalidad",  # después de descartar la solicitud
+    "RETENCION_ARCOP_SEGUIMIENTO_DIAS": "cumplida_finalidad",        # después del cierre de la solicitud
 }
 # Nombre en lenguaje simple de cada ajuste (pantalla e informes; el nombre técnico va aparte)
 NOMBRE_AJUSTE: dict[str, str] = {
@@ -844,6 +863,8 @@ NOMBRE_AJUSTE: dict[str, str] = {
     "RETENCION_EVENTOS_SEGURIDAD_DIAS": "Retención de eventos de seguridad revisados",
     "TUTOR_RETENCION_DIAS": "Retención de conversaciones del tutor",
     "CONTRATO_GRACIA_DIAS": "Plazo de gracia al terminar el contrato",
+    "RETENCION_SOLICITUDES_DESCARTADAS_DIAS": "Retención de solicitudes de contratación descartadas",
+    "RETENCION_ARCOP_SEGUIMIENTO_DIAS": "Retención del código de seguimiento e historial de derechos",
 }
 # Conservación sin número (depende de un evento o está pendiente): texto corto para el registro
 TEXTO_SIN_PLAZO: dict[str, str] = {
@@ -851,9 +872,8 @@ TEXTO_SIN_PLAZO: dict[str, str] = {
     C_ADMIN: "mientras la cuenta interna esté activa",
     C_AUDITOR: "mientras exista la cuenta del auditor externo",
     C_SESION: "mientras exista la cuenta (depuración de sesiones y enlaces vencidos por definir)",
-    C_CONTRATACION: "hasta traspasar la evaluación a la empresa o descartar la solicitud",
     C_AUDITORIA: "mientras exista el registro de auditoría (inmutable; plazo de purga por definir)",
-    C_REGISTRO_PLATAFORMA: "mientras Therion Labs mantenga el registro de la plataforma",
+    C_REGISTRO_PLATAFORMA: "mientras la persona de contacto ejerza el cargo",
 }
 
 # Base de licitud del inventario → código del catálogo del RAT

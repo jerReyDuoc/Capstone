@@ -16,6 +16,7 @@
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { Icon } from "@/components/ui/Icon";
 import type { Cuestionario } from "@/hooks/useCuestionario";
 import {
@@ -52,6 +53,8 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
   }, [paso]);
 
   const total = preguntas.length;
+  const respondidas = preguntas.filter((p) => resp[p.codigo] !== undefined).length;
+  const hayRespuestas = respondidas > 0;
   const enResumen = paso >= total;
   const pregunta = enResumen ? null : preguntas[paso];
 
@@ -136,7 +139,7 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
         ))}
       </div>
 
-      <div className={s.filtroGrid}>
+      <div className={s.filtroGrid} data-con-resumen={hayRespuestas || undefined}>
         <div className={s.filtroPrincipal}>
           {pregunta ? (
             <>
@@ -164,22 +167,25 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
               </fieldset>
 
               <div className={s.filtroAcciones}>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p - 1)} disabled={paso === 0}>
-                  <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
-                  Anterior
-                </button>
+                {/* Auditoría UX 16-11: sin "Anterior" en la primera pregunta (no hay adónde volver) */}
+                {paso > 0 ? (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso((p) => p - 1)}>
+                    <Icon name="flecha" className={s.flechaAtras} />
+                    Anterior
+                  </button>
+                ) : <span aria-hidden="true" />}
                 <span className={s.atajos} aria-hidden="true">
                   Atajos: <kbd>S</kbd> sí, <kbd>N</kbd> no, <kbd>Enter</kbd> seguir.
                 </span>
-                <button
-                  type="button"
+                <BotonConMotivo
                   className="btn btn-primary"
+                  alinear="fin"
                   onClick={seguir}
-                  disabled={resp[pregunta.codigo] === undefined}
+                  motivo={resp[pregunta.codigo] === undefined ? "Elige una respuesta para continuar" : null}
                 >
                   Seguir
                   <Icon name="flecha" />
-                </button>
+                </BotonConMotivo>
               </div>
             </>
           ) : (
@@ -209,7 +215,7 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
 
               <div className={s.filtroAcciones}>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaso(total - 1)}>
-                  <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
+                  <Icon name="flecha" className={s.flechaAtras} />
                   Anterior
                 </button>
                 <button type="button" className="btn btn-primary" onClick={confirmar} disabled={enviando} aria-busy={enviando}>
@@ -221,33 +227,37 @@ export function PasoFiltro({ c }: { c: Cuestionario }) {
           )}
         </div>
 
-        <aside className={s.filtroResumen} aria-label="Tus respuestas">
-          <p className={s.filtroResumenTitulo}>Tus respuestas</p>
-          {preguntas.some((p) => resp[p.codigo] !== undefined) ? (
+        {/* Auditoría UX 16-11 · Fases 9.5 y 9.7: el resumen aparece desde la primera respuesta (antes
+            ocupaba media pantalla vacío) y lista TODAS las preguntas que aplican, igual que la barra
+            de pasos: si F1 es "No", el resto deja de aplicar y desaparece de ambos. */}
+        {hayRespuestas ? (
+          <aside className={s.filtroResumen} aria-label="Tus respuestas">
+            <p className={s.filtroResumenTitulo}>
+              Tus respuestas · {respondidas} de {total}
+            </p>
             <ol className={s.respondidas}>
-              {preguntas.map((p, i) =>
-                resp[p.codigo] === undefined ? null : (
+              {preguntas.map((p, i) => {
+                const valor = resp[p.codigo];
+                return (
                   <li key={p.codigo}>
                     <button
                       type="button"
                       className={s.respondida}
                       aria-current={i === paso ? "step" : undefined}
                       onClick={() => setPaso(i)}
-                      aria-label={`Cambiar respuesta (${resp[p.codigo] ? "Sí" : "No"}): ${p.pregunta}`}
+                      aria-label={`${valor === undefined ? "Responder" : `Cambiar respuesta (${valor ? "Sí" : "No"})`}: ${p.pregunta}`}
                     >
                       <span className={s.respondidaTexto}>{p.pregunta}</span>
-                      <span className={s.respondidaValor} data-valor={resp[p.codigo] ? "si" : "no"}>
-                        {resp[p.codigo] ? "Sí" : "No"}
+                      <span className={s.respondidaValor} data-valor={valor === undefined ? "pendiente" : valor ? "si" : "no"}>
+                        {valor === undefined ? "Pendiente" : valor ? "Sí" : "No"}
                       </span>
                     </button>
                   </li>
-                ),
-              )}
+                );
+              })}
             </ol>
-          ) : (
-            <p className={s.ayuda}>Tus respuestas aparecerán aquí; puedes volver a cualquiera con un clic.</p>
-          )}
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </section>
   );

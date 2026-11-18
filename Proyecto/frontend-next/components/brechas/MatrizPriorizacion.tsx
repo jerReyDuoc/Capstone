@@ -15,22 +15,24 @@ const ESTADOS: [EstadoBrecha, string][] = [
  * combinación de impacto del control × estado, y qué severidad resulta.
  * Es una tabla real (no un dibujo): se lee igual con lector de pantalla.
  */
-export function MatrizPriorizacion({ brechas }: { brechas: BrechaVista[] }) {
+export function MatrizPriorizacion({ brechas, plano = false }: { brechas: BrechaVista[]; /** Sin tarjeta propia (dentro de "¿Cómo se prioriza?"). */ plano?: boolean }) {
   const contar = (impacto: ImpactoConocido, estado: EstadoBrecha) =>
     brechas.filter((b) => b.criticidad === impacto && b.estado === estado).length;
   const sinClasificar = brechas.filter((b) => b.criticidad === "Sin clasificar").length;
 
   return (
-    <section className="card" aria-labelledby="matriz-titulo" style={{ display: "grid", gap: 12, alignContent: "start" }}>
+    <section className={plano ? "pila-chica" : "card pila-chica"} aria-labelledby="matriz-titulo">
       <div>
-        <h2 className="card-title" id="matriz-titulo">Cómo se prioriza</h2>
-        <p className="card-sub">Impacto de cada brecha × qué tan incumplida está</p>
+        <h2 className={plano ? "sr-only" : "card-title"} id="matriz-titulo">Cómo se prioriza</h2>
+        <p className="card-sub">La severidad cruza el impacto de cada brecha con qué tan incumplida está.</p>
       </div>
+      {/* Auditoría UX 16-11: desplazamiento interno contenido (no empuja el ancho de la página) */}
+      <div className="scroll-x" role="region" aria-label="Matriz de priorización" tabIndex={0}>
       <table className="matriz">
         <caption className="sr-only">Brechas por impacto y estado de cumplimiento, con la severidad resultante</caption>
         <thead>
           <tr>
-            <td aria-hidden="true" style={{ border: 0, background: "transparent" }} />
+            <td aria-hidden="true" className="matriz-esquina" />
             {ESTADOS.map(([e, t]) => (
               <th key={e} scope="col">{t}</th>
             ))}
@@ -59,6 +61,7 @@ export function MatrizPriorizacion({ brechas }: { brechas: BrechaVista[] }) {
           ))}
         </tbody>
       </table>
+      </div>
       {sinClasificar > 0 ? (
         <p className="card-sub">
           {sinClasificar} {sinClasificar === 1 ? "brecha no tiene" : "brechas no tienen"} impacto en el catálogo: aparecen al final como “Sin clasificar”.

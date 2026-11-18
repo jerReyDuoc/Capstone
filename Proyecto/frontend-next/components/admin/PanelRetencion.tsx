@@ -12,6 +12,8 @@
  *   - Historial de ejecuciones y de cambios del plazo, leído del audit log (solo conteos).
  * La autorización real (solo admin_therion) la hace FastAPI en cada llamada.
  */
+import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BarraAdmin } from "@/components/admin/BarraAdmin";
@@ -22,7 +24,7 @@ import {
   apiRetencion, describirPlazo, errorPlazo, etiquetaResultado, plazoLegible, requiereConfirmacion, resumenEjecucion, textoConfirmacion,
   type DetalleEjecucion, type EstadoRetencion, type ModoRetencion, type Pendientes, type RegistroLog, type ResultadoSimulacion,
 } from "@/lib/admin/retencion";
-import { fechaChile, fechaHoraChile } from "@/lib/fechas";
+import { fechaChile, fechaDelServidor, fechaHoraChile, horaConZonas } from "@/lib/fechas";
 import a from "./admin.module.css";
 
 const TAMANO_PAGINA = 20;
@@ -179,11 +181,16 @@ export function PanelRetencion() {
       <main id="contenido" className={a.contenido}>
         <div>
           <h1 className="page-title">Retención de datos</h1>
-          <p className="page-sub">
-            Los datos personales de los usuarios temporales se conservan solo el tiempo necesario (Ley 21.719, principio de
-            limitación de la conservación). Vencido el plazo, una tarea diaria los anonimiza con la misma rutina que una
-            supresión ARCOP aprobada y conserva los puntajes para la comparativa sectorial. Cada ejecución queda en el audit log.
-          </p>
+          {/* Auditoría UX 16-11 · Fase 10.6: una línea; el detalle va en "Más información" */}
+          <p className="page-sub">Cuánto tiempo se conservan los datos de quienes hicieron el autodiagnóstico sin cuenta.</p>
+          <ComoSeCalcula titulo="Más información" className="intro-mas">
+            <p>
+              Los datos personales de los usuarios temporales se conservan solo el tiempo necesario (Ley 21.719, principio de
+              limitación de la conservación). Vencido el plazo, una tarea diaria los anonimiza con la misma rutina que una
+              supresión aprobada y conserva los puntajes para la comparativa sectorial. Cada ejecución queda en el registro
+              de auditoría.
+            </p>
+          </ComoSeCalcula>
         </div>
 
         {aviso ? (
@@ -224,8 +231,15 @@ export function PanelRetencion() {
               <div className={a.rejilla}>
                 <div className="kpi">
                   <span className="kpi-label"><Icon name="reloj" aria-hidden="true" /> Próxima ejecución</span>
-                  <span className="kpi-value">{fechaHoraChile(estado.proxima_ejecucion)}</span>
-                  <span className={a.sub}>Todos los días a las {String(estado.hora_utc).padStart(2, "0")}:00 UTC</span>
+                  {/* Auditoría UX 16-11: la hora siempre con su zona ("hoy 00:00 (Chile) · 03:00 UTC") */}
+                  <span className="kpi-value kpi-texto">
+                    {(() => {
+                      const d = fechaDelServidor(estado.proxima_ejecucion);
+                      return d ? horaConZonas(d) : "—";
+                    })()}
+                  </span>
+                  <span className={a.sub}>Todos los días a las {String(estado.hora_utc).padStart(2, "0")}:00 UTC (hora del servidor)
+                  </span>
                 </div>
                 <div className="kpi">
                   <span className="kpi-label"><Icon name="escudo" aria-hidden="true" /> Se anonimizarían hoy</span>
@@ -333,15 +347,21 @@ export function PanelRetencion() {
                   </div>
                 ) : (
                   <div className={a.acciones}>
-                    <button
+                    {/* Auditoría UX 16-11: desactivado con el motivo a la vista */}
+                    <BotonConMotivo
                       type="submit"
                       className="btn btn-primary"
-                      disabled={guardando || sinCambios || (modo === "plazo" && !!errDias)}
+                      ocupado={guardando}
                       aria-busy={guardando}
+                      motivo={
+                        guardando ? null
+                          : sinCambios ? "Cambia el plazo para poder guardarlo"
+                          : modo === "plazo" && errDias ? "Corrige el número de días para poder guardarlo"
+                          : null
+                      }
                     >
                       Guardar plazo
-                    </button>
-                    {sinCambios ? <span className={a.ayuda}>Es el plazo vigente.</span> : null}
+                    </BotonConMotivo>
                   </div>
                 )}
               </form>

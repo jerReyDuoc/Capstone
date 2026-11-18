@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ApiError,
   cargarPanel,
@@ -47,6 +47,11 @@ interface PanelContexto {
   demo: boolean;
   seleccionarEvaluacion: (id: number) => void;
   recargar: () => void;
+  /**
+   * Auditoría UX 16-11: recarga sin mostrar el esqueleto (al volver a la pestaña). Resuelve
+   * cuando los datos nuevos llegaron.
+   */
+  recargarSilencioso: () => Promise<void>;
   /** Construye un href conservando la evaluación seleccionada. */
   href: (ruta: string, extra?: Record<string, string>) => string;
 }
@@ -62,6 +67,9 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionApi[]>([]);
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const [version, setVersion] = useState(0);
+  // Recarga silenciosa: conserva lo que se ve mientras llegan los datos nuevos
+  const silencioso = useRef(false);
+  const alTerminar = useRef<(() => void) | null>(null);
   const [modo, setModo] = useState<ModoPanel>("detectando");
   const base = BASE_DE[modo];
 
@@ -110,11 +118,21 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (evaluacionId == null || modo === "detectando") return;
     const ctrl = new AbortController();
-    setEstado({ tipo: "cargando" });
+    const sinEsqueleto = silencioso.current;
+    silencioso.current = false;
+    if (!sinEsqueleto) setEstado({ tipo: "cargando" });
+    const terminar = () => {
+      alTerminar.current?.();
+      alTerminar.current = null;
+    };
     cargarPanel(evaluacionId, ctrl.signal, base)
       .then((panel) => setEstado({ tipo: "listo", panel }))
+      .then(terminar)
       .catch((e) => {
         if (e.name === "AbortError") return;
+        terminar();
+        // Si falla una recarga silenciosa, se conserva lo que ya se veía
+        if (sinEsqueleto) return;
         if (e instanceof ApiError && e.status === 404) {
           setEstado({ tipo: "sin-resumen", mensaje: e.message });
         } else {
@@ -154,6 +172,12 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       demo: MODO_DEMO,
       seleccionarEvaluacion,
       recargar: () => setVersion((v) => v + 1),
+      recargarSilencioso: () =>
+        new Promise<void>((resolver) => {
+          silencioso.current = true;
+          alTerminar.current = resolver;
+          setVersion((v) => v + 1);
+        }),
       href,
     }),
     [estado, modo, evaluaciones, evaluacionId, base, seleccionarEvaluacion, href],

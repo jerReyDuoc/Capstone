@@ -155,6 +155,10 @@ async def nodo_guardia(estado: EstadoAgente, config: RunnableConfig) -> dict:
                     g = guard.analizar(linea, PERFIL_EVIDENCIA)
                     r = ResultadoFiltro(g.bloquear, _categoria(g.categoria), g.regla) if g.bloquear \
                         else ResultadoFiltro.limpio()
+                    # T-14: además, las reglas propias del agente de alta certeza (no el filtro estricto del chat)
+                    evaluar_documento = getattr(filtro, "evaluar_documento", None)
+                    if not r.bloquear and evaluar_documento is not None:
+                        r = evaluar_documento(linea)
                 else:
                     r = filtro.evaluar(linea)
                 if r.bloquear:

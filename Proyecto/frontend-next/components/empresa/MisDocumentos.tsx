@@ -20,7 +20,7 @@ import {
   type DocumentosApi, type TipoEliminable,
 } from "@/lib/empresa";
 import { descargarBlob } from "@/lib/exportar";
-import s from "@/components/admin/admin.module.css";
+import s from "@/components/ui/comunes.module.css";
 
 type Pestana = "informes" | "registro" | "borradores" | "evidencias" | "constancias";
 type Estado = { tipo: "cargando" } | { tipo: "listo"; datos: DocumentosApi } | { tipo: "error"; mensaje: string };

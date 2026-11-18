@@ -14,6 +14,7 @@
  * La vista previa pinta el Markdown como texto con React (lib/borradores.ts): lo que escribe
  * el usuario nunca se inserta como HTML. HU-30: sin contrato vigente la página lo explica.
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/borradores";
 import { TONO_RIESGO } from "@/lib/registroActividades";
 import { useEspacioEmpresa } from "./EspacioEmpresaContexto";
-import s from "@/components/admin/admin.module.css";
+import s from "@/components/ui/comunes.module.css";
 import b from "./borradores.module.css";
 
 type Carga = { tipo: "cargando" } | { tipo: "listo" } | { tipo: "error"; mensaje: string };
@@ -321,9 +322,10 @@ function GenerarBorrador({
               </span>
             </span>
           </label>
-          <button type="submit" className="btn btn-primary" disabled={ocupado || lleno} aria-busy={ocupado}>
+          <BotonConMotivo type="submit" className="btn btn-primary" ocupado={ocupado} aria-busy={ocupado}
+                          motivo={!ocupado && lleno ? `Ya tienes ${catalogo.max_en_revision} borradores en revisión: termina o descarta uno para generar otro` : null}>
             {ocupado ? "Generando…" : "Generar borrador"}
-          </button>
+          </BotonConMotivo>
         </div>
         {ocupado && usarIa ? (
           <p className={b.espera} role="status">El Agente IA está redactando tu borrador. Puede tardar hasta un minuto.</p>

@@ -163,12 +163,13 @@ class PlazoCategoria:
     desactivados: tuple[str, ...]   # ajustes nombrados pero sin valor
     sin_numero: tuple[str, ...]     # conservaciones que dependen de un evento o están pendientes
     fundamento: str
+    condicion: str | None = None    # T-11: plazo por condición, sin número ("mientras ejerza el cargo")
 
     def como_dict(self) -> dict:
         return {"categoria": self.categoria, "categoria_nombre": cat_mapa.nombre_dato(self.categoria),
                 "dias": self.dias, "ajuste": self.ajuste, "ajustes": list(self.ajustes),
                 "desactivados": list(self.desactivados), "sin_numero": list(self.sin_numero),
-                "fundamento": self.fundamento}
+                "fundamento": self.fundamento, "condicion": self.condicion}
 
 
 def _recortar(texto: str, maximo: int = 300) -> str:
@@ -189,11 +190,17 @@ def plazos_actividad(act: inv.ActividadPlataforma, ajustes: dict[str, AjustePlaz
         desactivados = tuple(k for k in ajustes_cat if not ajustes[k].activo)
         sin_numero = tuple(c for c in conservaciones if c not in inv.AJUSTE_POR_CONSERVACION)
         rige = max(activos, key=lambda a: a.dias) if activos else None
+        # T-11: sin número que rija, una categoría cuyas conservaciones son TODAS condiciones (p. ej. el
+        # contacto del RoPA: "mientras ejerza el cargo") tiene un plazo por condición.
+        condiciones = [inv.CONDICION_POR_CONSERVACION[c] for c in sin_numero if c in inv.CONDICION_POR_CONSERVACION]
+        condicion = (condiciones[0] if not rige and not desactivados and condiciones
+                     and len(condiciones) == len(sin_numero) else None)
         partes = [f"{a.nombre} ({TEXTO_FUENTE[a.fuente]})" for a in sorted(activos, key=lambda a: -a.dias)]
         partes += [f"{ajustes[k].nombre}: regla desactivada" for k in desactivados]
         partes += [inv.TEXTO_SIN_PLAZO.get(c, c) for c in sin_numero]
         salida.append(PlazoCategoria(categoria, rige.dias if rige else None, rige.clave if rige else None,
-                                     tuple(ajustes_cat), desactivados, sin_numero, _recortar("; ".join(partes))))
+                                     tuple(ajustes_cat), desactivados, sin_numero, _recortar("; ".join(partes)),
+                                     condicion))
     return salida
 
 
@@ -340,7 +347,8 @@ def generar(conf, plazo_titular: tuple[int | None, str] | None = None) -> Regist
             "sin_destinatarios": False,
             "plazos": [{"categoria": p.categoria, "plazo": p.dias, "unidad": "dias" if p.dias else None,
                         "desde": inv.INICIO_POR_AJUSTE.get(p.ajuste) if p.ajuste else None,
-                        "fundamento": p.fundamento} for p in plazos],
+                        "fundamento": p.fundamento, **({"condicion": p.condicion} if p.condicion else {})}
+                       for p in plazos],
             "decisiones": {"existe": False, "perfilamiento": False, "logica": None, "consecuencias": None,
                            "intervencion_humana": None},
             "medidas": {"codigos": list(act.medidas), "otras": None},

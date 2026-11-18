@@ -12,7 +12,16 @@ from app.domain.ports.guardia_prompt_port import PERFIL_EVIDENCIA, PERFIL_JUSTIF
 from app.domain.ports.registro_ia_port import ContextoLlamada
 from app.application.ai.gateway import CapaIAError
 from app.domain.models.evento_seguridad import OrigenEvento
-from app.application.evidencias.casos_uso.procesar_evidencia.comun import AVISO_VERIFICACION, _texto_alerta
+from app.application.evidencias.casos_uso.procesar_evidencia.comun import (
+    AVISO_RESPUESTA_CAMBIADA,
+    AVISO_VERIFICACION,
+    _texto_alerta,
+)
+
+
+def _declarado(respuesta) -> dict:
+    """T-13: lo que el usuario declaró (estado y justificación), para comparar antes y después del LLM."""
+    return {"estado": respuesta.estado_clasificacion, "justificacion": respuesta.justificacion_usuario or ""}
 
 
 class ValidacionMixin:
@@ -121,6 +130,10 @@ class ValidacionMixin:
                     await self._registrar(respuesta, evidencia, OrigenEvento.EVIDENCIA.value, fragmento, control,
                                           det.regla)
 
+            # T-13: lo que declaró el usuario ANTES de llamar al LLM (la validación puede tardar y el usuario
+            # puede cambiar su respuesta mientras tanto)
+            declarado_antes = _declarado(respuesta)
+
             # 3. Validar con LLM a través de la capa de Políticas e IA.
             #    Ley 21.719: el validador sanitiza (NER) antes de que algo salga al
             #    proveedor; si no puede sanitizar, aborta (CapaIAError).
@@ -140,6 +153,12 @@ class ValidacionMixin:
                 evidencia.errores_validacion = [f"[{e.tipo_error}] {e.mensaje_usuario}"]
                 evidencia.fecha_procesada = date.today()
                 return await self.evidencia_repo.update(evidencia)
+
+            # T-13: se relee la respuesta CON BLOQUEO. Si el usuario la cambió mientras se revisaba el
+            # documento, la clasificación de la IA no se aplica (se conserva su elección).
+            respuesta = await self._releer_respuesta(respuesta)
+            if _declarado(respuesta) != declarado_antes:
+                return await self._descartar_por_cambio(evidencia, respuesta, declarado_antes)
 
             # 3b. HU-07: verificar la salida del modelo ANTES de usarla o guardarla
             verificacion = self._verificar(result, contenido, justificacion, control, brecha,
@@ -195,6 +214,33 @@ class ValidacionMixin:
             evidencia.errores_validacion = [str(e)]
             evidencia.fecha_procesada = date.today()
             return await self.evidencia_repo.update(evidencia)
+    async def _releer_respuesta(self, respuesta):
+        releer = getattr(self.respuesta_repo, "releer_bloqueada", None)
+        if releer is None:          # dobles de prueba: la misma respuesta (sin cambios)
+            return respuesta
+        actual = await releer(respuesta.id)
+        if actual is None:
+            raise ValueError(f"Respuesta {respuesta.id} no encontrada")
+        return actual
+
+    async def _descartar_por_cambio(self, evidencia: Evidencia, respuesta, antes: dict) -> Evidencia:
+        """T-13: la respuesta cambió durante la validación. La evidencia queda rechazada con un aviso
+        claro para volver a subirla, la respuesta no se toca y el descarte queda en el audit_log."""
+        evidencia.estado_validacion = EstadoValidacion.REJECTED.value
+        evidencia.clasificacion_llm = None
+        evidencia.confianza = None
+        evidencia.justificacion_llm = None
+        evidencia.datos_extraidos = None
+        evidencia.errores_validacion = [AVISO_RESPUESTA_CAMBIADA]
+        evidencia.fecha_procesada = date.today()
+        if self.auditar_descarte is not None:
+            self.auditar_descarte(evidencia, respuesta, {
+                "motivo": "respuesta_cambiada",
+                "estado_antes": antes["estado"], "estado_actual": respuesta.estado_clasificacion,
+                "justificacion_cambio": antes["justificacion"] != (respuesta.justificacion_usuario or ""),
+            })
+        return await self.evidencia_repo.update(evidencia)   # confirma y libera el bloqueo
+
     async def _sin_texto(self, evidencia: Evidencia, mensaje: str) -> Evidencia:
         """Archivo sin texto legible: no se gasta una llamada al LLM; la respuesta no cambia."""
         evidencia.estado_validacion = EstadoValidacion.REJECTED.value

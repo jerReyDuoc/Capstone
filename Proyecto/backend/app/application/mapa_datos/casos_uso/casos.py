@@ -14,8 +14,11 @@ from app.application.mapa_datos.casos_uso.historial_mapa import VersionesMixin
 class MapaDatosCasos(LecturaMixin, EdicionMixin, PlantillasYSugerenciasMixin, VersionesMixin, ExportacionMixin):
     """`cliente` es el ClienteConServicio de app/api/dependencias/servicio_pagado.py (contrato vigente)."""
 
-    def __init__(self, db: AsyncSession, cliente, limitador=None):
+    def __init__(self, db: AsyncSession, cliente, limitador=None, *, confirmar: bool = True):
+        """T-12: con `confirmar=False` el caso de uso deja el cambio en la transacción (flush) y quien lo
+        llama confirma todo junto (p. ej. aceptar una propuesta del asistente en UN solo commit)."""
         self.db = db
+        self.confirmar = confirmar
         self.actor = cliente.actor
         self.empresa_id: int = cliente.empresa.id
         self.razon_social: str = cliente.empresa.razon_social

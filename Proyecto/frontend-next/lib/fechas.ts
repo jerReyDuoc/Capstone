@@ -49,3 +49,33 @@ export function fechaHoraChile(iso: string | null | undefined, conSegundos = fal
 
 /** "15:21" de un Date del navegador (p. ej. la hora de la última actualización). */
 export const horaChile = (d: Date) => F_HORA.format(d);
+
+/**
+ * Auditoría UX 16-11 · "Actualizado hace X": tiempo relativo corto, en español de Chile.
+ * Se usa en vez de un botón "Actualizar" por página (los datos se recargan solos al volver).
+ */
+export function haceTexto(desde: Date, ahora: Date = new Date()): string {
+  const s = Math.max(0, Math.round((ahora.getTime() - desde.getTime()) / 1000));
+  if (s < 45) return "hace un momento";
+  const min = Math.round(s / 60);
+  if (min < 60) return min === 1 ? "hace 1 minuto" : `hace ${min} minutos`;
+  const h = Math.round(min / 60);
+  if (h < 24) return h === 1 ? "hace 1 hora" : `hace ${h} horas`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "hace 1 día" : `hace ${d} días`;
+}
+
+const F_HORA_UTC = new Intl.DateTimeFormat("es-CL", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
+const F_DIA_CHILE = new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_CHILE });
+
+/**
+ * Auditoría UX 16-11 · Hora con sus dos zonas para que no parezca contradictoria:
+ * "hoy 00:00 (Chile) · 03:00 UTC". `hoy`/`mañana` según el calendario de Chile.
+ */
+export function horaConZonas(instante: Date, ahora: Date = new Date()): string {
+  const dia = F_DIA_CHILE.format(instante);
+  const hoy = F_DIA_CHILE.format(ahora);
+  const manana = F_DIA_CHILE.format(new Date(ahora.getTime() + 86_400_000));
+  const prefijo = dia === hoy ? "hoy" : dia === manana ? "mañana" : fechaChile(instante.toISOString());
+  return `${prefijo} ${horaChile(instante)} (Chile) · ${F_HORA_UTC.format(instante)} UTC`;
+}

@@ -14,6 +14,8 @@
  * Aprobar una supresión pide una confirmación explícita (anonimiza de forma irreversible).
  * Cada acción queda en el historial de la solicitud y en el audit log (backend).
  */
+import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
+import { Sigla } from "@/components/ui/Sigla";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { fechaChile } from "@/lib/fechas";
@@ -118,14 +120,25 @@ export function BandejaArcop() {
 
       <main id="contenido" className={a.contenido}>
         <div>
-          <h1 className="page-title">Solicitudes ARCOP</h1>
-          <p className="page-sub">
-            Atiende los derechos de acceso, rectificación, supresión, oposición, portabilidad y bloqueo de los titulares
-            (Ley 21.719). Respuesta en {catalogo?.plazo_respuesta_dias ?? 30} días corridos, prorrogable una vez; el bloqueo,
-            en {catalogo?.plazo_bloqueo_dias_habiles ?? 2} días hábiles. Cada acción queda en el audit log.
-          </p>
+          <h1 className="page-title">Solicitudes <Sigla s="ARCOP" /></h1>
+          {/* Auditoría UX 16-11 · Fase 10.6: una línea; el detalle va en "Más información" */}
+          <p className="page-sub">Atiende los derechos de los titulares sobre sus datos personales dentro del plazo legal.</p>
+          <ComoSeCalcula titulo="Más información" className="intro-mas">
+            <p>
+              Derechos de acceso, rectificación, supresión, oposición, portabilidad y bloqueo (Ley 21.719). Respuesta en{" "}
+              {catalogo?.plazo_respuesta_dias ?? 30} días corridos, prorrogable una vez; el bloqueo, en{" "}
+              {catalogo?.plazo_bloqueo_dias_habiles ?? 2} días hábiles. Cada acción queda en el registro de auditoría.
+            </p>
+          </ComoSeCalcula>
         </div>
 
+        {/* Auditoría UX 16-11 · Fase 10.5: sin tarjetas en cero; una línea de estado */}
+        {conteos && CIFRAS.every((c) => !conteos[c.clave]) && !hayFiltros ? (
+          <p className="linea-estado" role="status">
+            <Icon name="check" aria-hidden="true" />
+            No hay solicitudes pendientes.
+          </p>
+        ) : (
         <div className={s.franja} role="group" aria-label="Solicitudes por atender">
           {CIFRAS.map((c) => {
             const activa = c.clave === "vencidas" ? filtros.vencidas : filtros.estado === c.clave && !filtros.vencidas;
@@ -144,6 +157,7 @@ export function BandejaArcop() {
             );
           })}
         </div>
+        )}
 
         {aviso ? (
           <p className="callout" role="status">

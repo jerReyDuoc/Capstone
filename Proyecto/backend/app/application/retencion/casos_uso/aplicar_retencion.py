@@ -23,6 +23,12 @@ plazo (config RETENCION_*; vacío = regla desactivada) se aplica:
                      TUTOR_RETENCION_DIAS (30 por defecto, decisión del PO del 28-oct) ->
                      se BORRAN con sus mensajes. Las métricas de llamadas_llm (sin texto) y
                      la bitácora se conservan.
+  R5  Contratación   T-11: solicitudes de contratación DESCARTADAS hace más de
+                     RETENCION_SOLICITUDES_DESCARTADAS_DIAS (180) -> se BORRAN (contacto,
+                     consentimientos y la fila). Un registro por solicitud en el audit_log.
+  R6  Seguimiento    T-11: solicitudes ARCOP cerradas hace más de RETENCION_ARCOP_SEGUIMIENTO_DIAS
+                     (730) -> el código de seguimiento se reemplaza por uno aleatorio (deja de
+                     servir) y el historial pierde quién hizo cada cambio (actor_id NULL).
 
 Cada titular se procesa en su propia transacción (o todo o nada por titular) y los
 archivos se borran después del commit. El resultado y los logs llevan solo conteos.
@@ -78,6 +84,8 @@ ORIGEN_MANUAL = "manual"     # el Oficial de Privacidad desde /admin/retencion
 ORIGEN_CLI = "cli"           # python -m app.cli.retencion
 ORIGENES = (ORIGEN_CRON, ORIGEN_MANUAL, ORIGEN_CLI)
 FUENTE_PARAMETRO = "parametro"  # plazos pasados al constructor (pruebas)
+# Reglas que solo corren si el diccionario de plazos las nombra (quien pasa plazos propios sin ellas no las usa)
+REGLAS_OPCIONALES = frozenset({"tutor", "contratacion", "arcop_seguimiento"})
 
 
 def _ahora() -> datetime:
@@ -92,6 +100,8 @@ class ResultadoRetencion:
     solicitudes_arcop: int = 0
     eventos_seguridad: int = 0
     conversaciones_tutor: int = 0
+    solicitudes_contratacion: int = 0   # T-11 R5
+    seguimientos_arcop: int = 0         # T-11 R6
     archivos_borrados: int = 0
     reglas_desactivadas: list[str] = field(default_factory=list)
     # HU-25
@@ -126,13 +136,17 @@ class AplicarRetencionUseCase:
             "arcop": settings.RETENCION_ARCOP_CERRADAS_DIAS,
             "eventos": settings.RETENCION_EVENTOS_SEGURIDAD_DIAS,
             "tutor": settings.TUTOR_RETENCION_DIAS,
+            # T-11
+            "contratacion": settings.RETENCION_SOLICITUDES_DESCARTADAS_DIAS,
+            "arcop_seguimiento": settings.RETENCION_ARCOP_SEGUIMIENTO_DIAS,
         }
 
     def _auditar(self, accion: str, entidad: str, entidad_id: int | None, regla: str, **detalle) -> None:
         fabricas().bitacora(self.s).registrar(
             accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ACTOR_SISTEMA,
             detalle={"regla": regla, "plazo_dias": self.plazos.get(
-                {"R1": "titulares", "R2": "arcop", "R3": "eventos", "R4": "tutor"}[regla]), **detalle},
+                {"R1": "titulares", "R2": "arcop", "R3": "eventos", "R4": "tutor", "R5": "contratacion",
+                 "R6": "arcop_seguimiento"}[regla]), **detalle},
         )
 
     @staticmethod
@@ -169,9 +183,11 @@ class AplicarRetencionUseCase:
         error: Exception | None = None
         try:
             for regla, metodo in (("titulares", self._titulares), ("arcop", self._arcop),
-                                  ("eventos", self._eventos), ("tutor", self._tutor)):
-                if regla == "tutor" and regla not in self.plazos:
-                    continue  # R4 es de HU-15: quien pasa sus propios plazos sin ella no la usa
+                                  ("eventos", self._eventos), ("tutor", self._tutor),
+                                  ("contratacion", self._contratacion),
+                                  ("arcop_seguimiento", self._arcop_seguimiento)):
+                if regla in REGLAS_OPCIONALES and regla not in self.plazos:
+                    continue  # R4 (HU-15), R5 y R6 (T-11): quien pasa sus propios plazos sin ellas no las usa
                 limite = self._limite(regla)
                 if limite is None:
                     r.reglas_desactivadas.append(regla)
@@ -212,7 +228,8 @@ class AplicarRetencionUseCase:
             "simulacion": r.simulacion,
             "inicio": inicio.isoformat(timespec="seconds"),
             "duracion_ms": r.duracion_ms,
-            "plazos_dias": {k: self.plazos.get(k) for k in ("titulares", "arcop", "eventos", "tutor")},
+            "plazos_dias": {k: self.plazos.get(k) for k in ("titulares", "arcop", "eventos", "tutor",
+                                                             "contratacion", "arcop_seguimiento")},
             "fuente_plazo_titulares": r.fuente_plazo_titular,
             "fecha_corte_titulares": corte.isoformat() if corte else None,
             "reglas_desactivadas": list(r.reglas_desactivadas),
@@ -223,6 +240,8 @@ class AplicarRetencionUseCase:
                 "solicitudes_arcop": r.solicitudes_arcop,
                 "eventos_seguridad": r.eventos_seguridad,
                 "conversaciones_tutor": r.conversaciones_tutor,
+                "solicitudes_contratacion": r.solicitudes_contratacion,
+                "seguimientos_arcop": r.seguimientos_arcop,
                 "archivos_borrados": r.archivos_borrados,
             },
             "omitida_por_ejecucion_en_curso": r.omitida_por_ejecucion_en_curso,
@@ -331,4 +350,34 @@ class AplicarRetencionUseCase:
             return
         r.conversaciones_tutor += await repo.eliminar_ids(ids)
         self._auditar(Accion.RETENCION_TUTOR, "conversacion_tutor", None, "R4", **self._ids(sorted(ids)))
+        await self.s.commit()
+
+    # ------------------------------------------------------------------ R5 (T-11)
+    async def _contratacion(self, limite: date, aplicar: bool, r: ResultadoRetencion) -> None:
+        repo_ret = fabricas().retencion(self.s)
+        ids = await repo_ret.ids_contrataciones_descartadas(datetime.combine(limite, datetime.min.time()))
+        if not aplicar:
+            r.solicitudes_contratacion += len(ids)
+            return
+        if not ids:
+            return
+        r.solicitudes_contratacion += await repo_ret.borrar_contrataciones(ids)
+        for solicitud_id in ids:
+            self._auditar(Accion.RETENCION_CONTRATACION, "solicitud_contratacion", solicitud_id, "R5",
+                          estado="descartada")
+        await self.s.commit()
+
+    # ------------------------------------------------------------------ R6 (T-11)
+    async def _arcop_seguimiento(self, limite: date, aplicar: bool, r: ResultadoRetencion) -> None:
+        repo_ret = fabricas().retencion(self.s)
+        ids = await repo_ret.ids_seguimiento_arcop_vencido(datetime.combine(limite, datetime.min.time()))
+        if not aplicar:
+            r.seguimientos_arcop += len(ids)
+            return
+        if not ids:
+            return
+        await repo_ret.retirar_seguimiento_arcop(ids, _ahora())
+        r.seguimientos_arcop += len(ids)
+        for solicitud_id in ids:
+            self._auditar(Accion.RETENCION_ARCOP_SEGUIMIENTO, "solicitudes_arcop", solicitud_id, "R6")
         await self.s.commit()

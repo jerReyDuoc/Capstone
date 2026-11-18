@@ -1,12 +1,19 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
+import { Actualizado } from "@/components/ui/Actualizado";
+import { useActualizacionAutomatica } from "@/hooks/useActualizacionAutomatica";
 import { usePanel } from "@/hooks/usePanel";
-import { Icon } from "@/components/ui/Icon";
 
 const fecha = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${iso}T12:00:00`)) : "sin fecha";
 
+/**
+ * Encabezado de las páginas del panel.
+ * Auditoría UX 16-11 · Fase 5.D: sin botón "Actualizar" por página. Los datos se recargan solos
+ * al volver a la pestaña (sin esqueleto) y se muestra "Actualizado hace X" con un ícono pequeño
+ * para forzar la recarga.
+ */
 export function PageHeader({
   eyebrow,
   titulo,
@@ -18,7 +25,14 @@ export function PageHeader({
   subtitulo: string;
   children?: ReactNode;
 }) {
-  const { evaluaciones, evaluacionId, seleccionarEvaluacion, recargar, estado } = usePanel();
+  const { evaluaciones, evaluacionId, seleccionarEvaluacion, recargarSilencioso, estado } = usePanel();
+  const actualizacion = useActualizacionAutomatica(recargarSilencioso);
+  const { marcar } = actualizacion;
+  const listo = estado.tipo === "listo";
+  // La primera carga cuenta como "actualizado"
+  useEffect(() => {
+    if (listo) marcar();
+  }, [listo, marcar]);
   const idSelect = useId();
   // Correcciones 29-10: el selector solo aparece cuando hay algo que elegir (≥2 completadas).
   const completadas = evaluaciones
@@ -54,16 +68,7 @@ export function PageHeader({
             </select>
           </div>
         ) : null}
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={recargar}
-          aria-busy={estado.tipo === "cargando"}
-          aria-label="Actualizar datos del panel"
-        >
-          <Icon name="refrescar" />
-          Actualizar
-        </button>
+        <Actualizado estado={actualizacion} />
       </div>
     </header>
   );

@@ -234,7 +234,7 @@ def completitud(contenido: dict, deriv: dict) -> dict:
     categorias = [t["codigo"] for t in deriv["tipos_datos"]]
     plazos = {p["categoria"]: p for p in c["plazos"]}
     sin_plazo = [cat_mapa.nombre_dato(x) for x in categorias
-                 if not (plazos.get(x) and plazos[x].get("plazo") and plazos[x].get("unidad"))]
+                 if not cat.plazo_definido(plazos.get(x))]
     if not categorias:
         r["conservacion"] = _estado(False, "Primero elige los datos de la actividad; luego indica cuánto se guarda cada uno.")
     elif sin_plazo:

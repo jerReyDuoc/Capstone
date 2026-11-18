@@ -631,9 +631,19 @@ function Indicadores({ datos }: { datos: ResumenPrivacidad }) {
     { etiqueta: "Proveedores", valor: String(conGarantia), de: `de ${datos.proveedores.length}`, pista: "con garantía declarada", medida: (100 * conGarantia) / Math.max(datos.proveedores.length, 1) },
     { etiqueta: "Hallazgos", valor: String(datos.revision.hallazgos.length), de: "", pista: resumenHallazgos(datos.revision.conteo), medida: null },
   ];
+  // Auditoría UX 16-11 · Fase 10.5: sin tarjetas en cero; si no hay nada que contar, una línea de estado
+  const conDatos = indicadores.filter((k) => k.valor !== "0" || (k.de && k.de !== "de 0"));
+  if (conDatos.length === 0) {
+    return (
+      <p className="linea-estado" role="status">
+        <Icon name="info" aria-hidden="true" />
+        Aún no hay actividades, proveedores ni hallazgos en el registro de la plataforma.
+      </p>
+    );
+  }
   return (
     <div className={s.kpis}>
-      {indicadores.map((k) => (
+      {conDatos.map((k) => (
         <div key={k.etiqueta} className="card kpi">
           <span className="kpi-label">{k.etiqueta}</span>
           <span className="kpi-value">{k.valor}{k.de ? <small>{k.de}</small> : null}</span>

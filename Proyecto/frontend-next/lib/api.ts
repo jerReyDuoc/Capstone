@@ -1,3 +1,4 @@
+import { MENSAJE_SIN_CONEXION, mensajePorEstado, textoSeguro } from "./mensajesUsuario";
 import { construirPanel } from "./adaptadores";
 import { DEMO_EVALUACIONES, panelDemo, planDemo } from "./demo";
 import { filtrosAParams, type FiltrosBrechas } from "./filtrosBrechas";
@@ -50,7 +51,7 @@ async function pedir(ruta: string, init: RequestInit): Promise<Response> {
     res = await fetch(ruta, { cache: "no-store", ...init });
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
-    throw new ApiError("No pudimos conectar con el servidor. Revisa que la API esté en línea.", 0);
+    throw new ApiError(MENSAJE_SIN_CONEXION, 0);
   }
   if (!res.ok) {
     let detalle: unknown;
@@ -61,10 +62,9 @@ async function pedir(ruta: string, init: RequestInit): Promise<Response> {
     } catch {
       /* cuerpo vacío */
     }
-    const msg =
-      typeof detalle === "string"
-        ? detalle
-        : (detalle as { mensaje?: string } | undefined)?.mensaje ?? `Error ${res.status} al consultar ${ruta}`;
+    // Auditoría UX 16-11: sin "Error 502 al consultar /api/…" en pantalla (lib/mensajesUsuario.ts)
+    const crudo = typeof detalle === "string" ? detalle : (detalle as { mensaje?: string } | undefined)?.mensaje;
+    const msg = textoSeguro(crudo, mensajePorEstado(res.status));
     throw new ApiError(msg, res.status, (detalle as { codigo?: string } | undefined)?.codigo);
   }
   return res;

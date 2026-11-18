@@ -90,6 +90,10 @@ class Accion:
     RETENCION_ARCOP = "retencion.arcop_anonimizada"          # T-06 R2
     RETENCION_EVENTOS = "retencion.extractos_eliminados"     # T-06 R3
     RETENCION_TUTOR = "retencion.conversaciones_eliminadas"  # T-06 R4
+    # T-13: la clasificación de la IA se descartó porque el usuario cambió su respuesta mientras se validaba
+    EVIDENCIA_CLASIFICACION_DESCARTADA = "evidencia.clasificacion_descartada"
+    RETENCION_CONTRATACION = "retencion.contratacion_descartada_eliminada"  # T-11 R5
+    RETENCION_ARCOP_SEGUIMIENTO = "retencion.arcop_seguimiento_retirado"    # T-11 R6
     # HU-25: cada ejecución de la retención (cron, manual o CLI, también la simulación y la
     # omitida por otra en curso) deja UN registro con plazos, conteos y duración; y cada
     # cambio del plazo desde el panel, el valor anterior y el nuevo.
@@ -209,6 +213,9 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RETENCION_ARCOP: Categoria.SUPRESION,
     Accion.RETENCION_EVENTOS: Categoria.SUPRESION,
     Accion.RETENCION_TUTOR: Categoria.SUPRESION,
+    Accion.RETENCION_CONTRATACION: Categoria.SUPRESION,
+    Accion.EVIDENCIA_CLASIFICACION_DESCARTADA: Categoria.MODIFICACION,
+    Accion.RETENCION_ARCOP_SEGUIMIENTO: Categoria.SUPRESION,
     Accion.RETENCION_EJECUCION: Categoria.SUPRESION,         # HU-25: el resumen de cada corrida
     Accion.DOCUMENTO_ELIMINADO: Categoria.SUPRESION,
     Accion.TUTOR_CONVERSACION_ELIMINADA: Categoria.SUPRESION,

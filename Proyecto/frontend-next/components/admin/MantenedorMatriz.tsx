@@ -13,6 +13,7 @@
  * evaluaciones cerradas siguen con la versión con que se respondieron; las en curso pasan a
  * la nueva. Cada cambio queda en el audit log (lo registra el backend).
  */
+import { BotonConMotivo } from "@/components/ui/BotonConMotivo";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -149,7 +150,9 @@ export function MantenedorMatriz() {
 
   return (
     <div className={a.pagina}>
+      {/* Sin recarga automática al volver: no debe pisar un borrador que se está editando */}
       <BarraAdmin
+        alVolver={false}
         onActualizar={async () => {
           setRecarga((n) => n + 1);
           await cargar();
@@ -380,9 +383,10 @@ function FranjaVersiones({
             <p className={s.saludError}>Se publicó otra versión después de crear este borrador: descártalo y crea uno nuevo.</p>
           ) : null}
           <div className={s.acciones}>
-            <button className="btn btn-primary" type="button" onClick={publicar} disabled={ocupado || !b.cambios}>
+            <BotonConMotivo className="btn btn-primary" onClick={publicar} ocupado={ocupado}
+                            motivo={!ocupado && !b.cambios ? "Haz al menos un cambio en el borrador para publicarlo" : null}>
               Revisar y publicar
-            </button>
+            </BotonConMotivo>
             <button className="btn btn-ghost" type="button" onClick={descartar} disabled={ocupado}>Descartar borrador</button>
           </div>
         </div>

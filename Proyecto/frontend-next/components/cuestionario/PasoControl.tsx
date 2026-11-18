@@ -20,7 +20,10 @@
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { AvisoError } from "@/components/inicio/AvisoError";
+import { BadgeImpacto } from "@/components/ui/Basicos";
+import { CampoArchivo } from "@/components/ui/CampoArchivo";
 import { Icon } from "@/components/ui/Icon";
+import { normalizarCriticidad } from "@/lib/madurez";
 import type { Cuestionario } from "@/hooks/useCuestionario";
 import { subirEvidencia } from "@/lib/cuestionario/api";
 import {
@@ -41,6 +44,10 @@ import type { ErrorEncuesta } from "@/lib/encuesta/contratos";
 import { ListaEvidencias, useSeguimientoEvidencias } from "./Evidencias";
 import s from "./cuestionario.module.css";
 
+/** Auditoría UX 16-11: las cuatro respuestas; "Requiere revisión" va como acción aparte. */
+const ESTADO_REVISION: EstadoDeclarado = "requiere_revision";
+const OPCIONES_PRINCIPALES = ESTADOS.filter((o) => o.valor !== ESTADO_REVISION);
+
 interface Props {
   c: Cuestionario;
   control: ControlAplicableApi;
@@ -60,7 +67,6 @@ export function PasoControl({ c, control, onLimites }: Props) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<ErrorEncuesta | null>(null);
   const [guardadoSinAvanzar, setGuardadoSinAvanzar] = useState(false);
-  const [vistaPrevia, setVistaPrevia] = useState<EstadoDeclarado | null>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
   const inputArchivo = useRef<HTMLInputElement>(null);
   const campoJustificacion = useRef<HTMLDivElement>(null);
@@ -106,7 +112,10 @@ export function PasoControl({ c, control, onLimites }: Props) {
   }, [estado]);
 
   const opcion = estado ? ESTADO_POR_VALOR[estado] : null;
-  const ayudaVisible = ESTADO_POR_VALOR[(vistaPrevia ?? estado) as EstadoDeclarado] ?? null;
+  // Auditoría UX 16-11 · Fase 9.2: la descripción solo de la opción ELEGIDA (antes aparecía al pasar
+  // el mouse y la opción parecía elegida).
+  const ayudaVisible = estado ? ESTADO_POR_VALOR[estado] : null;
+  const pideRevision = estado === ESTADO_REVISION;
   const errJust = estado ? errorJustificacion(estado, justificacion) : null;
   const largo = normalizarJustificacion(justificacion).length;
   const tieneEvidencias = (detalle?.evidencias.length ?? 0) > 0;
@@ -204,9 +213,9 @@ export function PasoControl({ c, control, onLimites }: Props) {
         (destino?.tagName === "INPUT" && !["radio", "checkbox", "file"].includes((destino as HTMLInputElement).type));
       if (escribiendo) return;
       const n = Number(e.key);
-      if (Number.isInteger(n) && n >= 1 && n <= ESTADOS.length) {
+      if (Number.isInteger(n) && n >= 1 && n <= OPCIONES_PRINCIPALES.length) {
         e.preventDefault();
-        elegirEstado(ESTADOS[n - 1].valor);
+        elegirEstado(OPCIONES_PRINCIPALES[n - 1].valor);
       }
     }
     window.addEventListener("keydown", alTeclear);
@@ -219,13 +228,10 @@ export function PasoControl({ c, control, onLimites }: Props) {
     <section className={`card ${s.pregunta}`} aria-labelledby="t-control" aria-busy={cargandoPrevia}>
       <div className={s.planteamiento}>
         <div className={s.cabecera}>
-          {control.criticidad ? (
-            <span className={`badge tone-${control.criticidad === "Alta" ? "alto" : control.criticidad === "Media" ? "medio" : "bajo"}`}>
-              Criticidad {control.criticidad.toLowerCase()}
-            </span>
-          ) : null}
+          {/* Auditoría UX 16-11: mismo vocabulario que Brechas ("Impacto alto"), no "Criticidad alta" */}
+          {control.criticidad ? <BadgeImpacto criticidad={normalizarCriticidad(control.criticidad)} /> : null}
           <span className={s.dominio}>{control.dominio?.nombre_dominio}</span>
-          <span className={s.dominio} style={{ marginLeft: "auto" }}>
+          <span className={`${s.dominio} ${s.alDerecha}`}>
             Pregunta {posicion + 1} de {total}
           </span>
         </div>
@@ -278,13 +284,9 @@ export function PasoControl({ c, control, onLimites }: Props) {
       <div className={s.respuesta}>
         <fieldset className={s.opciones} aria-invalid={tocado && !estado ? true : undefined}>
           <legend>¿En qué estado está esto en tu organización?</legend>
-          <div className={s.chips} onMouseLeave={() => setVistaPrevia(null)}>
-            {ESTADOS.map((o, n) => (
-              <label
-                key={o.valor}
-                className={s.chip}
-                onMouseEnter={() => setVistaPrevia(o.valor)}
-              >
+          <div className={s.chips}>
+            {OPCIONES_PRINCIPALES.map((o, n) => (
+              <label key={o.valor} className={s.chip}>
                 <input
                   type="radio"
                   name={`estado-${control.id_control}`}
@@ -293,30 +295,41 @@ export function PasoControl({ c, control, onLimites }: Props) {
                   aria-describedby={`${ids.opcion}-${o.valor}-ayuda`}
                   checked={estado === o.valor}
                   onChange={() => elegirEstado(o.valor)}
-                  onFocus={() => setVistaPrevia(o.valor)}
-                  onBlur={() => setVistaPrevia(null)}
                 />
                 <span className={s.marca} data-tono={o.tono} aria-hidden="true" />
                 <span className={s.chipEtiqueta} id={`${ids.opcion}-${o.valor}`}>{o.etiqueta}</span>
+                {/* Elegida = relleno + check visible (no solo el borde) */}
+                <Icon name="check" className={s.chipCheck} aria-hidden="true" />
                 <kbd className={s.atajo} aria-hidden="true">{n + 1}</kbd>
-                {/* La ayuda completa queda para lectores de pantalla; a la vista va en una sola línea abajo */}
                 <span className="sr-only" id={`${ids.opcion}-${o.valor}-ayuda`}>{o.ayuda}</span>
               </label>
             ))}
           </div>
           <p className={s.ayudaOpcion} aria-hidden="true">
-            {ayudaVisible ? (
+            {ayudaVisible && !pideRevision ? (
               <>
                 <span className={s.marca} data-tono={ayudaVisible.tono} />
                 <span><strong>{ayudaVisible.etiqueta}:</strong> {ayudaVisible.ayuda}</span>
               </>
-            ) : (
-              <span>Pasa el cursor por una opción para ver qué significa.</span>
-            )}
+            ) : null}
           </p>
+          {/* Auditoría UX 16-11 · Fase 9.3: "Requiere revisión" deja de ser una respuesta más; es una
+              acción aparte. Se envía el MISMO valor al backend (estado_clasificacion = "requiere_revision"). */}
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm ${s.botonRevision}`}
+            aria-pressed={pideRevision}
+            onClick={() => elegirEstado(ESTADO_REVISION)}
+          >
+            <Icon name={pideRevision ? "check" : "lupaMas"} aria-hidden="true" />
+            No estoy seguro, que lo revise la IA
+          </button>
+          {pideRevision ? (
+            <p className={s.ayuda}>{ESTADO_POR_VALOR[ESTADO_REVISION].ayuda}</p>
+          ) : null}
           {tocado && !estado ? <p className={s.errorCampo} role="alert">Elige un estado para continuar.</p> : null}
           <p className={s.atajos} aria-hidden="true">
-            Atajos: <kbd>1</kbd>–<kbd>5</kbd> eligen el estado y <kbd>Ctrl</kbd> + <kbd>Enter</kbd> guarda y continúa.
+            Atajos: <kbd>1</kbd>–<kbd>{OPCIONES_PRINCIPALES.length}</kbd> eligen el estado y <kbd>Ctrl</kbd> + <kbd>Enter</kbd> guarda y continúa.
           </p>
         </fieldset>
 
@@ -375,25 +388,22 @@ export function PasoControl({ c, control, onLimites }: Props) {
                   )}
                 </span>
               </div>
-              <div className={s.archivo}>
-                <input
-                  ref={inputArchivo}
-                  id={ids.archivo}
-                  type="file"
-                  accept={EXTENSIONES_EVIDENCIA.join(",")}
-                  aria-describedby={ids.ayudaArchivo}
-                  onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null)}
-                />
-                <label htmlFor={ids.archivo} className={`btn btn-ghost btn-sm ${s.btnArchivo}`}>
-                  <Icon name="descargar" style={{ transform: "rotate(180deg)" }} />
-                  {archivo ? "Cambiar archivo" : "Seleccionar archivo"}
-                </label>
-                <span className={s.nombreArchivo}>{archivo ? archivo.name : "Ningún archivo seleccionado"}</span>
-              </div>
+              <CampoArchivo
+                ref={inputArchivo}
+                id={ids.archivo}
+                accept={EXTENSIONES_EVIDENCIA.join(",")}
+                archivo={archivo}
+                describedBy={ids.ayudaArchivo}
+                error={errorArchivo}
+                onCambiar={(f) => {
+                  elegirArchivo(f);
+                  if (!f && inputArchivo.current) inputArchivo.current.value = "";
+                }}
+              />
               <p id={ids.ayudaArchivo} className={s.ayuda}>
                 Formatos: {EXTENSIONES_EVIDENCIA.join(", ")} · máx. 12 MB. La IA revisa si el documento respalda el estado que declaraste.
               </p>
-              {errorArchivo ? <p className={s.errorCampo} role="alert">{errorArchivo}</p> : null}
+
               {faltaEvidenciaRevision ? (
                 <p className={s.ayuda} role="note">
                   Sin evidencia, esta pregunta quedará pendiente y no podrás completar la evaluación hasta adjuntarla o cambiar el estado.
@@ -407,15 +417,13 @@ export function PasoControl({ c, control, onLimites }: Props) {
         </div>
 
         <div className={s.acciones}>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => c.irA(posicion - 1)}
-            disabled={posicion <= 0 || guardando}
-          >
-            <Icon name="flecha" style={{ transform: "rotate(180deg)" }} />
-            <span className={s.textoAnterior}>Anterior</span>
-          </button>
+          {/* Auditoría UX 16-11 · Fase 9.4: sin "Anterior" en la primera pregunta */}
+          {posicion > 0 ? (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => c.irA(posicion - 1)} disabled={guardando}>
+              <Icon name="flecha" className={s.flechaAtras} />
+              <span className={s.textoAnterior}>Anterior</span>
+            </button>
+          ) : <span aria-hidden="true" />}
           {guardadoSinAvanzar ? (
             <span className={s.guardado} role="status">
               <Icon name="check" />

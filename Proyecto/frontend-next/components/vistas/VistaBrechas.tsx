@@ -5,10 +5,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { InformeBrechas } from "@/components/brechas/InformeBrechas";
 import { MatrizPriorizacion } from "@/components/brechas/MatrizPriorizacion";
-import { TarjetasSeveridad } from "@/components/brechas/TarjetasSeveridad";
+import { ChipsSeveridad } from "@/components/brechas/TarjetasSeveridad";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeEstado, BadgeSeveridad, EstadoPanel } from "@/components/ui/Basicos";
+import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
 import { Icon } from "@/components/ui/Icon";
 import { useAvanceFormativo } from "@/hooks/useAvanceFormativo";
 import { usePanel } from "@/hooks/usePanel";
@@ -156,14 +157,14 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const botonOrden = (o: Orden, textoBoton: string) => (
     <button type="button" className="sort-btn" onClick={() => setOrden(o)}>
       {textoBoton}
-      <Icon name="ordenar" width={14} height={14} style={{ opacity: orden === o ? 1 : 0.5 }} />
+      <Icon name="ordenar" width={14} height={14} className={orden === o ? undefined : "icono-tenue"} />
     </button>
   );
 
   if (panel.brechas.length === 0) {
     return (
       <div className="state" role="status">
-        <Icon name="escudo" width={32} height={32} style={{ color: "var(--accent)" }} />
+        <Icon name="escudo" width={32} height={32} className="icono-estado icono-ok" />
         <h2>Sin brechas abiertas</h2>
         <p>
           Ninguno de los {panel.controlesEvaluados} controles evaluados quedó como no cumplido o parcialmente cumplido.
@@ -175,7 +176,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
 
   return (
     <>
-      <div className="no-print" style={{ display: "grid", gap: "var(--sp-6)" }}>
+      <div className="no-print pila">
         {/* Correcciones 29-10: sin la línea "N preguntas evaluadas → …". Solo queda un aviso
             pequeño cuando hay respuestas en revisión, porque explica por qué el listado puede cambiar. */}
         {panel.enRevision > 0 ? (
@@ -187,50 +188,12 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
           </p>
         ) : null}
 
-        {/* Criterio 2: severidades (también filtran) */}
-        <TarjetasSeveridad conteo={panel.brechasPorSeveridad} seleccion={filtros.severidades} onAlternar={alternarSeveridad} />
-
-        <div className="grid">
-          <div className="col-5 md-col-12" style={{ display: "grid" }}>
-            <MatrizPriorizacion brechas={panel.brechas} />
-          </div>
-          <section className="card col-7 md-col-12" aria-labelledby="brechas-dominio-titulo" style={{ display: "grid", gap: 16, alignContent: "start" }}>
-            <div>
-              <h2 className="card-title" id="brechas-dominio-titulo">Brechas por dominio</h2>
-              <p className="card-sub">Elige un dominio para filtrar el listado</p>
-            </div>
-            <ul className="gap-list">
-              {porDominio.map(([d, total, criticas]) => (
-                <li key={d}>
-                  <button
-                    type="button"
-                    className="domain-filter"
-                    aria-pressed={filtros.dominio === d}
-                    onClick={() => setFiltro({ dominio: filtros.dominio === d ? null : d })}
-                  >
-                    <span className="domain-filter-name">{d}</span>
-                    <span className="domain-bar" aria-hidden="true">
-                      <span className="fill" style={{ width: `${(total / maxDominio) * 100}%` }} />
-                    </span>
-                    <span className="domain-filter-count">
-                      {total}
-                      {criticas ? (
-                        <span style={{ color: "var(--critico)" }}>
-                          {" "}
-                          · {criticas} {pluralSeveridad("Crítica", criticas)}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+        {/* Criterio 2: severidades (también filtran). Auditoría UX 16-11: un solo resumen compacto */}
+        <ChipsSeveridad conteo={panel.brechasPorSeveridad} seleccion={filtros.severidades} onAlternar={alternarSeveridad} />
 
         {/* Criterio 2 + 3: listado priorizado, filtros y exportación */}
-        <section className="card" aria-labelledby="tabla-brechas-titulo" style={{ display: "grid", gap: 20, alignContent: "start" }}>
-          <div className="card-head" style={{ marginBottom: 0, alignItems: "flex-end" }}>
+        <section className="card tarjeta-apilada" aria-labelledby="tabla-brechas-titulo">
+          <div className="card-head card-head-fin">
             <div>
               <h2 className="card-title" id="tabla-brechas-titulo">Listado priorizado</h2>
               {/* Correcciones 29-10: el conteo solo se muestra cuando hay filtros (ahí sí informa) */}
@@ -305,7 +268,6 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
               <select
                 id={idEstado}
                 className="select"
-                style={{ minWidth: 200 }}
                 value={filtros.estado ?? ""}
                 onChange={(e) => setFiltro({ estado: (e.target.value || null) as FiltrosBrechas["estado"] })}
               >
@@ -345,7 +307,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
             </div>
           ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table-tarjetas">
                 <caption className="sr-only">
                   Brechas abiertas ordenadas por {orden === "prioridad" ? "prioridad" : "dominio"}. La columna Prioridad indica el
                   orden de atención recomendado.
@@ -362,17 +324,17 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                 <tbody>
                   {filtradas.map((b) => (
                     <tr key={b.respuestaId} data-sev={b.severidad} className={`sev-${SEVERIDAD_TONO[b.severidad]}`}>
-                      <td className="rank">
+                      <td className="rank" data-label="Prioridad">
                         <span className="sr-only">Prioridad </span>
                         {b.prioridad}
                       </td>
-                      <td>
-                        <span style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+                      <td data-label="Severidad">
+                        <span className="celda-insignias">
                           <BadgeSeveridad severidad={b.severidad} />
                           <BadgeEstado estado={b.estado} />
                         </span>
                       </td>
-                      <td style={{ minWidth: 260 }}>
+                      <td className="celda-brecha" data-label="Brecha detectada">
                         <span className="brecha-desc">{b.descripcion}</span>
                         {b.criticidad !== "Sin clasificar" ? (
                           <span className="brecha-codigos">
@@ -380,8 +342,8 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                           </span>
                         ) : null}
                       </td>
-                      <td>{b.dominio}</td>
-                      <td style={{ minWidth: 200 }}>
+                      <td data-label="Dominio">{b.dominio}</td>
+                      <td className="celda-accion" data-label="Acción y ruta formativa">
                         {b.accion ?? "—"}
                         {b.rutaFormativa ? (
                           <span className="ruta">
@@ -406,6 +368,44 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
             </div>
           )}
         </section>
+
+        <section className="card tarjeta-apilada" aria-labelledby="brechas-dominio-titulo">
+          <div>
+            <h2 className="card-title" id="brechas-dominio-titulo">Brechas por dominio</h2>
+            <p className="card-sub">Elige un dominio para filtrar el listado</p>
+          </div>
+          <ul className="gap-list">
+            {porDominio.map(([d, total, criticas]) => (
+              <li key={d}>
+                <button
+                  type="button"
+                  className="domain-filter"
+                  aria-pressed={filtros.dominio === d}
+                  onClick={() => setFiltro({ dominio: filtros.dominio === d ? null : d })}
+                >
+                  <span className="domain-filter-name">{d}</span>
+                  <span className="domain-bar" aria-hidden="true">
+                    <span className="fill" style={{ width: `${(total / maxDominio) * 100}%` }} />
+                  </span>
+                  <span className="domain-filter-count">
+                    {total}
+                    {criticas ? (
+                      <span className="cifra-critica">
+                        {" "}
+                        · {criticas} {pluralSeveridad("Crítica", criticas)}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Auditoría UX 16-11: la matriz explica la metodología; va plegada y cerrada por defecto */}
+        <ComoSeCalcula titulo="¿Cómo se prioriza?">
+          <MatrizPriorizacion brechas={panel.brechas} plano />
+        </ComoSeCalcula>
       </div>
 
       <InformeBrechas panel={panel} brechas={filtradas} filtros={filtros} emitido={emitido} />

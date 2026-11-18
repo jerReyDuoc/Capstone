@@ -20,8 +20,8 @@ from app.domain.privacidad import catalogo_datos_personales as inv
 NIVELES = ("critico", "alto", "medio", "bajo")
 _ORDEN = {n: i for i, n in enumerate(NIVELES)}
 # Conservaciones que dependen de una decisión pendiente (no de un evento natural como "mientras exista la cuenta")
-PENDIENTES = {inv.C_SESION: "Sesiones y enlaces vencidos", inv.C_AUDITORIA: "Registro de auditoría",
-              inv.C_CONTRATACION: "Solicitudes de contratación descartadas"}
+# T-11: las solicitudes de contratación descartadas ya tienen plazo (RETENCION_SOLICITUDES_DESCARTADAS_DIAS)
+PENDIENTES = {inv.C_SESION: "Sesiones y enlaces vencidos", inv.C_AUDITORIA: "Registro de auditoría"}
 MAX_HORAS_RETENCION = 48
 
 
@@ -105,9 +105,6 @@ def revisar(reg: RegistroPlataforma, conf, ultima_retencion: dict | None, ahora:
                           "El registro es inmutable y guarda la dirección IP de cada acción. Falta definir cuánto se "
                           "conserva y cómo se purga por lotes sellados.",
                           "Define el plazo y el procedimiento de purga del registro de auditoría."),
-        inv.C_CONTRATACION: ("Solicitudes de contratación sin plazo cuando se descartan",
-                             "Si una solicitud no termina en contrato, sus datos de contacto no tienen un plazo de "
-                             "eliminación.", "Define un plazo de eliminación para las solicitudes descartadas."),
     }
     for c, acts in pendientes.items():
         titulo, detalle, rec = textos[c]
