@@ -150,6 +150,12 @@ def _clave(nombre: str | None) -> str:
     return sin_tildes(nombre or "").strip()
 
 
+def orden_dimension(nombre: str | None) -> tuple[int, str]:
+    """Orden estable de las dimensiones: las 4 de HU-03 primero (DIMENSIONES_OFICIALES), luego por nombre."""
+    orden = {_clave(n): i for i, n in enumerate(DIMENSIONES_OFICIALES)}
+    return orden.get(_clave(nombre), len(orden)), _clave(nombre)
+
+
 def cinco_puntajes(puntaje_general: float, preguntas_total: int, dominios: list[DominioResultado],
                    catalogo: Iterable[str] = ()) -> list[PuntajeInforme]:
     """
@@ -167,8 +173,7 @@ def cinco_puntajes(puntaje_general: float, preguntas_total: int, dominios: list[
     for nombre in [*base, *(d.nombre for d in dominios)]:
         if nombre and _clave(nombre) not in {_clave(n) for n in nombres}:
             nombres.append(nombre)
-    orden = {_clave(n): i for i, n in enumerate(DIMENSIONES_OFICIALES)}
-    nombres.sort(key=lambda n: (orden.get(_clave(n), len(orden)), _clave(n)))
+    nombres.sort(key=orden_dimension)
 
     filas = [PuntajeInforme(
         nombre=GLOBAL,

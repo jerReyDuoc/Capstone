@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  DERECHOS, ESTADOS, ESTADOS_ARCOP, FILTROS_ADMIN_INICIALES, TIPOS_ARCOP,
+  DERECHOS, DIAS_POR_VENCER, ESTADOS, ESTADOS_ARCOP, FILTROS_ADMIN_INICIALES, TIPOS_ARCOP,
   accionesAdmin, accionesTitular, errorTexto, exportable, nombreDesdeDisposicion, normalizarCodigo,
   pasoActual, puedeProrrogar, queryAdmin, siguientePasoAdmin, textoEvento, textoPlazo, titularDe,
   type DetalleArcop, type EstadoArcop,
@@ -104,6 +104,18 @@ describe("HU-32 · proxy del admin (/bff/admin/api)", () => {
     const q = queryAdmin(f);
     expect(filtrarQueryAdmin(new URLSearchParams(q))).toBe(`?${q}`);
     expect(queryAdmin(FILTROS_ADMIN_INICIALES)).toBe("page=1&size=20");
+  });
+
+  it("T-19: por_vencer_dias pasa solo entre 1 y 30", () => {
+    for (const v of ["1", "5", "19", "30"]) {
+      expect(filtrarQueryAdmin(new URLSearchParams(`por_vencer_dias=${v}`))).toBe(`?por_vencer_dias=${v}`);
+    }
+    for (const v of ["0", "31", "-1", "05", "abc", "5.5"]) {
+      expect(filtrarQueryAdmin(new URLSearchParams(`por_vencer_dias=${v}`))).toBe("");
+    }
+    const q = queryAdmin({ ...FILTROS_ADMIN_INICIALES, por_vencer_dias: DIAS_POR_VENCER });
+    expect(q).toBe(`page=1&size=20&por_vencer_dias=${DIAS_POR_VENCER}`);
+    expect(filtrarQueryAdmin(new URLSearchParams(q))).toBe(`?${q}`);
   });
 });
 

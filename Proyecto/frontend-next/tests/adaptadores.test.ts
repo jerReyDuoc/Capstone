@@ -89,6 +89,19 @@ describe("construirPanel", () => {
     expect(p.dominios[0]).toMatchObject({ puntaje: 0, nivel: "inicial", promedioIndustria: null, diferencia: null });
   });
 
+  it("T-20: la dimensión sin preguntas aplicables no se pinta como 0", () => {
+    const conRelleno: ResumenApi = {
+      ...resumen,
+      dominios: [
+        ...resumen.dominios,
+        { dominio_id: 3, dominio: "Protección de Datos", puntaje: null, nivel_madurez: null, total_controles_evaluados: 0,
+          sin_controles_aplicables: true, etiqueta: "Sin preguntas aplicables" },
+      ],
+    };
+    const p = construirPanel({ resumen: conRelleno, comparativa: null, respuestas: [], catalogo });
+    expect(p.dominios.map((d) => d.nombre)).toEqual(["Gestión de Riesgos", "Uso Responsable"]);
+  });
+
   it("calcula la diferencia contra la industria cuando el backend no la trae", () => {
     const p = construirPanel({
       resumen,

@@ -98,6 +98,7 @@ class SolicitudARCOPRepository:
         tipo: str | None = None,
         solo_vencidas_al: datetime | None = None,
         usuario_definitivo_id: int | None = None,
+        por_vencer_entre: tuple[datetime, datetime] | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[SolicitudARCOP], int]:
@@ -122,6 +123,22 @@ class SolicitudARCOPRepository:
                     SolicitudARCOP.estado == EstadoSolicitudARCOP.PENDIENTE_INFORMACION.value,
                     SolicitudARCOP.fecha_limite_informacion < solo_vencidas_al,
                 ),
+            ))
+        if por_vencer_entre is not None:
+            # Misma regla que plazo_por_vencer(): abierta, sin plazo vencido y con alguno
+            # de sus plazos en [desde, hasta). El de información solo cuenta en pendiente_informacion.
+            desde, hasta = por_vencer_entre
+            pendiente = SolicitudARCOP.estado == EstadoSolicitudARCOP.PENDIENTE_INFORMACION.value
+            filtros.append(SolicitudARCOP.estado.not_in(EstadoSolicitudARCOP.finales()))
+            filtros.append(or_(SolicitudARCOP.fecha_limite_respuesta.is_(None),
+                               SolicitudARCOP.fecha_limite_respuesta >= desde))
+            filtros.append(or_(~pendiente, SolicitudARCOP.fecha_limite_informacion.is_(None),
+                               SolicitudARCOP.fecha_limite_informacion >= desde))
+            filtros.append(or_(
+                and_(SolicitudARCOP.fecha_limite_respuesta >= desde,
+                     SolicitudARCOP.fecha_limite_respuesta < hasta),
+                and_(pendiente, SolicitudARCOP.fecha_limite_informacion >= desde,
+                     SolicitudARCOP.fecha_limite_informacion < hasta),
             ))
         for f in filtros:
             q = q.where(f)

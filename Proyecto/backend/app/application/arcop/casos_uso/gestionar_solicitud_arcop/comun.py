@@ -70,6 +70,42 @@ def plazo_vencido(solicitud: SolicitudARCOP, ahora: datetime | None = None) -> b
     )
 
 
+MIN_POR_VENCER_DIAS, MAX_POR_VENCER_DIAS = 1, 30
+
+
+def ventana_por_vencer(dias: int, ahora: datetime | None = None) -> tuple[datetime, datetime]:
+    """
+    [ahora, fin) de "por vencer en `dias` días": hoy inclusive hasta el último instante de
+    hoy+dias (fin = medianoche del día siguiente). Desde `ahora`: lo anterior ya está vencido.
+    """
+    if not isinstance(dias, int) or not MIN_POR_VENCER_DIAS <= dias <= MAX_POR_VENCER_DIAS:
+        raise ValueError(
+            f"El parámetro 'por_vencer_dias' debe ser un entero entre "
+            f"{MIN_POR_VENCER_DIAS} y {MAX_POR_VENCER_DIAS}."
+        )
+    ahora = ahora or _ahora()
+    fin = datetime.combine(ahora.date() + timedelta(days=dias + 1), datetime.min.time())
+    return ahora, fin
+
+
+def plazo_por_vencer(solicitud: SolicitudARCOP, dias: int, ahora: datetime | None = None) -> bool:
+    """
+    True si la solicitud sigue abierta, NO tiene plazos vencidos y alguno de sus plazos
+    cae dentro de los próximos `dias` días (hoy inclusive). Misma regla que plazo_vencido():
+    el plazo de información solo cuenta mientras la solicitud está en pendiente_informacion.
+    """
+    desde, hasta = ventana_por_vencer(dias, ahora)
+    if solicitud.estado in Estado.finales() or plazo_vencido(solicitud, desde):
+        return False
+    if solicitud.fecha_limite_respuesta and desde <= solicitud.fecha_limite_respuesta < hasta:
+        return True
+    return bool(
+        solicitud.estado == Estado.PENDIENTE_INFORMACION.value
+        and solicitud.fecha_limite_informacion
+        and desde <= solicitud.fecha_limite_informacion < hasta
+    )
+
+
 def _sumar_dias(desde: datetime, dias: int | None) -> datetime | None:
     """Días CORRIDOS. None o 0 = sin plazo."""
     return desde + timedelta(days=dias) if dias else None

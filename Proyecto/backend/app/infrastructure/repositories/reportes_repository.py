@@ -26,6 +26,10 @@ class ReportesRepository:
         )
         return list(result.all())
 
+    async def dominios(self) -> list[Dominio]:
+        """Catálogo de dimensiones (tabla dominio): T-20, el resumen las informa todas."""
+        return list((await self.session.execute(select(Dominio))).scalars().all())
+
     async def benchmark_con_rubro_y_dominio(self, rubro_id: int | None
                                             ) -> list[tuple[Benchmark, Rubro, Dominio | None]]:
         query = (

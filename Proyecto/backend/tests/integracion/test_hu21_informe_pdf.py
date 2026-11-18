@@ -14,8 +14,11 @@ API corren en proceso (SQLite en memoria, ver apoyo/api_harness.py) y se omiten 
 """
 import asyncio
 import io
+import json
+import os
 import re
 from datetime import date, datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -254,6 +257,33 @@ def test_ficha_json_tiene_lo_que_muestra_la_pagina_sin_codigos_internos():
     assert f["brechas"]["total"] == 4 and len(f["brechas"]["principales"]) == 3
     assert f["rutas"]["modulos"] > 0 and f["rutas"]["horas"] > 0
     assert not re.search(r"\b(ERR-)?[A-Z]{3}-\d{3}\b", str(f))
+
+
+# =====================================================================
+# Golden (T-20): el contenido del PDF no cambia
+# =====================================================================
+# Texto normalizado de cada página + huella de la ficha, con fecha de emisión fija. Se compara
+# el texto (no los bytes): reportlab incrusta fecha de creación e id del documento.
+# Para regenerarlo A PROPÓSITO (cambio aprobado del informe): ACTUALIZAR_GOLDEN_HU21=1 pytest -k golden
+GOLDEN_HU21 = Path(__file__).resolve().parents[1] / "data" / "golden_hu21_informe.json"
+
+
+def _casos_golden() -> dict:
+    sin_riesgos = [d for d in DOMINIOS if d.nombre != "Gestión de Riesgos"]
+    return {
+        "completo": _informe(),
+        "dimension_sin_fila": _informe(_datos(dominios=sin_riesgos, controles_evaluados=5,
+                                              dimensiones_catalogo=tuple(sorted(d.nombre for d in DOMINIOS)))),
+    }
+
+
+def test_golden_el_pdf_de_hu21_no_cambia():
+    actual = {nombre: {"huella": inf.ficha.huella, "paginas": _paginas(_pdf(inf))}
+              for nombre, inf in _casos_golden().items()}
+    if os.environ.get("ACTUALIZAR_GOLDEN_HU21") == "1":
+        GOLDEN_HU21.write_text(json.dumps(actual, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    golden = json.loads(GOLDEN_HU21.read_text(encoding="utf-8"))
+    assert actual == golden, "El PDF de HU-21 cambió respecto del golden (tests/data/golden_hu21_informe.json)"
 
 
 # =====================================================================

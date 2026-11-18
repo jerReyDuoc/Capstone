@@ -454,11 +454,15 @@ export interface FiltrosAdmin {
   estado: EstadoArcop | null;
   tipo: TipoArcop | null;
   vencidas: boolean;
+  /** T-19: solo abiertas con algún plazo dentro de N días (1..30); null = sin filtro */
+  por_vencer_dias: number | null;
   evaluacion_id: number | null;
   page: number;
 }
 
-export const FILTROS_ADMIN_INICIALES: FiltrosAdmin = { estado: null, tipo: null, vencidas: false, evaluacion_id: null, page: 1 };
+export const FILTROS_ADMIN_INICIALES: FiltrosAdmin = { estado: null, tipo: null, vencidas: false, por_vencer_dias: null, evaluacion_id: null, page: 1 };
+/** T-19: ventana de la cifra "Por vencer" de la bandeja */
+export const DIAS_POR_VENCER = 5;
 export const TAMANO_PAGINA_ADMIN = 20;
 
 export function queryAdmin(f: FiltrosAdmin, size = TAMANO_PAGINA_ADMIN): string {
@@ -466,6 +470,7 @@ export function queryAdmin(f: FiltrosAdmin, size = TAMANO_PAGINA_ADMIN): string 
   if (f.estado) q.set("estado", f.estado);
   if (f.tipo) q.set("tipo", f.tipo);
   if (f.vencidas) q.set("vencidas", "true");
+  if (f.por_vencer_dias) q.set("por_vencer_dias", String(f.por_vencer_dias));
   if (f.evaluacion_id) q.set("evaluacion_id", String(f.evaluacion_id));
   return q.toString();
 }
@@ -476,13 +481,13 @@ export const apiAdminArcop = {
   catalogo: () => pedir<CatalogoArcop>(`${BASE_ADMIN}/catalogo`),
   listar: (f: FiltrosAdmin) => pedir<PaginaArcop>(`${BASE_ADMIN}/solicitudes?${queryAdmin(f)}`),
   /** Totales para la franja de arriba (una consulta mínima por cifra). */
-  async conteos(): Promise<Record<"recibida" | "en_revision" | "pendiente_informacion" | "en_proceso" | "vencidas", number>> {
+  async conteos(): Promise<Record<"recibida" | "en_revision" | "pendiente_informacion" | "en_proceso" | "vencidas" | "por_vencer", number>> {
     const total = (q: string) => pedir<PaginaArcop>(`${BASE_ADMIN}/solicitudes?page=1&size=1&${q}`).then((p) => p.total);
-    const [recibida, en_revision, pendiente_informacion, en_proceso, vencidas] = await Promise.all([
+    const [recibida, en_revision, pendiente_informacion, en_proceso, vencidas, por_vencer] = await Promise.all([
       total("estado=recibida"), total("estado=en_revision"), total("estado=pendiente_informacion"),
-      total("estado=en_proceso"), total("vencidas=true"),
+      total("estado=en_proceso"), total("vencidas=true"), total(`por_vencer_dias=${DIAS_POR_VENCER}`),
     ]);
-    return { recibida, en_revision, pendiente_informacion, en_proceso, vencidas };
+    return { recibida, en_revision, pendiente_informacion, en_proceso, vencidas, por_vencer };
   },
   detalle: (id: number) => pedir<DetalleArcop>(`${BASE_ADMIN}/solicitudes/${id}`),
   cambiarEstado: (id: number, estado: "en_revision" | "pendiente_informacion" | "en_proceso", comentario?: string) =>

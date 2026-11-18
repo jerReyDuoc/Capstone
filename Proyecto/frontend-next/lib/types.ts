@@ -40,6 +40,9 @@ export interface ResumenApi {
     puntaje: number | null;
     nivel_madurez: NivelMadurez | null;
     total_controles_evaluados: number | null;
+    /** T-20: true = dimensión sin fila (todas sus preguntas N/A); puntaje null y etiqueta "Sin preguntas aplicables" */
+    sin_controles_aplicables?: boolean;
+    etiqueta?: string | null;
   }[];
 }
 

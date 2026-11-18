@@ -195,6 +195,9 @@ async def listar_solicitudes(
     usuario_temporal_id: int | None = Query(None, description="Solo admin_therion: filtrar por titular invitado"),
     evaluacion_id: int | None = Query(None, description="Solo admin_therion: filtrar por evaluación (encuestado)"),
     vencidas: bool = Query(False, description="Solo solicitudes abiertas con algún plazo vencido"),
+    # El rango 1..30 lo valida el caso de uso (400 con mensaje), no Query(ge/le) (sería 422)
+    por_vencer_dias: int | None = Query(
+        None, description="Solo abiertas, sin plazo vencido, con algún plazo dentro de N días (1..30, hoy inclusive)"),
     actor: Actor = Depends(titular_o_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -204,7 +207,8 @@ async def listar_solicitudes(
     """
     items, total = await _ejecutar(
         _use_case(db).listar(actor, estado, tipo, usuario_temporal_id, page, size,
-                             solo_vencidas=vencidas, evaluacion_id=evaluacion_id)
+                             solo_vencidas=vencidas, evaluacion_id=evaluacion_id,
+                             por_vencer_dias=por_vencer_dias)
     )
     return {
         "items": [_resumen(s) for s in items],

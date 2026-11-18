@@ -101,7 +101,10 @@ export function contarPorCriticidad(brechas: BrechaVista[]): Record<Criticidad, 
 export function construirDominios(resumen: ResumenApi, comparativa: ComparativaApi | null): DominioVista[] {
   const bench = new Map((comparativa?.comparativas ?? []).map((c) => [c.dominio, c]));
   const metaGeneral = comparativa?.meta_puntaje ?? META_POR_DEFECTO;
+  // T-20: el resumen trae siempre las 4 dimensiones; las que no tienen preguntas aplicables no
+  // son un 0 (el panel las omite como antes; el informe las muestra como "Sin preguntas aplicables").
   return resumen.dominios
+    .filter((d) => !d.sin_controles_aplicables)
     .map<DominioVista>((d) => {
       const puntaje = d.puntaje ?? 0;
       const c = bench.get(d.dominio);
