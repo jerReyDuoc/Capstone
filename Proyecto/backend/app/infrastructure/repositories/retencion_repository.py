@@ -14,7 +14,14 @@ from app.domain.models.configuracion_retencion import (
     ID_UNICO,
     ConfiguracionRetencion as Conf,
 )
+from app.domain.models.documento_empresa import DocumentoEmpresa
+from app.domain.models.empresa import Empresa
 from app.domain.models.evaluacion import ORIGEN_PUBLICA, Evaluacion
+from app.domain.models.evidencia import Evidencia
+from app.domain.models.respuesta import Respuesta
+from app.domain.models.sanitizacion import Sanitizacion
+from app.domain.models.tutor_conversaciones import ConversacionTutor, MensajeTutor
+from app.domain.models.usuario_definitivo import UsuarioDefinitivo
 from app.domain.models.evento_seguridad import EventoSeguridad
 from app.domain.models.solicitud_arcop import (
     EstadoSolicitudARCOP,
@@ -226,3 +233,80 @@ class RetencionRepository:
             update(EventoSeguridad).where(EventoSeguridad.id_evento.in_(ids)).values(extracto=None)
             .execution_options(synchronize_session=False))
         return res.rowcount or 0
+
+    # ------------------------------------------------------------------ T-17 R7 empresas con la gracia vencida
+    async def empresas_pendientes_de_borrado(self, ids: list[int]) -> tuple[list[int], int]:
+        """
+        De las empresas con la gracia vencida: (las que aún hay que procesar y no tienen una solicitud
+        ARCOP abierta, cuántas se omiten por tenerla). Las ya procesadas (datos_eliminados_en) no cuentan.
+        """
+        if not ids:
+            return [], 0
+        pendientes = list((await self.session.execute(
+            select(Empresa.id).where(Empresa.id.in_(ids), Empresa.datos_eliminados_en.is_(None))
+            .order_by(Empresa.id))).scalars().all())
+        libres, omitidas = [], 0
+        for empresa_id in pendientes:
+            if await self._empresa_con_arcop_abierta(empresa_id):
+                omitidas += 1
+            else:
+                libres.append(empresa_id)
+        return libres, omitidas
+
+    async def _empresa_con_arcop_abierta(self, empresa_id: int) -> bool:
+        """Abierta = no final, de un usuario de la empresa, de una de sus evaluaciones o de su titular de origen."""
+        evals = select(Evaluacion.id).where(Evaluacion.empresa_id == empresa_id)
+        titulares = select(Evaluacion.usuario_temporal_id).where(Evaluacion.empresa_id == empresa_id)
+        usuarios = select(UsuarioDefinitivo.id).where(UsuarioDefinitivo.empresa_id == empresa_id)
+        return bool((await self.session.execute(
+            select(func.count()).select_from(SolicitudARCOP).where(
+                SolicitudARCOP.estado.not_in(list(EstadoSolicitudARCOP.finales())),
+                or_(SolicitudARCOP.usuario_definitivo_id.in_(usuarios),
+                    SolicitudARCOP.evaluacion_id.in_(evals),
+                    SolicitudARCOP.usuario_temporal_id.in_(titulares))))).scalar_one())
+
+    async def ids_usuarios_definitivos_de_empresa(self, empresa_id: int) -> list[int]:
+        return list((await self.session.execute(
+            select(UsuarioDefinitivo.id).where(UsuarioDefinitivo.empresa_id == empresa_id)
+            .order_by(UsuarioDefinitivo.id))).scalars().all())
+
+    async def borrar_documentos_empresa(self, empresa_id: int) -> tuple[int, list[str]]:
+        """Borra las filas de documento_empresa; devuelve (cantidad, rutas de archivo a borrar tras el commit)."""
+        rutas = [r for r in (await self.session.execute(
+            select(DocumentoEmpresa.storage_path).where(DocumentoEmpresa.empresa_id == empresa_id)
+        )).scalars().all() if r]
+        res = await self.session.execute(delete(DocumentoEmpresa).where(DocumentoEmpresa.empresa_id == empresa_id)
+                                         .execution_options(synchronize_session=False))
+        return int(res.rowcount or 0), rutas
+
+    async def eliminar_evidencias_empresa(self, empresa_id: int, ahora: datetime) -> tuple[int, list[str]]:
+        """
+        Como "eliminar" en Mis documentos (HU-29): se pierde el archivo, lo extraído y los textos; la fila
+        conserva clasificación, estados y puntajes para que el historial de madurez siga explicable.
+        """
+        resps = select(Respuesta.id).where(Respuesta.evaluacion_id.in_(
+            select(Evaluacion.id).where(Evaluacion.empresa_id == empresa_id)))
+        propias = Evidencia.respuesta_id.in_(resps)
+        rutas = [r for r in (await self.session.execute(
+            select(Evidencia.storage_path).where(propias))).scalars().all() if r]
+        await self.session.execute(
+            update(Sanitizacion).where(Sanitizacion.evidencia_id.in_(select(Evidencia.id_evidencia).where(propias)))
+            .values(mapa_cifrado=None, entidades=None).execution_options(synchronize_session=False))
+        res = await self.session.execute(
+            update(Evidencia).where(propias, Evidencia.fecha_eliminacion.is_(None))
+            .values(nombre_archivo=TEXTO_ANONIMIZADO, storage_path="", datos_extraidos=None, justificacion_llm=None,
+                    errores_validacion=None, justificacion_remediacion=None, fecha_eliminacion=ahora)
+            .execution_options(synchronize_session=False))
+        return int(res.rowcount or 0), rutas
+
+    async def borrar_conversaciones_tutor_empresa(self, empresa_id: int) -> int:
+        ids = select(ConversacionTutor.id).where(ConversacionTutor.empresa_id == empresa_id)
+        await self.session.execute(delete(MensajeTutor).where(MensajeTutor.conversacion_id.in_(ids))
+                                   .execution_options(synchronize_session=False))
+        res = await self.session.execute(delete(ConversacionTutor).where(ConversacionTutor.empresa_id == empresa_id)
+                                         .execution_options(synchronize_session=False))
+        return int(res.rowcount or 0)
+
+    async def marcar_empresa_datos_eliminados(self, empresa_id: int, ahora: datetime) -> None:
+        await self.session.execute(update(Empresa).where(Empresa.id == empresa_id)
+                                   .values(datos_eliminados_en=ahora).execution_options(synchronize_session=False))

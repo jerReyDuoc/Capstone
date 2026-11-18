@@ -20,7 +20,7 @@ from app.domain.evaluacion.analisis_brechas import (
     filtrar_brechas,
 )
 from app.application.informes.ficha import (
-    AVISO_INFORME,
+    aviso_informe,
     FichaInforme,
     cinco_puntajes,
     codigo_evaluacion,
@@ -49,7 +49,7 @@ def construir_informe(datos: "DatosEvaluacion", filtros: FiltrosBrechas,
                               datos.dimensiones_catalogo)
     ficha = FichaInforme(
         codigo=codigo, fecha_evaluacion=datos.fecha_inicio, fecha_completado=datos.fecha_completado,
-        version_matriz=version, version_matriz_registrada=registrada, aviso=AVISO_INFORME,
+        version_matriz=version, version_matriz_registrada=registrada, aviso=aviso_informe(getattr(datos, "aviso_informe_version", None)),
         aviso_aceptado_version=datos.aviso_aceptado_version, aviso_aceptado_fecha=datos.aviso_aceptado_fecha,
         puntajes=puntajes, huella=huella_datos(codigo, version, puntajes, brechas, plan),
     )

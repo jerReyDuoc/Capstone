@@ -94,6 +94,7 @@ class Accion:
     EVIDENCIA_CLASIFICACION_DESCARTADA = "evidencia.clasificacion_descartada"
     RETENCION_CONTRATACION = "retencion.contratacion_descartada_eliminada"  # T-11 R5
     RETENCION_ARCOP_SEGUIMIENTO = "retencion.arcop_seguimiento_retirado"    # T-11 R6
+    RETENCION_EMPRESA = "retencion.empresa_datos_eliminados"                # T-17 R7
     # HU-25: cada ejecución de la retención (cron, manual o CLI, también la simulación y la
     # omitida por otra en curso) deja UN registro con plazos, conteos y duración; y cada
     # cambio del plazo desde el panel, el valor anterior y el nuevo.
@@ -214,6 +215,7 @@ _CATEGORIAS: dict[str, str] = {
     Accion.RETENCION_EVENTOS: Categoria.SUPRESION,
     Accion.RETENCION_TUTOR: Categoria.SUPRESION,
     Accion.RETENCION_CONTRATACION: Categoria.SUPRESION,
+    Accion.RETENCION_EMPRESA: Categoria.SUPRESION,
     Accion.EVIDENCIA_CLASIFICACION_DESCARTADA: Categoria.MODIFICACION,
     Accion.RETENCION_ARCOP_SEGUIMIENTO: Categoria.SUPRESION,
     Accion.RETENCION_EJECUCION: Categoria.SUPRESION,         # HU-25: el resumen de cada corrida

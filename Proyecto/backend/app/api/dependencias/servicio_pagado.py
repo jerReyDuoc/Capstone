@@ -36,12 +36,12 @@ from app.core.database import get_db
 
 def servicio_habilitado(empresa, hoy: date | None = None) -> bool:
     """¿La empresa puede usar el servicio pagado hoy? Solo con contrato vigente."""
-    return bool(empresa is not None and empresa.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).servicio_habilitado)
+    return bool(empresa is not None and empresa.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy).servicio_habilitado)
 
 
 def documentos_habilitados(empresa, hoy: date | None = None) -> bool:
     """¿Puede descargar sus documentos? Hasta el fin del plazo de gracia."""
-    return bool(empresa is not None and empresa.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).documentos_disponibles)
+    return bool(empresa is not None and empresa.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy).documentos_disponibles)
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class ClienteConServicio:
 def contrato_no_vigente(empresa, codigo: str = "CONTRATO_NO_VIGENTE") -> HTTPException:
     detalle = {"codigo": codigo, "mensaje": "El servicio de tu empresa no está activo. Contacta a Therion Labs."}
     if empresa is not None:
-        v = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS)
+        v = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL)
         detalle.update(mensaje=v.mensaje(), situacion=v.situacion.value,
                        documentos_disponibles_hasta=v.como_dict()["documentos_disponibles_hasta"])
     return HTTPException(status_code=403, detail=detalle)

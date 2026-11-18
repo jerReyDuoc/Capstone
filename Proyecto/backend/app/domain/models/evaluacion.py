@@ -58,6 +58,9 @@ class Evaluacion(Base):
     # HU-21: versión de la matriz de controles con la que se calcularon los puntajes
     # ("<MATRIZ_VERSION>+<huella SHA-256>"). La fija POST /completar; NULL en las anteriores.
     version_matriz: Mapped[str | None] = mapped_column("version_matriz", String(40), nullable=True)
+    # T-16: versión del aviso legal con la que se emitió el informe (la primera emisión la fija y
+    # queda congelada: un informe emitido con v1 se sigue mostrando con v1).
+    aviso_informe_version: Mapped[str | None] = mapped_column("aviso_informe_version", String(20), nullable=True)
     # HU-24: versión de la matriz (con su contenido completo) con la que se respondió. La fija
     # POST /completar; el informe y el plan formativo de una evaluación cerrada leen los
     # textos, brechas y rutas de ESTA versión aunque el admin publique otra después.

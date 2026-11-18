@@ -260,7 +260,7 @@ class IniciarSesionUseCase:
         # en el plazo de gracia y sus derechos ARCOP); el servicio pagado responde 403
         # CONTRATO_NO_VIGENTE. La respuesta trae la situación para que el frontend la muestre.
         empresa = await fabricas().cuentas(self.db).empresa(usuario.empresa_id)
-        vigencia = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS) if empresa else None
+        vigencia = empresa.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL) if empresa else None
         ahora = _ahora()
         token, sesion = await abrir_sesion(self.db, Rol.CLIENTE.value, usuario.id, ahora)
         usuario.ultimo_acceso = ahora

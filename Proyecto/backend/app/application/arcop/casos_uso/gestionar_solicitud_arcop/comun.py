@@ -3,6 +3,9 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from app.core.config import settings
+from app.domain.calendario import sumar_dias_habiles
+
 from app.domain.models.solicitud_arcop import (
     EstadoSolicitudARCOP as Estado,
     SolicitudARCOP,
@@ -75,19 +78,15 @@ def _sumar_dias(desde: datetime, dias: int | None) -> datetime | None:
     return desde + timedelta(days=dias) if dias else None
 
 
-def _sumar_dias_habiles(desde: datetime, dias: int | None) -> datetime | None:
+def _sumar_dias_habiles(desde: datetime, dias: int | None, feriados=None) -> datetime | None:
     """
-    Días HÁBILES: de lunes a viernes. NO descuenta feriados (no hay calendario de
-    feriados en el proyecto): si uno cae dentro del plazo, el límite real es un día después.
+    Días HÁBILES: lunes a viernes, descontando los feriados de Chile (settings.FERIADOS_CL).
+    Wrapper de la función pura app/domain/calendario.sumar_dias_habiles; inyecta el calendario.
+    Un año sin feriados cargados avisa (una vez) y cuenta solo fines de semana.
     """
     if not dias:
         return None
-    fecha, restantes = desde, dias
-    while restantes > 0:
-        fecha += timedelta(days=1)
-        if fecha.weekday() < 5:  # 0=lunes ... 4=viernes
-            restantes -= 1
-    return fecha
+    return sumar_dias_habiles(desde, dias, settings.FERIADOS_CL if feriados is None else feriados)
 
 
 _ALFABETO_CODIGO = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32 (sin I, L, O, U)

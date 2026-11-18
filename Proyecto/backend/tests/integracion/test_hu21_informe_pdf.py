@@ -159,6 +159,29 @@ def test_aviso_legal_completo_en_la_primera_pagina():
     assert "versión 2026-10-v1" in pag1   # lo que aceptó el encuestado antes de responder
 
 
+LINEA_IA = ("Parte del análisis de las evidencias se apoya en un modelo de inteligencia artificial, cuyas salidas "
+            "se verifican con reglas automáticas y pueden ser revisadas por personas; sus resultados no "
+            "reemplazan el juicio de la organización.")
+
+
+def test_t16_pdf_avisa_uso_de_ia_y_lleva_la_version_v2():
+    assert AVISO_INFORME.version == "2026-11-v2" and LINEA_IA in AVISO_INFORME.texto
+    pag1 = _paginas(_pdf(_informe()))[0]
+    assert LINEA_IA in pag1
+    assert "Versión 2026-11-v2" in pag1
+    # lo que aceptó el encuestado se conserva tal cual (no se recalcula con la constante)
+    assert "versión 2026-10-v1" in pag1 and "2026-11-v1" not in pag1
+
+
+def test_t16_correo_del_informe_lleva_la_linea_de_ia_y_la_version():
+    from app.application.informes.correo import cuerpo_informe
+
+    texto, html = cuerpo_informe(123, 55.5, "Intermedio", 4, 1, 3, 6)
+    for cuerpo in (texto, html):
+        assert LINEA_IA in cuerpo
+        assert "2026-11-v2" in cuerpo and "2026-11-v1" not in cuerpo
+
+
 def test_aviso_legal_y_pagina_x_de_y_en_el_pie_de_todas_las_paginas():
     paginas = _paginas(_pdf(_informe()))
     assert len(paginas) >= 2
@@ -310,4 +333,78 @@ def test_api_completar_registra_la_version_de_la_matriz_y_el_pdf_la_imprime():
         assert ficha["codigo"] in paginas[0] and ficha["version_matriz"] in paginas[0]
         assert ficha["huella_corta"] in " ".join(paginas)
         assert all(AVISO_INFORME.pie in p for p in paginas)
+    _correr(esc)
+
+
+# =====================================================================
+# T-16 · La versión del aviso queda congelada en la evaluación
+# =====================================================================
+def test_t16_informe_con_v1_guardada_se_emite_con_v1_sin_linea_de_ia_en_pdf_y_correo():
+    from app.application.informes.correo import cuerpo_informe
+
+    informe = _informe(_datos(aviso_informe_version="2026-11-v1"))
+    assert informe.ficha.aviso.version == "2026-11-v1"
+    pag1 = _paginas(_pdf(informe))[0]
+    assert "Versión 2026-11-v1" in pag1 and LINEA_IA not in pag1 and "2026-11-v2" not in pag1
+    texto, html = cuerpo_informe(123, 55.5, "Intermedio", 4, 1, 3, 6, aviso=informe.ficha.aviso)
+    for cuerpo in (texto, html):
+        assert "2026-11-v1" in cuerpo and "2026-11-v2" not in cuerpo and LINEA_IA not in cuerpo
+
+
+def test_t16_sin_version_guardada_o_desconocida_se_usa_la_vigente():
+    from app.application.informes.ficha import aviso_informe
+
+    assert _informe(_datos(aviso_informe_version=None)).ficha.aviso is AVISO_INFORME
+    assert aviso_informe("9999-99-v9") is AVISO_INFORME and aviso_informe(None) is AVISO_INFORME
+
+
+@api
+def test_t16_api_solo_la_emision_fija_la_version_y_una_v1_guardada_se_respeta():
+    pytest.importorskip("reportlab")
+    from test_hu12_plan_formativo import _completar
+
+    async def esc(c, eval_id, todos):
+        from sqlalchemy import select, update
+        from app.core.database import get_db
+        from app.domain.models.evaluacion import Evaluacion
+        from app.main import app
+
+        def AsyncSessionLocal():   # la misma BD en memoria que usa el cliente
+            class _Ctx:
+                async def __aenter__(self):
+                    self.gen = app.dependency_overrides[get_db]()
+                    return await self.gen.__anext__()
+
+                async def __aexit__(self, *a):
+                    await self.gen.aclose()
+            return _Ctx()
+
+        async def _version():
+            async with AsyncSessionLocal() as s:
+                return (await s.execute(select(Evaluacion.aviso_informe_version)
+                                        .where(Evaluacion.id == eval_id))).scalar_one()
+
+        await _completar(c, eval_id, todos)
+        assert await _version() is None
+        # la vista JSON de la ficha NO emite: no congela (se muestra la vigente)
+        ficha = (await c.get(f"/api/evaluaciones/{eval_id}/informe/ficha")).json()
+        assert ficha["aviso_legal"]["version"] == "2026-11-v2" and await _version() is None
+        # cargar_evaluacion es de solo lectura
+        async with AsyncSessionLocal() as s:
+            from app.application.informes.carga import cargar_evaluacion
+            antes = (await cargar_evaluacion(s, eval_id)).aviso_informe_version
+            assert antes is None and not s.dirty
+        assert await _version() is None
+        # la descarga del PDF emite: congela v2
+        pdf = await c.get(f"/api/evaluaciones/{eval_id}/informe/pdf")
+        assert "Versión 2026-11-v2" in _paginas(pdf.content)[0] and await _version() == "2026-11-v2"
+
+        async with AsyncSessionLocal() as s:   # una evaluación que ya había emitido con v1
+            await s.execute(update(Evaluacion).where(Evaluacion.id == eval_id).values(aviso_informe_version="2026-11-v1"))
+            await s.commit()
+        ficha = (await c.get(f"/api/evaluaciones/{eval_id}/informe/ficha")).json()
+        assert ficha["aviso_legal"]["version"] == "2026-11-v1"
+        assert LINEA_IA not in ficha["aviso_legal"]["parrafos"] and await _version() == "2026-11-v1"
+        pdf = await c.get(f"/api/evaluaciones/{eval_id}/informe/pdf")
+        assert "Versión 2026-11-v1" in _paginas(pdf.content)[0] and await _version() == "2026-11-v1"
     _correr(esc)

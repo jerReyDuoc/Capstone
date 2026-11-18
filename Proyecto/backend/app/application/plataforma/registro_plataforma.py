@@ -86,8 +86,14 @@ class AjustePlazo:
     def activo(self) -> bool:
         return bool(self.dias and self.dias >= 1)
 
+    @property
+    def unidad(self) -> str:
+        """`dias_habiles` (lunes a viernes sin feriados de Chile) para la gracia del contrato; `dias` en el resto."""
+        return "dias_habiles" if self.clave.endswith("_DIAS_HABILES") else "dias"
+
     def como_dict(self) -> dict:
-        return {"clave": self.clave, "nombre": self.nombre, "dias": self.dias, "fuente": self.fuente,
+        return {"clave": self.clave, "nombre": self.nombre, "dias": self.dias, "unidad": self.unidad,
+                "fuente": self.fuente,
                 "fuente_texto": TEXTO_FUENTE.get(self.fuente, ""), "activo": self.activo}
 
 

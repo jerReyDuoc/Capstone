@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from app.application.informes.ficha import AVISO_INFORME, LINEA_USO_IA, AvisoInforme
+
 EMAIL_VALIDO = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s.]{2,}$")
 
 
@@ -20,9 +22,12 @@ def enmascarar(email: str) -> str:
 
 
 def cuerpo_informe(evaluacion_id: int, puntaje: float, nivel: str, brechas: int, criticas: int,
-                   modulos: int, horas: int) -> tuple[str, str]:
+                   modulos: int, horas: int, aviso: AvisoInforme = AVISO_INFORME) -> tuple[str, str]:
     """(texto plano, html) del correo. Sin datos personales: solo resultados de la organización."""
     p = f"{puntaje:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    # T-16: la versión del aviso es la del PDF adjunto; la línea de IA sale solo si ese aviso la trae
+    version_aviso = aviso.version
+    linea_ia = LINEA_USO_IA if LINEA_USO_IA in aviso.texto else ""
     texto = (
         "Hola,\n\n"
         f"Te enviamos el informe de tu evaluación #{evaluacion_id} de gobernanza de IA y protección de datos.\n\n"
@@ -31,6 +36,8 @@ def cuerpo_informe(evaluacion_id: int, puntaje: float, nivel: str, brechas: int,
         f"Plan formativo recomendado: {modulos} módulos, {horas} horas\n\n"
         "El informe completo va adjunto en PDF. Guárdalo: incluye el listado priorizado de brechas "
         "y el plan de capacitación por dimensión.\n\n"
+        + (f"{linea_ia}\n" if linea_ia else "")
+        + f"Versión del aviso legal: {version_aviso}.\n\n"
         "Este correo se generó automáticamente; no es necesario responderlo.\n"
         "ComplianceIA\n"
     )
@@ -51,7 +58,8 @@ def cuerpo_informe(evaluacion_id: int, puntaje: float, nivel: str, brechas: int,
 </tr></table>
 </td></tr>
 <tr><td style="padding:20px 28px 28px;font-size:12px;line-height:1.5;color:#5b6b64">
-Este correo se generó automáticamente; no es necesario responderlo. El informe es una autoevaluación orientativa y no constituye asesoría legal.
+Este correo se generó automáticamente; no es necesario responderlo. El informe es una autoevaluación orientativa y no constituye asesoría legal.<br><br>
+{linea_ia + '<br>' if linea_ia else ''}Versión del aviso legal: {version_aviso}.
 </td></tr></table>
 </td></tr></table></body></html>"""
     return texto, html

@@ -23,7 +23,6 @@ from app.domain.models.benchmark import Benchmark
 from app.domain.models.catalogo_brechas import CatalogoBrechas
 from app.domain.models.ruta_formativa import RutaFormativa
 
-
 class SinResultadosError(Exception):
     """La evaluación no existe o todavía no tiene resumen (no se ha completado)."""
 
@@ -47,6 +46,7 @@ class DatosEvaluacion:
     fecha_completado: datetime | None = None
     version_matriz: str | None = None          # la que quedó registrada al completar
     version_matriz_actual: str | None = None   # la de hoy (respaldo de las evaluaciones antiguas)
+    aviso_informe_version: str | None = None   # T-16: la del aviso con que se emitió (None = la vigente)
     aviso_aceptado_version: str | None = None
     aviso_aceptado_fecha: datetime | None = None
     dimensiones_catalogo: tuple[str, ...] = ()
@@ -124,6 +124,18 @@ def _brecha(b: CatalogoBrechas | None, rutas: dict[int, RutaCatalogo]) -> Brecha
         comportamiento=b.comportamiento_detectado, criticidad=b.criticidad, accion=b.accion_sistema,
         ruta=rutas.get(b.ruta_formativa_id) if b.ruta_formativa_id else None,
     )
+
+
+async def congelar_version_aviso(db: AsyncSession, evaluacion_id: int) -> str:
+    """
+    T-16: la primera EMISIÓN del informe fija la versión vigente del aviso; las siguientes la
+    reutilizan. UPDATE condicional (sin carrera entre dos emisiones simultáneas). NO hace commit:
+    lo hace quien emite. Devuelve la versión que quedó.
+    """
+    from app.application.informes.ficha import AVISO_INFORME
+
+    version = await fabricas().informes(db).congelar_version_aviso(evaluacion_id, AVISO_INFORME.version)
+    return version or AVISO_INFORME.version
 
 
 async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvaluacion:
@@ -226,6 +238,7 @@ async def cargar_evaluacion(db: AsyncSession, evaluacion_id: int) -> DatosEvalua
         fecha_completado=evaluacion.fecha_completado,
         version_matriz=evaluacion.version_matriz,
         version_matriz_actual=None if evaluacion.version_matriz else await version_matriz_vigente(db),
+        aviso_informe_version=evaluacion.aviso_informe_version,
         aviso_aceptado_version=usuario.aviso_legal_version if usuario else None,
         aviso_aceptado_fecha=usuario.fecha_aceptacion_aviso if usuario else None,
         dimensiones_catalogo=tuple(sorted(nombres_dominio.values())),

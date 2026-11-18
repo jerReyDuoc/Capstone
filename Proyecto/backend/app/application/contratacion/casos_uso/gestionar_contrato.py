@@ -63,7 +63,7 @@ def operaciones_posibles(situacion: SituacionContrato) -> list[str]:
 
 def _foto(e: Empresa, hoy: date) -> dict:
     """Lo que se guarda en la bitácora antes y después (sin datos personales)."""
-    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy)
+    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy)
     return {
         "estado": e.estado_contrato, "situacion": v.situacion.value,
         "fecha_inicio": e.fecha_inicio_contrato.isoformat(), "fecha_termino": e.fecha_termino_contrato.isoformat(),
@@ -91,7 +91,7 @@ class GestionarContratoUseCase:
         return empresa
 
     def _exigir(self, op: Operacion, e: Empresa, hoy: date) -> None:
-        situacion = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).situacion
+        situacion = e.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy).situacion
         if situacion in PERMITIDAS[op]:
             return
         if situacion is SituacionContrato.FINALIZADO:
@@ -174,7 +174,7 @@ class GestionarContratoUseCase:
 
 def contrato_dict(e: Empresa, hoy: date | None = None) -> dict:
     """Contrato para el panel interno y para el propio cliente (sin datos personales)."""
-    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy)
+    v = e.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy)
     return {
         "estado": e.estado_contrato,
         "fecha_inicio_contrato": e.fecha_inicio_contrato,
@@ -194,4 +194,4 @@ async def empresas_con_gracia_vencida(db: AsyncSession, hoy: date | None = None)
     """
     hoy = hoy or date.today()
     filas = await fabricas().contratacion(db).empresas_con_termino_vencido(hoy)
-    return sorted(e.id for e in filas if e.vigencia(settings.CONTRATO_GRACIA_DIAS, hoy=hoy).situacion is SituacionContrato.FINALIZADO)
+    return sorted(e.id for e in filas if e.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy).situacion is SituacionContrato.FINALIZADO)

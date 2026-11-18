@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Iterable
@@ -48,6 +49,9 @@ DIMENSIONES_OFICIALES = ("Gobernanza de IA", "Gestión de Riesgos", "Protección
 # =====================================================================
 # Aviso legal del informe (HU-04)
 # =====================================================================
+_log = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class AvisoInforme:
     version: str
@@ -56,24 +60,47 @@ class AvisoInforme:
     pie: str                 # una línea, en el pie de TODAS las páginas
 
 
-# BORRADOR TÉCNICO (T-SM-14): el texto lo valida el Product Owner con Therion Labs y el
-# docente. Si cambia, sube la versión: queda impresa en cada informe para saber cuál se usó.
-AVISO_INFORME = AvisoInforme(
-    version="2026-11-v1",
-    titulo="Aviso legal",
-    texto=(
-        "Este informe resume un autodiagnóstico que respondió la propia organización en la plataforma "
-        "ComplianceIA de Therion Labs. Es un instrumento orientativo: no es una auditoría, no certifica el "
-        "cumplimiento de la Ley N.º 21.719 sobre protección de datos personales ni de otra norma, y no "
-        "constituye asesoría legal.",
-        "Los puntajes, las brechas y las rutas se calculan solo con las respuestas y evidencias que entregó "
-        "la organización, que responde por su veracidad y completitud. El cumplimiento de la Ley N.º 21.719 "
-        "es responsabilidad de la organización como responsable del tratamiento; Therion Labs no asume las "
-        "obligaciones que deriven de las decisiones que se adopten con este documento.",
-        "Para una opinión jurídica o una certificación, consulte a un abogado o a un auditor independiente.",
-    ),
-    pie="Autodiagnóstico orientativo: no certifica el cumplimiento de la Ley N.º 21.719 ni constituye asesoría legal.",
+# T-16: aviso de uso de IA (también va en el cuerpo del correo del informe).
+LINEA_USO_IA = (
+    "Parte del análisis de las evidencias se apoya en un modelo de inteligencia artificial, cuyas salidas se "
+    "verifican con reglas automáticas y pueden ser revisadas por personas; sus resultados no reemplazan el "
+    "juicio de la organización."
 )
+
+_TEXTO_BASE = (
+    "Este informe resume un autodiagnóstico que respondió la propia organización en la plataforma "
+    "ComplianceIA de Therion Labs. Es un instrumento orientativo: no es una auditoría, no certifica el "
+    "cumplimiento de la Ley N.º 21.719 sobre protección de datos personales ni de otra norma, y no "
+    "constituye asesoría legal.",
+    "Los puntajes, las brechas y las rutas se calculan solo con las respuestas y evidencias que entregó "
+    "la organización, que responde por su veracidad y completitud. El cumplimiento de la Ley N.º 21.719 "
+    "es responsabilidad de la organización como responsable del tratamiento; Therion Labs no asume las "
+    "obligaciones que deriven de las decisiones que se adopten con este documento.",
+)
+_CIERRE = "Para una opinión jurídica o una certificación, consulte a un abogado o a un auditor independiente."
+_PIE = "Autodiagnóstico orientativo: no certifica el cumplimiento de la Ley N.º 21.719 ni constituye asesoría legal."
+
+# BORRADOR TÉCNICO (T-SM-14): el texto lo valida el Product Owner con Therion Labs y el
+# docente. Si cambia, AGREGA una versión nueva (no edites las anteriores): cada evaluación guarda
+# la versión con la que se emitió su informe (evaluacion.aviso_informe_version) y la sigue mostrando.
+AVISOS_INFORME: dict[str, AvisoInforme] = {
+    "2026-11-v1": AvisoInforme(
+        version="2026-11-v1", titulo="Aviso legal", texto=(*_TEXTO_BASE, _CIERRE), pie=_PIE),
+    "2026-11-v2": AvisoInforme(
+        version="2026-11-v2", titulo="Aviso legal", texto=(*_TEXTO_BASE, LINEA_USO_IA, _CIERRE), pie=_PIE),
+}
+AVISO_INFORME = AVISOS_INFORME["2026-11-v2"]   # el vigente: el que se fija en las emisiones nuevas
+
+
+def aviso_informe(version: str | None) -> AvisoInforme:
+    """El aviso de esa versión; None o desconocida -> el vigente (las desconocidas se registran)."""
+    if not version:
+        return AVISO_INFORME
+    aviso = AVISOS_INFORME.get(version)
+    if aviso is None:
+        _log.warning("[informe] versión de aviso desconocida %r; se usa la vigente %s", version, AVISO_INFORME.version)
+        return AVISO_INFORME
+    return aviso
 
 
 # =====================================================================

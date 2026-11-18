@@ -87,7 +87,7 @@ async def mi_empresa(cliente: ClienteConServicio = Depends(empresa_con_servicio)
             "id": empresa.id, "razon_social": empresa.razon_social, "rut": empresa.rut, "rubro": rubro,
             "fecha_inicio_contrato": empresa.fecha_inicio_contrato,
             "fecha_termino_contrato": empresa.fecha_termino_contrato,
-            "contrato_vigente": empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS),
+            "contrato_vigente": empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL),
             "contrato": contrato_dict(empresa),
         },
         "evaluaciones": [

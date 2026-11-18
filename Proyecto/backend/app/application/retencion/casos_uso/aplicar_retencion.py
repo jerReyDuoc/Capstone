@@ -29,6 +29,20 @@ plazo (config RETENCION_*; vacío = regla desactivada) se aplica:
   R6  Seguimiento    T-11: solicitudes ARCOP cerradas hace más de RETENCION_ARCOP_SEGUIMIENTO_DIAS
                      (730) -> el código de seguimiento se reemplaza por uno aleatorio (deja de
                      servir) y el historial pierde quién hizo cada cambio (actor_id NULL).
+  R7  Empresa        T-17: empresas con el plazo de gracia del contrato vencido (situación
+                     FINALIZADO, CONTRATO_GRACIA_DIAS_HABILES días hábiles; sin otro plazo) ->
+                     se BORRAN sus documentos (documento_empresa y sus archivos), se vacían sus
+                     evidencias (archivo, texto extraído y justificaciones; la fila conserva
+                     clasificación, estados y puntajes, como "eliminar" en Mis documentos) y se
+                     BORRAN sus conversaciones con el Agente IA Tutor y sus mensajes; el contacto
+                     del usuario definitivo se anonimiza con AnonimizacionRepository (y se cierran
+                     sus sesiones). Se conservan puntajes, resumen y benchmark. Se omite a la
+                     empresa con una solicitud ARCOP abierta (de su usuario, de sus evaluaciones o
+                     de su titular de origen). Idempotente: empresa.datos_eliminados_en marca a la
+                     ya procesada. Activa con RETENCION_EMPRESA_ACTIVA; clave "empresa" (no es un
+                     plazo en días: en `plazos` solo vale como interruptor). Un registro por empresa
+                     en el audit_log, con conteos.
+                     (Numeración: la bitácora histórica ya usa "R5" para Contratación.)
 
 Cada titular se procesa en su propia transacción (o todo o nada por titular) y los
 archivos se borran después del commit. El resultado y los logs llevan solo conteos.
@@ -68,7 +82,11 @@ from app.application.retencion.casos_uso.configurar_retencion import (
 )
 from app.application.fabricas import fabricas
 from app.domain.auth.actor import Actor
+from app.application.contratacion.casos_uso.gestionar_contrato import empresas_con_gracia_vencida
+from app.application.cuentas.casos_uso.sesiones import cerrar_todas
 from app.core.config import settings
+from app.domain.auth.actor import Rol
+from app.domain.models.sesion_modelo import MotivoCierre
 from app.domain.models.bitacora_auditoria import RESULTADO_ERROR, RESULTADO_OK, RESULTADO_OMITIDO
 from app.domain.auditoria.acciones import Accion
 
@@ -102,6 +120,9 @@ class ResultadoRetencion:
     conversaciones_tutor: int = 0
     solicitudes_contratacion: int = 0   # T-11 R5
     seguimientos_arcop: int = 0         # T-11 R6
+    empresas: int = 0                   # T-17 R7: empresas a las que se les borraron los datos
+    empresas_omitidas_por_arcop_abierta: int = 0
+    empresas_fallidas: int = 0
     archivos_borrados: int = 0
     reglas_desactivadas: list[str] = field(default_factory=list)
     # HU-25
@@ -146,7 +167,7 @@ class AplicarRetencionUseCase:
             accion=accion, entidad=entidad, entidad_id=entidad_id, actor_rol=ACTOR_SISTEMA,
             detalle={"regla": regla, "plazo_dias": self.plazos.get(
                 {"R1": "titulares", "R2": "arcop", "R3": "eventos", "R4": "tutor", "R5": "contratacion",
-                 "R6": "arcop_seguimiento"}[regla]), **detalle},
+                 "R6": "arcop_seguimiento"}.get(regla, "")), **detalle},  # R7: sin plazo en días
         )
 
     @staticmethod
@@ -156,6 +177,12 @@ class AplicarRetencionUseCase:
     def _limite(self, regla: str) -> date | None:
         dias = self.plazos.get(regla)
         return None if dias is None else self.hoy - timedelta(days=dias)
+
+    def _empresa_activa(self) -> bool | None:
+        """R7 no tiene plazo en días: None = no corre (plazos propios sin "empresa"); si no, activa o no."""
+        if self._plazos_explicitos:
+            return bool(self.plazos["empresa"]) if "empresa" in self.plazos else None
+        return settings.RETENCION_EMPRESA_ACTIVA
 
     async def execute(self, aplicar: bool = True, registrar: bool = True) -> ResultadoRetencion:
         """
@@ -193,6 +220,12 @@ class AplicarRetencionUseCase:
                     r.reglas_desactivadas.append(regla)
                     continue
                 await metodo(limite, aplicar, r)
+            # T-17 R7: interruptor, no plazo (el plazo es la gracia del contrato). El conteo se registra siempre.
+            activa = self._empresa_activa()
+            if activa is False:
+                r.reglas_desactivadas.append("empresa")
+            elif activa:
+                await self._empresas(aplicar, r)
         except Exception as e:  # noqa: BLE001 — se registra la ejecución fallida y se relanza
             error = e
             r.error = type(e).__name__
@@ -218,7 +251,7 @@ class AplicarRetencionUseCase:
         r.duracion_ms = int((time.monotonic() - t0) * 1000)
         if r.omitida_por_ejecucion_en_curso:
             resultado = RESULTADO_OMITIDO
-        elif r.error or r.titulares_fallidos:
+        elif r.error or r.titulares_fallidos or r.empresas_fallidas:
             resultado = RESULTADO_ERROR
         else:
             resultado = RESULTADO_OK
@@ -242,6 +275,9 @@ class AplicarRetencionUseCase:
                 "conversaciones_tutor": r.conversaciones_tutor,
                 "solicitudes_contratacion": r.solicitudes_contratacion,
                 "seguimientos_arcop": r.seguimientos_arcop,
+                "empresas": r.empresas,
+                "empresas_omitidas_por_arcop_abierta": r.empresas_omitidas_por_arcop_abierta,
+                "empresas_fallidas": r.empresas_fallidas,
                 "archivos_borrados": r.archivos_borrados,
             },
             "omitida_por_ejecucion_en_curso": r.omitida_por_ejecucion_en_curso,
@@ -381,3 +417,38 @@ class AplicarRetencionUseCase:
         for solicitud_id in ids:
             self._auditar(Accion.RETENCION_ARCOP_SEGUIMIENTO, "solicitudes_arcop", solicitud_id, "R6")
         await self.s.commit()
+
+    # ------------------------------------------------------------------ R7 (T-17)
+    async def _empresas(self, aplicar: bool, r: ResultadoRetencion) -> None:
+        repo_ret = fabricas().retencion(self.s)
+        vencidas = await empresas_con_gracia_vencida(self.s, self.hoy)
+        ids, omitidas = await repo_ret.empresas_pendientes_de_borrado(vencidas)
+        r.empresas_omitidas_por_arcop_abierta += omitidas
+        if not aplicar:
+            r.empresas += len(ids)
+            return
+
+        anonimizacion = fabricas().anonimizacion(self.s)
+        for empresa_id in ids:
+            ahora = _ahora()
+            try:
+                docs, rutas_docs = await repo_ret.borrar_documentos_empresa(empresa_id)
+                evidencias, rutas_evid = await repo_ret.eliminar_evidencias_empresa(empresa_id, ahora)
+                conversaciones = await repo_ret.borrar_conversaciones_tutor_empresa(empresa_id)
+                usuarios = await repo_ret.ids_usuarios_definitivos_de_empresa(empresa_id)
+                for usuario_id in usuarios:
+                    await anonimizacion.anonimizar_usuario_definitivo(usuario_id, ahora)
+                    await cerrar_todas(self.s, Rol.CLIENTE.value, usuario_id, MotivoCierre.SUPRESION_ARCOP, ahora)
+                await repo_ret.marcar_empresa_datos_eliminados(empresa_id, ahora)
+                rutas = rutas_docs + rutas_evid
+                self._auditar(Accion.RETENCION_EMPRESA, "empresa", empresa_id, "R7", documentos=docs,
+                              evidencias=evidencias, conversaciones_tutor=conversaciones,
+                              usuarios_anonimizados=len(usuarios), archivos=len(rutas))
+                await self.s.commit()
+            except Exception as e:  # noqa: BLE001 — una empresa fallida no detiene a las demás
+                await self.s.rollback()
+                logger.error("T-17 retención: no se pudieron borrar los datos de una empresa (%s)", type(e).__name__)
+                r.empresas_fallidas += 1
+                continue
+            r.empresas += 1
+            r.archivos_borrados += await self._borrar(rutas)

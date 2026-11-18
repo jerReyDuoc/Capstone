@@ -108,7 +108,7 @@ def _empresa(e: Empresa) -> dict:
     return {
         "id": e.id, "razon_social": e.razon_social, "rut": e.rut, "rubro_id": e.rubro_id,
         "fecha_inicio_contrato": e.fecha_inicio_contrato, "fecha_termino_contrato": e.fecha_termino_contrato,
-        "contrato_vigente": e.contrato_vigente(settings.CONTRATO_GRACIA_DIAS), "fecha_creacion": e.fecha_creacion,
+        "contrato_vigente": e.contrato_vigente(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL), "fecha_creacion": e.fecha_creacion,
         "contrato": contrato_dict(e),  # HU-30: estado, situación y plazo de gracia
     }
 

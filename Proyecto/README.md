@@ -842,7 +842,7 @@ Paginación: `page` ≥ 1, `size` 1–100; respuesta `{items, total, page, size,
 | POST | `/api/admin/empresas/{id}/contrato/renovacion` | 🛡️ | HU-30: `{fecha_termino_contrato}` → nueva fecha; deja el contrato activo |
 | POST | `/api/admin/empresas/{id}/contrato/suspension` | 🛡️ | HU-30: `{motivo}` → corta el servicio pagado sin terminar el contrato |
 | POST | `/api/admin/empresas/{id}/contrato/reactivacion` | 🛡️ | HU-30: levanta la suspensión |
-| POST | `/api/admin/empresas/{id}/contrato/terminacion` | 🛡️ | HU-30: `{motivo}` → termina el contrato y abre el plazo de gracia (`CONTRATO_GRACIA_DIAS`) |
+| POST | `/api/admin/empresas/{id}/contrato/terminacion` | 🛡️ | HU-30: `{motivo}` → termina el contrato y abre el plazo de gracia (`CONTRATO_GRACIA_DIAS_HABILES`, días hábiles con feriados de Chile) |
 | GET | `/api/admin/evaluaciones?estado=&origen=&empresa_id=` | 🛡️ | HU-28: todas las evaluaciones con rubro, puntaje general y empresa (si migró); sin contacto del encuestado |
 | GET | `/api/admin/bitacora?entidad=&entidad_id=&accion=` | 🛡️ | audit_log (HU-09): solo inserción; cada fila con IP y categoría |
 | GET | `/api/admin/bitacora/verificacion` | 🛡️ | HU-18: recalcula la cadena de hashes de la bitácora; devuelve si está íntegra, la primera falla y el último hash (ancla) |

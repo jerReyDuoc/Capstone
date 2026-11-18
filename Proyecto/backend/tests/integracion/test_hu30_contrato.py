@@ -22,12 +22,19 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from app.core.feriados import FERIADOS_CHILE
+from app.domain.calendario import sumar_dias_habiles
 from app.domain.contrato.vigencia import (
     PERMITIDAS, EstadoContrato, Operacion, SituacionContrato as S, evaluar, fin_de_gracia,
 )
 
 HOY = date(2026, 10, 28)
 INICIO, TERMINO = date(2026, 1, 1), date(2026, 12, 31)
+
+
+def _hab(desde: date, n: int) -> date:
+    """`desde` + n días hábiles con el calendario real de Chile (la gracia es en días hábiles)."""
+    return sumar_dias_habiles(desde, n, FERIADOS_CHILE)
 
 
 def _hoy_utc() -> date:
@@ -37,7 +44,7 @@ def _hoy_utc() -> date:
 
 def _v(estado="activo", inicio=INICIO, termino=TERMINO, terminacion=None, hoy=HOY, gracia=30):
     return evaluar(estado=estado, inicio=inicio, termino=termino, fecha_terminacion=terminacion,
-                   hoy=hoy, gracia_dias=gracia)
+                   hoy=hoy, gracia_dias=gracia, feriados=FERIADOS_CHILE)
 
 
 # ===================================================================== parte 1: reglas puras
@@ -47,14 +54,14 @@ def _v(estado="activo", inicio=INICIO, termino=TERMINO, terminacion=None, hoy=HO
     ({}, S.VIGENTE),
     ({"hoy": TERMINO}, S.VIGENTE),                         # el último día aún rige
     ({"hoy": TERMINO + timedelta(days=1)}, S.VENCIDO),
-    ({"hoy": TERMINO + timedelta(days=30)}, S.VENCIDO),    # último día de gracia
-    ({"hoy": TERMINO + timedelta(days=31)}, S.FINALIZADO),
+    ({"hoy": _hab(TERMINO, 30)}, S.VENCIDO),    # último día de gracia
+    ({"hoy": _hab(TERMINO, 30) + timedelta(days=1)}, S.FINALIZADO),
     ({"estado": "suspendido"}, S.SUSPENDIDO),
     ({"estado": "suspendido", "hoy": TERMINO + timedelta(days=5)}, S.VENCIDO),  # vence igual
-    ({"estado": "suspendido", "hoy": TERMINO + timedelta(days=31)}, S.FINALIZADO),
+    ({"estado": "suspendido", "hoy": _hab(TERMINO, 30) + timedelta(days=1)}, S.FINALIZADO),
     ({"estado": "terminado", "terminacion": HOY}, S.TERMINADO),
-    ({"estado": "terminado", "terminacion": HOY, "hoy": HOY + timedelta(days=30)}, S.TERMINADO),
-    ({"estado": "terminado", "terminacion": HOY, "hoy": HOY + timedelta(days=31)}, S.FINALIZADO),
+    ({"estado": "terminado", "terminacion": HOY, "hoy": _hab(HOY, 30)}, S.TERMINADO),
+    ({"estado": "terminado", "terminacion": HOY, "hoy": _hab(HOY, 30) + timedelta(days=1)}, S.FINALIZADO),
     ({"estado": "terminado", "terminacion": HOY, "gracia": 0, "hoy": HOY + timedelta(days=1)}, S.FINALIZADO),
 ])
 def test_situacion_del_contrato(kwargs, situacion):
@@ -64,21 +71,21 @@ def test_situacion_del_contrato(kwargs, situacion):
 def test_que_permite_cada_situacion():
     vigente, suspendido = _v(), _v(estado="suspendido")
     terminado = _v(estado="terminado", terminacion=HOY)
-    finalizado = _v(estado="terminado", terminacion=HOY, hoy=HOY + timedelta(days=60))
+    finalizado = _v(estado="terminado", terminacion=HOY, hoy=_hab(HOY, 60))
     assert vigente.servicio_habilitado and vigente.documentos_disponibles and not vigente.en_gracia
     assert not suspendido.servicio_habilitado and suspendido.documentos_disponibles
     assert not terminado.servicio_habilitado and terminado.documentos_disponibles and terminado.en_gracia
     assert not finalizado.servicio_habilitado and not finalizado.documentos_disponibles
-    assert terminado.como_dict()["documentos_disponibles_hasta"] == (HOY + timedelta(days=30)).isoformat()
+    assert terminado.como_dict()["documentos_disponibles_hasta"] == _hab(HOY, 30).isoformat()
     assert finalizado.como_dict()["documentos_disponibles_hasta"] is None
-    assert "27-11-2026" in terminado.mensaje() and "ARCOP" in finalizado.mensaje()
+    assert _hab(HOY, 30).strftime("%d-%m-%Y") in terminado.mensaje() and "ARCOP" in finalizado.mensaje()
 
 
 def test_terminar_un_contrato_ya_vencido_no_reinicia_el_plazo_de_gracia():
     vencio = date(2026, 9, 30)
-    assert fin_de_gracia(vencio, date(2026, 10, 28), 30) == vencio + timedelta(days=30)
-    assert fin_de_gracia(TERMINO, HOY, 30) == HOY + timedelta(days=30)   # terminación anticipada
-    v = _v(estado="terminado", termino=vencio, terminacion=HOY, hoy=vencio + timedelta(days=31))
+    assert fin_de_gracia(vencio, date(2026, 10, 28), 30, FERIADOS_CHILE) == _hab(vencio, 30)
+    assert fin_de_gracia(TERMINO, HOY, 30, FERIADOS_CHILE) == _hab(HOY, 30)   # terminación anticipada
+    v = _v(estado="terminado", termino=vencio, terminacion=HOY, hoy=_hab(vencio, 30) + timedelta(days=1))
     assert v.situacion is S.FINALIZADO
 
 
@@ -123,7 +130,7 @@ def hu27(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "CORREO_MODO", "archivo")
     monkeypatch.setattr(settings, "STORAGE_DIR", str(tmp_path))
     monkeypatch.setattr(settings, "ACTIVACION_URL_BASE", "http://localhost:3000/activar")
-    monkeypatch.setattr(settings, "CONTRATO_GRACIA_DIAS", 30)
+    monkeypatch.setattr(settings, "CONTRATO_GRACIA_DIAS_HABILES", 30)
     limitador = LimitadorMemoria()
     app.dependency_overrides[obtener_limitador] = lambda: limitador
     yield m
@@ -206,7 +213,7 @@ def test_api_admin_renueva_suspende_reactiva_y_termina_y_cada_cambio_queda_en_la
         assert r.status_code == 200, r.text
         contrato = r.json()["contrato"]
         assert contrato["situacion"] == "terminado" and contrato["en_plazo_de_gracia"] is True
-        assert contrato["documentos_disponibles_hasta"] == (_hoy_utc() + timedelta(days=30)).isoformat()
+        assert contrato["documentos_disponibles_hasta"] == _hab(_hoy_utc(), 30).isoformat()
         assert (await c.post(f"{base}/terminacion", json={"motivo": "otro"}, headers=adm)).status_code == 409
 
         # Renovar dentro del plazo de gracia deshace la terminación (el cliente vuelve)
@@ -336,12 +343,12 @@ def test_api_plazo_de_gracia_para_documentos_y_despues_retencion(hu27):
         r = await c.get("/api/cliente/contrato", headers=h)
         d = r.json()
         assert d["contrato"]["situacion"] == "terminado" and d["contrato"]["documentos_disponibles"] is True
-        assert d["contrato"]["documentos_disponibles_hasta"] == (_hoy_utc() + timedelta(days=30)).isoformat()
+        assert d["contrato"]["documentos_disponibles_hasta"] == _hab(_hoy_utc(), 30).isoformat()
         assert [k["url"] for k in d["documentos"]["constancias"]] == ["/api/formacion/modulos/1/constancia"]
         assert await hu27._bd(lambda s: empresas_con_gracia_vencida(s)) == []
 
         # Vencido el plazo: ya no descarga; sus datos quedan para la retención (HU-25)
-        await _mover_fechas(hu27, eid, fecha_terminacion=datetime.now() - timedelta(days=31))
+        await _mover_fechas(hu27, eid, fecha_terminacion=datetime.now() - timedelta(days=70))  # 30 días hábiles ya pasaron
         r = await c.get("/api/formacion/modulos/1/constancia", headers=h)
         assert r.status_code == 403 and hu27._codigo(r) == "PLAZO_GRACIA_VENCIDO"
         d = (await c.get("/api/cliente/contrato", headers=h)).json()

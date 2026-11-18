@@ -15,7 +15,8 @@ su fecha de término, sin cron ni tareas programadas:
   terminado                    hoy ≤ fin gracia             terminado   (en plazo de gracia)
   activo / terminado           hoy > fin gracia             finalizado  (retención, HU-25)
 
-Fin del plazo de gracia = (la fecha en que el contrato dejó de regir) + CONTRATO_GRACIA_DIAS.
+Fin del plazo de gracia = (la fecha en que el contrato dejó de regir) + CONTRATO_GRACIA_DIAS_HABILES días HÁBILES
+(lunes a viernes sin feriados; el calendario llega por parámetro, ver app/domain/calendario.py).
 Esa fecha es la de término pactada o, si el admin lo terminó antes, la de terminación (la
 que ocurra primero): terminar un contrato ya vencido no reinicia el plazo.
 
@@ -32,8 +33,10 @@ app/api/dependencias/servicio_pagado.py.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from enum import Enum
+
+from app.domain.calendario import Feriados, sumar_dias_habiles
 
 
 class EstadoContrato(str, Enum):
@@ -141,22 +144,24 @@ MENSAJES = {
 }
 
 
-def fin_de_gracia(termino: date, fecha_terminacion: date | None, gracia_dias: int) -> date:
+def fin_de_gracia(termino: date, fecha_terminacion: date | None, gracia_dias: int,
+                  feriados: Feriados | None = None) -> date:
+    """La gracia se cuenta en días HÁBILES (sin fines de semana ni `feriados`)."""
     fin_regimen = min(termino, fecha_terminacion) if fecha_terminacion else termino
-    return fin_regimen + timedelta(days=gracia_dias)
+    return sumar_dias_habiles(fin_regimen, gracia_dias, feriados)
 
 
 def evaluar(*, estado: str, inicio: date, termino: date, fecha_terminacion: date | None,
-            hoy: date, gracia_dias: int) -> Vigencia:
+            hoy: date, gracia_dias: int, feriados: Feriados | None = None) -> Vigencia:
     if estado == EstadoContrato.SUSPENDIDO.value and hoy <= termino:
         return Vigencia(S.SUSPENDIDO, None)
     if estado == EstadoContrato.TERMINADO.value:
-        fin = fin_de_gracia(termino, fecha_terminacion or hoy, gracia_dias)
+        fin = fin_de_gracia(termino, fecha_terminacion or hoy, gracia_dias, feriados)
         return Vigencia(S.TERMINADO if hoy <= fin else S.FINALIZADO, fin)
     # activo, o suspendido cuya fecha de término ya pasó (vence igual que uno activo)
     if hoy < inicio:
         return Vigencia(S.PENDIENTE, None)
     if hoy <= termino:
         return Vigencia(S.VIGENTE, None)
-    fin = fin_de_gracia(termino, None, gracia_dias)
+    fin = fin_de_gracia(termino, None, gracia_dias, feriados)
     return Vigencia(S.VENCIDO if hoy <= fin else S.FINALIZADO, fin)

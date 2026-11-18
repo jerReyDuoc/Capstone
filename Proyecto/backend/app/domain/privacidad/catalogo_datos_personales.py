@@ -60,8 +60,9 @@ C_ARCOP = "RETENCION_ARCOP_CERRADAS_DIAS después del cierre de la solicitud (lu
 C_EVENTOS = "RETENCION_EVENTOS_SEGURIDAD_DIAS después de revisado el evento"
 C_ADMIN = "Mientras la cuenta esté activa"
 C_PRUEBA = "Mientras exista el registro (prueba del consentimiento o de la atención del derecho)"
-C_CLIENTE = ("Mientras dure el contrato de la empresa y CONTRATO_GRACIA_DIAS después de su término "
-             "(HU-30); luego, las reglas de retención (HU-25)")
+C_CLIENTE = ("Mientras dure el contrato de la empresa y CONTRATO_GRACIA_DIAS_HABILES días hábiles después de su término "
+             "(HU-30); luego se borran sus documentos, evidencias y conversaciones del tutor y se anonimiza su contacto "
+             "(T-17, RETENCION_EMPRESA_ACTIVA)")
 # T-11: la solicitud descartada se borra completa RETENCION_SOLICITUDES_DESCARTADAS_DIAS después del descarte
 C_CONTRATACION = ("Hasta migrar la evaluación (se borra al pasar a la empresa) o RETENCION_SOLICITUDES_DESCARTADAS_DIAS "
                   "después de descartar la solicitud")
@@ -210,7 +211,8 @@ CATALOGO: dict[str, dict[str, Dato]] = {
                   "empresa_id", "fecha_migracion",  # HU-27
                   "fecha_completado",  # HU-29
                   "version_matriz",  # HU-21: "<etiqueta>+<huella>" de la matriz, sin datos personales
-                  "matriz_version_id"),  # HU-24: versión de la matriz con la que se respondió
+                  "matriz_version_id",  # HU-24: versión de la matriz con la que se respondió
+                  "aviso_informe_version"),  # T-16: versión del aviso legal con que se emitió el informe
         "clave_acceso_hash": Dato(
             CREDENCIAL, HASH,
             finalidad="Que el encuestado anónimo retome su evaluación y ejerza sus derechos",
@@ -351,6 +353,7 @@ CATALOGO: dict[str, dict[str, Dato]] = {
         # HU-30: estado del contrato (motivos de una lista cerrada, sin texto libre)
         "estado_contrato", "fecha_suspension", "motivo_suspension", "fecha_terminacion",
         "motivo_terminacion", "fecha_actualizacion_contrato",
+        "datos_eliminados_en",  # T-17: cuándo la retención borró los datos de la empresa tras la gracia
     ),
     "usuario_definitivo": {
         **_sin_dp("id", "empresa_id", "rol", "estado"),
@@ -836,7 +839,7 @@ AJUSTE_POR_CONSERVACION: dict[str, str] = {
     C_ARCOP: "RETENCION_ARCOP_CERRADAS_DIAS",
     C_EVENTOS: "RETENCION_EVENTOS_SEGURIDAD_DIAS",
     C_TUTOR: "TUTOR_RETENCION_DIAS",
-    C_CLIENTE: "CONTRATO_GRACIA_DIAS",
+    C_CLIENTE: "CONTRATO_GRACIA_DIAS_HABILES",
     # T-11
     C_CONTRATACION: "RETENCION_SOLICITUDES_DESCARTADAS_DIAS",
     C_CONTRATACION_PRUEBA: "RETENCION_SOLICITUDES_DESCARTADAS_DIAS",
@@ -852,7 +855,7 @@ INICIO_POR_AJUSTE: dict[str, str] = {
     "RETENCION_ARCOP_CERRADAS_DIAS": "cumplida_finalidad",      # después del cierre de la solicitud
     "RETENCION_EVENTOS_SEGURIDAD_DIAS": "cumplida_finalidad",   # después de revisado el evento
     "TUTOR_RETENCION_DIAS": "ultima_interaccion",               # sin actividad en la conversación
-    "CONTRATO_GRACIA_DIAS": "termino_relacion",                 # después del término del contrato
+    "CONTRATO_GRACIA_DIAS_HABILES": "termino_relacion",                 # después del término del contrato
     "RETENCION_SOLICITUDES_DESCARTADAS_DIAS": "cumplida_finalidad",  # después de descartar la solicitud
     "RETENCION_ARCOP_SEGUIMIENTO_DIAS": "cumplida_finalidad",        # después del cierre de la solicitud
 }
@@ -862,7 +865,7 @@ NOMBRE_AJUSTE: dict[str, str] = {
     "RETENCION_ARCOP_CERRADAS_DIAS": "Retención de solicitudes de derechos cerradas",
     "RETENCION_EVENTOS_SEGURIDAD_DIAS": "Retención de eventos de seguridad revisados",
     "TUTOR_RETENCION_DIAS": "Retención de conversaciones del tutor",
-    "CONTRATO_GRACIA_DIAS": "Plazo de gracia al terminar el contrato",
+    "CONTRATO_GRACIA_DIAS_HABILES": "Plazo de gracia al terminar el contrato (días hábiles)",
     "RETENCION_SOLICITUDES_DESCARTADAS_DIAS": "Retención de solicitudes de contratación descartadas",
     "RETENCION_ARCOP_SEGUIMIENTO_DIAS": "Retención del código de seguimiento e historial de derechos",
 }

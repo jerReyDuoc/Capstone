@@ -53,7 +53,7 @@ async def enviar_recordatorios(db: AsyncSession, ahora: datetime | None = None) 
     enviados, fallidos, revisadas = 0, 0, 0
     for empresa_id in sorted(primeras):
         empresa = await repo.empresa(empresa_id)
-        if empresa is None or not empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS, hoy=hoy):
+        if empresa is None or not empresa.contrato_vigente(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL, hoy=hoy):
             continue
         usuario = await repo.usuario_definitivo(empresa_id)
         if usuario is None or not usuario.activo:

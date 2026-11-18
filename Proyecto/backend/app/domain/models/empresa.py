@@ -2,6 +2,7 @@ from datetime import date, datetime
 from sqlalchemy import Integer, String, Date, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.domain.models.base import Base
+from app.domain.calendario import Feriados
 from app.domain.contrato.vigencia import EstadoContrato, SituacionContrato, Vigencia, evaluar
 
 _ESTADOS = ", ".join(f"'{v}'" for v in EstadoContrato.valores())
@@ -57,7 +58,11 @@ class Empresa(Base):
         "fecha_actualizacion_contrato", DateTime, nullable=True
     )
 
-    def vigencia(self, gracia_dias: int, hoy: date | None = None) -> Vigencia:
+    # T-17 (R7 de la retención): cuándo se borraron los documentos, evidencias y conversaciones del tutor de la
+    # empresa y se anonimizó su contacto, al terminar la gracia. NULL = aún no; sirve de marca de idempotencia.
+    datos_eliminados_en: Mapped[datetime | None] = mapped_column("datos_eliminados_en", DateTime, nullable=True)
+
+    def vigencia(self, gracia_dias: int, hoy: date | None = None, feriados: Feriados | None = None) -> Vigencia:
         return evaluar(
             estado=self.estado_contrato or EstadoContrato.ACTIVO.value,
             inicio=self.fecha_inicio_contrato,
@@ -65,8 +70,9 @@ class Empresa(Base):
             fecha_terminacion=self.fecha_terminacion.date() if self.fecha_terminacion else None,
             hoy=hoy or date.today(),
             gracia_dias=gracia_dias,
+            feriados=feriados,
         )
 
-    def contrato_vigente(self, gracia_dias: int, hoy: date | None = None) -> bool:
+    def contrato_vigente(self, gracia_dias: int, hoy: date | None = None, feriados: Feriados | None = None) -> bool:
         """Vigente = el servicio pagado está habilitado (HU-30: además no suspendido ni terminado)."""
-        return self.vigencia(gracia_dias, hoy=hoy).situacion is SituacionContrato.VIGENTE
+        return self.vigencia(gracia_dias, hoy=hoy, feriados=feriados).situacion is SituacionContrato.VIGENTE

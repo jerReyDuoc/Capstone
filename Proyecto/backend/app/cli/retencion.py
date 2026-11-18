@@ -3,7 +3,8 @@ T-06 — Ejecuta a mano los plazos de conservación (lo mismo que el cron diario
 
 Por defecto SIMULA: muestra cuántos titulares, solicitudes ARCOP y eventos de
 seguridad se anonimizarían, sin cambiar nada. Con --aplicar los anonimiza.
-Nunca imprime datos personales, solo conteos.
+Nunca imprime datos personales, solo conteos. T-17 (R7): también cuenta las empresas con la gracia
+del contrato vencida a las que se les borrarían documentos, evidencias y conversaciones del tutor.
 
     docker compose exec worker python -m app.cli.retencion
     docker compose exec worker python -m app.cli.retencion --aplicar
@@ -53,7 +54,7 @@ def main(argv: list[str] | None = None) -> None:
     if r["omitida_por_ejecucion_en_curso"]:
         print("No se ejecutó: hay otra ejecución de la retención en curso (cron o panel).")
     if r["reglas_desactivadas"]:
-        print("Reglas sin plazo configurado (no se aplicaron):", ", ".join(r["reglas_desactivadas"]))
+        print("Reglas desactivadas o sin plazo configurado (no se aplicaron):", ", ".join(r["reglas_desactivadas"]))
 
 
 if __name__ == "__main__":

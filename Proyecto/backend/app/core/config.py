@@ -1,8 +1,11 @@
 import re
+from datetime import date
 from pathlib import Path
 from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.feriados import FERIADOS_CHILE
 
 # Un solo .env para todo el proyecto: Proyecto/.env (junto al docker-compose.yml). En Docker
 # no existe dentro de la imagen: compose lo entrega como variables (env_file), que tienen
@@ -187,6 +190,11 @@ class Settings(BaseSettings):
     # Vencido, el código deja de servir (se reemplaza por uno aleatorio) y el historial pierde
     # quién hizo cada cambio; quedan tipo, estados y fechas como prueba de que se atendió.
     RETENCION_ARCOP_SEGUIMIENTO_DIAS: int | None = 730
+    # T-17 · Empresas con el plazo de gracia del contrato vencido (R7): se borran sus documentos, evidencias
+    # y conversaciones del tutor y se anonimiza su contacto; quedan puntajes, resumen y benchmark. El plazo
+    # es CONTRATO_GRACIA_DIAS_HABILES (no hay otro). Borra datos, así que quien lo active asume que el
+    # contrato de servicio lo permite; con False la regla no corre.
+    RETENCION_EMPRESA_ACTIVA: bool = True
     # ------------------------------------------------ HU-25: retención de usuarios temporales
     # El Oficial de Privacidad cambia el plazo de RETENCION_DATOS_TITULAR_DIAS desde el panel
     # interno (/admin/retencion). Lo que fije allí queda en la tabla configuracion_retencion y
@@ -268,10 +276,13 @@ class Settings(BaseSettings):
     EVIDENCIA_MIN_CARACTERES: int = 40
 
     # ------------------------------------------------ HU-30: vigencia del contrato
-    # Días que el usuario definitivo puede seguir descargando sus documentos después de que
-    # el contrato vence o el admin lo termina. Pasado el plazo, los datos quedan para las
-    # reglas de retención (HU-25). 0 = sin plazo de gracia. Valor provisorio hasta que lo fije el PO.
-    CONTRATO_GRACIA_DIAS: int = 30
+    # DÍAS HÁBILES (lunes a viernes sin feriados de Chile, ver FERIADOS_CL) que el usuario
+    # definitivo puede seguir descargando sus documentos después de que el contrato vence o el
+    # admin lo termina. Pasado el plazo, los datos quedan para las reglas de retención (HU-25).
+    # 0 = sin plazo de gracia. Valor provisorio hasta que lo fije el PO.
+    CONTRATO_GRACIA_DIAS_HABILES: int = 30
+    # Calendario de feriados de Chile por año (app/core/feriados.py; cargar cada año nuevo).
+    FERIADOS_CL: dict[int, tuple[date, ...]] = FERIADOS_CHILE
 
     # ------------------------------------------------ HU-29: "Mis documentos"
     # Informes PDF archivados por evaluación (cada uno es una foto del informe al generarlo).
@@ -501,8 +512,8 @@ class Settings(BaseSettings):
             raise ValueError("K_ANONIMATO_MINIMO no puede ser menor que 5 con APP_ENV=production (HU-10).")
         if self.K_ANONIMATO_DISTRIBUCION < self.K_ANONIMATO_MINIMO:
             raise ValueError("K_ANONIMATO_DISTRIBUCION debe ser mayor o igual que K_ANONIMATO_MINIMO (HU-10).")
-        if not 0 <= self.CONTRATO_GRACIA_DIAS <= 365:
-            raise ValueError("CONTRATO_GRACIA_DIAS debe estar entre 0 y 365 (HU-30).")
+        if not 0 <= self.CONTRATO_GRACIA_DIAS_HABILES <= 365:
+            raise ValueError("CONTRATO_GRACIA_DIAS_HABILES debe estar entre 0 y 365 (HU-30).")
         if self.CONTRATACION_AVISO_EMAIL and "@" not in self.CONTRATACION_AVISO_EMAIL:
             raise ValueError("CONTRATACION_AVISO_EMAIL debe ser un correo válido (o vacío).")
         if self.CONTRATACION_SOLICITUDES_IP_DIA is not None and self.CONTRATACION_SOLICITUDES_IP_DIA < 1:

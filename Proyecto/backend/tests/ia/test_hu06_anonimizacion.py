@@ -16,6 +16,7 @@ Cubre:
   -  textos ARCOP cifrados (excepción documentada) y legibles por el ORM
 """
 import asyncio
+import re
 import uuid
 
 import pytest
@@ -33,6 +34,7 @@ from app.domain.ports.registro_ia_port import ContextoLlamada, RegistroSanitizac
 from app.domain.ports.sanitizador_port import EntidadDetectada, TipoEntidad
 from app.infrastructure.security.cripto.cifrado import CifradorDatos, CifradorEntidades
 from app.infrastructure.security.pii.sanitizador_ner import SanitizadorNer
+from app.infrastructure.security.prompt_injection import seguridad
 from app.infrastructure.storage.archivo_cifrado_almacenamiento import ArchivoCifradoAlmacenamiento
 
 from apoyo.capa_ia_fakes import StubNLP
@@ -271,3 +273,47 @@ def test_subclaves_independientes():
     from app.infrastructure.security.cripto.cifrado import ClaveCifradoInvalida
     with pytest.raises(ClaveCifradoInvalida):
         evid.descifrar_texto(arcop.cifrar_texto("x"))
+
+
+# ---------------------------------------------------------------- extracto de evento de seguridad
+# El extracto del evento (registrar_evento_seguridad -> guardia_prompt.anonimizar) usa
+# seguridad.anonimizar, que a su vez usa _anonimizar. Se prueba por esa función pública.
+@pytest.mark.parametrize("correo", [
+    "matías.díaz@empresa.cl",       # tilde en la parte local (caso del reporte v1.1.0)
+    "ñandú@x.cl",                   # ñ al inicio
+    "José.Núñez@empresa.cl",        # mayúsculas acentuadas
+    "pingüino.ü@empresa.cl",        # diéresis
+])
+def test_extracto_anonimiza_correo_con_tildes_completo(correo):
+    t = seguridad.anonimizar(f"Contacto: {correo}.")
+    assert t == f"Contacto: {seguridad.ETIQUETA_CORREO}."
+    parte_local = correo.split("@")[0]
+    for fragmento in re.findall(r"[^\W\d_]+", parte_local):   # cada palabra de la parte local
+        assert fragmento not in t
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("matías punto díaz arroba empresa punto cl", f"Contacto: {seguridad.ETIQUETA_CORREO}."),
+    ("ñandú arroba x punto cl", f"Contacto: {seguridad.ETIQUETA_CORREO}."),
+    ("matías.díaz [at] empresa.cl", f"Contacto: {seguridad.ETIQUETA_CORREO}."),
+])
+def test_extracto_anonimiza_correo_con_tildes_escrito_en_palabras(texto, esperado):
+    t = seguridad.anonimizar(f"Contacto: {texto}.")
+    assert t == esperado
+    for fragmento in ("matías", "díaz", "ñandú", "arroba", "punto"):
+        assert fragmento.lower() not in t.lower()
+
+
+def test_lookbehind_no_corta_palabra_con_tilde_antes_de_arroba():
+    # Con el lookbehind ASCII, el original dejaba "canció[CORREO_ANON]" (corte a mitad de palabra).
+    t = seguridad.anonimizar("Contacto: canción arroba empresa punto cl.")
+    assert t == f"Contacto: {seguridad.ETIQUETA_CORREO}."
+
+
+@pytest.mark.parametrize("texto", [
+    "En el año 2025 la información de gestión se revisó con el comité.",
+    "Año fiscal: información, gestión y niño.",
+    "La política fue aprobada por el directorio y publicada en la intranet.",
+])
+def test_palabras_con_tilde_que_no_son_correo_no_se_etiquetan(texto):
+    assert seguridad.anonimizar(texto) == texto

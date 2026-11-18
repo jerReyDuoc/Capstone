@@ -155,15 +155,18 @@ _RE_TEL = re.compile(
     r"|9[\s.\-]\d{4}[\s.\-]\d{4}"
     r")(?!\d)"
 )
-_PAL = r"[A-Za-z0-9_+\-]+"
+# Letras de la parte local de un correo: ASCII + vocales con tilde, ü y ñ (HU-06).
+# Clase explícita y no \w: \w incluiría dígitos y underscore de otros alfabetos.
+_LETRAS_CORREO = "A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ"
+_PAL = rf"[{_LETRAS_CORREO}_+\-]+"
 _RE_CORREO_PALABRAS = re.compile(
-    rf"(?<![A-Za-z0-9_+\-])({_PAL}(?:\s+punto\s+{_PAL})*)\s+arroba\s+({_PAL}(?:\s+punto\s+{_PAL})+)(?![A-Za-z0-9_+\-])",
+    rf"(?<![{_LETRAS_CORREO}_+\-])({_PAL}(?:\s+punto\s+{_PAL})*)\s+arroba\s+({_PAL}(?:\s+punto\s+{_PAL})+)(?![{_LETRAS_CORREO}_+\-])",
     re.IGNORECASE,
 )
 _RE_ARROBA = re.compile(r"\s*[\[\(\{]\s*(?:arroba|at)\s*[\]\)\}]\s*", re.IGNORECASE)
 _RE_PUNTO = re.compile(r"\s*[\[\(\{]\s*(?:punto|dot)\s*[\]\)\}]\s*", re.IGNORECASE)
 _RE_CORREO = re.compile(
-    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}"
+    rf"[{_LETRAS_CORREO}._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{{2,}}"
 )
 
 

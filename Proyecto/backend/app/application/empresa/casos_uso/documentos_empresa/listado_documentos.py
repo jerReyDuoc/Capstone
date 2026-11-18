@@ -70,5 +70,5 @@ class ListadoDocumentosMixin:
                 "fecha_completado": a.fecha_completado, "codigo": a.codigo_constancia,
                 "descarga": f"/api/formacion/modulos/{a.ruta_formativa_id}/constancia",
             } for a, nombre in constancias if a.completado],
-            "documentos_disponibles_hasta": self.empresa.vigencia(settings.CONTRATO_GRACIA_DIAS).como_dict()["documentos_disponibles_hasta"],
+            "documentos_disponibles_hasta": self.empresa.vigencia(settings.CONTRATO_GRACIA_DIAS_HABILES, feriados=settings.FERIADOS_CL).como_dict()["documentos_disponibles_hasta"],
         }

@@ -94,6 +94,8 @@ async def _estado(db: AsyncSession) -> dict:
                               # T-11
                               "contratacion_descartada": settings.RETENCION_SOLICITUDES_DESCARTADAS_DIAS,
                               "arcop_seguimiento": settings.RETENCION_ARCOP_SEGUIMIENTO_DIAS},
+        # T-17 (R7): no es un plazo en días; se aplica al terminar la gracia del contrato
+        "empresa_activa": settings.RETENCION_EMPRESA_ACTIVA,
         "ultima_ejecucion": _fila(ultimas[0]) if ultimas else None,
         "cambios_recientes": [_fila(c) for c in cambios],
     }

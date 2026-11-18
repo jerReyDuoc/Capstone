@@ -18,6 +18,7 @@ archivos del cliente, así la API no sirve para mandar contenido arbitrario a te
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -37,7 +38,7 @@ from app.domain.evaluacion.analisis_brechas import (
 )
 from app.application.informes.analisis_informe import parsear_filtros, plan_a_dict
 from app.application.informes.informe_evaluacion import construir_informe, ficha_a_dict
-from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion
+from app.application.informes.carga import DatosEvaluacion, SinResultadosError, cargar_evaluacion, congelar_version_aviso
 from app.application.informes.datos_informe import DatosInforme, nombre_archivo
 from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.encuesta_publica.casos_uso.limites_encuesta import ventana_diaria
@@ -68,6 +69,14 @@ async def _datos(db: AsyncSession, evaluacion_id: int) -> DatosEvaluacion:
         return await cargar_evaluacion(db, evaluacion_id)
     except SinResultadosError as e:
         raise _error(404, "SIN_RESULTADOS", str(e))
+
+
+async def _datos_emision(db: AsyncSession, evaluacion_id: int) -> DatosEvaluacion:
+    """T-16: datos para EMITIR (PDF o correo): la primera emisión congela la versión del aviso."""
+    datos = await _datos(db, evaluacion_id)  # 404 si aún no hay resultados
+    version = await congelar_version_aviso(db, evaluacion_id)
+    await db.commit()
+    return replace(datos, aviso_informe_version=version)
 
 
 def _informe(datos: DatosEvaluacion, filtros: FiltrosBrechas) -> DatosInforme:
@@ -133,7 +142,7 @@ async def descargar_informe(
     _actor: Actor | None = Depends(alcance_evaluacion),
 ):
     """Informe en PDF para descargar directo (sin el diálogo de impresión del navegador)."""
-    informe = _informe(await _datos(db, evaluacion_id), parsear_filtros(severidad, dominio, estado, q))
+    informe = _informe(await _datos_emision(db, evaluacion_id), parsear_filtros(severidad, dominio, estado, q))
     contenido = _pdf(informe)
     return Response(
         content=contenido, media_type="application/pdf",
@@ -168,7 +177,7 @@ async def enviar_informe(
     if not correo.EMAIL_VALIDO.match(destino):
         raise _error(422, "EMAIL_INVALIDO", "Revisa el formato del correo (ejemplo: nombre@empresa.cl).")
 
-    datos = await _datos(db, evaluacion_id)  # 404 si aún no hay resultados (antes de gastar cupo)
+    datos = await _datos_emision(db, evaluacion_id)  # 404 si aún no hay resultados (antes de gastar cupo)
 
     fecha, ventana, _ = ventana_diaria()
     claves = [
@@ -196,6 +205,7 @@ async def enviar_informe(
         texto, html = correo.cuerpo_informe(
             evaluacion_id, datos.puntaje_general, ETIQUETA_MADUREZ[nivel_madurez(datos.puntaje_general)],
             informe.brechas_total, conteo["Crítica"], informe.plan.modulos, informe.plan.horas,
+            aviso=informe.ficha.aviso,
         )
         modo = await fabricas().correo.enviar(
             destino, f"Tu informe de diagnóstico · Evaluación #{evaluacion_id}", texto, html,

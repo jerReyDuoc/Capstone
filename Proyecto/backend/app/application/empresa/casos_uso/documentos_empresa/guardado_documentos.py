@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.informes.analisis_informe import parsear_filtros
-from app.application.informes.carga import SinResultadosError, cargar_evaluacion
+from dataclasses import replace
+
+from app.application.informes.carga import SinResultadosError, cargar_evaluacion, congelar_version_aviso
 from app.application.informes.datos_informe import DatosInforme
 from app.application.ports.generador_documentos_port import PdfNoDisponibleError
 from app.application.fabricas import fabricas
@@ -83,6 +85,8 @@ async def archivar_informe(db: AsyncSession, evaluacion: Evaluacion, actor: Acto
         datos = await cargar_evaluacion(db, evaluacion.id)
     except SinResultadosError as e:
         raise DocumentoError(409, "SIN_RESULTADOS", str(e))
+    # T-16: archivar es emitir; congela la versión del aviso dentro de esta transacción (sin commit propio)
+    datos = replace(datos, aviso_informe_version=await congelar_version_aviso(db, evaluacion.id))
     informe = _datos_informe(datos)
     try:
         pdf = fabricas().documentos.pdf_informe(informe)

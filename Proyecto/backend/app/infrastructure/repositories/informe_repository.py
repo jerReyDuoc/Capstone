@@ -1,7 +1,7 @@
 """Consultas que necesitan los informes (carga de los datos de una evaluación)."""
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +35,21 @@ class InformeRepository:
 
     async def evaluacion(self, evaluacion_id: int) -> Evaluacion | None:
         return await self.session.get(Evaluacion, evaluacion_id)
+
+    async def congelar_version_aviso(self, evaluacion_id: int, version: str) -> str | None:
+        """T-16: fija `version` solo si la evaluación aún no tiene (UPDATE condicional, sin carrera).
+        Devuelve la versión que quedó. No hace commit."""
+        await self.session.execute(
+            update(Evaluacion)
+            .where(Evaluacion.id == evaluacion_id, Evaluacion.aviso_informe_version.is_(None))
+            .values(aviso_informe_version=version)
+            .execution_options(synchronize_session=False)
+        )
+        # Se recarga la entidad (populate_existing) para que la del identity map no quede desfasada.
+        fila = (await self.session.execute(
+            select(Evaluacion).where(Evaluacion.id == evaluacion_id).execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        return fila.aviso_informe_version if fila else None
 
     async def resumenes_con_dominio(self, evaluacion_id: int) -> list:
         return list((await self.session.execute(
