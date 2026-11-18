@@ -21,7 +21,7 @@ import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { fechaChile } from "@/lib/fechas";
 import { ErrorBff } from "@/lib/encuesta/cliente";
 import {
-  COMENTARIO_MAX, DERECHOS, ESTADOS, ESTADOS_ARCOP, FILTROS_ADMIN_INICIALES, GUIA_ADMIN, MOTIVO_PRORROGA_MIN,
+  COMENTARIO_MAX, DERECHOS, DIAS_POR_VENCER, ESTADOS, ESTADOS_ARCOP, FILTROS_ADMIN_INICIALES, GUIA_ADMIN, MOTIVO_PRORROGA_MIN,
   RESPUESTA_MAX, RESPUESTA_MIN, TIPOS_ARCOP,
   accionesAdmin, apiAdminArcop, errorTexto, esFinal, mensajeError, siguientePasoAdmin, titularDe,
   type AccionAdmin, type CatalogoArcop, type DetalleArcop, type EstadoArcop, type FiltrosAdmin, type PaginaArcop, type TipoArcop,
@@ -36,11 +36,13 @@ import s from "./arcop.module.css";
 type Conteos = Awaited<ReturnType<typeof apiAdminArcop.conteos>>;
 
 const CIFRAS: { clave: keyof Conteos; etiqueta: string; filtro: Partial<FiltrosAdmin>; estilo?: "alerta" | "aviso" }[] = [
-  { clave: "recibida", etiqueta: "Nuevas", filtro: { estado: "recibida", vencidas: false } },
-  { clave: "en_revision", etiqueta: "En revisión", filtro: { estado: "en_revision", vencidas: false } },
-  { clave: "pendiente_informacion", etiqueta: "Esperando al titular", filtro: { estado: "pendiente_informacion", vencidas: false }, estilo: "aviso" },
-  { clave: "en_proceso", etiqueta: "En proceso", filtro: { estado: "en_proceso", vencidas: false } },
-  { clave: "vencidas", etiqueta: "Plazo vencido", filtro: { estado: null, vencidas: true }, estilo: "alerta" },
+  { clave: "recibida", etiqueta: "Nuevas", filtro: { estado: "recibida", vencidas: false, por_vencer_dias: null } },
+  { clave: "en_revision", etiqueta: "En revisión", filtro: { estado: "en_revision", vencidas: false, por_vencer_dias: null } },
+  { clave: "pendiente_informacion", etiqueta: "Esperando al titular", filtro: { estado: "pendiente_informacion", vencidas: false, por_vencer_dias: null }, estilo: "aviso" },
+  { clave: "en_proceso", etiqueta: "En proceso", filtro: { estado: "en_proceso", vencidas: false, por_vencer_dias: null } },
+  // T-19: abiertas con algún plazo dentro de DIAS_POR_VENCER días (sin las ya vencidas)
+  { clave: "por_vencer", etiqueta: `Vence en ${DIAS_POR_VENCER} días`, filtro: { estado: null, vencidas: false, por_vencer_dias: DIAS_POR_VENCER }, estilo: "aviso" },
+  { clave: "vencidas", etiqueta: "Plazo vencido", filtro: { estado: null, vencidas: true, por_vencer_dias: null }, estilo: "alerta" },
 ];
 
 export function BandejaArcop() {
@@ -112,7 +114,7 @@ export function BandejaArcop() {
     await Promise.all([cargarLista(filtros), cargarConteos()]);
   }
 
-  const hayFiltros = Boolean(filtros.estado || filtros.tipo || filtros.vencidas || filtros.evaluacion_id);
+  const hayFiltros = Boolean(filtros.estado || filtros.tipo || filtros.vencidas || filtros.por_vencer_dias || filtros.evaluacion_id);
 
   return (
     <div className={`${a.pagina} ${r.raiz}`}>
@@ -141,7 +143,9 @@ export function BandejaArcop() {
         ) : (
         <div className={s.franja} role="group" aria-label="Solicitudes por atender">
           {CIFRAS.map((c) => {
-            const activa = c.clave === "vencidas" ? filtros.vencidas : filtros.estado === c.clave && !filtros.vencidas;
+            const activa = c.clave === "vencidas" ? filtros.vencidas
+              : c.clave === "por_vencer" ? filtros.por_vencer_dias === DIAS_POR_VENCER
+              : filtros.estado === c.clave && !filtros.vencidas && !filtros.por_vencer_dias;
             const valor = conteos?.[c.clave];
             return (
               <button
@@ -149,7 +153,7 @@ export function BandejaArcop() {
                 type="button"
                 className={`${s.cifra} ${c.estilo === "alerta" && valor ? s.cifraAlerta : ""} ${c.estilo === "aviso" && valor ? s.cifraAviso : ""}`}
                 aria-pressed={activa}
-                onClick={() => cambiar(activa ? { estado: null, vencidas: false } : c.filtro)}
+                onClick={() => cambiar(activa ? { estado: null, vencidas: false, por_vencer_dias: null } : c.filtro)}
               >
                 <span className={s.cifraValor}>{valor ?? "—"}</span>
                 <span className={s.cifraEtiqueta}>{c.etiqueta}</span>

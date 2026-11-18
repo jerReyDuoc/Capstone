@@ -19,12 +19,13 @@ from app.application.arcop.casos_uso.gestionar_solicitud_arcop.casos import Gest
 from app.application.arcop.casos_uso.gestionar_solicitud_arcop.comun import (
     ESTADOS_GESTION, MAX_COMENTARIO, MAX_DESCRIPCION, MAX_RESPUESTA, MIN_DESCRIPCION, MIN_RESPUESTA,
     OperacionNoPermitidaError, RESULTADOS_RESOLUCION, SolicitudNoEncontradaError, TransicionInvalidaError,
-    _sumar_dias, _sumar_dias_habiles, normalizar_codigo, nuevo_codigo_seguimiento, plazo_vencido,
+    _sumar_dias, _sumar_dias_habiles, normalizar_codigo, nuevo_codigo_seguimiento, plazo_por_vencer, plazo_vencido,
+    ventana_por_vencer,
 )
 
 __all__ = [
     "ESTADOS_GESTION", "GestionarSolicitudARCOPUseCase", "MAX_COMENTARIO", "MAX_DESCRIPCION", "MAX_RESPUESTA",
     "MIN_DESCRIPCION", "MIN_RESPUESTA", "OperacionNoPermitidaError", "RESULTADOS_RESOLUCION",
     "SolicitudNoEncontradaError", "TransicionInvalidaError", "_sumar_dias", "_sumar_dias_habiles",
-    "normalizar_codigo", "nuevo_codigo_seguimiento", "plazo_vencido",
+    "normalizar_codigo", "nuevo_codigo_seguimiento", "plazo_por_vencer", "plazo_vencido", "ventana_por_vencer",
 ]

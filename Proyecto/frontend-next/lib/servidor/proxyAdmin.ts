@@ -99,6 +99,8 @@ const QUERY_ADMIN = new Map<string, RegExp>([
   // HU-32: tipo de derecho y solo solicitudes con plazo vencido
   ["tipo", /^(acceso|rectificacion|supresion|oposicion|portabilidad|bloqueo)$/],
   ["vencidas", /^(true|false)$/],
+  // T-19: solo solicitudes abiertas con algún plazo dentro de N días (1..30)
+  ["por_vencer_dias", /^([1-9]|[12]\d|30)$/],
   // HU-22: + origen de los eventos de seguridad
   ["origen", /^(publica|invitacion|justificacion|evidencia|tutor|tutor_antecedente|borrador)$/],
   ["vista", /^(clasificaciones|eventos)$/],

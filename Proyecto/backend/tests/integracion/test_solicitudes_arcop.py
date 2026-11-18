@@ -474,6 +474,73 @@ def test_plazos_configurados_y_vencidas(monkeypatch):
     _correr(esc)
 
 
+# ---------------------------------------------------------------- T-19: por vencer
+def test_t19_por_vencer_dias_trae_las_que_vencen_pronto_sin_vencidas_ni_cerradas(monkeypatch):
+    async def esc(c):
+        async def crear_con_plazo(dias):
+            monkeypatch.setattr(settings, "ARCOP_PLAZO_RESPUESTA_DIAS", dias)
+            return (await _crear(c))["id_solicitud"]
+
+        en_3_dias = await crear_con_plazo(3)
+        vencida = await crear_con_plazo(-1)
+        lejana = await crear_con_plazo(30)
+        cerrada = await crear_con_plazo(3)
+        r = await c.post(f"/api/arcop/solicitudes/{cerrada}/cancelacion", json={"motivo": "Ya no la necesito."},
+                         headers=TITULAR())
+        assert r.status_code == 200 and r.json()["estado"] == "cancelada"
+
+        r = await c.get("/api/arcop/solicitudes?por_vencer_dias=5", headers=ADMIN())
+        assert r.status_code == 200, r.text
+        ids = [x["id_solicitud"] for x in r.json()["items"]]
+        assert ids == [en_3_dias] and r.json()["total"] == 1
+        assert vencida not in ids and cerrada not in ids and lejana not in ids
+
+        # se combina con los filtros existentes
+        r = await c.get("/api/arcop/solicitudes?por_vencer_dias=5&estado=recibida&tipo=acceso", headers=ADMIN())
+        assert [x["id_solicitud"] for x in r.json()["items"]] == [en_3_dias]
+        r = await c.get("/api/arcop/solicitudes?por_vencer_dias=5&estado=en_revision", headers=ADMIN())
+        assert r.json()["total"] == 0
+        # el titular también lo usa, pero solo sobre sus solicitudes
+        r = await c.get("/api/arcop/solicitudes?por_vencer_dias=5", headers=OTRO())
+        assert r.json()["total"] == 0
+        # el límite es inclusivo: 30 días incluye la que vence en 30
+        r = await c.get("/api/arcop/solicitudes?por_vencer_dias=30", headers=ADMIN())
+        assert {x["id_solicitud"] for x in r.json()["items"]} == {en_3_dias, lejana}
+    _correr(esc)
+
+
+@pytest.mark.parametrize("valor", ["0", "31", "-2"])
+def test_t19_por_vencer_dias_fuera_de_rango_es_400(valor):
+    async def esc(c):
+        r = await c.get(f"/api/arcop/solicitudes?por_vencer_dias={valor}", headers=ADMIN())
+        assert r.status_code == 400, r.text
+        assert "entre 1 y 30" in r.json()["detail"]
+    _correr(esc)
+
+
+def test_t19_plazo_por_vencer_es_coherente_con_plazo_vencido():
+    from app.application.arcop.casos_uso.gestionar_solicitud_arcop import plazo_por_vencer, plazo_vencido
+    from app.domain.models.solicitud_arcop import SolicitudARCOP
+
+    ahora = datetime(2026, 11, 18, 15, 0)
+    s = lambda estado, resp=None, info=None: SolicitudARCOP(  # noqa: E731
+        estado=estado, fecha_limite_respuesta=resp, fecha_limite_informacion=info)
+    assert plazo_por_vencer(s("recibida", ahora + timedelta(days=3)), 5, ahora)
+    assert plazo_por_vencer(s("recibida", ahora), 1, ahora)                                  # hoy inclusive
+    assert plazo_por_vencer(s("recibida", datetime(2026, 11, 23, 23, 59)), 5, ahora)         # hoy+N inclusive
+    assert not plazo_por_vencer(s("recibida", datetime(2026, 11, 24, 0, 0)), 5, ahora)
+    assert not plazo_por_vencer(s("recibida", ahora - timedelta(minutes=1)), 5, ahora)       # ya vencida
+    assert plazo_vencido(s("recibida", ahora - timedelta(minutes=1)), ahora)
+    assert not plazo_por_vencer(s("resuelta", ahora + timedelta(days=1)), 5, ahora)          # cerrada
+    assert not plazo_por_vencer(s("recibida"), 5, ahora)                                     # sin plazo
+    # el plazo de información solo cuenta en pendiente_informacion (como plazo_vencido)
+    lejos = ahora + timedelta(days=20)
+    assert plazo_por_vencer(s("pendiente_informacion", lejos, ahora + timedelta(days=2)), 5, ahora)
+    assert not plazo_por_vencer(s("en_revision", lejos, ahora + timedelta(days=2)), 5, ahora)
+    with pytest.raises(ValueError, match="entre 1 y 30"):
+        plazo_por_vencer(s("recibida", ahora), 31, ahora)
+
+
 # ================================================================ HU-08 v3
 # ---------------------------------------------------------------- unitarias
 _PATRON_CODIGO = re.compile(r"^ARC-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$")

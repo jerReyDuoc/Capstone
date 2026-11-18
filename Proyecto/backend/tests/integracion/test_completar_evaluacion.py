@@ -134,6 +134,58 @@ def test_evidencia_en_validacion_impide_completar_hasta_que_termina():
 
 
 # =====================================================================
+# T-20 · El resumen trae siempre las 4 dimensiones
+# =====================================================================
+def test_t20_dimension_toda_no_aplica_sale_en_el_resumen_y_el_global_no_cambia(monkeypatch):
+    from app.infrastructure.repositories.reportes_repository import ReportesRepository
+
+    async def esc(c):
+        await c.post(f"/api/evaluaciones/{EVAL_ID}/filtro", json=SOLO_BASE)
+        for codigo in CONTROLES_BASE:
+            if codigo.startswith("SEG"):                                   # Seguridad: toda N/A
+                await _responder(c, codigo, "no_aplica", "")
+            else:
+                await _responder(c, codigo, "no_cumplido" if codigo == "GOB-001" else "cumplido")
+        assert (await c.post(f"/api/evaluaciones/{EVAL_ID}/completar")).status_code == 200
+
+        # "Antes" = el resumen sin relleno (solo las filas guardadas), como respondía hasta T-20
+        with monkeypatch.context() as m:
+            async def sin_catalogo(self):
+                return []
+            m.setattr(ReportesRepository, "dominios", sin_catalogo)
+            antes = (await c.get(f"/api/evaluaciones/{EVAL_ID}/resumen")).json()
+        despues = (await c.get(f"/api/evaluaciones/{EVAL_ID}/resumen")).json()
+
+        # Puntaje global y totales: idénticos (DAT 6x100, GOB 7/8, RIE 5x100; SEG no cuenta)
+        globales = ("evaluacion_id", "puntaje_general", "nivel_madurez_general", "total_controles_evaluados")
+        assert {k: despues[k] for k in globales} == {k: antes[k] for k in globales}
+        assert despues["puntaje_general"] == round((600 + 87.5 * 8 + 500) / 19, 2)
+        assert despues["total_controles_evaluados"] == 19
+
+        # Siempre las 4, en orden estable; las que tenían fila quedan igual
+        assert len(antes["dominios"]) == 3 and len(despues["dominios"]) == 4
+        assert [d["dominio"] for d in despues["dominios"]] == ["Datos", "Gobernanza", "Riesgos", "Seguridad"]
+        por_id = {d["dominio_id"]: d for d in despues["dominios"]}
+        for d in antes["dominios"]:
+            assert por_id[d["dominio_id"]] == d
+            assert d["sin_controles_aplicables"] is False and d["etiqueta"] is None
+        seg = despues["dominios"][3]
+        assert seg == {"dominio_id": 4, "dominio": "Seguridad", "puntaje": None, "nivel_madurez": None,
+                       "total_controles_evaluados": 0, "sin_controles_aplicables": True,
+                       "etiqueta": "Sin preguntas aplicables"}
+        # estable entre llamadas
+        assert (await c.get(f"/api/evaluaciones/{EVAL_ID}/resumen")).json() == despues
+    _correr(esc)
+
+
+def test_t20_orden_de_dimensiones_es_el_de_hu03():
+    from app.application.informes.ficha import DIMENSIONES_OFICIALES, orden_dimension
+    nombres = ["Uso Responsable", "Ciberseguridad", "Proteccion de Datos", "Gobernanza de IA", "Gestión de Riesgos"]
+    assert sorted(nombres, key=orden_dimension) == [*DIMENSIONES_OFICIALES[:2], "Proteccion de Datos",
+                                                    DIMENSIONES_OFICIALES[3], "Ciberseguridad"]
+
+
+# =====================================================================
 # Completar y lo que queda bloqueado después
 # =====================================================================
 def test_completar_genera_resumen_marca_completada_y_bloquea_todo():

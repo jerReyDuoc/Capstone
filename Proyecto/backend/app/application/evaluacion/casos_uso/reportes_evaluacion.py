@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from app.application.benchmark.sector import bloque_sector, publicar_fila
 from app.application.evaluacion.casos_uso.generar_resumen import nivel_madurez
+from app.application.informes.ficha import SIN_APLICABLES, orden_dimension
 from app.core.config import settings
 from app.domain.benchmark.k_anonimato import SUPRIMIDA, diferencia, posicion
 from app.domain.ports.repositorios_consultas import ReportesPort
@@ -42,6 +43,25 @@ class ReportesEvaluacionUseCase:
             suma_ponderada += (resumen.puntaje_obtenido or 0) * (resumen.total_controles_evaluados or 0)
 
         puntaje_general = round(suma_ponderada / total_controles, 2) if total_controles > 0 else 0.0
+
+        # T-20: siempre todas las dimensiones del catálogo (las 4 de HU-03), en orden estable.
+        # Las que no tienen fila (todas sus preguntas N/A) van sin puntaje; el global no cambia
+        # porque se calculó arriba solo con las filas existentes.
+        for d in dominios:
+            d.update(sin_controles_aplicables=False, etiqueta=None)
+        con_fila = {d["dominio_id"] for d in dominios}
+        for dominio in await self.repo.dominios():
+            if dominio.id not in con_fila:
+                dominios.append({
+                    "dominio_id": dominio.id,
+                    "dominio": dominio.nombre_dominio,
+                    "puntaje": None,
+                    "nivel_madurez": None,
+                    "total_controles_evaluados": 0,
+                    "sin_controles_aplicables": True,
+                    "etiqueta": SIN_APLICABLES,
+                })
+        dominios.sort(key=lambda d: orden_dimension(d["dominio"]))
         return {
             "evaluacion_id": evaluacion_id,
             "puntaje_general": puntaje_general,

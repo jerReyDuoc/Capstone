@@ -6,7 +6,7 @@ from app.domain.models.solicitud_arcop import (
     TipoSolicitudARCOP,
 )
 from app.application.arcop.casos_uso.gestionar_solicitud_arcop.comun import (
-    SolicitudNoEncontradaError, _ahora, normalizar_codigo,
+    SolicitudNoEncontradaError, _ahora, normalizar_codigo, ventana_por_vencer,
 )
 
 
@@ -25,11 +25,14 @@ class LecturaMixin:
 
     async def listar(self, actor: Actor, estado: str | None, tipo: str | None,
                      usuario_temporal_id: int | None, page: int, size: int,
-                     solo_vencidas: bool = False, evaluacion_id: int | None = None):
+                     solo_vencidas: bool = False, evaluacion_id: int | None = None,
+                     por_vencer_dias: int | None = None):
         if estado and estado not in Estado.valores():
             raise ValueError(f"Estado inválido. Debe ser uno de: {', '.join(Estado.valores())}")
         if tipo and tipo not in TipoSolicitudARCOP.valores():
             raise ValueError(f"Tipo inválido. Debe ser uno de: {', '.join(TipoSolicitudARCOP.valores())}")
+        # T-19: abiertas, sin plazo vencido y con alguno de sus plazos dentro de N días
+        por_vencer = ventana_por_vencer(por_vencer_dias) if por_vencer_dias is not None else None
         # El titular SIEMPRE queda filtrado a sus propias solicitudes
         if actor.es_admin:
             filtro = {"usuario_temporal_id": usuario_temporal_id, "evaluacion_id": evaluacion_id}
@@ -42,5 +45,6 @@ class LecturaMixin:
         return await self.repo.list(
             **filtro, estado=estado, tipo=tipo,
             solo_vencidas_al=_ahora() if solo_vencidas else None,
+            por_vencer_entre=por_vencer,
             offset=(page - 1) * size, limit=size,
         )

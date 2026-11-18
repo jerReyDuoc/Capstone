@@ -160,7 +160,66 @@ def test_c2_los_textos_son_dos_y_cada_uno_trae_su_version():
         assert datos["contacto"]["version"] == settings.CONSENTIMIENTO_CONTACTO_VERSION
         assert datos["migracion"]["version"] == settings.CONSENTIMIENTO_CONTRATACION_VERSION
         assert datos["contacto"]["texto"] != datos["migracion"]["texto"]
-        assert "contact" in datos["contacto"]["texto"] and "evaluación" in datos["migracion"]["texto"]
+        assert "contact" in datos["contacto"]["texto"] and "diagnóstico" in datos["migracion"]["texto"]
+    _correr(esc)
+
+
+# T-21: cada texto nombra su finalidad, su plazo y cómo se retira
+@pytest.mark.parametrize("clave, finalidad, plazo", [
+    ("contacto", "para contactarme por la contratación", "se conservan hasta 6 meses"),
+    ("migracion", "traspasar este diagnóstico", "mientras dure el contrato y sus 30 días hábiles de gracia"),
+])
+def test_t21_cada_texto_nombra_finalidad_plazo_y_retiro(clave, finalidad, plazo):
+    async def esc(c):
+        texto = (await c.get("/api/contratacion/consentimiento")).json()[clave]["texto"]
+        assert finalidad in texto, "falta la finalidad"
+        assert plazo in texto, "falta el plazo"
+        assert "retirar esta autorización" in texto and "«Mis derechos»" in texto, "falta cómo retirarlo"
+    _correr(esc)
+
+
+def test_t21_versiones_nuevas_no_reutilizan_las_anteriores():
+    assert settings.CONSENTIMIENTO_CONTACTO_VERSION == "2026-11-v1"
+    assert settings.CONSENTIMIENTO_CONTRATACION_VERSION == "2026-11-v1"
+    assert settings.CONSENTIMIENTO_CONTACTO_VERSION != "2026-10-v1"
+    assert settings.CONSENTIMIENTO_CONTRATACION_VERSION != "2026-10-v2"
+
+
+def test_t21_solicitud_nueva_guarda_version_nueva_con_fecha_y_la_anterior_conserva_la_suya(monkeypatch):
+    async def esc(c):
+        from datetime import datetime, timedelta, timezone
+        nuevas = (settings.CONSENTIMIENTO_CONTACTO_VERSION, settings.CONSENTIMIENTO_CONTRATACION_VERSION)
+
+        # Solicitud enviada cuando regían los textos anteriores
+        monkeypatch.setattr(settings, "CONSENTIMIENTO_CONTACTO_VERSION", "2026-10-v1")
+        monkeypatch.setattr(settings, "CONSENTIMIENTO_CONTRATACION_VERSION", "2026-10-v2")
+        vieja = await _evaluacion_completada(c, con_evidencia=False)
+        r = await _enviar(c, vieja)
+        assert r.status_code == 201, r.text
+        sid_vieja = r.json()["id"]
+        antes = await _fila(sid_vieja)
+        fechas_vieja = (antes.fecha_consentimiento_contacto, antes.fecha_autorizacion)
+
+        # Sube la versión: con la vieja ya no se acepta y la nueva queda registrada con su fecha
+        monkeypatch.setattr(settings, "CONSENTIMIENTO_CONTACTO_VERSION", nuevas[0])
+        monkeypatch.setattr(settings, "CONSENTIMIENTO_CONTRATACION_VERSION", nuevas[1])
+        nueva = await _evaluacion_completada(c, con_evidencia=False)
+        r = await _enviar(c, nueva, consentimiento_contacto={"version": "2026-10-v1", "aceptado": True})
+        assert r.status_code == 409 and _codigo(r) == "CONSENTIMIENTO_DESACTUALIZADO"
+        r = await _enviar(c, nueva)
+        assert r.status_code == 201, r.text
+        fila = await _fila(r.json()["id"])
+        assert (fila.consentimiento_contacto_version, fila.consentimiento_version) == nuevas
+        ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+        for fecha in (fila.fecha_consentimiento_contacto, fila.fecha_autorizacion):
+            assert fecha is not None and abs(ahora - fecha) < timedelta(minutes=5)
+
+        # La anterior conserva su versión y su fecha (sin backfill), también en la bandeja del admin
+        vieja_fila = await _fila(sid_vieja)
+        assert (vieja_fila.consentimiento_contacto_version, vieja_fila.consentimiento_version) == ("2026-10-v1", "2026-10-v2")
+        assert (vieja_fila.fecha_consentimiento_contacto, vieja_fila.fecha_autorizacion) == fechas_vieja
+        cons = (await c.get(f"/api/admin/contrataciones/{sid_vieja}", headers=admin())).json()["consentimientos"]
+        assert cons["contacto"]["version"] == "2026-10-v1" and cons["migracion"]["version"] == "2026-10-v2"
     _correr(esc)
 
 

@@ -9,6 +9,10 @@ frontend los lee de GET /api/contratacion/consentimiento, así que no hay que to
 Textos PROVISORIOS hasta que el PO apruebe los definitivos (pendiente "textos de
 consentimiento" de HU-27). Redactados en lenguaje claro: qué datos, para qué, qué pasa
 después y cómo se retira (Ley 21.719, consentimiento libre, informado y específico).
+
+T-21: cada texto nombra su FINALIDAD, su PLAZO y la forma de RETIRO (desde «Mis derechos»);
+por eso las dos versiones subieron a 2026-11-v1. Cada solicitud guarda la versión que aceptó
+y la fecha de aceptación; las anteriores conservan la suya (no se reescriben).
 """
 from dataclasses import dataclass
 
@@ -19,16 +23,17 @@ MIGRACION = "migracion"
 
 TEXTO_CONTACTO = (
     "Autorizo a Therion Labs a usar mi nombre, cargo, empresa, correo y teléfono (si lo indiqué) "
-    "solo para contactarme sobre la contratación de ComplianceIA. Si la contratación no se concreta, "
-    "estos datos se eliminan. Puedo retirar esta autorización cuando quiera ejerciendo mis derechos "
-    "sobre datos personales."
+    "para contactarme por la contratación de ComplianceIA. Si la contratación no se concreta, "
+    "estos datos se conservan hasta 6 meses y luego se eliminan. Puedo retirar esta autorización "
+    "cuando quiera desde «Mis derechos»."
 )
 
 TEXTO_MIGRACION = (
-    "Si mi empresa contrata, autorizo a Therion Labs a asociarle esta evaluación con sus respuestas, "
-    "evidencias anonimizadas, resultados, plan formativo e informes, para continuar sin repetir el "
-    "autodiagnóstico. Desde ese momento mi clave temporal deja de funcionar y el acceso pasa a la "
-    "cuenta de la empresa."
+    "Si mi empresa contrata, autorizo a Therion Labs a traspasar este diagnóstico (respuestas, "
+    "evidencias anonimizadas, resultados, plan formativo e informes) a la cuenta de la empresa, para "
+    "continuar sin repetir el autodiagnóstico. Desde ese momento mi clave temporal deja de funcionar. "
+    "La asociación se mantiene mientras dure el contrato y sus 30 días hábiles de gracia. Puedo retirar "
+    "esta autorización cuando quiera desde «Mis derechos»."
 )
 
 

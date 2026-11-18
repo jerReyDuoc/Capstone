@@ -224,13 +224,15 @@ class Settings(BaseSettings):
     # Versión vigente del texto con que el usuario temporal autoriza el traspaso de su
     # evaluación al pedir contratar (HU-31; el PO aún debe aprobar el texto definitivo).
     # HU-31 subió la versión porque reescribió el texto (sigue provisorio hasta que lo apruebe el PO).
-    CONSENTIMIENTO_CONTRATACION_VERSION: str = "2026-10-v2"
+    # T-21: 2026-10-v2 -> 2026-11-v1 (el texto nombra finalidad, plazo y retiro desde «Mis derechos»).
+    CONSENTIMIENTO_CONTRATACION_VERSION: str = "2026-11-v1"
 
     # ------------------------------------------------ HU-31: solicitud de contratación
     # Versión vigente del texto del consentimiento de CONTACTO COMERCIAL (separado del de
     # traspaso). Si el PO cambia el texto, se sube la versión: el envío con otra versión
     # se rechaza (409 CONSENTIMIENTO_DESACTUALIZADO) y el formulario muestra el nuevo.
-    CONSENTIMIENTO_CONTACTO_VERSION: str = "2026-10-v1"
+    # T-21: 2026-10-v1 -> 2026-11-v1 (el texto nombra finalidad, plazo de 6 meses y retiro).
+    CONSENTIMIENTO_CONTACTO_VERSION: str = "2026-11-v1"
     # Bandeja del equipo comercial de Therion Labs que recibe el aviso de cada solicitud
     # nueva. Vacío = sin aviso (queda en la bitácora como omitido). El aviso NO lleva
     # nombre, correo ni teléfono de la persona: solo el número, la empresa y el enlace.
