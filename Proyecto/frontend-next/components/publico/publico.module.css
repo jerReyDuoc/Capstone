@@ -13,7 +13,7 @@
 /* ---------- encabezado ---------- */
 .encabezado {
   position: sticky; top: 0; z-index: 10;
-  background: rgba(5, 8, 7, 0.82);
+  background: var(--cromo-fuerte);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
@@ -31,6 +31,13 @@
 }
 .navEnlace:hover { color: var(--text); background: var(--surface-2); }
 @media (min-width: 760px) { .navEnlace { display: inline-flex; } }
+/* Corrección 18-11: selector de tema (grupo en pantallas anchas, un botón en las angostas) */
+.tema { display: inline-flex; flex: none; margin-left: auto; }   /* sin enlaces, queda solo a la derecha */
+.navPublica { margin-left: auto; }                                 /* con enlaces, los dos juntos a la derecha */
+.navPublica + .tema { margin-left: 0; }
+.temaAncho { display: none; }
+.temaAngosto { display: inline-flex; }
+@media (min-width: 760px) { .temaAncho { display: inline-flex; } .temaAngosto { display: none; } }
 /* en teléfonos el encabezado no cabe completo: botones más cortos */
 @media (max-width: 479px) { .soloAncho { display: none; } .marcaSub { display: none; } }
 @media (max-width: 399px) {

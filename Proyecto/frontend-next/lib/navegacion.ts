@@ -8,6 +8,8 @@
  * - Rótulos cortos que caben en una línea.
  * - El mapa de datos, el asistente y el registro de actividades son pasos de UN flujo
  *   ("Arma tu registro"): el menú tiene una sola entrada y el flujo muestra los pasos.
+ * - Corrección 18-11: el asistente de registro TAMBIÉN es una sección propia ("Asistente"); dentro del mapa y
+ *   del registro se sigue abriendo con su botón flotante.
  */
 import type { IconName } from "@/components/ui/Icon";
 
@@ -81,7 +83,12 @@ export function gruposNavegacion(modo: ModoNavegacion): GrupoNav[] {
               etiqueta: "Arma tu registro",
               titulo: "Arma tu registro de actividades: mapa de datos, asistente y registro",
               icono: "mapa" as const,
-              tambien: ["/empresa/mapa-datos", "/empresa/asistente", "/empresa/registro-actividades"],
+              tambien: ["/empresa/mapa-datos", "/empresa/registro-actividades"],
+            }, {
+              ruta: "/empresa/asistente",
+              etiqueta: "Asistente",
+              titulo: "Asistente de registro: pregunta y revisa tu registro",
+              icono: "chispa" as const,
             }]
           : []),
         // HU-32: derechos ARCOP (cada titular tiene su página)

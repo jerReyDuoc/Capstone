@@ -1,6 +1,8 @@
 """Asistente RAT: cuota diaria, disponibilidad de la IA, estado de la pantalla y ciclo de la entrevista."""
 from __future__ import annotations
 
+import logging
+
 from app.application.rat.asistente import banco, inconsistencias
 from app.application.rat.casos_uso.asistente_rat.comun import (
     MAX_MENSAJES_VISTA, MAX_PROPUESTAS_VISTA, AsistenteError, _ahora, documento_a_dict, mensaje_a_dict,
@@ -12,6 +14,8 @@ from app.domain.auditoria.acciones import Accion
 from app.domain.models.asistente import AsistentePropuesta, AsistenteSesion
 from app.domain.ports.limitador_port import LimitadorNoDisponibleError
 
+logger = logging.getLogger(__name__)
+
 
 class SesionMixin:
     """Depende de los atributos que fija AsistenteRat.__init__ (db, repo, limitador, agente, ...)."""
@@ -19,6 +23,9 @@ class SesionMixin:
     # ------------------------------------------------------------------ cuota (C5)
     def _clave(self, tipo: str, fecha: str) -> str:
         return f"asistente:{tipo}:{self.empresa_id}:{fecha}"
+
+    def _clave_rafaga(self) -> str:
+        return f"asistente:min:{self.empresa_id}:{self.usuario_id}"
 
     async def cuota(self) -> dict:
         fecha, _, reinicio = ventana_diaria()
@@ -43,7 +50,9 @@ class SesionMixin:
         reserva = Reserva(self.limitador)
         pasos = []
         if tipo == "dia":
-            pasos.append((f"asistente:min:{self.empresa_id}", settings.ASISTENTE_RESPUESTAS_MINUTO_EMPRESA, 60, True))
+            # Corrección 18-11: la ráfaga es de la PERSONA (empresa + usuario), no solo de la empresa. La cuota
+            # diaria sigue siendo de la empresa (lógica de negocio, sin cambios).
+            pasos.append((self._clave_rafaga(), settings.ASISTENTE_RESPUESTAS_MINUTO_EMPRESA, 60, True))
         limite = settings.ASISTENTE_RESPUESTAS_DIA_EMPRESA if tipo == "dia" else settings.ASISTENTE_DOCUMENTOS_DIA_EMPRESA
         pasos += [(self._clave(tipo, fecha), limite, ventana, False),
                   (f"llm:global:{fecha}", settings.LLM_CUOTA_DIARIA_GLOBAL, ventana, False)]
@@ -52,6 +61,11 @@ class SesionMixin:
                 continue
             consumo = await self.limitador.consumir(clave, limite, ventana_s)
             reserva.claves.append(clave)
+            if es_rafaga:
+                # TEMPORAL (verificación del falso 429, 18-11): quitar cuando se confirme el arreglo en staging.
+                logger.warning("[RAFAGA-DEBUG] empresa=%s usuario=%s clave=%s usados=%s limite=%s reintentar_en_s=%s "
+                            "permitido=%s", self.empresa_id, self.usuario_id, clave, consumo.usados, limite,
+                            getattr(consumo, "reintentar_en_s", None), consumo.permitido)
             if not consumo.permitido:
                 await reserva.devolver()
                 if es_rafaga:

@@ -22,6 +22,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { usePanelOpcional, type ModoPanel } from "@/hooks/usePanel";
 import { LOGIN_DE } from "@/lib/acceso";
 import { pedir } from "@/lib/encuesta/cliente";
+import { limpiarDatosDeCuenta } from "@/lib/sesionNavegador";
 import {
   entradaActiva,
   grupoActivo,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/navegacion";
 import { BrandMark, Icon } from "@/components/ui/Icon";
 import { MenuCuenta, type OpcionCuenta } from "@/components/ui/MenuCuenta";
+import { SelectorTema } from "@/components/ui/SelectorTema";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -52,6 +54,7 @@ export function Sidebar() {
   async function salir() {
     // HU-28: el BFF revoca la sesión en el servidor y luego borra la cookie
     await pedir("/bff/cliente/logout", { method: "POST" }).catch(() => undefined);
+    limpiarDatosDeCuenta(); // Corrección 18-11: la conversación del asistente no pasa a la próxima cuenta
     router.replace(`${LOGIN_DE.cliente}?motivo=salida`);
     router.refresh();
   }
@@ -165,6 +168,8 @@ export function Sidebar() {
       <header className="barra-movil">
         {marca}
         {demo ? <span className="badge badge-demo">Demo</span> : null}
+        {/* Corrección 18-11: en escritorio el selector va en la barra superior (BarraSuperior) */}
+        <SelectorTema cuenta={cliente ? "cliente" : "ninguna"} compacto />
         {cliente ? <MenuCuenta titulo="Mi cuenta" detalle="Usuario de tu empresa" opciones={opcionesCuenta} /> : null}
       </header>
       <NavInferior grupos={grupos} destino={destino} pathname={pathname} listaGrupos={listaGrupos} cliente={cliente} />

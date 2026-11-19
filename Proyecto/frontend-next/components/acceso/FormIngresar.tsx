@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState, type FormEvent } from "react";
 import { INICIO_DE, mensajeLogin, TEXTO_MOTIVO, type MotivoLogin } from "@/lib/acceso";
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
+import { limpiarDatosDeCuenta } from "@/lib/sesionNavegador";
 import s from "@/components/inicio/inicio.module.css";
 
 export function FormIngresar({ motivo }: { motivo?: MotivoLogin }) {
@@ -35,6 +36,8 @@ export function FormIngresar({ motivo }: { motivo?: MotivoLogin }) {
     try {
       await pedir("/bff/cliente/login", { method: "POST", json: { email: email.trim(), password } });
       setPassword("");
+      // Corrección 18-11: si la sesión anterior venció sin "Cerrar sesión", quien entra no hereda sus datos
+      limpiarDatosDeCuenta();
       router.replace(INICIO_DE.cliente);
       router.refresh();
     } catch (err) {

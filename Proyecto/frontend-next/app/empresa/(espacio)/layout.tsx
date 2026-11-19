@@ -7,6 +7,7 @@
  * FastAPI en cada llamada.
  */
 import type { Metadata } from "next";
+import { BarraSuperior } from "@/components/shell/BarraSuperior";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { EspacioEmpresaProvider } from "@/components/empresa/EspacioEmpresaContexto";
 
@@ -22,6 +23,7 @@ export default function EspacioLayout({ children }: { children: React.ReactNode 
       <div className="shell">
         <Sidebar />
         <main id="contenido" className="main" tabIndex={-1}>
+          <BarraSuperior />
           <div className="main-inner">{children}</div>
         </main>
       </div>

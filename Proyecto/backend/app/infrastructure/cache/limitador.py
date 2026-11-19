@@ -27,6 +27,30 @@ logger = logging.getLogger(__name__)
 
 _PREFIJO = "cai:lim:"
 
+# Corrección 18-11 (falso "Estás respondiendo muy rápido"): antes `devolver` hacía DECR sin mirar si la clave
+# seguía viva. Si la ventana ya había vencido (una respuesta de la IA que tarda 70 s contra una ventana de
+# ráfaga de 60 s), Redis RECREABA la clave en -1 y SIN vencimiento; el SET NX EX de `consumir` ya no le ponía
+# TTL y el contador "por minuto" quedaba para siempre: tras 6 preguntas en total, la cuenta recibía 429 en
+# su primera pregunta de cualquier día. Ahora las dos operaciones son atómicas (Lua):
+#   consumir: crea la clave con su ventana; si encuentra una SIN vencimiento (dañada por la versión anterior)
+#             la reinicia con su ventana: las cuentas ya afectadas se reparan solas en su próxima consulta.
+#   devolver: descuenta solo si la clave existe y es > 0 (DECR conserva el TTL); nunca crea claves.
+_LUA_CONSUMIR = """
+local reparada = 0
+redis.call('SET', KEYS[1], 0, 'EX', ARGV[1], 'NX')
+if redis.call('TTL', KEYS[1]) == -1 then
+  redis.call('SET', KEYS[1], 0, 'EX', ARGV[1])
+  reparada = 1
+end
+local usados = redis.call('INCR', KEYS[1])
+return {usados, redis.call('TTL', KEYS[1]), reparada}
+"""
+_LUA_DEVOLVER = """
+local v = tonumber(redis.call('GET', KEYS[1]) or '0')
+if v > 0 then return redis.call('DECR', KEYS[1]) end
+return 0
+"""
+
 
 def _resultado(usados: int, limite: int, ttl: int, ventana_s: int) -> Consumo:
     return Consumo(
@@ -57,23 +81,18 @@ class LimitadorRedis:
     async def consumir(self, clave: str, limite: int, ventana_s: int) -> Consumo:
         k = _PREFIJO + clave
         try:
-            async with self._cliente().pipeline(transaction=True) as p:
-                p.set(k, 0, ex=ventana_s, nx=True)
-                p.incr(k)
-                p.ttl(k)
-                _, usados, ttl = await p.execute()
+            usados, ttl, reparada = await self._cliente().eval(_LUA_CONSUMIR, 1, k, int(ventana_s))
         except Exception as e:  # noqa: BLE001
             logger.error("Limitador Redis no disponible (%s)", type(e).__name__)
             raise LimitadorNoDisponibleError() from e
+        if int(reparada):
+            logger.warning("Limitador: la clave %s no tenía vencimiento; se reinició su ventana (%s s)", clave, ventana_s)
         return _resultado(int(usados), limite, int(ttl), ventana_s)
 
     async def devolver(self, clave: str) -> None:
         k = _PREFIJO + clave
         try:
-            redis = self._cliente()
-            valor = await redis.decr(k)
-            if int(valor) < 0:
-                await redis.set(k, 0, keepttl=True)
+            await self._cliente().eval(_LUA_DEVOLVER, 1, k)
         except Exception:  # noqa: BLE001  (devolver es "mejor esfuerzo")
             logger.warning("No se pudo devolver un consumo del limitador")
 

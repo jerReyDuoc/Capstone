@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { LOGIN_DE, type TipoCuenta } from "@/lib/acceso";
 import { pedir } from "@/lib/encuesta/cliente";
+import { limpiarDatosDeCuenta } from "@/lib/sesionNavegador";
 
 export function BotonCerrarSesion({
   tipo,
@@ -26,6 +27,7 @@ export function BotonCerrarSesion({
     if (saliendo) return;
     setSaliendo(true);
     await pedir(tipo === "admin" ? "/bff/admin/logout" : "/bff/cliente/logout", { method: "POST" }).catch(() => undefined);
+    limpiarDatosDeCuenta(); // Corrección 18-11: nada de esta cuenta queda en el navegador
     router.replace(`${LOGIN_DE[tipo]}?motivo=salida`);
     router.refresh();
   }

@@ -86,3 +86,31 @@
   .pestanas { margin-inline: var(--sp-4); }
   .revision { padding-inline: var(--sp-4); }
 }
+
+/* ---------- Corrección 18-11: la conversación en su propia sección (/empresa/asistente) ---------- */
+.seccion {
+  display: flex; flex-direction: column; min-height: 0;
+  height: min(72dvh, 780px);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-lg);
+  background: var(--surface); overflow: hidden;
+}
+@media (max-width: 1023px) { .seccion { height: calc(100dvh - 220px - var(--bottom-nav-h)); min-height: 420px; } }
+.seccionCabeza {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--line);
+}
+.seccionTitulo {
+  display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0;
+  font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600;
+}
+.seccionTitulo svg { width: 18px; height: 18px; color: var(--accent); }
+.contexto {
+  display: inline-flex; gap: var(--sp-1); padding: 3px;
+  border: 1px solid var(--line-control); border-radius: var(--radius-pill); background: var(--surface-3);
+}
+.contexto button {
+  min-height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--radius-pill);
+  background: transparent; font: inherit; font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer;
+}
+.contexto button:hover { color: var(--text); }
+.contexto button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }

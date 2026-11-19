@@ -4,10 +4,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  agruparRevision, cuotaTexto, guardarConversacion, historialParaEnviar, leerConversacion, pasoSiguiente,
+  agruparRevision, claveConversacion, cuotaTexto, guardarConversacion, historialParaEnviar, leerConversacion, pasoSiguiente,
   preguntaAlerta, validarPregunta, type AlertaRegistro, type MensajeGuia,
 } from "@/lib/guiaRegistro";
 import { autorizarRutaCliente } from "@/lib/servidor/proxyCliente";
+import { borrarClavesConPrefijo, PREFIJOS_DE_CUENTA } from "@/lib/sesionNavegador";
 
 const ok = (m: string, r: string) => autorizarRutaCliente(m, r.split("/")).ok;
 
@@ -49,14 +50,48 @@ describe("conversación", () => {
       setItem: (k: string, v: string) => void datos.set(k, v),
       removeItem: (k: string) => void datos.delete(k),
     };
-    guardarConversacion(almacen, [{ id: "1", rol: "usuario", texto: "hola" }]);
-    expect(leerConversacion(almacen)).toEqual([{ id: "1", rol: "usuario", texto: "hola" }]);
-    datos.set("guia-registro:conversacion", JSON.stringify([{ rol: "admin", texto: 1 }, { id: "2", rol: "guia", texto: "ok" }]));
-    expect(leerConversacion(almacen).map((m) => m.id)).toEqual(["2"]);
-    datos.set("guia-registro:conversacion", "{no es json");
-    expect(leerConversacion(almacen)).toEqual([]);
-    guardarConversacion(almacen, []);
+    guardarConversacion(almacen, 7, [{ id: "1", rol: "usuario", texto: "hola" }]);
+    expect(leerConversacion(almacen, 7)).toEqual([{ id: "1", rol: "usuario", texto: "hola" }]);
+    datos.set(claveConversacion(7), JSON.stringify([{ rol: "admin", texto: 1 }, { id: "2", rol: "guia", texto: "ok" }]));
+    expect(leerConversacion(almacen, 7).map((m) => m.id)).toEqual(["2"]);
+    datos.set(claveConversacion(7), "{no es json");
+    expect(leerConversacion(almacen, 7)).toEqual([]);
+    guardarConversacion(almacen, 7, []);
     expect(datos.size).toBe(0);
+  });
+
+  it("Corrección 18-11: la conversación es de una cuenta y no la ve otra", () => {
+    const datos = new Map<string, string>();
+    const almacen = {
+      getItem: (k: string) => datos.get(k) ?? null,
+      setItem: (k: string, v: string) => void datos.set(k, v),
+      removeItem: (k: string) => void datos.delete(k),
+    };
+    guardarConversacion(almacen, 1, [{ id: "a", rol: "usuario", texto: "de la cuenta 1" }]);
+    expect(leerConversacion(almacen, 2)).toEqual([]);
+    expect(leerConversacion(almacen, 1)).toHaveLength(1);
+    // Sin usuario conocido no se lee ni se guarda nada
+    expect(leerConversacion(almacen, null)).toEqual([]);
+    guardarConversacion(almacen, null, [{ id: "b", rol: "usuario", texto: "x" }]);
+    expect([...datos.keys()]).toEqual([claveConversacion(1)]);
+    // La clave de antes (sin dueño) se descarta y nunca se muestra
+    datos.set("guia-registro:conversacion", JSON.stringify([{ id: "v", rol: "usuario", texto: "vieja" }]));
+    expect(leerConversacion(almacen, 2)).toEqual([]);
+    expect(datos.has("guia-registro:conversacion")).toBe(false);
+  });
+
+  it("Corrección 18-11: al cerrar sesión se borra lo de la cuenta y nada más", () => {
+    const datos = new Map<string, string>([
+      [claveConversacion(1), "[]"], [claveConversacion(2), "[]"], ["guia-registro:conversacion", "[]"],
+      ["mapa-datos:guia-plegada", "1"],
+    ]);
+    const almacen = {
+      get length() { return datos.size; },
+      key: (i: number) => [...datos.keys()][i] ?? null,
+      removeItem: (k: string) => void datos.delete(k),
+    };
+    expect(borrarClavesConPrefijo(almacen, PREFIJOS_DE_CUENTA)).toBe(3);
+    expect([...datos.keys()]).toEqual(["mapa-datos:guia-plegada"]);
   });
 
   it("valida la pregunta y muestra la cuota en simple", () => {

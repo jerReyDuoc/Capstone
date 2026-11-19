@@ -5,6 +5,11 @@
  * lateral con respuestas cortas que orientan. No arma ni propone registros: la persona completa todo a
  * mano. La conversación la guarda el navegador (sessionStorage) y se envía en cada pregunta.
  *
+ * Corrección 18-11: la conversación es de UNA cuenta. Se guarda bajo `guia-registro:conversacion:<usuarioId>`
+ * (antes era una clave fija y la cuenta que entraba después en la misma pestaña veía la conversación de la
+ * anterior) y se borra al cerrar o iniciar sesión (lib/sesionNavegador.ts). Sin usuario conocido no se lee ni
+ * se guarda nada.
+ *
  * Aquí solo hay llamadas y lógica de presentación pura (probada en tests/guia_registro.test.ts).
  */
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
@@ -13,7 +18,11 @@ export const BASE_GUIA = "/bff/cliente/api/asistente/guia";
 export const MAX_CARACTERES_GUIA = 2000;
 export const MAX_MENSAJES_GUARDADOS = 30;
 export const TURNOS_ENVIADOS = 6;
-const CLAVE_ALMACEN = "guia-registro:conversacion";
+/** Prefijo de todo lo que la guía guarda en el navegador (lo borra limpiarDatosDeCuenta al cerrar sesión). */
+export const PREFIJO_ALMACEN_GUIA = "guia-registro:";
+/** Clave de antes de la corrección 18-11 (sin dueño): se descarta si aparece. */
+const CLAVE_SIN_DUENO = `${PREFIJO_ALMACEN_GUIA}conversacion`;
+export const claveConversacion = (usuarioId: number) => `${CLAVE_SIN_DUENO}:${usuarioId}`;
 
 export type VistaGuia = "mapa" | "registro";
 export type Severidad = "Crítica" | "Alta" | "Media" | "Baja";
@@ -77,9 +86,14 @@ export function historialParaEnviar(mensajes: MensajeGuia[], max = TURNOS_ENVIAD
     .map((m) => ({ rol: m.rol, texto: m.texto.slice(0, 600) }));
 }
 
-export function leerConversacion(almacen: Pick<Storage, "getItem"> | null): MensajeGuia[] {
+export function leerConversacion(
+  almacen: Pick<Storage, "getItem" | "removeItem"> | null,
+  usuarioId: number | null,
+): MensajeGuia[] {
+  if (usuarioId == null) return [];
   try {
-    const crudo = almacen?.getItem(CLAVE_ALMACEN);
+    almacen?.removeItem(CLAVE_SIN_DUENO); // la de antes no sabe de quién es: nunca se muestra
+    const crudo = almacen?.getItem(claveConversacion(usuarioId));
     const lista = crudo ? (JSON.parse(crudo) as unknown) : [];
     if (!Array.isArray(lista)) return [];
     return lista
@@ -92,10 +106,16 @@ export function leerConversacion(almacen: Pick<Storage, "getItem"> | null): Mens
   }
 }
 
-export function guardarConversacion(almacen: Pick<Storage, "setItem" | "removeItem"> | null, mensajes: MensajeGuia[]) {
+export function guardarConversacion(
+  almacen: Pick<Storage, "setItem" | "removeItem"> | null,
+  usuarioId: number | null,
+  mensajes: MensajeGuia[],
+) {
+  if (usuarioId == null) return;
+  const clave = claveConversacion(usuarioId);
   try {
-    if (!mensajes.length) almacen?.removeItem(CLAVE_ALMACEN);
-    else almacen?.setItem(CLAVE_ALMACEN, JSON.stringify(mensajes.slice(-MAX_MENSAJES_GUARDADOS)));
+    if (!mensajes.length) almacen?.removeItem(clave);
+    else almacen?.setItem(clave, JSON.stringify(mensajes.slice(-MAX_MENSAJES_GUARDADOS)));
   } catch {
     /* sin almacenamiento (modo privado): la conversación dura lo que dure la página */
   }

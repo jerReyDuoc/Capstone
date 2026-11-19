@@ -49,6 +49,18 @@ describe("navegación por tareas", () => {
     expect(grupoActivo(grupos, "/panel/capacitacion/7")).toBe("plan");
     expect(grupoActivo(grupos, "/empresa")).toBeNull();
   });
+
+  it("Corrección 18-11: el asistente es una sección propia del menú (no marca «Arma tu registro»)", () => {
+    const grupos = gruposNavegacion("cliente");
+    const entradas = grupos.flatMap((g) => g.entradas);
+    const asistente = entradas.find((e) => e.ruta === "/empresa/asistente")!;
+    const arma = entradas.find((e) => e.ruta === RUTA_ARMA_REGISTRO)!;
+    expect(asistente).toBeDefined();
+    expect(entradaActiva(asistente, "/empresa/asistente")).toBe(true);
+    expect(entradaActiva(arma, "/empresa/asistente")).toBe(false);
+    expect(grupoActivo(grupos, "/empresa/asistente")).toBe("privacidad");
+    expect(gruposNavegacion("encuestado").flatMap((g) => g.entradas).map((e) => e.ruta)).not.toContain("/empresa/asistente");
+  });
 });
 
 describe("flujo único del registro", () => {

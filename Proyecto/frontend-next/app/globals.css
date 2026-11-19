@@ -119,7 +119,67 @@
   --dur: 180ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
+  /* Corrección 18-11 (temas): lo que antes estaba fijo en el CSS, ahora como token (mismos valores en oscuro) */
+  --nna: #c4a5ff;                                   /* datos de niños, niñas y adolescentes (mapa) */
+  --fondo-brillo: rgba(20, 216, 158, 0.09);         /* halo decorativo del fondo */
+  --fondo-trama: rgba(255, 255, 255, 0.018);        /* cuadrícula decorativa del fondo */
+  --cromo: rgba(5, 8, 7, 0.86);                     /* barra lateral */
+  --cromo-fuerte: rgba(5, 8, 7, 0.94);              /* barras superiores fijas */
+  --cromo-inferior: rgba(10, 16, 14, 0.97);         /* barra inferior (móvil) */
+
   color-scheme: dark;
+}
+
+/* =====================================================================
+   Corrección 18-11 · Temas: <html data-theme="dark|light|blue"> (lib/tema.ts, SelectorTema).
+   "dark" es :root (sin cambios). Los otros dos solo cambian tokens; todos los pares texto/fondo
+   superan WCAG 2.1 AA (texto ≥4,5:1, controles ≥3:1), verificados con la fórmula de luminancia:
+     light: texto 16,6:1 · secundario 8,4:1 · tenue 6,1:1 · acento 6,5:1 · borde de control 4,3:1
+            severidades sobre --surface: crítica 6,8 · alta 5,9 · media 6,4 · baja 7,0 · sin clasificar 6,4
+     blue:  texto 16,1:1 · secundario 9,3:1 · tenue 6,9:1 · acento 9,5:1 · borde de control 4,3:1
+            severidades: crítica 6,5 · alta 8,5 · media 11,0 · baja 9,7 · sin clasificar 7,4; "Cumplido" 10,1
+   El tema claro usa la paleta de Extras/Cambios/propuesta_tema_claro.css (sin su cambio de tipografía).
+   ===================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f6f2; --surface: #ffffff; --surface-2: #f1f0eb; --surface-3: #ecebe6;
+  --line: #e4e2da; --line-strong: #d6d3c9; --line-control: #7c7a70;
+  --text: #1c1f1d; --text-muted: #4a4f4b; --text-subtle: #5f645c;
+  --accent: #0d6b52; --accent-hover: #0a5843; --accent-strong: #0d6b52; --accent-soft: #e3efe9;
+  --accent-glow: rgba(13, 107, 82, 0.12); --on-accent: #ffffff;
+  --severity-critical: #b4123a; --severity-critical-soft: #f8e3e8; --on-severity-critical: #ffffff;
+  --severity-high: #a8460a; --severity-high-soft: #f8ebe1;
+  --severity-medium: #7d5800; --severity-medium-soft: #f6efdc;
+  --severity-low: #355a8c; --severity-low-soft: #e6edf6;
+  --severity-none: #56606b; --severity-none-soft: #eceef0;
+  --ok-soft: #e3efe9;
+  --nivel-gestionado: #2f5fa8; --nivel-gestionado-soft: #e5ecf7;
+  --barra-neutra: #7c8a94;
+  --disabled-bg: #ecebe6; --disabled-text: #5f645c; --disabled-line: #d6d3c9;
+  --serie-industria: #5b6fd6; --serie-meta: #8a6400; --grid: #e4e2da;
+  --nna: #6b3fb8;
+  --fondo-brillo: transparent; --fondo-trama: transparent;
+  --cromo: #fbfaf7; --cromo-fuerte: rgba(251, 250, 247, 0.96); --cromo-inferior: rgba(251, 250, 247, 0.98);
+}
+:root[data-theme="blue"] {
+  color-scheme: dark;
+  --bg: #06101d; --surface: #0b1829; --surface-2: #102036; --surface-3: #13253d;
+  --line: #182b44; --line-strong: #243b5a; --line-control: #5d7ea6;
+  --text: #eef4fb; --text-muted: #adbdd2; --text-subtle: #8fa3bd;
+  --accent: #5cc8ff; --accent-hover: #86d7ff; --accent-strong: #2fa8e6; --accent-soft: #0f2d49;
+  --accent-glow: rgba(92, 200, 255, 0.16); --on-accent: #03121f;
+  --severity-critical: #ff6b7a; --severity-critical-soft: rgba(255, 107, 122, 0.16); --on-severity-critical: #1a0208;
+  --severity-high: #ff9a52; --severity-high-soft: rgba(255, 154, 82, 0.14);
+  --severity-low: #c3b5ff; --severity-low-soft: rgba(195, 181, 255, 0.14);   /* violeta: no se confunde con el acento */
+  --severity-none: #9aa8b8; --severity-none-soft: rgba(154, 168, 184, 0.14);
+  --ok: #3ddc97; --ok-soft: rgba(61, 220, 151, 0.14);                          /* "Cumplido" sigue siendo verde */
+  --nivel-gestionado: #8cc4ff; --nivel-gestionado-soft: rgba(140, 196, 255, 0.14);
+  --barra-neutra: #7088a3;
+  --disabled-bg: #1a2a40; --disabled-text: #a7b3c2; --disabled-line: #2a3d57;
+  --serie-industria: #e0a8ff; --grid: #1c2e47;
+  --nna: #e0a8ff;
+  --fondo-brillo: rgba(92, 200, 255, 0.08); --fondo-trama: rgba(160, 200, 255, 0.025);
+  --cromo: rgba(6, 16, 29, 0.88); --cromo-fuerte: rgba(6, 16, 29, 0.95); --cromo-inferior: rgba(11, 24, 41, 0.97);
 }
 
 /* ---------- Base ---------- */
@@ -134,9 +194,9 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   background-image:
-    radial-gradient(900px 520px at 12% -8%, rgba(20, 216, 158, 0.09), transparent 60%),
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    radial-gradient(900px 520px at 12% -8%, var(--fondo-brillo), transparent 60%),
+    linear-gradient(var(--fondo-trama) 1px, transparent 1px),
+    linear-gradient(90deg, var(--fondo-trama) 1px, transparent 1px);
   background-size: auto, 56px 56px, 56px 56px;
   background-attachment: fixed;
   color: var(--text);
@@ -198,7 +258,7 @@ button, select, input { font: inherit; color: inherit; }
   display: flex; flex-direction: column;
   gap: var(--sp-6);
   padding: var(--sp-6) var(--sp-4);
-  background: rgba(5, 8, 7, 0.86);
+  background: var(--cromo);
   border-right: 1px solid var(--line);
   backdrop-filter: blur(8px);
   /* Correcciones 05-11: con todos los grupos (Mi empresa, Gobernanza de IA y la sesión) la
@@ -296,6 +356,28 @@ button, select, input { font: inherit; color: inherit; }
   padding: var(--sp-8) var(--sp-10) var(--sp-12);
 }
 .main-inner { max-width: var(--content-max); margin: 0 auto; display: grid; gap: var(--sp-6); }
+
+/* ---------- Corrección 18-11: barra superior y selector de tema ---------- */
+.barra-superior {
+  max-width: var(--content-max); margin: calc(-1 * var(--sp-4)) auto var(--sp-4);
+  display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3);
+}
+.selector-tema {
+  display: inline-flex; gap: 2px; padding: 3px;
+  border: 1px solid var(--line-control); border-radius: var(--radius-pill); background: var(--surface-3);
+}
+.selector-tema button {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  min-height: 32px; padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--radius-pill); background: transparent;
+  font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.selector-tema button:hover { color: var(--text); }
+.selector-tema button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.selector-tema-compacto button { width: 36px; min-height: 36px; padding: 0; justify-content: center; }
+@media (max-width: 1023.98px) { .barra-superior { display: none; } }
+@media print { .barra-superior, .selector-tema { display: none !important; } }
 
 /* Tablet horizontal / laptops pequeños: 1024–1279 px → barra lateral compacta */
 @media (max-width: 1279.98px) {
@@ -1297,7 +1379,8 @@ textarea { font: inherit; color: inherit; }
 @media print {
   @page { size: A4 landscape; margin: 12mm 12mm 14mm; }
 
-  :root {
+  /* Corrección 18-11: también con tema claro/azul el PDF se imprime con esta paleta */
+  :root, :root[data-theme] {
     --text: #111827; --text-muted: #374151; --text-subtle: #4b5563;
     --line: #d1d5db; --line-strong: #9ca3af;
     --critico: #b4123a; --naranja: #c2410c; --medio: #a16207; --bajo: #15803d; --info: #4b5563;
@@ -1575,12 +1658,14 @@ textarea { font: inherit; color: inherit; }
     position: sticky; top: 0; z-index: 30;
     display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
     min-height: 56px; padding: var(--sp-1) var(--sp-4);
-    border-bottom: 1px solid var(--line); background: rgba(5, 8, 7, 0.94); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line); background: var(--cromo-fuerte); backdrop-filter: blur(8px);
   }
   .barra-movil .brand { padding: 0; }
   .barra-movil .brand-mark { width: 30px; height: 30px; }
   .barra-movil .brand-text { display: flex; }
   .barra-movil .badge-demo { margin-left: auto; }
+  .barra-movil .selector-tema { margin-left: auto; flex-shrink: 0; }
+  .barra-movil .badge-demo + .selector-tema { margin-left: 0; }
   /* El contenido no queda tapado por la barra inferior */
   .main { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + var(--sp-8)); }
 
@@ -1588,7 +1673,7 @@ textarea { font: inherit; color: inherit; }
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     display: block;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    border-top: 1px solid var(--line-strong); background: rgba(10, 16, 14, 0.97); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line-strong); background: var(--cromo-inferior); backdrop-filter: blur(8px);
   }
   .nav-inferior ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
   .nav-inferior-item {

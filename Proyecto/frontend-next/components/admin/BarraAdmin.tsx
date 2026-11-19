@@ -18,6 +18,7 @@ import { useEffect, useId, useState } from "react";
 import { Actualizado } from "@/components/ui/Actualizado";
 import { BrandMark, Icon } from "@/components/ui/Icon";
 import { MenuCuenta } from "@/components/ui/MenuCuenta";
+import { SelectorTema } from "@/components/ui/SelectorTema";
 import { useActualizacionAutomatica } from "@/hooks/useActualizacionAutomatica";
 import { LOGIN_DE } from "@/lib/acceso";
 import { pedir } from "@/lib/encuesta/cliente";
@@ -104,6 +105,7 @@ export function BarraAdmin({
       </nav>
       <div className={a.barraAcciones}>
         <Actualizado estado={actualizacion} className={a.actualizado} />
+        <SelectorTema compacto />
         <MenuCuenta
           titulo="Administración Therion Labs"
           detalle="Sesión de administrador"

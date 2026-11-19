@@ -24,6 +24,7 @@ import { ipCliente } from "@/lib/servidor/peticion";
 import { COOKIE_SESION, sesionDelToken } from "@/lib/servidor/sesion";
 import { COOKIE_ADMIN, sesionAdminDelToken } from "@/lib/servidor/sesionAdmin";
 import { COOKIE_CLIENTE, sesionClienteDelToken } from "@/lib/servidor/sesionCliente";
+import { HASH_SCRIPT_TEMA } from "@/lib/tema";
 
 const DEV = process.env.NODE_ENV !== "production";
 const TURNSTILE = "https://challenges.cloudflare.com";
@@ -71,7 +72,9 @@ function permitir(clave: string, { limite, ms }: Ventana, ahora = Date.now()): {
 function cspFlujo(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${TURNSTILE}${DEV ? " 'unsafe-eval'" : ""}`,
+    // Corrección 18-11: + el hash del script del tema (app/layout.tsx). Solo aquí: en cspBase un hash haría que el
+    // navegador ignore 'unsafe-inline' y rompería los scripts en línea de las páginas prerenderizadas.
+    `script-src 'self' 'nonce-${nonce}' '${HASH_SCRIPT_TEMA}' 'strict-dynamic' ${TURNSTILE}${DEV ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",

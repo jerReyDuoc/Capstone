@@ -1,9 +1,13 @@
 /**
  * HU-19 · Encabezado y pie de las páginas públicas. Server Components: no hidratan.
+ * Corrección 18-11: la única excepción es el selector de tema (SelectorTema, componente cliente), para que quien
+ * no tiene cuenta también elija claro, oscuro o azul (se guarda en este navegador). En pantallas anchas es el
+ * grupo de tres íconos; en las angostas, un botón que pasa al tema siguiente (así el encabezado no se desborda).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandMark } from "@/components/ui/Icon";
+import { SelectorTema } from "@/components/ui/SelectorTema";
 import s from "./publico.module.css";
 
 /**
@@ -39,6 +43,10 @@ export function EncabezadoPublico({ enlaces = true, ancho = "normal" }: { enlace
             </Link>
           </nav>
         ) : null}
+        <div className={s.tema}>
+          <span className={s.temaAncho}><SelectorTema compacto /></span>
+          <span className={s.temaAngosto}><SelectorTema variante="ciclo" /></span>
+        </div>
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { BarraSuperior } from "@/components/shell/BarraSuperior";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Cargando } from "@/components/ui/Basicos";
 import { PanelProvider } from "@/hooks/usePanel";
@@ -14,6 +15,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         <div className="shell">
           <Sidebar />
           <main id="contenido" className="main" tabIndex={-1}>
+            <BarraSuperior />
             <div className="main-inner">{children}</div>
           </main>
         </div>

@@ -17,21 +17,26 @@
  *   └──────────────────────────────────────────────────────────────────┘
  *
  * La conversación se guarda en el navegador (sessionStorage) y se comparte entre las dos vistas.
+ * Corrección 18-11: es de UNA cuenta (hooks/useConversacionGuia.ts) y el asistente también es una sección
+ * propia del menú, /empresa/asistente (SeccionAsistente.tsx), con el mismo contenido (ContenidoAsistente).
  * `?asistente=1` en la URL lo abre al cargar. Todo el texto se pinta como texto con React (nunca HTML).
  */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/Icon";
 import s from "@/components/formacion/tutor.module.css";
-import { ErrorBff } from "@/lib/encuesta/cliente";
+import { useConversacionGuia, type ConversacionGuia } from "@/hooks/useConversacionGuia";
 import {
-  agruparRevision, cantidad, cargarResumenGuia, cuotaTexto, guardarConversacion, leerConversacion, mensajeGuia,
-  MAX_CARACTERES_GUIA, nuevoId, parrafos, pasoSiguiente, preguntaAlerta, preguntarGuia, validarPregunta,
+  agruparRevision, cantidad, cuotaTexto, MAX_CARACTERES_GUIA, parrafos, pasoSiguiente, preguntaAlerta,
   type AlertaRegistro, type CuotaGuia, type GrupoRevision, type MensajeGuia, type ResumenGuia, type VistaGuia,
 } from "@/lib/guiaRegistro";
 import g from "./guia.module.css";
 
-const RUTA: Record<VistaGuia, string> = { mapa: "/empresa/mapa-datos", registro: "/empresa/registro-actividades" };
+/** La sección propia del asistente en el menú (Corrección 18-11). */
+export const RUTA_ASISTENTE = "/empresa/asistente";
+
+export const RUTA: Record<VistaGuia, string> = { mapa: "/empresa/mapa-datos", registro: "/empresa/registro-actividades" };
 
 export interface AccionesGuia {
   /** Abre una actividad del registro (solo en la vista del registro). */
@@ -65,28 +70,7 @@ function Panel({ vista, acciones, onCerrar }: { vista: VistaGuia; acciones: Acci
   const ref = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   const idTitulo = useId();
-  const [pestana, setPestana] = useState<Pestana>("preguntar");
-  const [resumen, setResumen] = useState<ResumenGuia | null>(null);
-  const [errorCarga, setErrorCarga] = useState("");
-  const [mensajes, setMensajes] = useState<MensajeGuia[]>([]);
-  const [cuota, setCuota] = useState<CuotaGuia | null>(null);
-  const [enviando, setEnviando] = useState(false);
-  const [error, setError] = useState("");
-
-  const cargar = useCallback(async () => {
-    setErrorCarga("");
-    try {
-      const r = await cargarResumenGuia();
-      setResumen(r);
-      setCuota(r.ia.cuota);
-    } catch (e) {
-      if (e instanceof ErrorBff && e.status === 401) {
-        router.replace("/ingresar?motivo=sesion");
-        return;
-      }
-      setErrorCarga(mensajeGuia(e));
-    }
-  }, [router]);
+  const conv = useConversacionGuia(vista);
 
   // La página de atrás no hace scroll mientras el panel está abierto (igual que el tutor)
   useEffect(() => {
@@ -100,50 +84,9 @@ function Panel({ vista, acciones, onCerrar }: { vista: VistaGuia; acciones: Acci
 
   useEffect(() => {
     if (ref.current && !ref.current.open) ref.current.showModal();
-    setMensajes(leerConversacion(typeof window === "undefined" ? null : window.sessionStorage));
-    void cargar();
-  }, [cargar]);
-
-  useEffect(() => {
-    guardarConversacion(typeof window === "undefined" ? null : window.sessionStorage, mensajes);
-  }, [mensajes]);
+  }, []);
 
   const cerrar = () => ref.current?.close();
-
-  /** Devuelve true si se envió (el composer se limpia). */
-  const enviar = async (texto: string): Promise<boolean> => {
-    if (enviando) return false;
-    const v = validarPregunta(texto, resumen?.limites.max_caracteres ?? MAX_CARACTERES_GUIA);
-    if (!v.ok) {
-      setError(v.motivo);
-      return false;
-    }
-    setPestana("preguntar");
-    setError("");
-    setEnviando(true);
-    const anteriores = mensajes;
-    const propio: MensajeGuia = { id: nuevoId(), rol: "usuario", texto: v.texto };
-    setMensajes([...anteriores, propio]);
-    try {
-      const r = await preguntarGuia(v.texto, vista, anteriores);
-      setCuota(r.cuota);
-      setMensajes((m) => [
-        ...m.map((x) => (x.id === propio.id && r.bloqueado ? { ...x, bloqueado: true } : x)),
-        { id: nuevoId(), rol: "guia", texto: r.respuesta, sugerencias: r.sugerencias },
-      ]);
-      return true;
-    } catch (e) {
-      if (e instanceof ErrorBff && e.status === 401) {
-        router.replace("/ingresar?motivo=sesion");
-        return false;
-      }
-      setMensajes((m) => m.filter((x) => x.id !== propio.id));
-      setError(mensajeGuia(e));
-      return false;
-    } finally {
-      setEnviando(false);
-    }
-  };
 
   /** Lleva a resolver una alerta: en la misma vista abre la ficha; si es de la otra vista, navega. */
   const irA = (a: AlertaRegistro | null, destino: VistaGuia) => {
@@ -154,8 +97,6 @@ function Panel({ vista, acciones, onCerrar }: { vista: VistaGuia; acciones: Acci
     else if (destino !== vista) router.push(RUTA[destino]);
     cerrar();
   };
-
-  const pendientes = resumen?.revision.length ?? 0;
 
   return (
     <dialog ref={ref} className={s.panel} aria-labelledby={idTitulo} onClose={onCerrar}>
@@ -169,8 +110,12 @@ function Panel({ vista, acciones, onCerrar }: { vista: VistaGuia; acciones: Acci
             <p className={s.subtitulo}>Te oriento paso a paso. Tú completas y decides qué se guarda.</p>
           </div>
           <div className={s.acciones}>
-            <button type="button" className="icon-btn" onClick={() => { setMensajes([]); setError(""); }}
-              aria-label="Nueva conversación" title="Nueva conversación" disabled={enviando || !mensajes.length}>
+            <Link href={`${RUTA_ASISTENTE}?vista=${vista}`} className="icon-btn" aria-label="Abrir el asistente en su sección"
+              title="Abrir el asistente en su sección">
+              <Icon name="flecha" />
+            </Link>
+            <button type="button" className="icon-btn" onClick={conv.nuevaConversacion}
+              aria-label="Nueva conversación" title="Nueva conversación" disabled={conv.enviando || !conv.mensajes.length}>
               <Icon name="mas" />
             </button>
             <button type="button" className="icon-btn" onClick={cerrar} aria-label="Cerrar el asistente">
@@ -178,32 +123,58 @@ function Panel({ vista, acciones, onCerrar }: { vista: VistaGuia; acciones: Acci
             </button>
           </div>
         </header>
-
-        <div className={g.pestanas} role="tablist" aria-label="Qué quieres hacer">
-          <button type="button" role="tab" aria-selected={pestana === "preguntar"} onClick={() => setPestana("preguntar")}>
-            <Icon name="mensaje" /> Preguntar
-          </button>
-          <button type="button" role="tab" aria-selected={pestana === "revisar"} onClick={() => setPestana("revisar")}>
-            <Icon name="check" /> Revisar mi registro
-            {pendientes ? <span className={g.contador} aria-label={`${pendientes} por resolver`}>{pendientes}</span> : null}
-          </button>
-        </div>
-
-        {pestana === "revisar" ? (
-          <Revision resumen={resumen} error={errorCarga} onReintentar={cargar} onIr={irA}
-            onPreguntar={(grupo) => void enviar(preguntaAlerta(grupo))} enviando={enviando} />
-        ) : (
-          <Chat vista={vista} resumen={resumen} mensajes={mensajes} enviando={enviando} error={error} cuota={cuota}
-            onEnviar={enviar} onLimpiarError={() => setError("")} />
-        )}
+        <ContenidoAsistente vista={vista} conv={conv} onIr={irA} />
       </div>
     </dialog>
   );
 }
 
+/**
+ * Corrección 18-11 · Lo que hace el asistente (pestañas «Preguntar» y «Revisar mi registro»), igual en el panel
+ * flotante y en la sección propia del menú.
+ */
+export function ContenidoAsistente({
+  vista, conv, onIr,
+}: {
+  vista: VistaGuia;
+  conv: ConversacionGuia;
+  onIr: (a: AlertaRegistro | null, destino: VistaGuia) => void;
+}) {
+  const [pestana, setPestana] = useState<Pestana>("preguntar");
+  const { resumen, errorCarga, cargar, mensajes, cuota, enviando, error } = conv;
+  const pendientes = resumen?.revision.length ?? 0;
+
+  const enviar = async (texto: string): Promise<boolean> => {
+    setPestana("preguntar");
+    return conv.enviar(texto);
+  };
+
+  return (
+    <>
+      <div className={g.pestanas} role="tablist" aria-label="Qué quieres hacer">
+        <button type="button" role="tab" aria-selected={pestana === "preguntar"} onClick={() => setPestana("preguntar")}>
+          <Icon name="mensaje" /> Preguntar
+        </button>
+        <button type="button" role="tab" aria-selected={pestana === "revisar"} onClick={() => setPestana("revisar")}>
+          <Icon name="check" /> Revisar mi registro
+          {pendientes ? <span className={g.contador} aria-label={`${pendientes} por resolver`}>{pendientes}</span> : null}
+        </button>
+      </div>
+
+      {pestana === "revisar" ? (
+        <Revision resumen={resumen} error={errorCarga} onReintentar={cargar} onIr={onIr}
+          onPreguntar={(grupo) => void enviar(preguntaAlerta(grupo))} enviando={enviando} />
+      ) : (
+        <Chat vista={vista} resumen={resumen} mensajes={mensajes} enviando={enviando} error={error} cuota={cuota}
+          listo={conv.listo} onEnviar={enviar} onLimpiarError={conv.limpiarError} />
+      )}
+    </>
+  );
+}
+
 /* ================================================================== preguntar */
-function Chat({
-  vista, resumen, mensajes, enviando, error, cuota, onEnviar, onLimpiarError,
+export function Chat({
+  vista, resumen, mensajes, enviando, error, cuota, listo = true, onEnviar, onLimpiarError,
 }: {
   vista: VistaGuia;
   resumen: ResumenGuia | null;
@@ -211,6 +182,8 @@ function Chat({
   enviando: boolean;
   error: string;
   cuota: CuotaGuia | null;
+  /** false mientras no se sabe de qué cuenta es la conversación: no se puede enviar. */
+  listo?: boolean;
   onEnviar: (t: string) => Promise<boolean>;
   onLimpiarError: () => void;
 }) {
@@ -219,7 +192,7 @@ function Chat({
   const entrada = useRef<HTMLTextAreaElement>(null);
   const idAyuda = useId();
   const max = resumen?.limites.max_caracteres ?? MAX_CARACTERES_GUIA;
-  const sinCuota = cuota?.restantes === 0 && resumen?.ia.habilitada !== false;
+  const sinCuota = (cuota?.restantes === 0 && resumen?.ia.habilitada !== false) || !listo;
   const ultima = [...mensajes].reverse().find((m) => m.rol === "guia");
 
   useEffect(() => {
