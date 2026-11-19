@@ -9,6 +9,7 @@
 import type { NextRequest } from "next/server";
 import {
   BackendNoDisponibleError,
+  borrarCookie,
   jsonSinCache,
   llamarBackend,
   respuestaError,
@@ -52,5 +53,9 @@ export async function POST(req: NextRequest) {
   }
   const salida = jsonSinCache({ expiraEn: sesion.expiraEn });
   guardarCookieCliente(salida, token, sesion.expiraEn);
+  // Corrección 18-11 (2): una sola sesión por navegador. Si antes se hizo el autodiagnóstico sin cuenta, su
+  // cookie se borra: si no, el panel (/panel/*) podía abrirse como encuestado y dejar a la empresa sin salida.
+  // La evaluación no se pierde: se retoma con su código en /retomar.
+  borrarCookie(salida);
   return salida;
 }

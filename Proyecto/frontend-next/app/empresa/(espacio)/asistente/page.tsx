@@ -1,6 +1,7 @@
 /**
- * /empresa/asistente — Corrección 18-11: el asistente de registro como sección propia del menú
- * («Privacidad y registro → Asistente»), con sus dos pestañas («Preguntar» y «Revisar mi registro»).
+ * /empresa/asistente — Corrección 18-11: el asistente de registro a página completa, con sus dos pestañas
+ * («Preguntar» y «Revisar mi registro»). Corrección 18-11 (2): ya no tiene entrada en el menú; se llega desde el
+ * panel del asistente (botón «Asistente» del mapa de datos y del registro de actividades).
  * El botón flotante del mapa de datos y del registro de actividades sigue abriendo el mismo asistente, con la
  * misma conversación de la cuenta. `?vista=mapa|registro` elige sobre qué se pregunta.
  */

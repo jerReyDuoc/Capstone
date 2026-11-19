@@ -41,25 +41,24 @@ describe("navegación por tareas", () => {
     expect(rutas).toContain("/panel/mis-derechos");
   });
 
-  it("el mapa, el asistente y el registro marcan la misma entrada", () => {
+  it("Corrección 18-11 (2): el mapa de datos y el registro de actividades son dos entradas del menú", () => {
     const grupos = gruposNavegacion("cliente");
-    const arma = grupos.flatMap((g) => g.entradas).find((e) => e.ruta === RUTA_ARMA_REGISTRO)!;
-    expect(entradaActiva(arma, "/empresa/mapa-datos")).toBe(true);
-    expect(entradaActiva(arma, "/empresa/registro-actividades/revision")).toBe(true);
+    const entradas = grupos.flatMap((g) => g.entradas);
+    const mapa = entradas.find((e) => e.ruta === "/empresa/mapa-datos")!;
+    const registro = entradas.find((e) => e.ruta === "/empresa/registro-actividades")!;
+    expect(entradaActiva(mapa, "/empresa/mapa-datos")).toBe(true);
+    expect(entradaActiva(mapa, RUTA_ARMA_REGISTRO)).toBe(true);
+    expect(entradaActiva(mapa, "/empresa/registro-actividades")).toBe(false);
+    expect(entradaActiva(registro, "/empresa/registro-actividades/revision")).toBe(true);
+    expect(entradaActiva(registro, "/empresa/mapa-datos")).toBe(false);
     expect(grupoActivo(grupos, "/panel/capacitacion/7")).toBe("plan");
     expect(grupoActivo(grupos, "/empresa")).toBeNull();
   });
 
-  it("Corrección 18-11: el asistente es una sección propia del menú (no marca «Arma tu registro»)", () => {
-    const grupos = gruposNavegacion("cliente");
-    const entradas = grupos.flatMap((g) => g.entradas);
-    const asistente = entradas.find((e) => e.ruta === "/empresa/asistente")!;
-    const arma = entradas.find((e) => e.ruta === RUTA_ARMA_REGISTRO)!;
-    expect(asistente).toBeDefined();
-    expect(entradaActiva(asistente, "/empresa/asistente")).toBe(true);
-    expect(entradaActiva(arma, "/empresa/asistente")).toBe(false);
-    expect(grupoActivo(grupos, "/empresa/asistente")).toBe("privacidad");
-    expect(gruposNavegacion("encuestado").flatMap((g) => g.entradas).map((e) => e.ruta)).not.toContain("/empresa/asistente");
+  it("Corrección 18-11 (2): el asistente no tiene entrada propia (se abre con su botón en las dos vistas)", () => {
+    const rutas = gruposNavegacion("cliente").flatMap((g) => g.entradas).map((e) => e.ruta);
+    expect(rutas).not.toContain("/empresa/asistente");
+    expect(gruposNavegacion("encuestado").flatMap((g) => g.entradas).map((e) => e.ruta)).not.toContain("/empresa/mapa-datos");
   });
 });
 

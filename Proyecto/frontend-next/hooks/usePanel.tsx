@@ -73,14 +73,17 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [modo, setModo] = useState<ModoPanel>("detectando");
   const base = BASE_DE[modo];
 
-  // ¿Quien mira es un encuestado con sesión? Si la URL pide otra evaluación, se trata
+  // Corrección 18-11 (2): la sesión de la EMPRESA manda. Antes ganaba la del encuestado: quien hizo el
+  // autodiagnóstico sin cuenta y después inició sesión en el mismo navegador entraba a /panel/* como encuestado
+  // (menú gratuito, sin "Mi empresa") y no podía volver. El login ya borra la cookie del encuestado
+  // (app/bff/cliente/login); esto cubre a quien ya tenía las dos cookies.
+  // Si no hay sesión de empresa: ¿es un encuestado con sesión? Si la URL pide otra evaluación, se trata
   // como acceso interno (el BFF igual rechazaría cualquier evaluación que no sea la suya).
-  // HU-28: si no, ¿es el usuario definitivo de una empresa cliente? (ve las de su empresa)
   useEffect(() => {
     const ctrl = new AbortController();
     Promise.all([sesionEncuestado(ctrl.signal), sesionCliente(ctrl.signal)])
       .then(([id, cliente]) =>
-        setModo(id != null && (idUrl == null || idUrl === id) ? "encuestado" : cliente ? "cliente" : "interno"),
+        setModo(cliente ? "cliente" : id != null && (idUrl == null || idUrl === id) ? "encuestado" : "interno"),
       )
       .catch((e) => {
         if (e.name !== "AbortError") setModo("interno");

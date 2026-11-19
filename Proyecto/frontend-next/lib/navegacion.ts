@@ -7,9 +7,10 @@
  * - Cambia la organización del menú, NO las URL: todas las rutas existentes se conservan.
  * - Rótulos cortos que caben en una línea.
  * - El mapa de datos, el asistente y el registro de actividades son pasos de UN flujo
- *   ("Arma tu registro"): el menú tiene una sola entrada y el flujo muestra los pasos.
- * - Corrección 18-11: el asistente de registro TAMBIÉN es una sección propia ("Asistente"); dentro del mapa y
- *   del registro se sigue abriendo con su botón flotante.
+ *   ("Arma tu registro", /empresa/registro, que lleva al paso pendiente y muestra los pasos).
+ * - Corrección 18-11 (2): el menú separa "Mapa de datos" y "Registro" en dos entradas. El asistente no tiene
+ *   entrada propia: se abre con su botón "Asistente" en las dos vistas (su sección /empresa/asistente se
+ *   conserva y se llega desde el panel del asistente).
  */
 import type { IconName } from "@/components/ui/Icon";
 
@@ -79,16 +80,17 @@ export function gruposNavegacion(modo: ModoNavegacion): GrupoNav[] {
       entradas: [
         ...(cliente
           ? [{
-              ruta: RUTA_ARMA_REGISTRO,
-              etiqueta: "Arma tu registro",
-              titulo: "Arma tu registro de actividades: mapa de datos, asistente y registro",
+              ruta: "/empresa/mapa-datos",
+              etiqueta: "Mapa de datos",
+              titulo: "Mapa de datos personales",
               icono: "mapa" as const,
-              tambien: ["/empresa/mapa-datos", "/empresa/registro-actividades"],
+              // La entrada única del flujo lleva al paso pendiente (y desde ahí a una de las dos vistas)
+              tambien: [RUTA_ARMA_REGISTRO],
             }, {
-              ruta: "/empresa/asistente",
-              etiqueta: "Asistente",
-              titulo: "Asistente de registro: pregunta y revisa tu registro",
-              icono: "chispa" as const,
+              ruta: "/empresa/registro-actividades",
+              etiqueta: "Registro",
+              titulo: "Registro de actividades de tratamiento",
+              icono: "lista" as const,
             }]
           : []),
         // HU-32: derechos ARCOP (cada titular tiene su página)
