@@ -41,17 +41,3 @@ export function pasoPendiente(a: AvanceRegistro): NumeroPaso {
   if (a.actividades === 0) return 2;
   return 3;
 }
-
-/** En qué paso está la persona según la página que mira. */
-export function pasoDeRuta(pathname: string, asistenteAbierto: boolean): NumeroPaso | null {
-  if (pathname.startsWith("/empresa/registro-actividades")) return 3;
-  if (pathname.startsWith("/empresa/mapa-datos") || pathname.startsWith("/empresa/asistente")) return asistenteAbierto ? 2 : 1;
-  return null;
-}
-
-export type EstadoPaso = "hecho" | "actual" | "pendiente";
-
-export function estadoPasos(actual: NumeroPaso, pendiente: NumeroPaso): Record<NumeroPaso, EstadoPaso> {
-  const de = (n: NumeroPaso): EstadoPaso => (n === actual ? "actual" : n < pendiente ? "hecho" : "pendiente");
-  return { 1: de(1), 2: de(2), 3: de(3) };
-}

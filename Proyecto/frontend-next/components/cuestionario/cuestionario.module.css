@@ -168,7 +168,8 @@
   padding: var(--sp-4) var(--sp-6);
   border-top: 1px solid var(--line-strong);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  background: rgba(10, 16, 14, 0.94);
+  /* Corrección 18-11 (temas): antes rgba(10, 16, 14, 0.94) fijo (oscuro en los temas claro y azul) */
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(8px);
   margin-top: auto; /* al fondo de la columna aunque la pregunta sea más alta */
 }

@@ -126,6 +126,7 @@
   --cromo: rgba(5, 8, 7, 0.86);                     /* barra lateral */
   --cromo-fuerte: rgba(5, 8, 7, 0.94);              /* barras superiores fijas */
   --cromo-inferior: rgba(10, 16, 14, 0.97);         /* barra inferior (móvil) */
+  --lienzo: #070b0a;                                /* fondo del lienzo del mapa de datos */
 
   color-scheme: dark;
 }
@@ -160,6 +161,8 @@
   --nna: #6b3fb8;
   --fondo-brillo: transparent; --fondo-trama: transparent;
   --cromo: #fbfaf7; --cromo-fuerte: rgba(251, 250, 247, 0.96); --cromo-inferior: rgba(251, 250, 247, 0.98);
+  /* el lienzo del mapa sigue oscuro: los nodos del grafo tienen colores pensados para fondo oscuro */
+  --lienzo: #070b0a;
 }
 :root[data-theme="blue"] {
   color-scheme: dark;
@@ -180,6 +183,7 @@
   --nna: #e0a8ff;
   --fondo-brillo: rgba(92, 200, 255, 0.08); --fondo-trama: rgba(160, 200, 255, 0.025);
   --cromo: rgba(6, 16, 29, 0.88); --cromo-fuerte: rgba(6, 16, 29, 0.95); --cromo-inferior: rgba(11, 24, 41, 0.97);
+  --lienzo: #040b15;
 }
 
 /* ---------- Base ---------- */
@@ -631,7 +635,7 @@ button, select, input { font: inherit; color: inherit; }
   position: absolute; z-index: 40;
   min-width: 180px; max-width: 260px;
   padding: var(--sp-3) var(--sp-4);
-  background: #111a17;
+  background: var(--surface-2); /* Corrección 18-11 (temas): antes #111a17 fijo */
   border: 1px solid var(--line-control);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);

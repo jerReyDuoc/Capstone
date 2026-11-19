@@ -1,7 +1,7 @@
 /** Auditoría UX 16-11 · lógica pura de las mejoras de interfaz. */
 import { describe, expect, it } from "vitest";
 import { haceTexto, horaConZonas } from "@/lib/fechas";
-import { estadoPasos, pasoDeRuta, pasoPendiente, PASOS_REGISTRO } from "@/lib/flujoRegistro";
+import { pasoPendiente, PASOS_REGISTRO } from "@/lib/flujoRegistro";
 import { NIVELES } from "@/lib/madurez";
 import { entradaActiva, grupoActivo, gruposNavegacion, MI_EMPRESA, RUTA_ARMA_REGISTRO } from "@/lib/navegacion";
 import { PRIORIDAD_TEXTO } from "@/lib/planFormativo";
@@ -68,12 +68,7 @@ describe("flujo único del registro", () => {
     expect(pasoPendiente({ mapaIniciado: true, elementos: 4, actividades: 0 })).toBe(2);
     expect(pasoPendiente({ mapaIniciado: true, elementos: 4, actividades: 2 })).toBe(3);
   });
-  it("sabe en qué paso está cada pantalla", () => {
-    expect(pasoDeRuta("/empresa/mapa-datos", false)).toBe(1);
-    expect(pasoDeRuta("/empresa/mapa-datos", true)).toBe(2);
-    expect(pasoDeRuta("/empresa/registro-actividades", false)).toBe(3);
-    expect(pasoDeRuta("/empresa", false)).toBeNull();
-    expect(estadoPasos(3, 3)).toEqual({ 1: "hecho", 2: "hecho", 3: "actual" });
+  it("tiene tres pasos", () => {
     expect(PASOS_REGISTRO).toHaveLength(3);
   });
 });

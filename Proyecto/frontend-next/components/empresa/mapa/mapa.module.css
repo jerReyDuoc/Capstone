@@ -83,18 +83,29 @@
 .lienzo {
   position: relative; height: clamp(420px, 64vh, 700px); min-width: 0;
   border: 1px solid var(--line-strong); border-radius: var(--radius-lg); overflow: hidden;
-  background-color: #070b0a;
+  background-color: var(--lienzo);
   background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 22px 22px;
   touch-action: none; cursor: grab; user-select: none;
 }
+/* Corrección 18-11 (temas): en el tema claro el lienzo sigue oscuro, así que lo que va encima (controles, zoom,
+   ayuda, anillo de selección de los nodos) usa los tokens del tema oscuro; si no, quedaba texto oscuro sobre fondo
+   oscuro. Los temas oscuro y azul ya son oscuros y no necesitan esto. */
+:global(:root[data-theme="light"]) .lienzo {
+  color-scheme: dark;
+  --surface: #0a100e; --surface-3: #142019; --line-control: #567067;
+  --text: #f1f4f3; --text-muted: #a9b3af; --text-subtle: #8a9590;
+  --accent: #14d89e; --accent-hover: #3be3b2;
+}
 .lienzo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* el contorno de foco del lienzo queda AFUERA, sobre la página clara: usa el acento del tema claro */
+:global(:root[data-theme="light"]) .lienzo:focus-visible { outline-color: #0d6b52; }
 .lienzo[data-arrastrando="true"] { cursor: grabbing; }
 .lienzo svg { display: block; width: 100%; height: 100%; }
 .controles {
   position: absolute; top: var(--sp-3); right: var(--sp-3); z-index: 2;
   display: grid; gap: 4px; padding: 4px;
-  border: 1px solid var(--line-control); border-radius: var(--radius-md); background: rgba(10, 16, 14, 0.9);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
 .controles button {
   display: inline-grid; place-items: center; width: 38px; height: 38px;
@@ -105,7 +116,7 @@
 .controles svg { width: 18px; height: 18px; }
 .ayudaLienzo {
   position: absolute; left: var(--sp-3); bottom: var(--sp-3); z-index: 2;
-  padding: 4px 10px; border-radius: var(--radius-pill); background: rgba(10, 16, 14, 0.85);
+  padding: 4px 10px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--surface) 85%, transparent);
   font-size: var(--fs-xs); color: var(--text-muted); pointer-events: none;
 }
 .zoom { position: absolute; left: var(--sp-3); top: var(--sp-3); z-index: 2; font-size: var(--fs-xs); color: var(--text-subtle); font-variant-numeric: tabular-nums; }

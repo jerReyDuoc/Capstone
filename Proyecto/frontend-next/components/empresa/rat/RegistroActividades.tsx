@@ -285,8 +285,6 @@ export function RegistroActividades() {
     <div className={s.pagina}>
       {encabezado}
 
-      {/* Auditoría UX 16-11: el aviso "Primero arma tu mapa de datos" lo reemplaza el indicador de
-          pasos del flujo (PasosRegistro), con el siguiente paso a la vista. */}
       {registro.actividades.length === 0 ? (
         <section className={s.vacio} aria-labelledby="titulo-vacio">
           <h2 id="titulo-vacio" className="card-title">Aún no registras actividades</h2>
