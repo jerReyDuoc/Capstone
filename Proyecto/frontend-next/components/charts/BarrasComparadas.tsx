@@ -11,7 +11,7 @@
  * pueden ocultar, y cada dominio enfocable (Enter abre el detalle si hay `onSeleccionar`).
  * Las series se distinguen también por forma: la empresa es sólida y el rubro rayado.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { formatoDiferencia, formatoDiferenciaMeta, formatoPuntaje, NIVELES } from "@/lib/madurez";
 import type { DominioVista } from "@/lib/types";
 import { ChartFrame } from "./ChartFrame";
@@ -39,11 +39,14 @@ export function BarrasComparadas({
   onSeleccionar,
   titulo = "Madurez por dominio",
   subtitulo,
+  extraAcciones,
 }: {
   dominios: DominioVista[];
   onSeleccionar?: (d: DominioVista) => void;
   titulo?: string;
   subtitulo?: string;
+  /** Controles extra junto a la leyenda (p. ej. el selector Radar / Barras del Diagnóstico). */
+  extraAcciones?: ReactNode;
 }) {
   const hayIndustria = dominios.some((d) => d.promedioIndustria != null);
   const meta = dominios[0]?.meta ?? 75;
@@ -51,53 +54,28 @@ export function BarrasComparadas({
   const alternar = (s: Serie) => setVisibles((v) => ({ ...v, [s]: !v[s] }));
 
   const leyenda = (
-    <div className="chip-group" role="group" aria-label="Series visibles">
-      <button type="button" className="chip" aria-pressed={visibles.empresa} onClick={() => alternar("empresa")}>
-        <span className="chip-swatch barra-muestra-empresa" />
-        Tu empresa
-      </button>
-      {hayIndustria ? (
-        <button type="button" className="chip" aria-pressed={visibles.industria} onClick={() => alternar("industria")}>
-          <span className="chip-swatch barra-muestra-rubro" />
-          Promedio del rubro
+    <div className="chart-acciones">
+      {extraAcciones}
+      <div className="chip-group" role="group" aria-label="Series visibles">
+        <button type="button" className="chip" aria-pressed={visibles.empresa} onClick={() => alternar("empresa")}>
+          <span className="chip-swatch barra-muestra-empresa" />
+          Tu empresa
         </button>
-      ) : null}
-      <button type="button" className="chip" aria-pressed={visibles.meta} onClick={() => alternar("meta")}>
-        <span className="chip-swatch barra-muestra-meta" />
-        Meta ({formatoPuntaje(meta)})
-      </button>
+        {hayIndustria ? (
+          <button type="button" className="chip" aria-pressed={visibles.industria} onClick={() => alternar("industria")}>
+            <span className="chip-swatch barra-muestra-rubro" />
+            Promedio del rubro
+          </button>
+        ) : null}
+        <button type="button" className="chip" aria-pressed={visibles.meta} onClick={() => alternar("meta")}>
+          <span className="chip-swatch barra-muestra-meta" />
+          Meta ({formatoPuntaje(meta)})
+        </button>
+      </div>
     </div>
   );
 
-  const tabla = (
-    <div className="table-wrap">
-      <table className="table">
-        <caption className="sr-only">Puntaje de madurez por dominio, comparado con el rubro y la meta</caption>
-        <thead>
-          <tr>
-            <th scope="col">Dominio</th>
-            <th scope="col" className="num">Tu empresa</th>
-            <th scope="col">Nivel</th>
-            <th scope="col" className="num">Meta</th>
-            {hayIndustria ? <th scope="col" className="num">Rubro</th> : null}
-            {hayIndustria ? <th scope="col" className="num">Diferencia</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {dominios.map((d) => (
-            <tr key={d.id}>
-              <th scope="row">{d.nombre}</th>
-              <td className="num">{formatoPuntaje(d.puntaje)}</td>
-              <td>{NIVELES[d.nivel].etiqueta}</td>
-              <td className="num">{formatoPuntaje(d.meta)}</td>
-              {hayIndustria ? <td className="num">{formatoPuntaje(d.promedioIndustria)}</td> : null}
-              {hayIndustria ? <td className="num">{d.diferencia != null ? `${d.diferencia > 0 ? "+" : ""}${formatoPuntaje(d.diferencia)}` : "—"}</td> : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const tabla = <TablaMadurez dominios={dominios} />;
 
   const etiqueta = (d: DominioVista) =>
     `${d.nombre}: tu empresa ${formatoPuntaje(d.puntaje)} de 100, nivel ${NIVELES[d.nivel].etiqueta}. ${formatoDiferenciaMeta(d.diferenciaMeta)}.${
@@ -160,5 +138,39 @@ export function BarrasComparadas({
         <span>100</span>
       </p>
     </ChartFrame>
+  );
+}
+
+/** Alternativa en tabla de la madurez por dominio (la usan las barras y el radar). */
+export function TablaMadurez({ dominios }: { dominios: DominioVista[] }) {
+  const hayIndustria = dominios.some((d) => d.promedioIndustria != null);
+  return (
+    <div className="table-wrap">
+      <table className="table">
+        <caption className="sr-only">Puntaje de madurez por dominio, comparado con el rubro y la meta</caption>
+        <thead>
+          <tr>
+            <th scope="col">Dominio</th>
+            <th scope="col" className="num">Tu empresa</th>
+            <th scope="col">Nivel</th>
+            <th scope="col" className="num">Meta</th>
+            {hayIndustria ? <th scope="col" className="num">Rubro</th> : null}
+            {hayIndustria ? <th scope="col" className="num">Diferencia</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {dominios.map((d) => (
+            <tr key={d.id}>
+              <th scope="row">{d.nombre}</th>
+              <td className="num">{formatoPuntaje(d.puntaje)}</td>
+              <td>{NIVELES[d.nivel].etiqueta}</td>
+              <td className="num">{formatoPuntaje(d.meta)}</td>
+              {hayIndustria ? <td className="num">{formatoPuntaje(d.promedioIndustria)}</td> : null}
+              {hayIndustria ? <td className="num">{d.diferencia != null ? `${d.diferencia > 0 ? "+" : ""}${formatoPuntaje(d.diferencia)}` : "—"}</td> : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

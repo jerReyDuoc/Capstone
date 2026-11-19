@@ -3,6 +3,8 @@
  * Fuente: Proyecto/backend/app/api/routes/{reportes,evaluaciones,catalogos}.py
  * ------------------------------------------------------------------ */
 
+import type { CumplimientoVista } from "./cumplimientoNormativa";
+
 export type NivelMadurez = "inicial" | "en_desarrollo" | "gestionado" | "optimizado";
 
 export type EstadoClasificacion =
@@ -142,6 +144,8 @@ export interface BrechaCatalogoApi {
 export interface ControlApi {
   id_control: number;
   codigo_control: string | null;
+  /** Mejoras 19-11: normativa de la que sale el control ("Ley N.º 21.719", "ISO/IEC 42001"…). */
+  framework_fuente?: string | null;
   obligacion: string | null;
   criticidad: string | null;
   recomendacion: string | null;
@@ -228,6 +232,8 @@ export interface PanelVista {
   sinRubro: boolean;
   /** HU-10: comparación del puntaje general con el sector (null con backends previos). */
   sector: SectorVista | null;
+  /** Mejoras 19-11: cumplimiento por normativa (lib/cumplimientoNormativa.ts). */
+  cumplimiento?: CumplimientoVista;
 }
 
 /** HU-10 · Comparativa sectorial con k-anonimato. */

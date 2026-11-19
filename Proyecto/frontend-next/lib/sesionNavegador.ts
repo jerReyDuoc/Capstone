@@ -12,10 +12,11 @@
  * Las preferencias que no son datos de la cuenta (p. ej. la guía del mapa plegada) no se tocan.
  */
 import { pedir } from "@/lib/encuesta/cliente";
+import { PREFIJO_ALMACEN_DOCUMENTOS } from "@/lib/generadorDocumentos";
 import { PREFIJO_ALMACEN_GUIA } from "@/lib/guiaRegistro";
 
-/** Prefijos de las claves del navegador que pertenecen a una cuenta. */
-export const PREFIJOS_DE_CUENTA = [PREFIJO_ALMACEN_GUIA] as const;
+/** Prefijos de las claves del navegador que pertenecen a una cuenta (Mejoras 19-11: brecha → documento). */
+export const PREFIJOS_DE_CUENTA = [PREFIJO_ALMACEN_GUIA, PREFIJO_ALMACEN_DOCUMENTOS] as const;
 
 type Almacen = Pick<Storage, "length" | "key" | "removeItem">;
 

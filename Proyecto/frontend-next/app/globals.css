@@ -87,6 +87,7 @@
   --serie-industria: #8fa3ff; /* lavanda: se distingue del verde también en daltonismo */
   --serie-meta: #f4d58d;      /* HU-12: meta de cumplimiento, siempre en línea de puntos (forma ≠ industria) */
   --grid: #22302a;
+  --serie-cian: #22c3e6;      /* Mejoras 19-11: segundo tono del degradado del radar (cian de la marca) */
 
   /* Tipografía (las variables de fuente las inyecta next/font en layout.tsx) */
   --font-display: var(--font-space-grotesk, "Space Grotesk"), ui-sans-serif, system-ui, sans-serif;
@@ -157,7 +158,7 @@
   --nivel-gestionado: #2f5fa8; --nivel-gestionado-soft: #e5ecf7;
   --barra-neutra: #7c8a94;
   --disabled-bg: #ecebe6; --disabled-text: #5f645c; --disabled-line: #d6d3c9;
-  --serie-industria: #5b6fd6; --serie-meta: #8a6400; --grid: #e4e2da;
+  --serie-industria: #5b6fd6; --serie-meta: #8a6400; --grid: #e4e2da; --serie-cian: #0a7ea4;
   --nna: #6b3fb8;
   --fondo-brillo: transparent; --fondo-trama: transparent;
   --cromo: #fbfaf7; --cromo-fuerte: rgba(251, 250, 247, 0.96); --cromo-inferior: rgba(251, 250, 247, 0.98);
@@ -179,7 +180,7 @@
   --nivel-gestionado: #8cc4ff; --nivel-gestionado-soft: rgba(140, 196, 255, 0.14);
   --barra-neutra: #7088a3;
   --disabled-bg: #1a2a40; --disabled-text: #a7b3c2; --disabled-line: #2a3d57;
-  --serie-industria: #e0a8ff; --grid: #1c2e47;
+  --serie-industria: #e0a8ff; --grid: #1c2e47; --serie-cian: #3ddc97;
   --nna: #e0a8ff;
   --fondo-brillo: rgba(92, 200, 255, 0.08); --fondo-trama: rgba(160, 200, 255, 0.025);
   --cromo: rgba(6, 16, 29, 0.88); --cromo-fuerte: rgba(6, 16, 29, 0.95); --cromo-inferior: rgba(11, 24, 41, 0.97);
@@ -1790,3 +1791,174 @@ textarea { font: inherit; color: inherit; }
 .texto-fuerte { color: var(--text); }
 .alinear-inicio { justify-self: start; }
 .gap-top .code.gap-prioridad { margin-left: 0; color: var(--text); }
+
+/* =====================================================================
+   Mejoras 19-11
+   ===================================================================== */
+
+/* ---------- 1. Campo de contraseña con botón mostrar/ocultar (components/ui/PasswordInput.tsx) ---------- */
+.campo-contrasena { position: relative; display: block; width: 100%; }
+.campo-contrasena > input { width: 100%; padding-right: 52px; }
+/* Edge y Chrome en Windows agregan su propio botón: se oculta para que no haya dos ojos */
+.campo-contrasena > input::-ms-reveal, .campo-contrasena > input::-ms-clear { display: none; }
+.campo-contrasena-boton {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.campo-contrasena-boton:hover { color: var(--text); background: var(--surface-2); }
+.campo-contrasena-boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; color: var(--text); }
+.campo-contrasena-boton:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- 2. Radar de madurez (components/charts/RadarMadurez.tsx) ---------- */
+.chart-acciones { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; justify-content: flex-end; }
+.selector-vista { display: inline-flex; padding: 3px; border: 1px solid var(--line-control); border-radius: var(--radius-pill); background: var(--surface-3); }
+.selector-vista-opcion {
+  min-height: 34px; padding: 0 var(--sp-4); border: 0; border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-muted); font-weight: 600; font-size: var(--fs-sm); cursor: pointer;
+}
+.selector-vista-opcion[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.selector-vista-opcion:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.solo-angosto { display: none; }
+@media (max-width: 599.98px) {
+  .solo-amplio { display: none !important; }
+  .solo-angosto { display: block; }
+}
+
+.radar { display: block; width: 100%; height: auto; max-height: 520px; overflow: visible; }
+.radar-anillo { fill: none; stroke: var(--grid); stroke-width: 1; }
+.radar-anillo-borde { stroke: var(--line-strong); }
+.radar-eje { stroke: var(--grid); stroke-width: 1; }
+.radar-escala { fill: var(--text-subtle); font-size: 10px; font-variant-numeric: tabular-nums; }
+.radar-etiqueta { fill: var(--text-muted); font-size: 13px; font-weight: 600; transition: fill var(--dur) var(--ease); }
+.radar-etiqueta-activa { fill: var(--text); }
+.radar-etiqueta-valor { fill: var(--accent); font-family: var(--font-display); font-size: 14px; font-weight: 700; }
+.radar-stop-centro { stop-color: var(--serie-cian); stop-opacity: 0.12; }
+.radar-stop-borde { stop-color: var(--serie-empresa); stop-opacity: 0.38; }
+.radar-stop-trazo-a { stop-color: var(--serie-empresa); }
+.radar-stop-trazo-b { stop-color: var(--serie-cian); }
+.radar-empresa { stroke-width: 2.5; stroke-linejoin: round; }
+.radar-meta { fill: none; stroke: var(--serie-meta); stroke-width: 1.8; stroke-dasharray: 6 5; stroke-linejoin: round; }
+.radar-rubro { fill: none; stroke: var(--serie-industria); stroke-width: 1.8; stroke-dasharray: 2 4; stroke-linecap: round; stroke-linejoin: round; }
+.radar-rubro-marca { fill: var(--surface); stroke: var(--serie-industria); stroke-width: 2; }
+.radar-vertice { cursor: default; outline: none; }
+.radar-vertice-accion { cursor: pointer; }
+.radar-vertice-zona { fill: transparent; }
+.radar-vertice-punto {
+  fill: var(--serie-empresa); stroke: var(--surface); stroke-width: 2.5;
+  transition: r var(--dur) var(--ease), stroke var(--dur) var(--ease);
+}
+.radar-vertice-activo .radar-vertice-punto, .radar-vertice:hover .radar-vertice-punto { r: 7.5px; }
+.radar-vertice:focus-visible .radar-vertice-zona { stroke: var(--accent); stroke-width: 2; }
+.radar-entrada { animation: radar-entrada 700ms var(--ease) both; }
+@keyframes radar-entrada { from { opacity: 0; transform: scale(0.35); } to { opacity: 1; transform: scale(1); } }
+.radar-muestra-empresa { background: linear-gradient(135deg, var(--serie-empresa), var(--serie-cian)); }
+.radar-muestra-rubro { background: transparent; border: 2px dotted var(--serie-industria); border-radius: 50%; }
+.radar-muestra-meta { background: transparent; border: 2px dashed var(--serie-meta); }
+@media (prefers-reduced-motion: reduce) {
+  .radar-entrada { animation: none; }
+  .radar-vertice-punto { transition: none; }
+}
+@media print {
+  .radar-entrada { animation: none; }
+}
+
+
+/* ---------- 4. Cumplimiento por normativa (components/brechas/ProgresoCumplimiento.tsx) ---------- */
+.cumplimiento-rejilla { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: var(--sp-4); align-items: stretch; }
+@media (max-width: 1023.98px) { .cumplimiento-rejilla { grid-template-columns: minmax(0, 1fr); } }
+.cumplimiento { display: grid; gap: var(--sp-4); align-content: start; }
+.cumplimiento .card-title, .brechas-tipo .card-title { display: flex; align-items: center; flex-wrap: wrap; }
+.cumplimiento-cabeza { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6); align-items: flex-end; justify-content: space-between; }
+.cumplimiento-cifra {
+  margin: 0; font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--cump);
+}
+.cump-ok { --cump: var(--accent); }
+.cump-bueno { --cump: var(--nivel-gestionado); }
+.cump-medio { --cump: var(--severity-medium); }
+.cump-bajo { --cump: var(--severity-high); }
+.cumplimiento-barra { height: 12px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; }
+.cumplimiento-barra > span {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--cump), color-mix(in srgb, var(--cump) 70%, var(--serie-cian)));
+  transition: width 700ms var(--ease);
+}
+.cumplimiento-barra-fina { height: 8px; }
+.cumplimiento-subtitulo { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-subtle); }
+.cumplimiento-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); }
+.cumplimiento-fila {
+  display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center;
+  width: 100%; min-height: var(--target); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text);
+  text-align: left; cursor: pointer; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.cumplimiento-fila:hover { background: var(--surface-2); }
+.cumplimiento-fila[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.cumplimiento-fila:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cumplimiento-fila-nombre { font-weight: 600; }
+.cumplimiento-fila-valor { display: grid; justify-items: end; font-variant-numeric: tabular-nums; }
+.cumplimiento-fila-valor strong { font-family: var(--font-display); }
+.cumplimiento-fila-valor span { font-size: var(--fs-xs); color: var(--text-subtle); }
+@media (max-width: 599.98px) {
+  .cumplimiento-fila { grid-template-columns: minmax(0, 1fr) auto; }
+  .cumplimiento-fila .cumplimiento-barra { grid-column: 1 / -1; grid-row: 2; }
+  .cumplimiento-cifra { font-size: var(--fs-2xl); }
+}
+
+.brechas-tipo { display: grid; gap: var(--sp-3); align-content: start; }
+.brechas-tipo .card-sub { margin: 0; }
+.brechas-tipo-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.brechas-tipo-lista li {
+  display: grid; gap: 2px; padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-strong); border-left: 4px solid var(--tipo); border-radius: var(--radius-md); background: var(--surface-2);
+}
+.brechas-tipo-valor { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; line-height: 1.1; color: var(--tipo); font-variant-numeric: tabular-nums; }
+.brechas-tipo-texto { font-size: var(--fs-sm); color: var(--text-muted); font-weight: 600; }
+.tipo-cumple { --tipo: var(--ok); }
+.tipo-parcial { --tipo: var(--severity-medium); }
+.tipo-no-cumple { --tipo: var(--severity-high); }
+.tipo-critico { --tipo: var(--severity-critical); }
+
+/* Pestañas por normativa: en celular se deslizan horizontalmente */
+.pestanas-normativa {
+  display: flex; gap: var(--sp-2); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  padding: 2px 2px var(--sp-2); margin: 0 -2px; scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+}
+.pestana-normativa {
+  flex: none; scroll-snap-align: start; display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: var(--target); padding: 0 var(--sp-4);
+  border: 1px solid var(--line-control); border-radius: var(--radius-pill); background: var(--surface-3);
+  color: var(--text-muted); font-weight: 600; font-size: var(--fs-sm); white-space: nowrap; cursor: pointer;
+}
+.pestana-normativa:hover { color: var(--text); border-color: var(--text-subtle); }
+.pestana-normativa[aria-pressed="true"] { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.pestana-normativa:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pestana-normativa-pct { font-family: var(--font-display); color: var(--cump); font-variant-numeric: tabular-nums; }
+
+.th-con-ayuda { display: inline-flex; align-items: center; }
+.th-con-ayuda .infotip { margin-left: var(--sp-1); }
+.th-con-ayuda .infotip-panel { text-transform: none; letter-spacing: normal; font-weight: 400; }
+.texto-tenue { color: var(--text-subtle); font-size: var(--fs-sm); }
+.ruta-documento { width: fit-content; min-height: 32px; font-weight: 600; text-decoration: none; }
+.ruta-documento:hover { text-decoration: underline; }
+
+/* Barra superior móvil en pantallas de 375 px: el menú de cuenta se salía 6 px (existía antes de estas mejoras) */
+@media (max-width: 389.98px) {
+  .barra-movil { gap: var(--sp-2); padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .barra-movil .brand { min-width: 0; }
+}
+
+/* Tabla de brechas con 7 columnas: cabe en escritorio sin desplazar */
+.tabla-brechas th, .tabla-brechas td { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+.table.tabla-brechas .celda-brecha { min-width: 220px; }
+.table.tabla-brechas .celda-accion { min-width: 180px; }
+.tabla-brechas td[data-label="Responsable sugerido"] { min-width: 110px; font-size: var(--fs-sm); color: var(--text-muted); }
+.tabla-brechas .brecha-codigos { font-family: var(--font-body); }
+@media (max-width: 599.98px) {
+  .tabla-brechas td[data-label="Estado"], .tabla-brechas td[data-label="Riesgo"], .tabla-brechas td[data-label="Impacto"] {
+    display: inline-block; width: auto; margin-right: var(--sp-5); vertical-align: top;
+  }
+}

@@ -171,7 +171,7 @@ export async function descargarBorrador(id: number, formato: FormatoBorrador): P
 /* ------------------------------------------------------------ presentación */
 
 export const ETIQUETA_TIPO: Record<TipoBorrador, string> = {
-  politica_llm: "Política de uso de LLM",
+  politica_llm: "Política de uso de IA",
   aviso_privacidad: "Aviso de privacidad",
   pia: "Evaluación de impacto (PIA)",
 };

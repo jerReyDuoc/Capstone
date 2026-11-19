@@ -7,7 +7,7 @@ import { VistasFijadas } from "@/components/brechas/VistasFijadas";
 import { CtaContratar } from "@/components/contratacion/CtaContratar";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { BarrasCriticidad } from "@/components/charts/BarrasCriticidad";
-import { BarrasComparadas } from "@/components/charts/BarrasComparadas";
+import { MadurezPorDominio } from "@/components/charts/MadurezPorDominio";
 import { AvisoCohorte } from "@/components/sector/AvisoCohorte";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeNivel, EstadoPanel } from "@/components/ui/Basicos";
@@ -97,7 +97,8 @@ export function VistaDiagnostico() {
 
               <div className="grid">
                 <div className="card col-7 md-col-12">
-                  <BarrasComparadas
+                  {/* Mejoras 19-11: radar de madurez (barras en celular o si el usuario las elige) */}
+                  <MadurezPorDominio
                     dominios={p.dominios}
                     onSeleccionar={(d) => router.push(`${href("/panel/dominios")}#${slug(d.nombre)}`)}
                   />

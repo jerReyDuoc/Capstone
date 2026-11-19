@@ -9,7 +9,7 @@
 | **Metodología** | Scrumban (Por hacer → En curso → Listo, con límite WIP) |
 | **Meta de madurez** | TRL 5 — validación de componentes en entorno representativo (local, simulando uso real) |
 | **Stack** | FastAPI · SQLAlchemy 2.0 async · PostgreSQL 16 · Redis 7 · ARQ · Groq · spaCy · Next.js 15 + React 19 · Docker Compose |
-| **Última actualización** | 13-nov-2026 (HU-40: revisión interna del registro —lista de verificación por actividad y por elemento del mapa, observaciones que bloquean la marca, versión marcada como revisada con fecha y nombre en el informe del registro, diferencias entre versiones, paquete de evidencia ZIP verificable con hash, envío por correo y recordatorio de revisión periódica—) · 13-nov-2026 (HU-38: el registro de actividades conectado con la evaluación, las brechas y los borradores —riesgo explicable por actividad, matriz de mayor riesgo, PIA y aviso de privacidad pre-llenados, el registro vigente como evidencia y su estado en Mi empresa—) · 13-nov-2026 (HU-41: registro de tratamiento de la propia plataforma —mapa, RAT y RoPA de ComplianceAI— generado desde el inventario de datos, con revisión interna) · 13-nov-2026 (HU-37: informe RoPA desde el registro de actividades, en PDF y Excel, como responsable y como encargado) · 12-nov-2026 (HU-36: informe del registro de actividades en PDF y Excel, con código verificable, matriz de riesgos y marca de agua de borrador; mapa de datos con ficha en ventana, asistentes por pasos y guía) |
+| **Última actualización** | 19-nov-2026 (mejoras de interfaz: mostrar/ocultar contraseña, radar de madurez en el Diagnóstico, favicon de TherionLabs, cumplimiento por normativa en el Plan de acción y generador de reportes y documentos; ver [10.1.1](#1011-mejoras-del-19-nov-2026)) · 13-nov-2026 (HU-40: revisión interna del registro —lista de verificación por actividad y por elemento del mapa, observaciones que bloquean la marca, versión marcada como revisada con fecha y nombre en el informe del registro, diferencias entre versiones, paquete de evidencia ZIP verificable con hash, envío por correo y recordatorio de revisión periódica—) · 13-nov-2026 (HU-38: el registro de actividades conectado con la evaluación, las brechas y los borradores —riesgo explicable por actividad, matriz de mayor riesgo, PIA y aviso de privacidad pre-llenados, el registro vigente como evidencia y su estado en Mi empresa—) · 13-nov-2026 (HU-41: registro de tratamiento de la propia plataforma —mapa, RAT y RoPA de ComplianceAI— generado desde el inventario de datos, con revisión interna) · 13-nov-2026 (HU-37: informe RoPA desde el registro de actividades, en PDF y Excel, como responsable y como encargado) · 12-nov-2026 (HU-36: informe del registro de actividades en PDF y Excel, con código verificable, matriz de riesgos y marca de agua de borrador; mapa de datos con ficha en ventana, asistentes por pasos y guía) |
 
 ---
 
@@ -1046,7 +1046,7 @@ caso de uso ─► GatewayIA.ejecutar(tarea, textos, datos, contexto)
 |---|---|
 | `/panel?evaluacion=ID` | Diagnóstico: madurez general, nivel, brechas abiertas y controles evaluados; radar de madurez por dominio (empresa vs. **meta** y promedio del rubro); barras por severidad; comparativa meta y rubro; las 4 brechas más urgentes; **Descargar PDF** y **Enviar por correo** |
 | `/panel/dominios` | Una tarjeta por dominio: puntaje, nivel, distancia a la meta, marca del promedio del rubro y acceso a sus brechas |
-| `/panel/brechas?severidad=&dominio=&estado=&q=` | HU-11: listado priorizado por severidad (Crítica/Alta/Media/Baja), filtros en la URL, CSV, vistas fijadas, **PDF directo del listado filtrado** y envío por correo |
+| `/panel/brechas?severidad=&dominio=&estado=&q=&normativa=` | HU-11: listado priorizado por severidad (Crítica/Alta/Media/Baja), filtros en la URL, CSV, vistas fijadas, **PDF directo del listado filtrado** y envío por correo. Desde el 19-11: **progreso general de cumplimiento** y desglose por normativa, **brechas por tipo** y pestañas por normativa que filtran el listado |
 | `/panel/capacitacion` | HU-12: plan de estudio por dimensión normativa (nivel del plan, objetivo, módulos con objetivos y contenidos, brechas que cierran), filtros por nivel, "Empieza por" y exportación CSV para el LMS |
 
 - **Datos:** consume `GET /api/evaluaciones`, `/{id}/resumen`, `/{id}/comparativa` (opcional), `/{id}/respuestas`, `/{id}/plan-formativo`, `/{id}/informe/pdf`, `POST /{id}/informe/enviar`, `GET /api/brechas` y `/api/controles`. El encuestado de la landing pasa por el BFF (`/bff/api/*`), que solo deja su propia evaluación. Una evaluación sin resumen (sin `POST /cerrar` o `/completar`) muestra un aviso en vez de los gráficos.
@@ -1062,7 +1062,7 @@ caso de uso ─► GatewayIA.ejecutar(tarea, textos, datos, contexto)
 | `/ingresar` | Usuario definitivo de una empresa cliente | Inicio de sesión; con sesión vigente lleva directo a `/empresa` |
 | `/empresa` | Usuario definitivo | Espacio de su empresa: contrato, **Mis evaluaciones** (HU-29: historial con gráfico de evolución global y por dimensión, **Nueva evaluación** y **Guardar informe**; cada una con **Ver resultados** en `/panel` modo cliente) y **Mis documentos** (informes, borradores, evidencias y constancias con descarga y eliminación) |
 | `/empresa/evaluacion/[id]` | Usuario definitivo | HU-29: responde la reevaluación con el cuestionario de siempre, por `/bff/cliente/api/*` |
-| `/empresa/borradores` | Usuario definitivo | HU-16: genera la política de uso de LLM, el aviso de privacidad o la PIA adaptados a sus brechas; editor Markdown con vista previa y campos por completar, descarga en Markdown/PDF y consolidación |
+| `/empresa/borradores` | Usuario definitivo | HU-16 + 19-11: **Generador de reportes y documentos**. Genera con IA la política de uso de IA, el aviso de privacidad o la PIA adaptados a sus brechas (editor Markdown con vista previa y campos por completar, descarga en Markdown/PDF y "marcar como final"); da acceso a los reportes que ya genera la plataforma; vista previa lateral e historial de documentos generados |
 | `/panel/capacitacion` (modo cliente) | Usuario definitivo | HU-26: avance de la empresa (por dimensión y nivel) y, en cada módulo, su estado y la acción Empezar / Continuar / Constancia |
 | `/panel/capacitacion/[ruta]` | Usuario definitivo | HU-26: recorrido del módulo (lecciones, material, actividad de verificación y constancia) |
 | `/panel/remediacion` | Usuario definitivo | HU-17: cerrar brechas subiendo evidencia; el puntaje y el radar se actualizan si el control mejora |
@@ -1076,6 +1076,17 @@ caso de uso ─► GatewayIA.ejecutar(tarea, textos, datos, contexto)
 | `/restablecer#token=…` | Ambos | Define la contraseña nueva; cierra todas las sesiones abiertas de la cuenta |
 
 Cerrar sesión revoca el token en el servidor (`POST /api/auth/logout`) antes de borrar la cookie. Detalle en `Extras/Cambios/frontend/CAMBIOS_HU28.md`.
+
+#### 10.1.1 Mejoras del 19-nov-2026
+
+Solo frontend: no cambian endpoints ni la base de datos.
+
+- **Mostrar u ocultar contraseña.** `components/ui/PasswordInput.tsx` se usa en el ingreso de empresas y de administradores, en la activación de la cuenta y en el restablecimiento. El botón del ojo es `type="button"`, cambia su `aria-label` ("Mostrar contraseña" / "Ocultar contraseña"), funciona con teclado y vuelve a ocultar la contraseña al enviar el formulario.
+- **Radar de madurez** (`components/charts/RadarMadurez.tsx`, geometría en `lib/radar.ts`). Muestra un eje por cada dimensión que devuelve el resumen (con 4 dimensiones es un rombo), con la empresa, la meta y el promedio del rubro. Tiene tooltip, leyenda que oculta series, vista de tabla y animación (que se desactiva con "reducir movimiento"). Bajo 600 px se muestran las barras (`MadurezPorDominio.tsx`), y en pantallas más anchas se puede elegir Radar o Barras.
+- **Favicon.** Usa la convención de archivos de Next.js (`app/favicon.ico` de 16/32, `app/icon1..3.png` de 16/32/512, `app/apple-icon.png` de 180 y `app/icon.svg`). `npm run iconos` (`scripts/generar-iconos.mjs`, que usa `sharp`, ya incluido en Next) los regenera desde `public/marca/therionlabs-logo.svg|png`. Mientras ese archivo no exista, se usa la marca hexagonal provisional.
+- **Cumplimiento por normativa** (`lib/cumplimientoNormativa.ts`, `components/brechas/ProgresoCumplimiento.tsx`). Cada respuesta se asocia a una normativa mediante el `framework_fuente` de su control (`GET /api/controles`). La fórmula es `% = (cumplidos × 1 + parciales × 0,5) / (cumplidos + parciales + no cumplidos + en revisión) × 100`, la misma que el puntaje por dimensión de `generar_resumen.py`; "no aplica" queda fuera del cálculo. Hoy la matriz tiene controles de la Ley 21.719, ISO/IEC 42001, NIST AI RMF, NIST AI 600-1 y OWASP LLM. **ISO/IEC 27001 e ISO/IEC 23894 no tienen controles**, así que no se muestran. En "Brechas por tipo", una brecha crítica se cuenta solo como "Crítico". El responsable de cada brecha es una sugerencia según la dimensión.
+- **Generador de reportes y documentos** (`components/empresa/Borradores.tsx`, `lib/generadorDocumentos.ts`). Desde cada brecha, "Generar documento" abre `/empresa/borradores?plantilla=…&brecha=ID` con el documento recomendado ya elegido. La relación entre el borrador y la brecha se guarda en el navegador (`localStorage`), se muestra en el historial y se borra al cerrar sesión.
+- **Pruebas:** `tests/mejoras_1911.test.ts`. Con Node < 20.19, `npm test` no carga `vitest.config.ts` porque Vite 7 exige Node 20.19 o superior.
 
 ### 10.2 Prototipo estático (archivado)
 
@@ -1382,7 +1393,7 @@ docker compose exec worker python scripts/evaluacion/benchmark_ner.py --paginas 
 docker compose exec api sh -c 'LIVE_BASE_URL=http://localhost:8000 LIVE_DATABASE_URL=$DATABASE_URL LIVE_ENTITY_MAP_KEY=$ENTITY_MAP_KEY pytest tests/ia/test_live_capa_ia.py -v -s'
 ```
 
-**Frontend (`frontend-next`):** `npm test` corre 5 suites vitest (66 pruebas, 13 de HU-12: meta, BFF, CSV del plan, plan demo).
+**Frontend (`frontend-next`):** `npm test` corre 33 suites vitest (367 pruebas al 19-nov-2026; `tests/mejoras_1911.test.ts` cubre la contraseña, el radar, el cumplimiento por normativa y el generador de documentos).
 
 **Prueba visual móvil (Playwright, auditoría UX 16-nov-2026):** `tests/e2e/desborde-movil.spec.ts` abre 24 pantallas de las cuatro áreas (público, encuestado, cliente y admin) a **390 × 844** y falla si alguna es más ancha que la ventana (`scrollWidth > innerWidth`), indicando qué elemento se sale. No necesita backend: `tests/e2e/simulacion.ts` responde las llamadas al BFF con datos de prueba (los del modo demo).
 

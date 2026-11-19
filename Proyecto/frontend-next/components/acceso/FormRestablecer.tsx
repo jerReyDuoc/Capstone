@@ -12,6 +12,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { LOGIN_DE, tipoCuenta, type TipoCuenta } from "@/lib/acceso";
 import { problemasContrasena, tokenDesdeFragmento } from "@/lib/activacion";
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import s from "@/components/inicio/inicio.module.css";
 
 type Estado =
@@ -113,7 +114,7 @@ export function FormRestablecer() {
       <input type="text" name="username" autoComplete="username" value={estado.email} readOnly hidden />
       <div className={s.campo}>
         <label htmlFor={`${id}-pw`}>Contraseña nueva</label>
-        <input id={`${id}-pw`} className={s.input} type="password" autoComplete="new-password" value={password}
+        <PasswordInput id={`${id}-pw`} className={s.input} autoComplete="new-password" value={password}
                maxLength={128} onChange={(e) => setPassword(e.target.value)}
                aria-describedby={`${id}-ayuda`} aria-invalid={problemas.length > 0} />
         <span id={`${id}-ayuda`} className={s.ayuda}>
@@ -122,7 +123,7 @@ export function FormRestablecer() {
       </div>
       <div className={s.campo}>
         <label htmlFor={`${id}-pw2`}>Repite la contraseña</label>
-        <input id={`${id}-pw2`} className={s.input} type="password" autoComplete="new-password" value={confirmacion}
+        <PasswordInput id={`${id}-pw2`} className={s.input} autoComplete="new-password" value={confirmacion}
                maxLength={128} onChange={(e) => setConfirmacion(e.target.value)} aria-invalid={problemas.length > 0} />
       </div>
       {problemas.length ? (

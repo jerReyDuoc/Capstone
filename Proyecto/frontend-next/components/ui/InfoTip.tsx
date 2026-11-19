@@ -7,9 +7,18 @@
  * fuera; el hover solo no sirve en pantallas táctiles ni con teclado (WCAG 2.1.1 y 1.4.13).
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 
-export function InfoTip({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
+export function InfoTip({
+  etiqueta,
+  children,
+  icono = "info",
+}: {
+  etiqueta: string;
+  children: ReactNode;
+  /** Mejoras 19-11: "ayuda" muestra el ícono "?" (ayuda para el cliente). */
+  icono?: IconName;
+}) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLSpanElement>(null);
   const boton = useRef<HTMLButtonElement>(null);
@@ -45,7 +54,7 @@ export function InfoTip({ etiqueta, children }: { etiqueta: string; children: Re
         aria-label={etiqueta}
         onClick={() => setAbierto((v) => !v)}
       >
-        <Icon name="info" />
+        <Icon name={icono} />
       </button>
       {/* Siempre en el DOM (oculto) para que aria-controls apunte a algo que existe */}
       <span id={id} className="infotip-panel" role="note" hidden={!abierto}>

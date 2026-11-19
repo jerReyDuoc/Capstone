@@ -48,11 +48,57 @@ const CATALOGO: BrechaCatalogoApi[] = [
   ruta_formativa: { id: i + 1, nombre: ruta },
 }));
 
+/**
+ * Mejoras 19-11: normativa de cada control (como `framework_fuente` de la matriz sembrada), para que el
+ * cumplimiento por normativa del Plan de acción tenga datos en el modo demo y en las pruebas de navegador.
+ */
+const FRAMEWORK_DEMO: Record<string, string> = {
+  DAT: "Ley N.º 21.719",
+  GOB: "ISO/IEC 42001",
+  RIE: "NIST AI RMF 100-1",
+  SEG: "OWASP LLM",
+};
+const frameworkDe = (codigo: string) => FRAMEWORK_DEMO[codigo.slice(0, 3)] ?? null;
+
+/** Controles con brecha en el demo: uno por fila del catálogo (id 100 + id de la brecha). */
+const CONTROLES_CATALOGO: ControlApi[] = CATALOGO.map((b) => {
+  const codigo = (b.codigo_brecha ?? "").replace(/^ERR-/, "");
+  return {
+    id_control: 100 + b.id_brecha,
+    codigo_control: codigo,
+    framework_fuente: frameworkDe(codigo),
+    obligacion: b.comportamiento_detectado,
+    criticidad: b.criticidad,
+    recomendacion: b.accion_sistema,
+    dominio: { id: 0, nombre_dominio: b.categoria },
+  };
+});
+
+/** Mejoras 19-11: controles CUMPLIDOS del demo (sin brecha), con su normativa. */
+const CUMPLIDOS_DEMO: [number, string, string][] = [
+  [160, "DAT-005", "Protección de Datos"], [161, "DAT-006", "Protección de Datos"], [162, "DAT-008", "Protección de Datos"],
+  [163, "GOB-001", "Gobernanza de IA"], [164, "GOB-002", "Gobernanza de IA"], [165, "GOB-004", "Gobernanza de IA"],
+  [166, "GOB-009", "Gobernanza de IA"], [167, "RIE-001", "Gestión de Riesgos"], [168, "RIE-010", "Gestión de Riesgos"],
+  [169, "SEG-001", "Uso Responsable"], [170, "SEG-002", "Uso Responsable"], [171, "SEG-006", "Uso Responsable"],
+];
+const CONTROLES_CUMPLIDOS: ControlApi[] = CUMPLIDOS_DEMO.map(([id, codigo, dominio]) => ({
+  id_control: id,
+  codigo_control: codigo,
+  framework_fuente: codigo === "SEG-006" ? "NIST 600-1" : frameworkDe(codigo),
+  obligacion: null,
+  criticidad: "Media",
+  recomendacion: null,
+  dominio: { id: 0, nombre_dominio: dominio },
+}));
+
 /** HU-11: control sin brecha de catálogo; el análisis toma su criticidad y código. */
 const CONTROLES: ControlApi[] = [
+  ...CONTROLES_CATALOGO,
+  ...CONTROLES_CUMPLIDOS,
   {
     id_control: 141,
     codigo_control: "GOB-007",
+    framework_fuente: "ISO/IEC 42001",
     obligacion: "Mantener un inventario actualizado de los sistemas de IA en uso y de sus responsables.",
     criticidad: "Media",
     recomendacion: "Levantar el inventario de sistemas de IA y asignar un responsable por sistema.",
@@ -203,6 +249,17 @@ export function datosApiDemo(evaluacionId: number): {
       matriz_controles_id_control: 141,
       catalogo_brechas_id_brecha: null,
     },
+    // Mejoras 19-11: lo que la empresa ya cumple (la evaluación más antigua cumplía menos)
+    ...CUMPLIDOS_DEMO.slice(0, id === DEMO_EVALUACIONES[0].id ? CUMPLIDOS_DEMO.length : 5).map(([control], i): RespuestaApi => ({
+      id_respuesta: 950 + i,
+      estado_clasificacion: "cumplido",
+      estado_clasificacion_final: "cumplido",
+      fuente_clasificacion: "usuario",
+      confianza_clasificacion: null,
+      fecha_validacion: null,
+      matriz_controles_id_control: control,
+      catalogo_brechas_id_brecha: null,
+    })),
   ];
 
   return { resumen, comparativa, respuestas, catalogo: CATALOGO, controles: CONTROLES };

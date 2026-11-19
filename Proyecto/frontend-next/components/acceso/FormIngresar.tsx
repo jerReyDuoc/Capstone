@@ -13,6 +13,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { INICIO_DE, mensajeLogin, TEXTO_MOTIVO, type MotivoLogin } from "@/lib/acceso";
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
 import { limpiarDatosDeCuenta } from "@/lib/sesionNavegador";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import s from "@/components/inicio/inicio.module.css";
 
 export function FormIngresar({ motivo }: { motivo?: MotivoLogin }) {
@@ -62,7 +63,7 @@ export function FormIngresar({ motivo }: { motivo?: MotivoLogin }) {
       </div>
       <div className={s.campo}>
         <label htmlFor={`${id}-pw`}>Contraseña</label>
-        <input id={`${id}-pw`} ref={refPassword} className={s.input} type="password" autoComplete="current-password"
+        <PasswordInput id={`${id}-pw`} ref={refPassword} className={s.input} autoComplete="current-password"
                value={password} onChange={(e) => setPassword(e.target.value)} maxLength={200} required
                aria-invalid={Boolean(error)} />
       </div>

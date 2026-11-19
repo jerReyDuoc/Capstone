@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="512" height="512">
+  <!-- Ícono PROVISIONAL: la marca hexagonal de la app (components/ui/Icon.tsx · BrandMark).
+       Para usar el logo oficial de TherionLabs: ponlo en public/marca/therionlabs-logo.svg (o .png)
+       y ejecuta `npm run iconos`. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3be3b2"/>
+      <stop offset="1" stop-color="#1fa6e0"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 3 35 11.5v17L20 37 5 28.5v-17L20 3Z" fill="#0b1512" stroke="url(#g)" stroke-width="2"/>
+  <path d="M12 15.5 20 20l8-4.5M20 20v9.5M12 15.5v9l8 4.5M28 15.5v9" fill="none" stroke="url(#g)" stroke-width="2.2" stroke-linejoin="round"/>
+</svg>

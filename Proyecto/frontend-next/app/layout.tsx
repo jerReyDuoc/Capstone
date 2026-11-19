@@ -12,7 +12,14 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
+/**
+ * Mejoras 19-11 · Favicon e íconos: convención de archivos de Next.js (app/favicon.ico, app/icon*.png,
+ * app/icon.svg y app/apple-icon.png). Next agrega los <link rel="icon"> y <link rel="apple-touch-icon">
+ * con sus tamaños; se regeneran desde el logo con `npm run iconos` (scripts/generar-iconos.mjs).
+ */
 export const metadata: Metadata = {
+  applicationName: "ComplianceAI · TherionLabs",
+  appleWebApp: { title: "ComplianceAI" },
   title: { default: "Panel · ComplianceAI", template: "%s · ComplianceAI" },
   description: "Gobernanza de IA y cumplimiento de la Ley 21.719: madurez por dominio y brechas priorizadas.",
 };

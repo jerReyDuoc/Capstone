@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState, type FormEvent } from "react";
 import { INICIO_DE, mensajeLogin, TEXTO_MOTIVO, type MotivoLogin } from "@/lib/acceso";
 import { ErrorBff, pedir } from "@/lib/encuesta/cliente";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import s from "./admin.module.css";
 
 export function FormLoginAdmin({ destino = INICIO_DE.admin, motivo }: { destino?: string; motivo?: MotivoLogin }) {
@@ -61,7 +62,7 @@ export function FormLoginAdmin({ destino = INICIO_DE.admin, motivo }: { destino?
       </div>
       <div className={s.campo}>
         <label htmlFor={`${id}-pw`}>Contraseña</label>
-        <input id={`${id}-pw`} ref={refPassword} className={s.control} type="password" autoComplete="current-password"
+        <PasswordInput id={`${id}-pw`} ref={refPassword} className={s.control} autoComplete="current-password"
                value={password} onChange={(e) => setPassword(e.target.value)} maxLength={200} required
                aria-invalid={Boolean(error)} />
       </div>

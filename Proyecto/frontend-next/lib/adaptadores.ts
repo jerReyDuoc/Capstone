@@ -1,3 +1,4 @@
+import { calcularCumplimiento } from "./cumplimientoNormativa";
 import { CRITICIDADES, META_POR_DEFECTO, nivelDesdePuntaje } from "./madurez";
 import { calcularSeveridad, contarPorSeveridad, PESO_SEVERIDAD } from "./severidad";
 import type {
@@ -161,6 +162,7 @@ export function construirPanel(args: {
     muestrasRubro: Math.max(0, ...dominios.map((d) => d.muestras)),
     sinRubro: args.comparativa == null || args.comparativa.rubro_id == null,
     sector: construirSector(args.comparativa, args.resumen.puntaje_general),
+    cumplimiento: calcularCumplimiento(args.respuestas, args.controles ?? []),
   };
 }
 

@@ -5,18 +5,22 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { InformeBrechas } from "@/components/brechas/InformeBrechas";
 import { MatrizPriorizacion } from "@/components/brechas/MatrizPriorizacion";
+import { PestanasNormativa, ProgresoCumplimiento, TarjetaBrechasPorTipo } from "@/components/brechas/ProgresoCumplimiento";
 import { ChipsSeveridad } from "@/components/brechas/TarjetasSeveridad";
 import { AccionesInforme } from "@/components/informe/AccionesInforme";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { BadgeEstado, BadgeSeveridad, EstadoPanel } from "@/components/ui/Basicos";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { ComoSeCalcula } from "@/components/ui/ComoSeCalcula";
 import { Icon } from "@/components/ui/Icon";
 import { useAvanceFormativo } from "@/hooks/useAvanceFormativo";
 import { usePanel } from "@/hooks/usePanel";
 import { useVistasFijadas } from "@/hooks/useVistasFijadas";
 import { ordenarBrechas } from "@/lib/adaptadores";
+import { brechasPorTipo, filtrarPorNormativa, responsableSugerido, type CumplimientoVista } from "@/lib/cumplimientoNormativa";
 import { brechasACsv, descargarTexto, nombreArchivo } from "@/lib/exportar";
 import { hrefRemediacion } from "@/lib/formacion";
+import { hrefGenerarDocumento, recordarBrechaPendiente, relacionDesdeBrecha } from "@/lib/generadorDocumentos";
 import {
   describirFiltros,
   filtrarBrechas,
@@ -25,7 +29,7 @@ import {
   hayFiltros,
   type FiltrosBrechas,
 } from "@/lib/filtrosBrechas";
-import { IMPACTO_TEXTO, SEVERIDAD_TONO, SEVERIDADES, pluralSeveridad } from "@/lib/severidad";
+import { IMPACTO_TEXTO, IMPACTO_TONO, SEVERIDAD_TONO, SEVERIDADES, pluralSeveridad } from "@/lib/severidad";
 import type { BrechaVista, PanelVista, Severidad } from "@/lib/types";
 
 type Orden = "prioridad" | "dominio";
@@ -34,9 +38,9 @@ export function VistaBrechas() {
   return (
     <>
       <PageHeader
-        eyebrow="Brechas normativas priorizadas"
+        eyebrow="Plan de acción"
         titulo="Brechas"
-        subtitulo="Prácticas no cumplidas o cumplidas en parte tras el autodiagnóstico, ordenados por severidad para enfocar primero los recursos donde el riesgo es mayor."
+        subtitulo="Tu avance de cumplimiento por normativa y las prácticas no cumplidas o cumplidas en parte, ordenadas por severidad para enfocar primero los recursos donde el riesgo es mayor."
       />
       <EstadoPanel>{(p) => <ListadoPriorizado panel={p} />}</EstadoPanel>
     </>
@@ -47,7 +51,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { href } = usePanel();
+  const { href, modo } = usePanel();
   // HU-26 C3: brechas cuya formación ya está hecha (solo el usuario definitivo)
   const { estado: avance } = useAvanceFormativo();
   const formadas = useMemo(
@@ -61,6 +65,11 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
 
   // Los filtros viven en la URL: se pueden compartir, sobreviven al "atrás" y son los que se fijan/exportan.
   const filtrosUrl = useMemo(() => filtrosDesdeParams(params), [params]);
+  // Mejoras 19-11: pestaña de normativa (va en la URL, pero fuera de los filtros que se fijan o van al PDF)
+  const cumplimiento: CumplimientoVista = panel.cumplimiento ?? CUMPLIMIENTO_VACIO;
+  const pedida = params.get("normativa");
+  const normativaActiva = cumplimiento.normativas.find((n) => n.id === pedida) ?? null;
+  const normativa = normativaActiva?.id ?? null;
   const [texto, setTexto] = useState(filtrosUrl.texto);
   const filtros: FiltrosBrechas = { ...filtrosUrl, texto };
   const [orden, setOrden] = useState<Orden>("prioridad");
@@ -71,11 +80,13 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const ultimaUrl = useRef({ params, filtrosUrl });
   ultimaUrl.current = { params, filtrosUrl };
 
-  const navegar = (f: FiltrosBrechas) => {
+  const navegar = (f: FiltrosBrechas, conservarNormativa = true) => {
     const q = new URLSearchParams();
     const ev = ultimaUrl.current.params.get("evaluacion");
     if (ev) q.set("evaluacion", ev);
     for (const [k, v] of Object.entries(filtrosAParams(f))) q.set(k, v);
+    const norm = ultimaUrl.current.params.get("normativa");
+    if (norm && conservarNormativa) q.set("normativa", norm);
     const s = q.toString();
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
@@ -105,7 +116,14 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   const limpiar = () => {
     if (texto !== "") saltarRetardo.current = true;
     setTexto("");
-    navegar({ severidades: [], dominio: null, estado: null, texto: "" });
+    navegar({ severidades: [], dominio: null, estado: null, texto: "" }, false);
+  };
+  const elegirNormativa = (id: string | null) => {
+    const q = new URLSearchParams(params.toString());
+    if (id) q.set("normativa", id);
+    else q.delete("normativa");
+    const s = q.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
 
   const dominios = useMemo(
@@ -113,15 +131,21 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
     [panel.brechas],
   );
 
+  const deNormativa = useMemo(
+    () => filtrarPorNormativa(panel.brechas, normativa, cumplimiento.normativaPorControl),
+    [panel.brechas, normativa, cumplimiento.normativaPorControl],
+  );
+  const tipos = brechasPorTipo(normativaActiva ? normativaActiva.cumplidos : cumplimiento.general.cumplidos, deNormativa);
+
   const filtradas = useMemo(() => {
-    const lista = filtrarBrechas(panel.brechas, filtros);
+    const lista = filtrarBrechas(deNormativa, filtros);
     const cmp: Record<Orden, (a: BrechaVista, b: BrechaVista) => number> = {
       prioridad: (a, b) => a.prioridad - b.prioridad,
       dominio: (a, b) => a.dominio.localeCompare(b.dominio, "es") || ordenarBrechas(a, b),
     };
     return [...lista].sort(cmp[orden]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel.brechas, filtrosUrl, texto, orden]);
+  }, [deNormativa, filtrosUrl, texto, orden]);
 
   const porDominio = useMemo(
     () =>
@@ -133,7 +157,16 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
   );
   const maxDominio = Math.max(1, ...porDominio.map((x) => x[1]));
 
-  const conFiltros = hayFiltros(filtros);
+  const conFiltros = hayFiltros(filtros) || normativa != null;
+  const resumenFiltros = [normativaActiva?.nombre, hayFiltros(filtros) ? describirFiltros(filtros) : null].filter(Boolean).join(" · ");
+  const esCliente = modo === "cliente";
+
+  const bloqueCumplimiento = (
+    <div className="cumplimiento-rejilla">
+      <ProgresoCumplimiento cumplimiento={cumplimiento} seleccion={normativa} onSeleccionar={elegirNormativa} />
+      <TarjetaBrechasPorTipo tipos={tipos} normativa={normativaActiva?.nombre ?? null} />
+    </div>
+  );
   const vistaFijada = estaFijada(filtros);
   const ariaSort = (o: Orden) => (orden === o ? "ascending" : "none");
   const sinClasificar = panel.brechasPorSeveridad["Sin clasificar"];
@@ -163,13 +196,16 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
 
   if (panel.brechas.length === 0) {
     return (
-      <div className="state" role="status">
+      <div className="no-print pila">
+        {bloqueCumplimiento}
+        <div className="state" role="status">
         <Icon name="escudo" width={32} height={32} className="icono-estado icono-ok" />
         <h2>Sin brechas abiertas</h2>
         <p>
           Ninguno de los {panel.controlesEvaluados} controles evaluados quedó como no cumplido o parcialmente cumplido.
           {panel.enRevision > 0 ? ` Aún hay ${panel.enRevision} en revisión por la IA: si alguno resulta incumplido, aparecerá aquí.` : ""}
         </p>
+        </div>
       </div>
     );
   }
@@ -188,6 +224,9 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
           </p>
         ) : null}
 
+        {/* Mejoras 19-11: progreso de cumplimiento por normativa y brechas por tipo */}
+        {bloqueCumplimiento}
+
         {/* Criterio 2: severidades (también filtran). Auditoría UX 16-11: un solo resumen compacto */}
         <ChipsSeveridad conteo={panel.brechasPorSeveridad} seleccion={filtros.severidades} onAlternar={alternarSeveridad} />
 
@@ -199,7 +238,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
               {/* Correcciones 29-10: el conteo solo se muestra cuando hay filtros (ahí sí informa) */}
               <p className={conFiltros ? "card-sub" : "sr-only"} role="status" aria-live="polite">
                 {conFiltros
-                  ? `Mostrando ${filtradas.length} de ${panel.brechas.length} brechas · ${describirFiltros(filtros)}`
+                  ? `Mostrando ${filtradas.length} de ${panel.brechas.length} brechas · ${resumenFiltros}`
                   : `${panel.brechas.length} brechas, de la más a la menos urgente`}
               </p>
             </div>
@@ -235,6 +274,12 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
               </>
             ) : null}
           </p>
+
+          {/* Mejoras 19-11: pestañas por normativa (se deslizan en celular) */}
+          <PestanasNormativa cumplimiento={cumplimiento} seleccion={normativa} onSeleccionar={elegirNormativa} />
+          {normativaActiva && deNormativa.length === 0 ? (
+            <p className="card-sub">{normativaActiva.nombre} no tiene brechas abiertas en esta evaluación.</p>
+          ) : null}
 
           <div className="toolbar">
             <div className="field field-grow">
@@ -307,7 +352,7 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
             </div>
           ) : (
             <div className="table-wrap">
-              <table className="table table-tarjetas">
+              <table className="table table-tarjetas tabla-brechas">
                 <caption className="sr-only">
                   Brechas abiertas ordenadas por {orden === "prioridad" ? "prioridad" : "dominio"}. La columna Prioridad indica el
                   orden de atención recomendado.
@@ -315,54 +360,88 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
                 <thead>
                   <tr>
                     <th scope="col" aria-sort={ariaSort("prioridad")}>{botonOrden("prioridad", "Prioridad")}</th>
-                    <th scope="col">Severidad</th>
-                    <th scope="col">Brecha detectada</th>
-                    <th scope="col" aria-sort={ariaSort("dominio")}>{botonOrden("dominio", "Dominio")}</th>
-                    <th scope="col">Acción y ruta formativa</th>
+                    <th scope="col" aria-sort={ariaSort("dominio")}>{botonOrden("dominio", "Control")}</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Riesgo</th>
+                    <th scope="col">Impacto</th>
+                    <th scope="col">
+                      <span className="th-con-ayuda">
+                        Responsable
+                        <InfoTip etiqueta="¿Quién es el responsable sugerido?" icono="ayuda">
+                          Es el área que suele hacerse cargo de este tipo de práctica. Asígnalo a la persona que corresponda
+                          en tu empresa.
+                        </InfoTip>
+                      </span>
+                    </th>
+                    <th scope="col">Acción sugerida</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtradas.map((b) => (
-                    <tr key={b.respuestaId} data-sev={b.severidad} className={`sev-${SEVERIDAD_TONO[b.severidad]}`}>
-                      <td className="rank" data-label="Prioridad">
-                        <span className="sr-only">Prioridad </span>
-                        {b.prioridad}
-                      </td>
-                      <td data-label="Severidad">
-                        <span className="celda-insignias">
-                          <BadgeSeveridad severidad={b.severidad} />
-                          <BadgeEstado estado={b.estado} />
-                        </span>
-                      </td>
-                      <td className="celda-brecha" data-label="Brecha detectada">
-                        <span className="brecha-desc">{b.descripcion}</span>
-                        {b.criticidad !== "Sin clasificar" ? (
+                  {filtradas.map((b) => {
+                    const idNorma = b.controlId != null ? cumplimiento.normativaPorControl[b.controlId] : undefined;
+                    const norma = idNorma ? cumplimiento.normativas.find((n) => n.id === idNorma) : undefined;
+                    return (
+                      <tr key={b.respuestaId} data-sev={b.severidad} className={`sev-${SEVERIDAD_TONO[b.severidad]}`}>
+                        <td className="rank" data-label="Prioridad">
+                          <span className="sr-only">Prioridad </span>
+                          {b.prioridad}
+                        </td>
+                        <td className="celda-brecha" data-label="Control">
+                          <span className="brecha-desc">{b.descripcion}</span>
                           <span className="brecha-codigos">
-                            <span>Impacto {IMPACTO_TEXTO[b.criticidad]}</span>
+                            <span>{b.dominio}</span>
+                            {norma ? <span className="badge tone-info" title={norma.nombreCompleto}>{norma.nombre}</span> : null}
                           </span>
-                        ) : null}
-                      </td>
-                      <td data-label="Dominio">{b.dominio}</td>
-                      <td className="celda-accion" data-label="Acción y ruta formativa">
-                        {b.accion ?? "—"}
-                        {b.rutaFormativa ? (
-                          <span className="ruta">
-                            <Icon name="libro" />
-                            {b.rutaFormativa}
-                          </span>
-                        ) : null}
-                        {formadas.has(b.respuestaId) ? (
-                          <span className="ruta ruta-formada">
-                            <Icon name="check" />
-                            Formación hecha ·{" "}
-                            <Link href={hrefRemediacion(panel.evaluacionId, b.respuestaId)}>
-                              subir evidencia<span className="sr-only"> de la brecha {b.prioridad}</span>
+                        </td>
+                        <td data-label="Estado">
+                          <BadgeEstado estado={b.estado} />
+                        </td>
+                        <td data-label="Riesgo">
+                          <BadgeSeveridad severidad={b.severidad} prefijo="Riesgo" />
+                        </td>
+                        <td data-label="Impacto">
+                          {b.criticidad === "Sin clasificar" ? (
+                            <span className="texto-tenue">Sin clasificar</span>
+                          ) : (
+                            <span className={`badge tone-${IMPACTO_TONO[b.criticidad]}`}>
+                              <span className="sr-only">Impacto </span>
+                              {IMPACTO_TEXTO[b.criticidad].charAt(0).toUpperCase() + IMPACTO_TEXTO[b.criticidad].slice(1)}
+                            </span>
+                          )}
+                        </td>
+                        <td data-label="Responsable sugerido">{responsableSugerido(b.dominio)}</td>
+                        <td className="celda-accion" data-label="Acción sugerida">
+                          {b.accion ?? "—"}
+                          {b.rutaFormativa ? (
+                            <span className="ruta">
+                              <Icon name="libro" />
+                              {b.rutaFormativa}
+                            </span>
+                          ) : null}
+                          {formadas.has(b.respuestaId) ? (
+                            <span className="ruta ruta-formada">
+                              <Icon name="check" />
+                              Formación hecha ·{" "}
+                              <Link href={hrefRemediacion(panel.evaluacionId, b.respuestaId)}>
+                                subir evidencia<span className="sr-only"> de la brecha {b.prioridad}</span>
+                              </Link>
+                            </span>
+                          ) : null}
+                          {/* Mejoras 19-11: ir directo al documento que ayuda a cerrarla (servicio contratado) */}
+                          {esCliente ? (
+                            <Link
+                              className="ruta ruta-documento"
+                              href={hrefGenerarDocumento(b, panel.evaluacionId)}
+                              onClick={() => recordarBrechaPendiente(relacionDesdeBrecha(b, panel.evaluacionId))}
+                            >
+                              <Icon name="documento" />
+                              Generar documento<span className="sr-only"> para cerrar la brecha {b.prioridad}</span>
                             </Link>
-                          </span>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -412,3 +491,9 @@ function ListadoPriorizado({ panel }: { panel: PanelVista }) {
     </>
   );
 }
+
+const CUMPLIMIENTO_VACIO: CumplimientoVista = {
+  general: { cumplidos: 0, parciales: 0, noCumplidos: 0, enRevision: 0, noAplica: 0, evaluados: 0, porcentaje: null },
+  normativas: [],
+  normativaPorControl: {},
+};
