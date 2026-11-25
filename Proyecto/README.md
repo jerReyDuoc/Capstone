@@ -76,7 +76,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Área | Estado | Detalle |
 |---|---|---|
 | Backend FastAPI (Clean Architecture) | ✅ Hecho | 13 routers, 51 endpoints |
-| Base de datos y migraciones | ✅ Hecho | 19 tablas, 18 migraciones Alembic, seeds de catálogos, controles y filtro |
+| Base de datos y migraciones | ✅ Hecho | 19 tablas, 44 migraciones Alembic, seeds de catálogos, controles y filtro |
 | Filtro de aplicabilidad (F1–F7) | ✅ Hecho | Árbol de decisión aditivo (22 controles base + 18 condicionales) |
 | Respuestas y reglas de clasificación | ✅ Hecho | Matriz de 5 estados declarables (HU-02): `requiere_revision` la elige el usuario y la resuelve el LLM; justificación obligatoria en parcial y revisión |
 | Validación de evidencias con LLM (worker ARQ + Groq) | ✅ Hecho | Asíncrona; el backend decide, el LLM solo propone |
@@ -90,8 +90,8 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Capa anti prompt-injection | ✅ Hecho | Bloqueo preventivo y bandeja de eventos. HU-07: reglas multilenguaje (inglés, portugués, francés, alemán, italiano) e indirectas, y saneamiento de caracteres invisibles, separadores y marcadores de turno antes del prompt |
 | Verificación de las salidas del modelo (HU-07) | ✅ Hecho | Cada propuesta del modelo sobre una evidencia se revisa antes de usarla: formato (LLM05), afirmaciones sin respaldo en el documento (alucinaciones, LLM09), fuga de datos personales o del system prompt (LLM02/LLM07) e inyecciones que llegaron al modelo (LLM01). Con un hallazgo grave la pregunta queda para revisión humana y se registra una alerta (`origen=salida_llm`). Test-set de 124 casos borde (alucinación residual < 2 %), set de 131 ataques/legítimos OWASP, métricas en `GET /api/ia/metricas` y prueba en vivo con `scripts/evaluacion/evaluar_alucinaciones.py` contra Groq o un **modelo local** (Ollama, perfil `modelo-local`). Ver `Extras/Cambios/backend/CAMBIOS_HU07.md` |
 | Reportes: cierre, resumen por dominio, comparativa, benchmark | ✅ Hecho | Benchmark recalculado **al completar cada evaluación** y por cron diario; la comparativa trae siempre la **meta de cumplimiento** (75) y el promedio del rubro solo con ≥ 3 evaluaciones (ver [5.7](#57-benchmark-sectorial-y-meta-de-cumplimiento)) |
-| Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `Extras/Cambios/CAMBIOS_HU12.md` |
-| Informe PDF y envío por correo | ✅ Hecho | El servidor genera el PDF (resultado, comparativa, brechas priorizadas y plan formativo): se **descarga directo** desde el panel (ya no abre la impresión) y se **envía por correo** como adjunto (SMTP, p. ej. Gmail). Ver [5.11](#511-informe-pdf-y-envío-por-correo) y la guía `frontend-next/docs/Guia_envio_informe_por_correo.pdf` |
+| Planes de estudio recomendados (HU-12) | ✅ Hecho | Mapeo automático brecha → ruta del catálogo formativo, nivel Inicial/Intermedio/Avanzado por dimensión con objetivos, panel `/panel/capacitacion` organizado por dimensión normativa y exportación CSV. Ver [5.10](#510-plan-formativo-hu-12) y `Extras/Cambios/backend/CAMBIOS_HU12.md` |
+| Informe PDF y envío por correo | ✅ Hecho | El servidor genera el PDF (resultado, comparativa, brechas priorizadas y plan formativo): se **descarga directo** desde el panel (ya no abre la impresión) y se **envía por correo** como adjunto (SMTP, p. ej. Gmail). Ver [5.11](#511-informe-pdf-y-envío-por-correo) (la guía de correo que mencionaba `frontend-next/docs/` no está en el repositorio) |
 | Derechos ARCOP (Ley 21.719) + autenticación por roles | ✅ Hecho | Titular y administrador; anonimización al aprobar una supresión |
 | Derechos ARCOP en la página web (HU-32) | ✅ Hecho | Usuario temporal (N.º de evaluación + clave) en `/panel/mis-derechos`, usuario definitivo en `/empresa/mis-derechos` (con o sin contrato), bandeja del admin en `/admin/arcop`, seguimiento público en `/mis-derechos` y descarga de datos en JSON/CSV al resolverse un acceso o una portabilidad. Ver `Extras/Cambios/frontend/CAMBIOS_HU32.md` |
 | Dockerización completa | ✅ Hecho | `docker compose up -d --build` levanta los 6 servicios; un solo `Proyecto/.env` para todo, con los puertos del host configurables (ver 12.1) |
@@ -108,7 +108,7 @@ La IA corporativa se está adoptando sin políticas de seguridad, las auditoría
 | Registro conectado con el cumplimiento (HU-38) | ✅ Hecho | Cada actividad del registro recibe un **nivel de riesgo explicable** (datos sensibles, de NNA, transferencias sin garantía, decisiones automatizadas, **uso de IA** y **volumen** de personas); las de mayor riesgo forman la **matriz de riesgos** (Decreto 662, art. 3 letra e) con la **evaluación de impacto recomendada** y sus motivos. La **PIA** de borradores se pre-llena con esas actividades y el **aviso de privacidad** toma las finalidades y bases de licitud del registro. Un registro **vigente y completo** cuenta como **evidencia** de los controles de protección de datos (estado, brecha y puntaje, como una remediación; **nunca baja** un control). **Mi empresa** muestra el estado del mapa y del registro y sus brechas con la ruta de remediación (corregir, módulo formativo y re-evaluar). Ver [5.22](#522-registro-conectado-con-el-cumplimiento-hu-38) |
 | Revisión interna del registro (HU-40) | ✅ Hecho | Registro de actividades › **Revisión interna** (`/empresa/registro-actividades/revision`): el mismo usuario de la empresa recorre la lista de verificación (7 puntos por actividad, 4 por elemento y 5 por flujo del mapa), deja observaciones, las cierra al corregir y marca la versión como revisada (fecha, nombre y cargo; la marca sale en el PDF y el Excel del registro). Diferencias entre versiones, informe de la revisión en PDF, paquete de evidencia ZIP con script de verificación, envío por correo y recordatorio periódico configurable. Ver [5.23](#523-revisión-interna-del-registro-hu-40) |
 | Privacidad de la plataforma (HU-41) | ✅ Hecho | Panel interno › **Privacidad de la plataforma** (`/admin/privacidad`, solo admin): el mapa de datos, el RAT y el RoPA de ComplianceAI se generan desde `catalogo_datos_personales.py` (9 actividades con finalidad, base y plazo), con los plazos **vigentes** de la retención, los proveedores activos como encargados (país y garantía) y una **revisión interna** con hallazgos. PDF y Excel con los mismos generadores que el cliente y código `CIA-PLAT-REG/ROPA-AAAA-NNNNNN-D`. Ver [5.21](#521-privacidad-de-la-plataforma-hu-41) |
-| Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) |
+| Pipeline CI/CD y staging (HU-23) | ✅ Hecho | En cada pull request: pytest + cobertura, TypeScript + vitest y construcción de las imágenes sin secretos (check **CI aprobado**). Al integrar en `main`: despliegue automático a staging en Azure Container Apps (migraciones, `api`, `worker` y `web`, prueba de humo HTTPS y vuelta atrás automática). Datos semilla idempotentes. Ver [14.1](#141-integración-y-despliegue-continuo-hu-23) y [`Extras/Cambios/DESPLIEGUE_STAGING.md`](../Extras/Cambios/DESPLIEGUE_STAGING.md) |
 
 El detalle priorizado de lo pendiente está en la [sección 16](#16-backlog-deuda-técnica-y-riesgos).
 
@@ -190,7 +190,7 @@ Capstone/
     ├── README.md                   # ← este documento
     ├── .env.example                # Plantilla del ÚNICO .env (compose, backend y frontend)
     ├── docker-compose.yml          # Sistema completo (6 servicios)
-    ├── docs/DESPLIEGUE_STAGING.md  # HU-23: CI/CD, staging en Azure, secretos, vuelta atrás y verificación
+    ├── ../Extras/Cambios/DESPLIEGUE_STAGING.md  # HU-23: CI/CD, staging en Azure, secretos, vuelta atrás y verificación
     ├── infra/azure/preparar_staging.sh  # HU-23: preparación única del staging (Cloud Shell)
     ├── frontend-next/              # Panel web Next.js (HU-13, ver sección 10.1)
     │   ├── app/                    # /panel, /panel/dominios, /panel/brechas, /panel/capacitacion (HU-12),
@@ -200,13 +200,13 @@ Capstone/
     │   ├── hooks/                  # usePanel, usePlanFormativo (HU-12), useCuestionario, …
     │   ├── lib/                    # Tipos de la API, adaptadores, cliente HTTP, severidad, planFormativo, datos demo
     │   ├── tests/                  # vitest (adaptadores, HU-11, cuestionario, encuesta, HU-12)
-    │   ├── docs/                   # ACCESIBILIDAD.md
+    │   ├── docs/                   # (ignorada por .gitignore; ACCESIBILIDAD.md no está en el repositorio)
     │   └── Dockerfile              # Build standalone (node 22)
     └── backend/
         ├── Dockerfile              # Imagen única para migrate, api y worker
         ├── requirements.txt
         ├── alembic.ini
-        ├── migrations/versions/    # 18 migraciones Alembic
+        ├── migrations/versions/    # 44 migraciones Alembic
         ├── scripts/evaluacion/benchmark_ner.py  # Benchmark y profiling del motor NER (T-04)
         ├── scripts/evaluacion/auditoria_minimizacion.py  # T-06: DER, matriz y escaneo de la BD (solo lectura)
         ├── app/cli/retencion.py                         # T-06: plazos de conservación (simulación / --aplicar)
@@ -217,7 +217,7 @@ Capstone/
             ├── core/
             │   ├── config.py       # Settings (pydantic-settings) + validaciones de producción
             │   ├── database.py     # Engine async, sesión
-            │   ├── autenticacion.py# Tokens HMAC, roles, hash de contraseñas, dependencias
+            │   # Autenticación (tokens HMAC, roles, hash de contraseñas) en api/dependencias/autenticacion.py
             │   └── crear_admin.py  # CLI para crear/desactivar administradores
             ├── api/routes/         # arcop, auth, catalogos, controles, encuesta_publica, evaluaciones,
             │                       # evidencias, filtro, informes (HU-12), metricas_ia, reportes,
@@ -327,6 +327,8 @@ Al crear la respuesta, la **justificación** pasa por el detector de prompt inje
 - `GET /api/evaluaciones/{id}/progreso` devuelve respondidos / aplicables, el avance por dimensión, el siguiente control pendiente y el estado declarado de cada control ya respondido, para **reanudar** el cuestionario. Si se rehace el filtro, las respuestas de controles que dejan de aplicar no cuentan (`respuestas_fuera_de_alcance`).
 
 ### 5.4 Validación asíncrona de evidencias
+
+Formatos admitidos (cuestionario y cierre de brechas, misma lista): PDF con texto seleccionable, Word (`.docx`) y `.txt`, con máximo `EVIDENCIA_MAX_MB` (10 MB). El backend valida el tipo por su contenido, no solo por la extensión (`application/evidencias/archivos.py`).
 
 ```mermaid
 sequenceDiagram
@@ -685,7 +687,7 @@ erDiagram
 
 ### 6.3 Migraciones (Alembic)
 
-Cadena lineal; la cabeza actual es **`a9d3e5f7c1b2`**.
+Cadena lineal de **44 archivos**; la cabeza actual es **`a4d9e2b7c1f6`** (`t17_empresa_datos_eliminados_en`). La tabla siguiente lista solo las primeras 18 (hasta HU-12, `a9d3e5f7c1b2`); las posteriores no están detalladas aquí.
 
 | # | Revisión | Contenido |
 |---|---|---|
@@ -1052,7 +1054,7 @@ caso de uso ─► GatewayIA.ejecutar(tarea, textos, datos, contexto)
 - **Datos:** consume `GET /api/evaluaciones`, `/{id}/resumen`, `/{id}/comparativa` (opcional), `/{id}/respuestas`, `/{id}/plan-formativo`, `/{id}/informe/pdf`, `POST /{id}/informe/enviar`, `GET /api/brechas` y `/api/controles`. El encuestado de la landing pasa por el BFF (`/bff/api/*`), que solo deja su propia evaluación. Una evaluación sin resumen (sin `POST /cerrar` o `/completar`) muestra un aviso en vez de los gráficos.
 - **Reglas:** brecha = respuesta con estado vigente `no_cumplido` (misma regla que `Respuesta.sincronizar_brecha`, HU-02); las parciales se cuentan aparte. Niveles con los mismos cortes del backend (25/50/75).
 - **Criterios de aceptación:** responsivo ≥ 1024 px (barra lateral compacta entre 1024 y 1279 px); gráficos de radar y barras interactivos con mouse y teclado (tooltip, Enter filtra o abre el detalle, vista de tabla); WCAG 2.1 AA (contraste ≥ 5,7:1 en texto, foco visible, zoom 200 %, alternativas en texto). Paleta y tipografía del sitio TherionLabs.
-- **Documentación:** `frontend-next/README.md`, `Extras/Cambios/frontend/HU-13_HANDOFF.md` (tokens, layout, componentes, casos borde) y `docs/ACCESIBILIDAD.md` (auditoría).
+- **Documentación:** `frontend-next/README.md` y `Extras/Cambios/frontend/CAMBIOS_HU13.md`. El `HU-13_HANDOFF.md` y `frontend-next/docs/ACCESIBILIDAD.md` mencionados antes no están en el repositorio.
 - **Modo demo** sin backend: `cd frontend-next && npm install && NEXT_PUBLIC_DEMO=1 npm run dev`.
 
 **Acceso con email y contraseña (HU-28).** Todo pasa por el BFF de Next.js y el token vive solo en una cookie httpOnly:
@@ -1167,7 +1169,7 @@ Para ver los rangos reservados: `netsh interface ipv4 show excludedportrange pro
 docker compose exec api python -m app.cli.crear_admin --email admin@therionlabs.cl
 ```
 
-**4. Envío del informe por correo** (opcional). Sin configurar, el backend queda en `CORREO_MODO=archivo`: el botón funciona pero el correo se guarda en `/data/storage/correos` y el panel avisa «Entorno de desarrollo…». Para que llegue de verdad (guía paso a paso en `frontend-next/docs/Guia_envio_informe_por_correo.pdf`):
+**4. Envío del informe por correo** (opcional). Sin configurar, el backend queda en `CORREO_MODO=archivo`: el botón funciona pero el correo se guarda en `/data/storage/correos` y el panel avisa «Entorno de desarrollo…». Para que llegue de verdad (la guía paso a paso que mencionaba `frontend-next/docs/` no está en el repositorio; los pasos son estos):
 
 1. En la cuenta Gmail remitente activa la verificación en 2 pasos y crea una **contraseña de aplicación** en `myaccount.google.com/apppasswords` (16 caracteres; no es la contraseña normal y no vence: todo el equipo puede usar la misma).
 2. Descomenta y completa en `Proyecto/.env` la sección «Informe por correo»:
@@ -1420,7 +1422,7 @@ npm run test:e2e                       # construye la app y la levanta en el pue
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Cada pull request a `main`, cada push a `main` y a mano | pytest con cobertura ≥ 70 % (y SonarQube si hay `SONAR_TOKEN`); TypeScript + vitest del frontend; construye las imágenes `api` y `web` sin publicarlas y comprueba que no lleven secretos. Resume todo en el check **CI aprobado**, que se marca como obligatorio en `main` |
 | [`.github/workflows/deploy-staging.yml`](../.github/workflows/deploy-staging.yml) | Solo, cuando CI termina en verde en `main`; y a mano | Publica `api:<commit>` y `web:<commit>` en `acrcomplainceia`, ejecuta el job `migrate`, actualiza `api`, `worker` y `web`, hace la prueba de humo por HTTPS y vuelve a la versión anterior si algo falla |
 
-El flujo del equipo pasa a ser **rama → pull request → CI en verde + revisión → merge**. Las pruebas corren en GitHub; nadie tiene que ejecutar nada en su computador. Los datos semilla del piloto (administrador y 20 evaluaciones sintéticas para la comparativa) los carga `backend/scripts/operacion/sembrar_staging.py`. La guía completa (preparación, secretos, vuelta atrás, verificación QA y costos) está en [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md).
+El flujo del equipo pasa a ser **rama → pull request → CI en verde + revisión → merge**. Las pruebas corren en GitHub; nadie tiene que ejecutar nada en su computador. Los datos semilla del piloto (administrador y 20 evaluaciones sintéticas para la comparativa) los carga `backend/scripts/operacion/sembrar_staging.py`. La guía completa (preparación, secretos, vuelta atrás, verificación QA y costos) está en [`Extras/Cambios/DESPLIEGUE_STAGING.md`](../Extras/Cambios/DESPLIEGUE_STAGING.md).
 
 ---
 
@@ -1485,7 +1487,7 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 
 | # | Ítem | Propuesta |
 |---|---|---|
-| 6 | Las evidencias se leen como texto UTF-8: PDF, DOCX e imágenes llegan al LLM como texto ilegible. La API no limita tamaño (solo el BFF de Next, 12 MB) ni tipo MIME | Extracción de texto por tipo (pypdf, python-docx, OCR opcional), lista blanca de MIME y tope de tamaño en la API |
+| 6 | ~~Las evidencias se leen como texto UTF-8: PDF y DOCX llegan al LLM como texto ilegible; la API no limita tamaño ni tipo~~ **Resuelto (HU-17):** PDF (pypdf), DOCX (XML dentro del ZIP) y TXT se extraen según el contenido real (`app/infrastructure/archivos/extractor_texto.py`); lista blanca por contenido y extensión en `app/application/evidencias/archivos.py` (`detectar_tipo`, usado al subir); tope `EVIDENCIA_MAX_MB` (10 MB) en la API. **Queda abierto:** PDF escaneados sin texto seleccionable (no hay OCR; se rechazan en la remediación con un mensaje) |
 | 7 | ~~`GET /evaluaciones/{id}/controles-aplicables` p95 542 ms~~ **Resuelto en HU-01** (consulta única + caché del catálogo): p95 24,1 ms en la medición live del 16-oct | — |
 | 8 | NER: los falsos positivos "la Ley 21" y "Presidenta del Directorio" se corrigieron en T-04. Queda abierto: textos **completamente en mayúsculas** con frases largas, donde spaCy puede no aislar el nombre | Regla adicional para texto 100 % en mayúsculas; ampliar `ner_gold.jsonl` con casos reales anonimizados |
 | 9 | `LLM_PRECIO_*` en 0: el costo estimado sale siempre 0 | Cargar precios del modelo en el `.env` |
@@ -1514,18 +1516,18 @@ Priorizado para la planificación del próximo sprint. Los números se usan como
 | [`reporte_latencia_live_c10.md`](../Extras/Evidencias/reporte_latencia_live_c10.md) | Último reporte de latencia de la API |
 | [`Extras/Cambios/backend/CAMBIOS_HU06.md`](../Extras/Cambios/backend/CAMBIOS_HU06.md) | HU-06: anonimización antes de persistir, decisiones del PO, excepción ARCOP y migración de datos existentes |
 | [`Extras/Cambios/backend/CAMBIOS_T04.md`](../Extras/Cambios/backend/CAMBIOS_T04.md) | T-04: optimización del motor NER (cambios, mediciones antes/después, decisión sobre ONNX) |
-| [`Extras/Cambios/CAMBIOS_HU12.md`](../Extras/Cambios/CAMBIOS_HU12.md) | HU-12, arreglo de la comparativa y PDF/correo: archivos, cómo aplicarlo, verificación y decisiones para el PO |
-| `frontend-next/docs/Guia_envio_informe_por_correo.pdf` | Guía para el equipo: configurar Gmail SMTP, el `.env`, el antivirus y solucionar errores del envío por correo |
+| [`Extras/Cambios/backend/CAMBIOS_HU12.md`](../Extras/Cambios/backend/CAMBIOS_HU12.md) | HU-12, arreglo de la comparativa y PDF/correo: archivos, cómo aplicarlo, verificación y decisiones para el PO |
+| *(referida como `frontend-next/docs/Guia_envio_informe_por_correo.pdf`, no está en el repositorio)* | Guía para el equipo: configurar Gmail SMTP, el `.env`, el antivirus y solucionar errores del envío por correo |
 | [`CAMBIOS_HU13.md`](../Extras/Cambios/frontend/CAMBIOS_HU13.md) | HU-13: qué se agregó, cómo aplicarlo y qué se verificó |
-| [`HU-13_HANDOFF.md`](../Extras/Cambios/frontend/HU-13_HANDOFF.md) | Especificación de diseño del panel: criterios de aceptación, tokens, layout, componentes y casos borde |
-| [`frontend-next/docs/ACCESIBILIDAD.md`](frontend-next/docs/ACCESIBILIDAD.md) | Auditoría WCAG 2.1 AA del panel |
+| `HU-13_HANDOFF.md` (en `Extras/Cambios/frontend/`, no está en el repositorio) | Especificación de diseño del panel: criterios de aceptación, tokens, layout, componentes y casos borde |
+| `frontend-next/docs/ACCESIBILIDAD.md` (no está en el repositorio; la carpeta `docs/` está en `.gitignore`) | Auditoría WCAG 2.1 AA del panel |
 | `../Documentos/Fase 1/Presentación Proyecto.pdf` | Presentación: cliente, problema, solución, equipo, sprints, TRL |
 | `../Documentos/Fase 1/Bitácora CPCITT 2025-2.pdf` | Bitácora del proyecto |
 | `../Documentos/Fase 1/`, `../Documentos/Fase 2/` | Guía del estudiante, evaluaciones formativas, autoevaluaciones y diarios de reflexión por integrante |
 | `../Extras/Guia_ComplianceAI_PromptInjection.docx.pdf` | Guía del módulo anti prompt-injection |
 | [`../Extras/README.md`](../Extras/README.md) | Qué hay en `Extras/` (documentos de cambios por HU, evidencias y prototipo archivado) y la regla para los documentos nuevos |
 | [`CAMBIOS_HU20.md`](../Extras/Cambios/backend/CAMBIOS_HU20.md) | HU-20: matriz de autorización, interruptor de desarrollo y ajustes a las pruebas |
-| [`docs/DESPLIEGUE_STAGING.md`](docs/DESPLIEGUE_STAGING.md) | HU-23: CI/CD, ambiente de staging en Azure, datos semilla, secretos, vuelta atrás, verificación QA y costos |
+| [`Extras/Cambios/DESPLIEGUE_STAGING.md`](../Extras/Cambios/DESPLIEGUE_STAGING.md) | HU-23: CI/CD, ambiente de staging en Azure, datos semilla, secretos, vuelta atrás, verificación QA y costos |
 | [`CAMBIOS_HU23.md`](../Extras/Cambios/backend/CAMBIOS_HU23.md) | HU-23: estado anterior, archivos, decisiones y pendientes del pipeline |
 
 ---

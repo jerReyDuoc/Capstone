@@ -1,4 +1,5 @@
 import { mensajeEvidencia } from "@/lib/mensajesUsuario";
+import { ACCEPT, EXTENSIONES_ADMITIDAS, validarArchivo } from "@/lib/remediacion";
 /**
  * HU-01 / HU-02 · Modelo del cuestionario adaptativo (lógica pura, probada en tests/).
  *
@@ -304,21 +305,16 @@ export function motivoEvidencia(
 }
 
 /**
- * Formatos de evidencia. El worker (process_evidence.py) lee el archivo como texto UTF-8,
- * así que hoy solo los formatos de texto se validan bien; un PDF o un Word llegarían
- * como bytes ilegibles al LLM. Ampliar esta lista cuando el backend extraiga texto de PDF.
+ * Formatos de evidencia: MISMA fuente de verdad que "cerrar brechas" (lib/remediacion.ts). El backend
+ * valida por contenido (PDF, DOCX, TXT) y extrae el texto antes de anonimizar y analizar con la IA.
+ * EVIDENCIA_MAX_MB_DEFECTO replica EVIDENCIA_MAX_MB del backend (10 MB); el servidor es quien manda.
  */
-export const EXTENSIONES_EVIDENCIA = [".txt", ".md", ".csv", ".json"];
-export const MAX_BYTES_EVIDENCIA = 12 * 1024 * 1024; // igual que MAX_BYTES_ARCHIVO del BFF
+export const EXTENSIONES_EVIDENCIA = EXTENSIONES_ADMITIDAS;
+export const ACCEPT_EVIDENCIA = ACCEPT;
+export const EVIDENCIA_MAX_MB_DEFECTO = 10;
 
 export function errorArchivoEvidencia(archivo: { name: string; size: number }): string | null {
-  const nombre = archivo.name.toLowerCase();
-  if (!EXTENSIONES_EVIDENCIA.some((ext) => nombre.endsWith(ext))) {
-    return `Por ahora la evidencia debe ser un archivo de texto (${EXTENSIONES_EVIDENCIA.join(", ")}).`;
-  }
-  if (archivo.size === 0) return "El archivo está vacío.";
-  if (archivo.size > MAX_BYTES_EVIDENCIA) return "El archivo supera el máximo de 12 MB.";
-  return null;
+  return validarArchivo(archivo, EVIDENCIA_MAX_MB_DEFECTO);
 }
 
 /* ------------------------------------------------------------------ revisión antes de completar */

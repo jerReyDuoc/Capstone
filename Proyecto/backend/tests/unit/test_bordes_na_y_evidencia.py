@@ -520,6 +520,36 @@ class TestSubidaSinEvidencia:
         assert ev.mime_type == "application/octet-stream"
         assert len(storage.guardados) == 1
 
+    # Cuestionario (diagnóstico): mismos tipos que "cerrar brechas" (PDF, DOCX, TXT) por contenido
+    def _subir_archivo(self, nombre, contenido, mime):
+        storage, evid_repo = FakeStorage(), FakeEvidenciaRepo()
+        uc = SubirEvidenciaUseCase(evid_repo, FakeRespuestaRepo(_respuesta(CUMP)), storage, FakeEvaluaciones())
+        return asyncio.run(uc.execute(10, nombre, contenido, mime)), storage
+
+    def test_cuestionario_acepta_pdf(self):
+        pdf = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"
+        ev, storage = self._subir_archivo("politica.pdf", pdf, "application/pdf")
+        assert ev.estado_validacion == EstadoValidacion.PENDING.value and len(storage.guardados) == 1
+
+    def test_cuestionario_acepta_docx(self):
+        import io, zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("[Content_Types].xml", "<Types/>")
+            z.writestr("word/document.xml", "<w:document xmlns:w='x'><w:body/></w:document>")
+        ev, storage = self._subir_archivo(
+            "Acta.docx", buf.getvalue(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        assert ev.estado_validacion == EstadoValidacion.PENDING.value and len(storage.guardados) == 1
+
+    def test_cuestionario_rechaza_pdf_disfrazado_y_ejecutables(self):
+        from app.application.evidencias.casos_uso.subir_evidencia import TipoArchivoNoAdmitidoError
+        for nombre, contenido in (("falso.pdf", b"MZ" + bytes(8)), ("x.docx", b"texto plano")):
+            storage = FakeStorage()
+            uc = SubirEvidenciaUseCase(FakeEvidenciaRepo(), FakeRespuestaRepo(_respuesta(CUMP)), storage, FakeEvaluaciones())
+            with pytest.raises(TipoArchivoNoAdmitidoError):
+                asyncio.run(uc.execute(10, nombre, contenido, "application/pdf"))
+            assert storage.guardados == []
 
 # =====================================================================
 # B. FALTA DE EVIDENCIA - procesamiento

@@ -32,7 +32,8 @@ import {
   ESTADO_POR_VALOR,
   ESTADOS,
   esEstadoDeclarado,
-  EXTENSIONES_EVIDENCIA,
+  ACCEPT_EVIDENCIA,
+  EVIDENCIA_MAX_MB_DEFECTO,
   JUSTIFICACION_MIN,
   normalizarJustificacion,
   type ControlAplicableApi,
@@ -391,7 +392,7 @@ export function PasoControl({ c, control, onLimites }: Props) {
               <CampoArchivo
                 ref={inputArchivo}
                 id={ids.archivo}
-                accept={EXTENSIONES_EVIDENCIA.join(",")}
+                accept={ACCEPT_EVIDENCIA}
                 archivo={archivo}
                 describedBy={ids.ayudaArchivo}
                 error={errorArchivo}
@@ -401,7 +402,7 @@ export function PasoControl({ c, control, onLimites }: Props) {
                 }}
               />
               <p id={ids.ayudaArchivo} className={s.ayuda}>
-                Formatos: {EXTENSIONES_EVIDENCIA.join(", ")} · máx. 12 MB. La IA revisa si el documento respalda el estado que declaraste.
+                Formatos aceptados: PDF (con texto seleccionable), Word (.docx) o texto (.txt) · máx. {EVIDENCIA_MAX_MB_DEFECTO} MB. Los datos personales se anonimizan antes del análisis. La IA revisa si el documento respalda el estado que declaraste.
               </p>
 
               {faltaEvidenciaRevision ? (

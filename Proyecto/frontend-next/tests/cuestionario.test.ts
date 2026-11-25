@@ -86,10 +86,12 @@ describe("respuestas · reglas de HU-02", () => {
 
   it("formatos de evidencia que el worker puede leer", () => {
     expect(errorArchivoEvidencia({ name: "politica.txt", size: 10 })).toBeNull();
-    expect(errorArchivoEvidencia({ name: "Politica.MD", size: 10 })).toBeNull();
-    expect(errorArchivoEvidencia({ name: "informe.pdf", size: 10 })).toMatch(/texto/);
+    expect(errorArchivoEvidencia({ name: "Politica.TXT", size: 10 })).toBeNull();
+    expect(errorArchivoEvidencia({ name: "informe.pdf", size: 10 })).toBeNull();
+    expect(errorArchivoEvidencia({ name: "Acta.DOCX", size: 10 })).toBeNull();
+    expect(errorArchivoEvidencia({ name: "foto.png", size: 10 })).toMatch(/PDF/);
     expect(errorArchivoEvidencia({ name: "vacio.txt", size: 0 })).toMatch(/vacío/);
-    expect(errorArchivoEvidencia({ name: "grande.txt", size: 13 * 1024 * 1024 })).toMatch(/12 MB/);
+    expect(errorArchivoEvidencia({ name: "grande.txt", size: 13 * 1024 * 1024 })).toMatch(/10 MB/);
   });
 });
 
